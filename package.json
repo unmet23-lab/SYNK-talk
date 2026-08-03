@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "expo": "~57.0.9",
+    "expo-splash-screen": "~57.0.5",
     "expo-status-bar": "~57.0.1",
     "expo-updates": "~57.0.11",
     "react": "19.2.3",
@@ -25,5 +26,9 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "opentype.js": "^2.0.0",
+    "sharp": "^0.35.3"
   }
 }
