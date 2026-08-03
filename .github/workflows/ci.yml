@@ -1,0 +1,64 @@
+name: CI
+
+# 두 갈래로 나눈다:
+#   verify — 자격증명이 없어도 항상 돈다. 지금 당장 값을 한다.
+#   build  — EXPO_TOKEN 이 등록된 뒤에만 돈다. 없으면 조용히 건너뛴다(빨간불로 남기지 않는다).
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: 커밋 가드 회귀
+        run: npm test
+      - name: 교정 엔진 평가
+        run: npm run eval
+
+  build:
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: EXPO_TOKEN 확인
+        id: gate
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "have=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::EXPO_TOKEN 이 없어 빌드를 건너뛴다. 등록 절차는 docs/배포_경로.md 참조."
+          else
+            echo "have=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.have == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.have == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - uses: expo/expo-github-action@v8
+        if: steps.gate.outputs.have == 'true'
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+        if: steps.gate.outputs.have == 'true'
+
+      # 커밋 해시를 앱 안으로 넣는다 — 「도착 확인 화면」이 이 값을 보여준다.
+      # 이게 없으면 「밀었다」와 「도착했다」를 화면에서 구별할 수 없다.
+      - name: preview 빌드
+        if: steps.gate.outputs.have == 'true'
+        env:
+          EXPO_PUBLIC_COMMIT: ${{ github.sha }}
+        run: eas build --platform android --profile preview --non-interactive --no-wait
