@@ -50,9 +50,13 @@ function scoreOne(fx, out) {
   if (포함.length) r.메모.push(`빠짐: ${포함.map((s) => `"${s}"`).join(', ')}`);
   if (불포함.length) r.메모.push(`남음: ${불포함.map((s) => `"${s}"`).join(', ')}`);
 
+  // v1 방침(2026-08-03 유호님 결정: 틀린 것은 전부 고친다) 이후로는 기대 태그를
+  // **전부** 요구한다. some() 이었다면 오류 3개 중 1개만 잡아도 통과해서,
+  // 방침을 바꾼 것이 채점에 하나도 반영되지 않는다.
   const 기대 = fx.기대태그 || [];
-  r.판정.태그 = 기대.some((t) => 태그.includes(t));
-  if (!r.판정.태그) r.메모.push(`태그 불일치 — 기대 [${기대.join(', ')}] / 실제 [${태그.join(', ')}]`);
+  const 놓친 = 기대.filter((t) => !태그.includes(t));
+  r.판정.태그 = 놓친.length === 0;
+  if (!r.판정.태그) r.메모.push(`태그 놓침: ${놓친.join(', ')} / 실제 [${태그.join(', ')}]`);
 
   const 초과 = 태그.filter((t) => !기대.includes(t));
   if (초과.length) r.메모.push(`추가 태그(감점 아님): ${초과.join(', ')}`);
