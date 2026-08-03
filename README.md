@@ -17,7 +17,8 @@
 |---|---|
 | `.githooks/pre-commit` | 자격증명·비밀·대용량·ignore 강제추가 차단 (어느 AI 도구가 커밋하든 걸린다) |
 | `tools/guard.js` | 검사 순수함수 — 픽스처로 못박힌다 |
-| `tests/guard.test.js` | 회귀 23건 (차단 15 · **통과 8** — 거짓양성 검사를 같은 무게로) |
+| `tests/guard.test.js` | 순수함수 회귀 23건 (차단 15 · **통과 8** — 거짓양성을 같은 무게로) |
+| `tests/precommit.integration.test.js` | git 호출부 회귀 6건 (임시 저장소를 매번 새로 만든다) |
 | `.gitignore` · `.gitattributes` | 자격증명 격리 · LF 통일 |
 | `docs/` | 이 저장소 규약 + 공용지침(생성물) |
 

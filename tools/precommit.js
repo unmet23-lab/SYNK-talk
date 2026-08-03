@@ -51,7 +51,10 @@ function stagedSize(p) {
 function ignoredButStaged(paths) {
   if (!paths.length) return [];
   try {
-    const out = execFileSync('git', ['check-ignore', '--stdin'], {
+    // --no-index 가 없으면 이 검사는 **아무것도 잡지 못한다**: check-ignore는 기본적으로
+    // 인덱스를 참조해 「이미 추적 중인 파일」을 무시 대상에서 뺀다. 그런데 우리가 잡으려는
+    // 상황(`git add -f`)은 정확히 그 「이미 추적 중」 상태다. 0일차 실측으로 발견.
+    const out = execFileSync('git', ['check-ignore', '--no-index', '--stdin'], {
       input: paths.join('\n'),
       encoding: 'utf8',
     });
