@@ -1,0 +1,37 @@
+# ── 자격증명 — 영원히 git 밖 ────────────────────────────────
+# 「git 밖에 두기로 한 것」은 「추가하지 않기」로는 안 지켜진다. 여기로 지킨다.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.keystore
+*.jks
+credentials*.json
+service-account*.json
+**/로그인*
+**/*비밀번호*
+
+# ── 도구·머신 종속 ──────────────────────────────────────────
+node_modules/
+.expo/
+.expo-shared/
+dist/
+build/
+web-build/
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+
+# EAS / Supabase 로컬 상태
+.eas/
+supabase/.temp/
+supabase/.branches/
+
+# 에이전트 작업 잔여물
+.claude/settings.local.json
+.claude/worktrees/
+.orca/

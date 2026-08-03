@@ -1,0 +1,4 @@
+#!/bin/sh
+# SYNK-talk 커밋 게이트. 어느 AI 도구가 커밋하든 여기를 지난다.
+# 설치: node tools/install-hooks.js  (git config core.hooksPath .githooks)
+exec node "$(dirname "$0")/../tools/precommit.js"
