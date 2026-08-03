@@ -20,6 +20,7 @@ import {
 import * as Speech from 'expo-speech';
 import { 색, 폰트, 모노트래킹 } from './테마';
 import { 머뭇거림추적, 발화문턱_DB, 다음호흡 } from '../lib/세호흡.js';
+import { 마이크준비, 마이크끄기 } from '../lib/마이크권한.js';
 import { 항목추가, 다음시도번호, 학습출석 } from '../lib/제출로그.js';
 import { 로그읽기, 로그쓰기, 음성보관, 지속저장 } from './저장.js';
 import { 급수편지 } from '../contents/첫편지.js';
@@ -65,10 +66,10 @@ export default function 말하기화면({ 급수 = 0 }) {
       } catch (e) {
         set오류(String(e.message || e));
       }
+      // 마이크 권한은 여기서 묻지 않는다 — 녹음 버튼을 누를 때 묻는다(lib/마이크권한.js).
+      // 여기서 켜는 건 재생뿐이다: 무음 스위치가 켜진 폰에서도 ①듣기가 들려야 한다.
       try {
-        const p = await AudioModule.requestRecordingPermissionsAsync();
-        if (!p.granted) set오류('마이크 권한이 없어요 — 설정에서 허용해 주세요');
-        await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+        await setAudioModeAsync({ playsInSilentMode: true });
       } catch (e) {
         set오류('오디오 준비 실패: ' + String(e.message || e));
       }
@@ -200,6 +201,7 @@ function 녹음카드({ step, 제시문, 안내, 선택지, 텍스트병기, dat
   const [녹음, set녹음] = useState(null); // { uri, duration_ms, hesitation_ms, spoke }
   const [병기글, set병기글] = useState('');
   const [듣는중, set듣는중] = useState(false);
+  const [막힘, set막힘] = useState(null); // 녹음이 시작되지 못한 이유 — 버튼 옆에 글자로 선다
   const 추적 = useRef(null);
   const 플레이어 = useRef(null);
 
@@ -221,6 +223,16 @@ function 녹음카드({ step, 제시문, 안내, 선택지, 텍스트병기, dat
   );
 
   const 시작 = async () => {
+    set막힘(null);
+    // 권한은 「지금」 묻는다 — 학생이 무엇을 하려는지 아는 순간에.
+    const 준비 = await 마이크준비({
+      권한요청: () => AudioModule.requestRecordingPermissionsAsync(),
+      오디오모드: setAudioModeAsync,
+    });
+    if (!준비.ok) {
+      set막힘(준비.메시지);
+      return;
+    }
     try {
       추적.current = 머뭇거림추적();
       await recorder.prepareToRecordAsync();
@@ -229,12 +241,13 @@ function 녹음카드({ step, 제시문, 안내, 선택지, 텍스트병기, dat
     } catch (e) {
       set단계('대기');
       set녹음(null);
-      throw e;
+      set막힘('녹음을 시작하지 못했어요: ' + String(e.message || e));
     }
   };
 
   const 끝 = async () => {
     await recorder.stop();
+    await 마이크끄기({ 오디오모드: setAudioModeAsync }); // 바로 뒤 「내 목소리 듣기」가 작게 들리지 않도록
     const duration_ms = rState.durationMillis || 0;
     const r = 추적.current ? 추적.current.결과(duration_ms) : { 발화있음: true, 머뭇거림_ms: 0 };
     set녹음({ uri: recorder.uri, duration_ms, hesitation_ms: r.머뭇거림_ms, spoke: r.발화있음 });
@@ -313,6 +326,7 @@ function 녹음카드({ step, 제시문, 안내, 선택지, 텍스트병기, dat
         <중앙>
           <녹음버튼 onPress={시작} />
           <Text style={s.녹음안내}>탭하면 녹음이 시작돼요</Text>
+          {막힘 && <Text style={s.오류}>{막힘}</Text>}
         </중앙>
       )}
 
