@@ -112,6 +112,17 @@ test('판정불가는 분모에서 빠지고 따로 보고된다 (감추면 「�
     '종료 코드가 rows.length와 비교한다 — 판정불가가 하나라도 있으면 영원히 1(실패)이 된다');
 });
 
+test('실학생 픽스처를 따로 채점할 수 있다 (합성 픽스처를 덮으면 유형 커버리지를 영영 못 묻는다)', () => {
+  const { main } = require(path.join(ROOT, 'tools', 'eval-score.js'));
+  const src = fs.readFileSync(path.join(ROOT, 'tools', 'eval-score.js'), 'utf8');
+  assert.ok(/--fixture/.test(src), '픽스처를 고를 수 없다 — 수집층이 올린 실학생 픽스처를 채점할 방법이 없다');
+  // 기본값은 합성이어야 한다(실학생 파일이 아직 없어도 기존 채점이 그대로 돌아야 한다)
+  assert.equal(main(['evals/출력_v1.json']), 0, '인자 없이 부르면 합성 픽스처로 채점돼야 한다');
+  // 없는 픽스처를 조용히 통과시키면 「검사 안 함」이 「점수 좋음」이 된다
+  assert.equal(main(['evals/출력_v1.json', '--fixture', 'evals/없는파일.json']), 2,
+    '없는 픽스처인데 실패로 끝나지 않는다 — 채점을 안 한 것이 성공으로 보인다');
+});
+
 test('픽스처에 「정상」 표본이 있다 (거짓양성을 못 재면 과교정이 만점으로 보인다)', () => {
   const fx = JSON.parse(fs.readFileSync(path.join(ROOT, 'evals', '픽스처.json'), 'utf8'));
   const 정상 = fx.항목.filter((x) => x.종류 === '정상');

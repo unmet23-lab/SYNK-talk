@@ -85,12 +85,24 @@ function scoreOne(fx, out) {
 }
 
 function main(argv) {
-  const outPath = argv[0];
+  /* 픽스처를 골라 쓴다 — 합성(evals/픽스처.json)과 실학생(수집층이 올리는 것)은 **다른 질문에 답한다**:
+   * 합성은 「23개 오류 유형을 다 잡는가」(유형 커버리지), 실학생은 「우리 학생이 실제로 무너지는 곳을
+   * 잡는가」(분포). 하나로 덮으면 덮인 쪽 질문을 영영 못 묻는다. 그래서 기본값은 합성 그대로 두고
+   * 수집층은 다른 경로에 올린다. */
+  const fi = argv.indexOf('--fixture');
+  const fixturePath = fi !== -1 && argv[fi + 1] ? path.resolve(ROOT, argv[fi + 1]) : FIXTURE;
+  // fi === -1 이면 fi+1 === 0 이라, 조건을 그냥 `i !== fi + 1`로 쓰면 **출력 경로 자신이 걸러진다**
+  const outPath = argv.filter((a, i) => !a.startsWith('--') && !(fi !== -1 && i === fi + 1))[0];
   if (!outPath) {
-    console.error('사용: node tools/eval-score.js evals/출력_v0.json [--json]');
+    console.error('사용: node tools/eval-score.js evals/출력_v0.json [--json] [--fixture evals/픽스처_실학생.json]');
     return 2;
   }
-  const fixture = load(FIXTURE);
+  if (!fs.existsSync(fixturePath)) {
+    console.error(`픽스처가 없다: ${path.relative(ROOT, fixturePath)}\n` +
+      '  실학생 픽스처는 수집층(SYNK-appsscript) 시트 메뉴 「🚀 골든셋 → SYNK-talk 저장소로 바로 보내기」가 올린다.');
+    return 2;
+  }
+  const fixture = load(fixturePath);
   const outputs = load(path.resolve(ROOT, outPath));
   const byId = new Map(outputs.항목.map((o) => [o.id, o]));
 
