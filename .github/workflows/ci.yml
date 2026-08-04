@@ -55,6 +55,22 @@ jobs:
       - run: npm ci
         if: steps.gate.outputs.have == 'true'
 
+      # 토큰이 있어도 프로젝트가 EAS 에 연결돼 있지 않으면 빌드는 못 돈다 — 그리고 CI 는 그것을
+      # 스스로 만들 수 없다(공식: CI 는 사전 링크된 프로젝트를 요구한다). 그 상태를 eas 의 낯선
+      # 오류로 만나면 원인이 「토큰이 잘못됐나」로 오독된다. 무엇이 없는지 먼저 이름을 대고 멈춘다.
+      - name: 프로젝트 링크 확인
+        if: steps.gate.outputs.have == 'true'
+        run: |
+          node -e '
+            const a = require("./app.json");
+            const id = a.expo && a.expo.extra && a.expo.extra.eas && a.expo.extra.eas.projectId;
+            if (!id) {
+              console.error("::error::app.json 에 extra.eas.projectId 가 없다 — 이 앱은 아직 EAS 프로젝트와 연결되지 않았다. 토큰 문제가 아니다. 로컬에서 eas init 을 1회 돌려 나온 값을 커밋해야 한다(docs/배포_경로.md).");
+              process.exit(1);
+            }
+            console.log("projectId=" + id);
+          '
+
       # 커밋 해시를 앱 안으로 넣는다 — 「도착 확인 화면」이 이 값을 보여준다.
       # 이게 없으면 「밀었다」와 「도착했다」를 화면에서 구별할 수 없다.
       - name: preview 빌드
