@@ -49,6 +49,20 @@ function scoreOne(fx, out) {
     return r;
   }
 
+  /* 🔴 대조할 근거가 하나도 없는 오류 항목은 **채점에서 뺀다**. 아래 검사들은 전부
+   *   「기대한 것이 없으면 통과」 모양이라, 셋이 다 비면 무엇을 내놓든 통과가 된다
+   *   (08-04 실측: 엔진이 「바나나」를 내놔도 통과였다). 픽스처 문서는 빈 배열을
+   *   "그 검사를 건너뛴다"고 적어 두었는데, 건너뜀이 통과와 같은 모양이면 **점수를 부풀린다**.
+   *   수집층은 전면 재작성이면 포함·불포함을 일부러 비우므로(추측을 확신처럼 적지 않는다),
+   *   오류태그까지 비어 있는 행이 실제로 나온다. 통과도 실패도 아닌 제3의 상태로 세고 분모에서 뺀다. */
+  const 근거수 = (fx.포함 || []).length + (fx.불포함 || []).length + (fx.기대태그 || []).length;
+  if (근거수 === 0) {
+    r.판정불가 = true;
+    r.통과 = null;
+    r.메모.push('판정불가 — 포함·불포함·기대태그가 모두 비어 대조할 근거가 없다. 채점에서 뺀다(강사 교정을 더 받아야 한다).');
+    return r;
+  }
+
   const 포함 = (fx.포함 || []).filter((s) => !고친.includes(s));
   const 불포함 = (fx.불포함 || []).filter((s) => 고친.includes(s));
   r.판정.교정 = 포함.length === 0 && 불포함.length === 0;
@@ -81,11 +95,15 @@ function main(argv) {
   const byId = new Map(outputs.항목.map((o) => [o.id, o]));
 
   const rows = fixture.항목.map((fx) => scoreOne(fx, byId.get(fx.id)));
-  const 정상 = rows.filter((r) => r.종류 === '정상');
-  const 오류 = rows.filter((r) => r.종류 === '오류');
+  const 판정불가 = rows.filter((r) => r.판정불가);
+  const 채점대상 = rows.filter((r) => !r.판정불가);
+  const 정상 = 채점대상.filter((r) => r.종류 === '정상');
+  const 오류 = 채점대상.filter((r) => r.종류 === '오류');
 
   const 요약 = {
-    항목수: rows.length,
+    항목수: 채점대상.length,
+    // 판정불가는 **분모에서 빼고 따로 센다**. 0으로 감추면 「표본이 부족하다」가 「점수가 좋다」로 보인다.
+    판정불가: 판정불가.length,
     거짓양성: {
       // 「고치지 말았어야 하는데 고친」 건수
       건수: 정상.filter((r) => !r.판정.불변).length,
@@ -93,18 +111,18 @@ function main(argv) {
     },
     교정정확: { 건수: 오류.filter((r) => r.판정.교정).length, 분모: 오류.length },
     태그정확: { 건수: 오류.filter((r) => r.판정.태그).length, 분모: 오류.length },
-    전체통과: rows.filter((r) => r.통과).length,
+    전체통과: 채점대상.filter((r) => r.통과 === true).length,
   };
 
   if (argv.includes('--json')) {
     console.log(JSON.stringify({ 요약, 항목: rows }, null, 2));
-    return 요약.거짓양성.건수 === 0 && 요약.전체통과 === rows.length ? 0 : 1;
+    return 요약.거짓양성.건수 === 0 && 요약.전체통과 === 요약.항목수 ? 0 : 1;
   }
 
   const pct = (a, b) => (b === 0 ? '—' : `${Math.round((a / b) * 100)}%`);
   console.log(`\n교정 엔진 채점 — ${path.basename(outPath)}\n`);
   for (const r of rows) {
-    console.log(`${r.통과 ? '✔' : '✖'} ${r.id}  ${r.입력}`);
+    console.log(`${r.판정불가 ? '—' : r.통과 ? '✔' : '✖'} ${r.id}  ${r.입력}`);
     if (!r.통과 || r.메모.length) {
       console.log(`    → ${r.출력}`);
       r.메모.forEach((m) => console.log(`    · ${m}`));
@@ -120,9 +138,11 @@ function main(argv) {
   console.log(
     `태그 정확  ${요약.태그정확.건수}/${요약.태그정확.분모}  ${pct(요약.태그정확.건수, 요약.태그정확.분모)}`
   );
-  console.log(`전체 통과  ${요약.전체통과}/${요약.항목수}\n`);
+  console.log(`전체 통과  ${요약.전체통과}/${요약.항목수}`);
+  // 침묵하면 「표본이 부족하다」가 「점수가 좋다」로 읽힌다 — 0이어도 한 줄은 낸다.
+  console.log(`판정불가  ${요약.판정불가}건  (대조 근거가 없어 채점에서 뺀 항목 — 강사 교정을 더 받아야 한다)\n`);
 
-  return 요약.거짓양성.건수 === 0 && 요약.전체통과 === rows.length ? 0 : 1;
+  return 요약.거짓양성.건수 === 0 && 요약.전체통과 === 요약.항목수 ? 0 : 1;
 }
 
 if (require.main === module) process.exit(main(process.argv.slice(2)));

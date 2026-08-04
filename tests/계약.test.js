@@ -85,6 +85,33 @@ test('「종류: 정상」이면 `불변`이 없어도 거짓양성으로 채점
   assert.equal(안건드림.통과, true, '멀쩡히 둔 경우까지 실패로 채점한다 — 반대 방향으로 틀렸다');
 });
 
+test('대조 근거가 하나도 없는 오류 항목은 통과가 아니라 「판정불가」다 (없으면 「바나나」도 만점이다)', () => {
+  const { scoreOne } = require(path.join(ROOT, 'tools', 'eval-score.js'));
+  /* 수집층이 실제로 만들 수 있는 모양 — 전면 재작성이면 포함·불포함을 일부러 비우고
+   * (추측을 확신처럼 적지 않는다), 오류태그 열까지 비어 있으면 셋이 다 빈다.
+   * 검사들이 전부 「기대한 것이 없으면 통과」라 무엇을 내놓든 통과가 됐다(08-04 실측). */
+  const fx = { id: 'U01', 종류: '오류', 입력: '어제 친구 만나서 밥 먹고 영화 봤다', 기대태그: [], 기대교정: '어제는 친구를 만나 저녁을 먹었습니다', 포함: [], 불포함: [] };
+  const r = scoreOne(fx, { 고친문장: '바나나', 오류태그: [] });
+  assert.equal(r.판정불가, true, '대조 근거가 없는데 판정불가로 표시되지 않았다');
+  assert.notEqual(r.통과, true,
+    '엉뚱한 출력이 통과로 세어졌다 — 채점 못 하는 항목이 만점으로 들어가 점수를 부풀린다');
+
+  // 근거가 하나라도 있으면 정상 채점 경로로 가야 한다(반대 방향으로 틀리지 않았는지)
+  const 태그만 = scoreOne({ ...fx, 기대태그: ['어순'] }, { 고친문장: '바나나', 오류태그: [] });
+  assert.ok(!태그만.판정불가 && 태그만.통과 === false, '근거가 있는데도 판정불가로 빠졌다 — 채점이 통째로 비어버린다');
+});
+
+test('판정불가는 분모에서 빠지고 따로 보고된다 (감추면 「표본 부족」이 「점수 좋음」으로 읽힌다)', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'tools', 'eval-score.js'), 'utf8');
+  const i = src.indexOf('function main(');
+  const main = src.slice(i);
+  assert.ok(/판정불가/.test(main), 'main이 판정불가를 아예 모른다 — 채점 대상에 섞여 분모를 늘린다');
+  assert.ok(/채점대상/.test(main) && /전체통과: 채점대상/.test(main),
+    '전체통과를 전체 행에서 센다 — 판정불가가 통과로도 실패로도 안 세어지면서 분모만 채운다');
+  assert.equal(/요약\.전체통과 === rows\.length/.test(main), false,
+    '종료 코드가 rows.length와 비교한다 — 판정불가가 하나라도 있으면 영원히 1(실패)이 된다');
+});
+
 test('픽스처에 「정상」 표본이 있다 (거짓양성을 못 재면 과교정이 만점으로 보인다)', () => {
   const fx = JSON.parse(fs.readFileSync(path.join(ROOT, 'evals', '픽스처.json'), 'utf8'));
   const 정상 = fx.항목.filter((x) => x.종류 === '정상');
