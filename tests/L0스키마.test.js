@@ -35,20 +35,25 @@ function CHECK값목록_(제약이름) {
   return [...SQL.slice(i, 끝).matchAll(/'([^']+)'/g)].map((m) => m[1]);
 }
 
+/* 제약 이름의 버전은 계약에서 파생시킨다 — 손으로 적으면 개정마다 세 곳을 따로 고쳐야 하고,
+ * 하나를 빠뜨리면 「이름이 갈렸다」가 아니라 「제약을 못 찾았다」로 나와 원인이 흐려진다.
+ * 「이름이 계약 버전을 달고 있는가」는 아래 전용 테스트 하나가 전담한다(판정을 두 곳에 적지 않는다). */
+const 제약 = (기본이름) => `${기본이름}_${계약.버전}`;
+
 test('event_type CHECK가 계약 값목록과 같다', () => {
-  assert.deepEqual(CHECK값목록_('learning_events_event_type_c3'),
+  assert.deepEqual(CHECK값목록_(제약('learning_events_event_type')),
     계약.learning_events.값목록.event_type,
     'DDL과 계약이 갈라졌다 — 서버는 보내는데 DB가 조용히 거절하는 상태가 된다.\n' +
     '  고치는 법: 계약 파일을 먼저 고치고(c4 개정) SQL의 CHECK를 그것에 맞춘다');
 });
 
 test('task_type CHECK가 계약 값목록과 같다', () => {
-  assert.deepEqual(CHECK값목록_('learning_events_task_type_c3'),
+  assert.deepEqual(CHECK값목록_(제약('learning_events_task_type')),
     계약.learning_events.값목록.task_type, 'DDL과 계약이 갈라졌다');
 });
 
 test('verdict CHECK가 계약 골든판정 3값과 같다', () => {
-  assert.deepEqual(CHECK값목록_('corrections_verdict_c3'), 계약.골든판정, 'DDL과 계약이 갈라졌다');
+  assert.deepEqual(CHECK값목록_(제약('corrections_verdict')), 계약.골든판정, 'DDL과 계약이 갈라졌다');
 });
 
 test('오류태그 23종은 DB CHECK로 복제하지 않는다 (배열 CHECK = 이중 정본)', () => {

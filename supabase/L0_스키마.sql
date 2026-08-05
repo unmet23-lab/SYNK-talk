@@ -11,10 +11,12 @@
 --    `create table if not exists` 는 테이블이 이미 있으면 **문장 전체를 건너뛴다.**
 --    그래서 나중에 열·CHECK 를 고치고 재실행해도 **아무 일도 안 일어나는데 초록으로 보인다.**
 --    → 이미 선 테이블의 변경은 반드시 별도 `alter table` 로 적는다.
---    → CHECK 이름에 계약 버전이 박혀 있다(`..._c3`). c4 개정은 이름째 갈아끼운다:
---         alter table engine.learning_events drop constraint learning_events_event_type_c3;
---         alter table engine.learning_events add  constraint learning_events_event_type_c4 check (...);
+--    → CHECK 이름에 계약 버전이 박혀 있다(지금 `..._c4`). 다음 개정은 이름째 갈아끼운다:
+--         alter table engine.learning_events drop constraint learning_events_event_type_c4;
+--         alter table engine.learning_events add  constraint learning_events_event_type_c5 check (...);
 --       꼬리의 확인 ④ 가 「옛 이름이 그대로 남아 있음」을 드러낸다.
+--    ⚠ 이 파일은 2026-08-06에 c3→c4로 올랐다(event_type 6→9종). **그 전에 이미 적용한 DB가 있다면**
+--       재실행이 아니라 위 alter 3쌍(event_type·task_type·corrections_verdict)으로 이행한다.
 -- ============================================================================
 
 create schema if not exists engine;
@@ -67,12 +69,13 @@ create table if not exists engine.learning_events (
   schema_ver       text not null,
   unique (learner_id, idempotency_key),
 
-  -- c3 6종만. 제안 3종(intervention.delivered·correction.viewed·data_use.granted)은
-  -- c4 승인 대기라 여기서 선점하지 않는다 (문서 §6-1).
-  constraint learning_events_event_type_c3 check (event_type in (
+  -- c4 9종 (계약 `계약/수집_교정_계약.json` 값목록이 정본 — 여기는 파생이다).
+  -- c3 6종 + 3종 추가: intervention.delivered · correction.viewed · data_use.granted (문서 §6-1 해소).
+  constraint learning_events_event_type_c4 check (event_type in (
     'submission.created', 'quiz.answered', 'choice.selected',
-    'correction.responded', 'preference.stated', 'session.abandoned')),
-  constraint learning_events_task_type_c3 check (task_type is null or task_type in (
+    'correction.responded', 'correction.viewed', 'preference.stated',
+    'session.abandoned', 'intervention.delivered', 'data_use.granted')),
+  constraint learning_events_task_type_c4 check (task_type is null or task_type in (
     '숙제제출', '다시쓰기', '퀴즈응답', '대화턴', '발화녹음', '출석발화'))
 );
 
@@ -128,7 +131,7 @@ create table if not exists engine.corrections (
   created_at             timestamptz not null default now(),
   schema_ver             text not null,
 
-  constraint corrections_verdict_c3 check (verdict is null or verdict in (
+  constraint corrections_verdict_c4 check (verdict is null or verdict in (
     'AI 교정이 맞다', '고칠 곳이 있다', '원문이 이미 맞다'))
 );
 
@@ -221,7 +224,7 @@ from (select
      where table_schema='engine' and grantee in ('anon','authenticated'))        as 새는권한,
   (select count(*) from pg_constraint
      where connamespace='engine'::regnamespace and contype='c'
-       and right(conname,3)='_c3')                                               as c3제약
+       and right(conname,3)='_c4')                                               as c4제약
 ) t;
 */
 
@@ -238,8 +241,10 @@ from (select
 --    select grantee, table_name, privilege_type from information_schema.role_table_grants
 --    where table_schema='engine' and grantee in ('anon','authenticated');
 --
--- ④ CHECK 제약 3개가 **_c3 이름으로** 붙어 있어야 한다 — 위 ⚠의 「조용한 미적용」을 드러낸다.
---    계약이 c4로 올라갔는데 여기 _c3가 그대로면, 파일만 고치고 DB엔 안 들어간 상태다.
+-- ④ CHECK 제약 3개가 **_c4 이름으로** 붙어 있어야 한다 — 위 ⚠의 「조용한 미적용」을 드러낸다.
+--    계약이 c5로 올라갔는데 여기 _c4가 그대로면, 파일만 고치고 DB엔 안 들어간 상태다.
+--    🔴 여기 `_c3`가 나오면 **이 파일이 c4로 오르기 전(2026-08-06)에 이미 적용된 DB**다 —
+--       재실행으로는 안 바뀐다(create table if not exists가 통째로 건너뛴다). 헤더 ⚠의 alter 경로로 간다.
 --    select conname from pg_constraint
 --    where connamespace='engine'::regnamespace and contype='c' and conname like '%\_c_' order by 1;
 --    기대: corrections_verdict_c3 · learning_events_event_type_c3 · learning_events_task_type_c3

@@ -1,10 +1,11 @@
 {
   "계약": "SYNK 학습 데이터 공용 어휘 — 수집층(Apps Script) ↔ 교정 엔진(SYNK-talk) ↔ L0(Supabase engine.*)",
-  "버전": "c3",
+  "버전": "c4",
   "왜": "두 저장소가 같은 어휘를 각자 들고 있다. 갈라지면 2년치 집계가 제품에서 안 읽히고, 그 사실은 데이터가 이미 쌓인 뒤에 드러난다(소급 불가). 프로즈 경고로 지키던 것을 계약 파일 + 양쪽 회귀로 옮긴 것이다.",
   "고치는_법": "이 파일을 고쳤으면 두 저장소 모두에 같은 바이트로 넣는다. 한쪽만 고치면 그쪽 CI가 빨개진다(그게 이 파일의 목적이다).",
   "c2에서_바뀐_것": "픽스처_항목필드에 「불변」을 추가했다. 채점기(SYNK-talk tools/eval-score.js)가 거짓양성 검사로 갈아타는 유일한 스위치인데 c1 목록에 없었고, 그래서 수집층이 그 필드를 안 만드는 것을 양쪽 회귀가 둘 다 못 봤다. 없으면 정상 표본이 오류 항목으로 채점되는데 오류 채점은 포함·불포함·기대태그가 모두 비면 무조건 통과라, 「멀쩡한 문장을 건드렸는가」가 자동 만점이 된다.",
   "c3에서_바뀐_것": "M0 계약 동결 — learning_events(N1) 절 신설. 지금까지 이 파일이 덮던 것은 교정 어휘(오류태그·골든판정·픽스처)뿐이라 「학습 행동 한 건」의 모양은 어디에도 계약이 없었다. 각 시트가 자기 헤더를 정본으로 삼고 있어서, 시트가 Supabase engine.* 로 이관되는 날 무엇이 필수였는지 말할 원천이 없다. 부록 A-0(제3의 계약 원천 금지)에 따라 별도 계약 파일을 만들지 않고 여기에 넣는다. 계약 이름도 함께 넓혔다(교정 엔진 전용 → 학습 데이터 공용). 같은 날 다른 세션이 SYNK-talk `docs/L0_데이터계약.md`(초안 v1 · d0fc94a)에 물리 스키마를 썼고, 이름이 갈려 있어 **L0 컬럼명으로 통일**했다(이름_규약 참조). 그 대조에서 필드 2건이 잡혔다 — `confidence` 의미 충돌 분리(estimator_confidence), `task_type` 부재.",
+  "c4에서_바뀐_것": "S1(첫 앱 화면) 진입 전제 — 「발생 순간에만 얻을 수 있는 원본 증거」의 자리를 계약에 낸다(코어엔진 §9 빈 곳 ①⑤ · 2026-08-06 유호님 분류). 파생 설계는 소급 복원되지만 원본은 안 된다. ①event_type 3종 추가(intervention.delivered=AI가 무엇을 했나 · correction.viewed=학생이 교정을 봤나 · data_use.granted=훈련 승격을 행의 신분이 아니라 사건으로 · 근거 L0 §3-2·§6-1·C0 §9). ②`task_snapshot` 합류 — L0 §3-3의 v1.1 최대 신설(P0-3)이 이 계약에 없었다. c3의 `라이브_대응.task_ref: [숙제문항, 문제]`는 **참조와 스냅샷을 한 칸에 넣은 오류**다(L0 §5가 지적). 문항이 수정되면 그때 학생이 무엇을 보고 답했는지 영원히 사라진다 — 정정해 `task_ref: [숙제ID]` / `task_snapshot: [숙제문항, 문제]`로 가른다. ③`selection_reason`·`rejected_all` — c3 선택로그는 「무엇을 골랐나」까지고 **「왜」와 「전부 거절했다」가 없었다**(§9 ③ 선호 레코드의 실물 대조). `skipped`(무반응)와 전량 거절은 다른 사건이다. ④`cited_refs` — 어느 지식 노트가 그 답에 실렸나(§9 ⑤). 없으면 지식이 틀렸을 때 **이미 나간 답**을 못 찾아 미래분만 고친다. 자리만 내고 채우기는 RAG 도입일부터 강제. ⑤`privacy_class` 보류 해소 — 유호님 기각이 이미 확정이라 「대기」가 아니었다(L0 §6-2 · 열을 만들지 않는다). 목록 이름을 실제 역할대로 `필드로_만들지_않는다`로 고쳤다.",
   "오류태그": [
     "조사:주격(이/가·은/는)",
     "조사:목적격(을/를)",
@@ -61,16 +62,16 @@
     "필드": {
       "봉투": ["event_id", "occurred_at", "ingested_at", "correlation_id", "idempotency_key", "schema_ver"],
       "주체·맥락": ["learner_id", "level_snapshot", "skill_ids", "task_type", "event_type"],
-      "내용": ["task_ref", "body_original", "corrected_text"],
+      "내용": ["task_ref", "task_snapshot", "body_original", "corrected_text"],
       "라벨": ["error_tags", "confidence", "attempt_no", "learner_response"],
-      "선택로그": ["options_shown", "position", "recommended_option", "selected_option", "changed_selection", "latency_ms", "skipped"],
-      "출처": ["model", "prompt_ver", "audio_ref", "intervention_id", "degraded"],
+      "선택로그": ["options_shown", "position", "recommended_option", "selected_option", "changed_selection", "latency_ms", "skipped", "selection_reason", "rejected_all"],
+      "출처": ["model", "prompt_ver", "cited_refs", "audio_ref", "intervention_id", "degraded"],
       "추정메타": ["source_kind", "estimator_confidence", "evidence_refs", "estimator_version", "valid_from", "expires_at", "user_confirmed"],
       "권한": ["consent_ver"]
     },
     "값목록": {
       "task_type": ["숙제제출", "다시쓰기", "퀴즈응답", "대화턴", "발화녹음", "출석발화"],
-      "event_type": ["submission.created", "quiz.answered", "choice.selected", "correction.responded", "preference.stated", "session.abandoned"],
+      "event_type": ["submission.created", "quiz.answered", "choice.selected", "correction.responded", "correction.viewed", "preference.stated", "session.abandoned", "intervention.delivered", "data_use.granted"],
       "source_kind": ["explicit", "teacher", "observed", "inferred"],
       "learner_response": ["채택", "무시", "수정"]
     },
@@ -81,7 +82,8 @@
       "ingested_at": ["created_at"],
       "learner_id": ["student_id"],
       "level_snapshot": ["급수"],
-      "task_ref": ["숙제문항", "문제"],
+      "task_ref": ["숙제ID"],
+      "task_snapshot": ["숙제문항", "문제"],
       "body_original": ["제출문", "학생문", "고른답"],
       "corrected_text": ["고친문장"],
       "error_tags": ["오류태그"],
@@ -94,8 +96,8 @@
       "event_id", "correlation_id", "idempotency_key", "schema_ver",
       "skill_ids", "task_type", "event_type",
       "attempt_no", "learner_response",
-      "options_shown", "position", "recommended_option", "selected_option", "changed_selection", "latency_ms", "skipped",
-      "intervention_id", "degraded",
+      "options_shown", "position", "recommended_option", "selected_option", "changed_selection", "latency_ms", "skipped", "selection_reason", "rejected_all",
+      "cited_refs", "intervention_id", "degraded",
       "source_kind", "estimator_confidence", "evidence_refs", "estimator_version", "valid_from", "expires_at", "user_confirmed",
       "consent_ver"
     ],
@@ -104,10 +106,14 @@
       "task_type": "지금은 「어느 시트에 있느냐」가 과업을 말한다. 한 테이블이 되면 열로 나와야 한다.",
       "estimator_confidence": "A-10 ③의 추정 신뢰도다. **라벨 축의 `confidence`(학생이 스스로 매긴 확신도 · 라이브 quiz_log에 이미 있다)와 다른 것이라 이름을 갈랐다** — 둘 다 `confidence`로 두면 「AI가 얼마나 확신하나」와 「학생이 얼마나 확신하나」가 한 칸에서 섞인다(2026-08-05 L0 대조에서 잡힘).",
       "consent_ver": "이벤트 행에는 없다. 라이브의 행 단위 스탬프(`음성동의버전`·엔진_폼리포트.js 동의버전스탬프_)는 상담데이터입력의 **학생 행**에 찍히고 **첫 판만** 기록한다(스탬프 불변). 그래서 학생이 나중에 다른 판에 동의해도 그 뒤 이벤트가 어느 판 아래 수집됐는지 조인으로 복원되지 않는다 — 소급 불가.",
-      "schema_ver": "이 파일의 `버전`을 행이 스스로 들고 있게 하는 열(부록 A-8 · 유호님 확정 「넣어」). 과거 행은 영원히 빈칸이라 늦을수록 빈칸이 늘어난다."
+      "schema_ver": "이 파일의 `버전`을 행이 스스로 들고 있게 하는 열(부록 A-8 · 유호님 확정 「넣어」). 과거 행은 영원히 빈칸이라 늦을수록 빈칸이 늘어난다.",
+      "selection_reason": "왜 그것을 골랐나. **선택 자체(무엇)는 c3가 이미 잡지만 이유는 그 순간에만 있다** — 나중에 물으면 다른 답이 나온다(회상 편향). 학생에게 매번 묻지 않는다(질문 총량 상한 · §9 능동 학습 조건). 물었을 때만 채우고, 안 물었으면 빈칸이지 0이 아니다. 운영 판단(상담 3안 중 선택)도 같은 필드다.",
+      "rejected_all": "제시된 후보를 **전부 거절**했다(=우리 안이 다 틀렸다). `skipped`(무반응·건너뜀)와 다른 사건인데 c3는 둘을 구분할 수단이 없었다 — 합치면 「관심 없었다」와 「전부 아니었다」가 한 칸에서 섞여 개인화가 잘못 배운다. 전량 기각일 때 `selected_option`은 null이고 `selection_reason`이 가장 값지다.",
+      "cited_refs": "그 답에 실제로 실린 지식 노트 참조 목록(§9 ⑤ 호출·인용 로그). `evidence_refs`(추정메타 — 추정의 근거)와 다르다: 이쪽은 **생성에 들어간 입력**이다. 없으면 지식 노트가 틀린 것을 알아도 **이미 나간 답**을 못 찾아 미래분만 고친다(A-5 회수의 전제). 자리만 지금 내고, 채우는 것은 RAG 도입일부터 첫날 강제 — 나중에 붙이면 그 사이 답들은 영원히 출처 미상이다.",
+      "task_snapshot": "라이브에는 있으나(`숙제문항`·`문제`) **한 테이블이 되면 `task_ref`와 별개 열이어야 한다.** 참조는 지금 문항을 가리키고 스냅샷은 그때 문항을 담는다 — 문항이 수정되면 참조만으로는 복원 불가. ⚠ 실측(2026-08-06): 라이브 `quiz_log`는 `문제`·`정답`은 남기지만 **보기(오답 선택지)와 문항 버전을 안 남긴다.** L0 `task_snapshot`(jsonb)은 「질문·보기·정답·지시문+버전」을 담기로 되어 있으므로 새 앱은 채우고, 라이브 열 보강은 별건이다(학생 0명 구간이라 S1 차단자는 아니다)."
     },
-    "보류_유호확정대기": {
-      "privacy_class": "부록 A-10 ⑤가 제안한 3등급(개인화 전용·회사 개선용·훈련 데이터)은 §9의 유호님 기각(\"동의·출처만 넣어. 「이 행을 훈련에 써도 되나」를 말하는 열은 넣지마\" · 재제안 금지)과 글자 그대로 부딪친다. A-10은 그 기각 뒤에 쓰인 AI 【설계안】이라 기각을 넘지 못한다. 경계 판정은 A-8(schema_ver)이 밟은 절차와 같아야 한다 — 유호님께 물어 확정한다. 확정 전까지 이 열은 계약에 없다."
+    "필드로_만들지_않는다": {
+      "privacy_class": "**해소(2026-08-06) — 유호님 기각이 이미 확정이라 「확정 대기」가 아니었다.** 부록 A-10 ⑤의 3등급(개인화 전용·회사 개선용·훈련 데이터)은 §9의 기각(\"동의·출처만 넣어. 「이 행을 훈련에 써도 되나」를 말하는 열은 넣지마\" · 재제안 금지)과 글자 그대로 부딪치고, A-10은 그 기각 뒤에 쓰인 AI 【설계안】이라 기각을 넘지 못한다. 열 없이 같은 일을 한다(L0 §6-2): 원본 이벤트는 언제나 개인용 · 회사 통계는 별도 비식별 산출물 · 훈련 승격은 행의 신분이 아니라 `data_use.granted` **사건**으로(c4 값목록). 이 목록은 「계약 필드로 들어오면 안 되는 것」이고, 비면 아무것도 안 지킨다."
     }
   }
 }
