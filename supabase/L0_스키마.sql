@@ -206,7 +206,27 @@ create policy learner_self_consents on engine.consents for select to authenticat
 
 
 -- ============================================================================
--- 확인 — 위를 Run 한 뒤 이 세 줄을 따로 Run 한다. 셋 다 기대값이면 적용된 것이다.
+-- 확인 (한 번에) — 위를 Run 한 뒤, 아래 select 를 통째로 복사해 Run 한다.
+--   `판정` 칸에 「✅ 전부 통과」가 나오면 끝. 숫자를 비교할 필요가 없다.
+-- ============================================================================
+/*
+select case when 테이블수=6 and RLS켜짐=6 and 정책수=5 and 새는권한=0 and c3제약=3
+            then '✅ 전부 통과'
+            else '❌ 아래 숫자를 그대로 알려주세요 (기대: 6·6·5·0·3)' end as 판정, *
+from (select
+  (select count(*) from pg_tables  where schemaname='engine')                    as 테이블수,
+  (select count(*) from pg_tables  where schemaname='engine' and rowsecurity)    as RLS켜짐,
+  (select count(*) from pg_policies where schemaname='engine')                   as 정책수,
+  (select count(*) from information_schema.role_table_grants
+     where table_schema='engine' and grantee in ('anon','authenticated'))        as 새는권한,
+  (select count(*) from pg_constraint
+     where connamespace='engine'::regnamespace and contype='c'
+       and right(conname,3)='_c3')                                               as c3제약
+) t;
+*/
+
+-- ============================================================================
+-- 확인 (갈래별) — 위 한 줄이 ❌ 일 때 어디가 어긋났는지 보는 용도.
 -- ============================================================================
 -- ① 테이블 6개 · RLS 전부 true 여야 한다
 --    select tablename, rowsecurity from pg_tables where schemaname='engine' order by 1;

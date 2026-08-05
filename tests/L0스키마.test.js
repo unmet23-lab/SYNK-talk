@@ -22,9 +22,10 @@ const ROOT = path.join(__dirname, '..');
 const 계약 = JSON.parse(fs.readFileSync(path.join(ROOT, '계약', '수집_교정_계약.json'), 'utf8'));
 /* 주석을 벗기고 센다 — 헤더의 c4 마이그레이션 **예시**가 실제 제약으로 세어져서
  * 버전 검사가 빨개졌다(2026-08-05 실측). 검사가 자기 문서를 위반으로 잡으면 곧 꺼진다.
- * ⚠ 천장: 문자열 리터럴 안의 `--` 는 구분하지 못한다(지금 이 파일엔 없다). */
+ * 두 종류 다 벗긴다: 줄 주석 `--` 과 블록 주석(확인 쿼리를 담아둔 자리).
+ * ⚠ 천장: 문자열 리터럴 안의 `--`·`/*` 는 구분하지 못한다(지금 이 파일엔 없다). */
 const 원문 = fs.readFileSync(path.join(ROOT, 'supabase', 'L0_스키마.sql'), 'utf8');
-const SQL = 원문.replace(/--.*$/gm, '');
+const SQL = 원문.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--.*$/gm, '');
 
 function CHECK값목록_(제약이름) {
   const i = SQL.indexOf(`constraint ${제약이름} check`);
