@@ -1,9 +1,10 @@
 {
-  "계약": "SYNK 수집층(Apps Script) ↔ 교정 엔진(SYNK-talk) 공용 어휘",
-  "버전": "c2",
+  "계약": "SYNK 학습 데이터 공용 어휘 — 수집층(Apps Script) ↔ 교정 엔진(SYNK-talk) ↔ L0(Supabase engine.*)",
+  "버전": "c3",
   "왜": "두 저장소가 같은 어휘를 각자 들고 있다. 갈라지면 2년치 집계가 제품에서 안 읽히고, 그 사실은 데이터가 이미 쌓인 뒤에 드러난다(소급 불가). 프로즈 경고로 지키던 것을 계약 파일 + 양쪽 회귀로 옮긴 것이다.",
   "고치는_법": "이 파일을 고쳤으면 두 저장소 모두에 같은 바이트로 넣는다. 한쪽만 고치면 그쪽 CI가 빨개진다(그게 이 파일의 목적이다).",
   "c2에서_바뀐_것": "픽스처_항목필드에 「불변」을 추가했다. 채점기(SYNK-talk tools/eval-score.js)가 거짓양성 검사로 갈아타는 유일한 스위치인데 c1 목록에 없었고, 그래서 수집층이 그 필드를 안 만드는 것을 양쪽 회귀가 둘 다 못 봤다. 없으면 정상 표본이 오류 항목으로 채점되는데 오류 채점은 포함·불포함·기대태그가 모두 비면 무조건 통과라, 「멀쩡한 문장을 건드렸는가」가 자동 만점이 된다.",
+  "c3에서_바뀐_것": "M0 계약 동결 — learning_events(N1) 절 신설. 지금까지 이 파일이 덮던 것은 교정 어휘(오류태그·골든판정·픽스처)뿐이라 「학습 행동 한 건」의 모양은 어디에도 계약이 없었다. 각 시트가 자기 헤더를 정본으로 삼고 있어서, 시트가 Supabase engine.* 로 이관되는 날 무엇이 필수였는지 말할 원천이 없다. 부록 A-0(제3의 계약 원천 금지)에 따라 별도 계약 파일을 만들지 않고 여기에 넣는다. 계약 이름도 함께 넓혔다(교정 엔진 전용 → 학습 데이터 공용). 같은 날 다른 세션이 SYNK-talk `docs/L0_데이터계약.md`(초안 v1 · d0fc94a)에 물리 스키마를 썼고, 이름이 갈려 있어 **L0 컬럼명으로 통일**했다(이름_규약 참조). 그 대조에서 필드 2건이 잡혔다 — `confidence` 의미 충돌 분리(estimator_confidence), `task_type` 부재.",
   "오류태그": [
     "조사:주격(이/가·은/는)",
     "조사:목적격(을/를)",
@@ -51,5 +52,62 @@
     "포함",
     "불포함",
     "불변"
-  ]
+  ],
+  "learning_events": {
+    "무엇": "학습 행동 한 건의 필수 필드 규격(코어엔진 §9 레코드 ④ · 앱기능 N1). 모든 과업이 한 모양으로 쌓여야 3·4년차에 한 벌로 읽힌다.",
+    "정본_경계": "여기는 「무엇이 필수인가」만 정한다. 물리 스키마(테이블·타입·인덱스·RLS)는 SYNK-talk `docs/L0_데이터계약.md`, 시트 헤더는 그 파생이다. 시트 헤더 상수(엔진_수집.js SHEET_SKELETON)는 정본이 아니라 현행 구현이며, 아래 라이브_대응이 둘을 잇는다.",
+    "이름_규약": "필드 이름은 **L0 컬럼명(snake_case 영문)을 그대로 쓴다.** 같은 것을 두 이름으로 부르면 계약이 계약을 못 한다 — 2026-08-05 실측: 이 절과 L0 초안이 각각 「과업종류/task_type」·「급수/level_snapshot」·「강등여부/degraded」로 갈려 있었다. 한글은 라이브 시트 열 이름에만 남는다(라이브_대응이 번역표다).",
+    "왜_봉투가_따로인가": "오프라인 제출·재시도가 있는 앱에서 발생 시점과 수집 시점이 갈리고 같은 사건이 두 번 저장된다. 봉투 6개가 없으면 그때 중복을 셀 수도 지울 수도 없다.",
+    "필드": {
+      "봉투": ["event_id", "occurred_at", "ingested_at", "correlation_id", "idempotency_key", "schema_ver"],
+      "주체·맥락": ["learner_id", "level_snapshot", "skill_ids", "task_type", "event_type"],
+      "내용": ["task_ref", "body_original", "corrected_text"],
+      "라벨": ["error_tags", "confidence", "attempt_no", "learner_response"],
+      "선택로그": ["options_shown", "position", "recommended_option", "selected_option", "changed_selection", "latency_ms", "skipped"],
+      "출처": ["model", "prompt_ver", "audio_ref", "intervention_id", "degraded"],
+      "추정메타": ["source_kind", "estimator_confidence", "evidence_refs", "estimator_version", "valid_from", "expires_at", "user_confirmed"],
+      "권한": ["consent_ver"]
+    },
+    "값목록": {
+      "task_type": ["숙제제출", "다시쓰기", "퀴즈응답", "대화턴", "발화녹음", "출석발화"],
+      "event_type": ["submission.created", "quiz.answered", "choice.selected", "correction.responded", "preference.stated", "session.abandoned"],
+      "source_kind": ["explicit", "teacher", "observed", "inferred"],
+      "learner_response": ["채택", "무시", "수정"]
+    },
+    "값목록_규칙": "오류태그와 같다 — 늘리는 것은 안전하고 이름 변경·삭제는 과거 집계를 깨뜨린다. 늘릴 때 이 파일의 버전을 올리고 두 저장소에 같은 바이트로 넣는다. 자유 문자열로 두면 같은 것이 열 가지 이름으로 쌓여 축이 사라진다(목소리폼 「미션」이 실제로 그렇게 됐다).",
+    "왜_task_type과_event_type_둘인가": "`event_type`은 **무슨 일이 일어났나**(제출됐다·골랐다·답했다), `task_type`은 **어느 과업이었나**(숙제·다시쓰기·발화)다. 둘을 합치면 숙제 제출과 다시쓰기 제출이 똑같이 `submission.created`가 되어 구분이 사라진다. `skill_ids`·`content_id`로는 대신 못 센다 — 그건 「무엇을 재는가」지 「어느 통로로 들어왔는가」가 아니다. ⚠ L0 초안 v1에는 `task_type`이 없다(합류 항목).",
+    "라이브_대응": {
+      "occurred_at": ["제출일"],
+      "ingested_at": ["created_at"],
+      "learner_id": ["student_id"],
+      "level_snapshot": ["급수"],
+      "task_ref": ["숙제문항", "문제"],
+      "body_original": ["제출문", "학생문", "고른답"],
+      "corrected_text": ["고친문장"],
+      "error_tags": ["오류태그"],
+      "confidence": ["확신도"],
+      "model": ["model"],
+      "prompt_ver": ["prompt_ver"],
+      "audio_ref": ["audio_ref"]
+    },
+    "미구현": [
+      "event_id", "correlation_id", "idempotency_key", "schema_ver",
+      "skill_ids", "task_type", "event_type",
+      "attempt_no", "learner_response",
+      "options_shown", "position", "recommended_option", "selected_option", "changed_selection", "latency_ms", "skipped",
+      "intervention_id", "degraded",
+      "source_kind", "estimator_confidence", "evidence_refs", "estimator_version", "valid_from", "expires_at", "user_confirmed",
+      "consent_ver"
+    ],
+    "미구현_주의": {
+      "event_id": "라이브 시트의 `id` 열로 대신하지 않는다 — 시트마다 따로 채번해 한 테이블로 합치면 충돌한다.",
+      "task_type": "지금은 「어느 시트에 있느냐」가 과업을 말한다. 한 테이블이 되면 열로 나와야 한다.",
+      "estimator_confidence": "A-10 ③의 추정 신뢰도다. **라벨 축의 `confidence`(학생이 스스로 매긴 확신도 · 라이브 quiz_log에 이미 있다)와 다른 것이라 이름을 갈랐다** — 둘 다 `confidence`로 두면 「AI가 얼마나 확신하나」와 「학생이 얼마나 확신하나」가 한 칸에서 섞인다(2026-08-05 L0 대조에서 잡힘).",
+      "consent_ver": "이벤트 행에는 없다. 라이브의 행 단위 스탬프(`음성동의버전`·엔진_폼리포트.js 동의버전스탬프_)는 상담데이터입력의 **학생 행**에 찍히고 **첫 판만** 기록한다(스탬프 불변). 그래서 학생이 나중에 다른 판에 동의해도 그 뒤 이벤트가 어느 판 아래 수집됐는지 조인으로 복원되지 않는다 — 소급 불가.",
+      "schema_ver": "이 파일의 `버전`을 행이 스스로 들고 있게 하는 열(부록 A-8 · 유호님 확정 「넣어」). 과거 행은 영원히 빈칸이라 늦을수록 빈칸이 늘어난다."
+    },
+    "보류_유호확정대기": {
+      "privacy_class": "부록 A-10 ⑤가 제안한 3등급(개인화 전용·회사 개선용·훈련 데이터)은 §9의 유호님 기각(\"동의·출처만 넣어. 「이 행을 훈련에 써도 되나」를 말하는 열은 넣지마\" · 재제안 금지)과 글자 그대로 부딪친다. A-10은 그 기각 뒤에 쓰인 AI 【설계안】이라 기각을 넘지 못한다. 경계 판정은 A-8(schema_ver)이 밟은 절차와 같아야 한다 — 유호님께 물어 확정한다. 확정 전까지 이 열은 계약에 없다."
+    }
+  }
 }
