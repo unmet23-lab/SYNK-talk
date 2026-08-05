@@ -20,7 +20,11 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const 계약 = JSON.parse(fs.readFileSync(path.join(ROOT, '계약', '수집_교정_계약.json'), 'utf8'));
-const SQL = fs.readFileSync(path.join(ROOT, 'supabase', 'L0_스키마.sql'), 'utf8');
+/* 주석을 벗기고 센다 — 헤더의 c4 마이그레이션 **예시**가 실제 제약으로 세어져서
+ * 버전 검사가 빨개졌다(2026-08-05 실측). 검사가 자기 문서를 위반으로 잡으면 곧 꺼진다.
+ * ⚠ 천장: 문자열 리터럴 안의 `--` 는 구분하지 못한다(지금 이 파일엔 없다). */
+const 원문 = fs.readFileSync(path.join(ROOT, 'supabase', 'L0_스키마.sql'), 'utf8');
+const SQL = 원문.replace(/--.*$/gm, '');
 
 function CHECK값목록_(제약이름) {
   const i = SQL.indexOf(`constraint ${제약이름} check`);
@@ -52,6 +56,20 @@ test('오류태그 23종은 DB CHECK로 복제하지 않는다 (배열 CHECK = �
   const 태그가_SQL에 = 계약.오류태그.filter((t) => SQL.includes(`'${t}'`));
   assert.deepEqual(태그가_SQL에, [],
     `오류태그가 DDL에 박혔다: ${태그가_SQL에.join(', ')} — 계약 파일과 이중 정본이 된다`);
+});
+
+test('CHECK 제약 이름이 계약 버전을 달고 있다 (c4 개정이 조용히 미적용되는 것을 막는다)', () => {
+  /* `create table if not exists` 는 테이블이 이미 있으면 문장 전체를 건너뛴다 —
+   * CHECK 를 고치고 재실행해도 **아무 일도 안 일어나는데 초록으로 보인다.**
+   * 이름에 버전을 박아두면 ①계약이 c4로 오를 때 이 테스트가 빨개져 rename 을 강제하고
+   * ②DB 쪽은 확인 ④ 가 옛 이름을 드러낸다. 파일과 DB 양쪽에 눈을 하나씩 둔다. */
+  const 이름들 = [...SQL.matchAll(/constraint (\w+) check/g)].map((m) => m[1]);
+  assert.ok(이름들.length >= 3, `CHECK 제약을 ${이름들.length}개밖에 못 찾았다 — 정규식이 낡았다`);
+  const 안맞는 = 이름들.filter((n) => !n.endsWith(`_${계약.버전}`));
+  assert.deepEqual(안맞는, [],
+    `제약 이름이 계약 버전(${계약.버전})과 안 맞는다: ${안맞는.join(', ')}\n` +
+    '  계약이 올랐다면 SQL 의 CHECK 를 새 값목록으로 고치고 **이름도 새 버전으로 바꾼 뒤**,\n' +
+    '  이미 선 DB 에는 alter table drop constraint / add constraint 를 따로 돌린다(재실행으론 안 바뀐다)');
 });
 
 test('모든 engine 테이블에 RLS가 켜져 있다 (잊은 테이블 = 노출하는 날의 구멍)', () => {

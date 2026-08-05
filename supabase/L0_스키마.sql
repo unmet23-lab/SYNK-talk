@@ -4,7 +4,17 @@
 -- 필드 「무엇이 필수인가」 정본 = 계약/수집_교정_계약.json (c3)
 --
 -- 적용법: Supabase 대시보드 → SQL Editor → 전문 붙여넣기 → Run
--- 여러 번 돌려도 안전하다(전부 IF NOT EXISTS / OR REPLACE).
+--
+-- ⚠ 재실행의 정확한 성질 — 두 가지가 다르다:
+--    · 안전하다  = 여러 번 돌려도 에러가 안 나고 **데이터를 안 지운다**  ✅
+--    · 반영된다  = 이 파일을 고친 뒤 다시 돌리면 그 변경이 적용된다      ❌ 아니다
+--    `create table if not exists` 는 테이블이 이미 있으면 **문장 전체를 건너뛴다.**
+--    그래서 나중에 열·CHECK 를 고치고 재실행해도 **아무 일도 안 일어나는데 초록으로 보인다.**
+--    → 이미 선 테이블의 변경은 반드시 별도 `alter table` 로 적는다.
+--    → CHECK 이름에 계약 버전이 박혀 있다(`..._c3`). c4 개정은 이름째 갈아끼운다:
+--         alter table engine.learning_events drop constraint learning_events_event_type_c3;
+--         alter table engine.learning_events add  constraint learning_events_event_type_c4 check (...);
+--       꼬리의 확인 ④ 가 「옛 이름이 그대로 남아 있음」을 드러낸다.
 -- ============================================================================
 
 create schema if not exists engine;
@@ -207,3 +217,9 @@ create policy learner_self_consents on engine.consents for select to authenticat
 -- ③ 아무 행도 안 나와야 한다 — anon·authenticated에 engine 권한이 남아 있으면 구멍이다
 --    select grantee, table_name, privilege_type from information_schema.role_table_grants
 --    where table_schema='engine' and grantee in ('anon','authenticated');
+--
+-- ④ CHECK 제약 3개가 **_c3 이름으로** 붙어 있어야 한다 — 위 ⚠의 「조용한 미적용」을 드러낸다.
+--    계약이 c4로 올라갔는데 여기 _c3가 그대로면, 파일만 고치고 DB엔 안 들어간 상태다.
+--    select conname from pg_constraint
+--    where connamespace='engine'::regnamespace and contype='c' and conname like '%\_c_' order by 1;
+--    기대: corrections_verdict_c3 · learning_events_event_type_c3 · learning_events_task_type_c3
