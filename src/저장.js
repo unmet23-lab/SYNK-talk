@@ -34,7 +34,7 @@ export async function 로그읽기() {
     return 역직렬화(f.textSync());
   } catch (e) {
     // 읽기 실패를 빈 로그로 둔갑시키지 않는다 — 호출부가 오류를 화면에 띄운다
-    throw new Error('로그 읽기 실패: ' + (e && e.message));
+    throw new Error('기록을 읽지 못했어요: ' + (e && e.message));
   }
 }
 

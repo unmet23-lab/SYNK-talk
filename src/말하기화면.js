@@ -71,7 +71,7 @@ export default function 말하기화면({ 급수 = 0 }) {
       try {
         await setAudioModeAsync({ playsInSilentMode: true });
       } catch (e) {
-        set오류('오디오 준비 실패: ' + String(e.message || e));
+        set오류('소리를 준비하지 못했어요: ' + String(e.message || e));
       }
     })();
   }, [date]);
@@ -82,7 +82,7 @@ export default function 말하기화면({ 급수 = 0 }) {
     try {
       await 로그쓰기(새로그);
     } catch (e) {
-      set오류('저장 실패: ' + String(e.message || e)); // 화면은 진행하되 실패를 숨기지 않는다
+      set오류('저장하지 못했어요: ' + String(e.message || e)); // 화면은 진행하되 실패를 숨기지 않는다
     }
     return 새로그;
   };
