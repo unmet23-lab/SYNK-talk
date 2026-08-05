@@ -253,6 +253,16 @@
    `보류_유호확정대기.privacy_class` 문구를 「해소(열 없음)」로 정리.
 2. **`node tools/계약동기화.js`** 로 형제 저장소에 같은 바이트로 넣는다(🚫손복사).
 3. `supabase/L0_스키마.sql` — CHECK 값 3종 추가 + 제약 이름 `_c3`→`_c4`.
+   🔴 **`create table if not exists`로는 제약이 안 바뀐다.** 유호님이 이미 붙여넣은 뒤라면 그 문장은
+   테이블이 있다는 이유로 통째로 건너뛰고, **스크립트는 성공한 것처럼 끝난다**(조용한 미적용은
+   「통과」와 같은 모양이다). 그래서 값이 바뀌는 개정은 **명시적 ALTER**로 간다:
+   ```sql
+   alter table engine.learning_events drop constraint if exists learning_events_event_type_c3;
+   alter table engine.learning_events add  constraint learning_events_event_type_c4 check (...);
+   ```
+   ⚠ **적용 여부를 모르는 채로 고치지 않는다** — 붙여넣기가 진행 중일 수 있다. 먼저 확인 쿼리로
+   현재 제약 이름을 읽고(`select conname from pg_constraint where conrelid='engine.learning_events'::regclass`)
+   그 결과에 맞춰 간다.
 4. 양쪽 회귀: `tests/L0스키마.test.js`(제약 이름) · `tests/C0계약.test.js` · SYNK-appsscript `tests/계약.test.js`.
 5. 양쪽 CI 초록 확인 후 push.
 
