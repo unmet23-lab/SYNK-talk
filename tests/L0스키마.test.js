@@ -116,3 +116,18 @@ test('학생에게 쓰기 정책을 열지 않았다 (쓰기는 전부 Edge Func
   assert.deepEqual([...new Set(정책)], ['select'],
     `select 아닌 정책이 있다: ${[...new Set(정책)].join(', ')} — 학생 토큰이 DB에 직접 쓰면 payload 검증을 건너뛴다`);
 });
+
+/* ── supabase/확인_적용전상태.sql — 유호님이 직접 붙여넣는 파일이라 성질이 다르다 ──
+ * 「읽기만 한다」고 적어두고 Run 하시게 하는 파일이다. 여기에 쓰기 문장이 한 줄이라도 섞이면
+ * **재려던 「실행 전 상태」를 재는 행위가 오염시킨다** — 그러면 무엇이 원래 있었는지 영영 모른다.
+ * 프로즈로 "읽기 전용"이라 적는 것으로는 안 지켜지므로 기계로 막는다. */
+test('확인_적용전상태.sql 은 읽기 전용이다 (쓰기 동사 0)', () => {
+  const 확인원문 = fs.readFileSync(path.join(ROOT, 'supabase', '확인_적용전상태.sql'), 'utf8');
+  const 확인본문 = 확인원문.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--.*$/gm, '');
+  const 쓰기동사 = /\b(insert|update|delete|drop|truncate|alter|create|grant|revoke|refresh|call|do)\b/i;
+  const 걸린것 = 확인본문.match(쓰기동사);
+  assert.equal(걸린것, null,
+    `확인 파일 본문에 쓰기 동사 "${걸린것 && 걸린것[0]}" 가 있다 — 이 파일은 상태를 재기만 해야 한다`);
+  assert.ok(/^\s*with\b|^\s*select\b/im.test(확인본문),
+    '확인 파일에 조회문이 없다 — 주석만 남았거나 본문이 통째로 사라졌다(빈 파일도 「쓰기 0」으로 통과한다)');
+});
