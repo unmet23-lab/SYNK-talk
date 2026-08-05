@@ -213,7 +213,7 @@ create policy learner_self_consents on engine.consents for select to authenticat
 --   `판정` 칸에 「✅ 전부 통과」가 나오면 끝. 숫자를 비교할 필요가 없다.
 -- ============================================================================
 /*
-select case when 테이블수=6 and RLS켜짐=6 and 정책수=5 and 새는권한=0 and c3제약=3
+select case when 테이블수=6 and RLS켜짐=6 and 정책수=5 and 새는권한=0 and c4제약=3
             then '✅ 전부 통과'
             else '❌ 아래 숫자를 그대로 알려주세요 (기대: 6·6·5·0·3)' end as 판정, *
 from (select

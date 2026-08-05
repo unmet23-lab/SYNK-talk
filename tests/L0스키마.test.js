@@ -78,6 +78,28 @@ test('CHECK 제약 이름이 계약 버전을 달고 있다 (c4 개정이 조용
     '  이미 선 DB 에는 alter table drop constraint / add constraint 를 따로 돌린다(재실행으론 안 바뀐다)');
 });
 
+test('확인 쿼리가 참조하는 이름이 전부 정의된 별칭이다 (별칭만 고치고 참조를 안 고치면 Run 이 깨진다)', () => {
+  /* 실측 2026-08-06: c3→c4 개정에서 `as c3제약`만 `as c4제약`으로 고치고
+   * `case when ... and c3제약=3` 참조를 안 고쳤다. 위 「제약 이름」 테스트는 초록이었다 —
+   * 그건 constraint 이름만 보지 확인 쿼리 안을 안 본다. 유호님이 Run 하면 그때서야
+   * 「column c3제약 does not exist」가 뜬다. 텍스트 검사로 잡을 수 있는 것을 사람 손에 미루지 않는다. */
+  /* ⚠ `SQL`이 아니라 `원문`을 본다 — 확인 쿼리는 **블록 주석 안**에 살고, 위 SQL 상수는
+   *   그 주석을 벗겨낸 것이라 여기선 아무것도 안 보인다(그러면 이 검사는 영원히 통과한다). */
+  const 시작 = 원문.indexOf('select case when');
+  const 끝 = 원문.indexOf(') t;', 시작);
+  assert.ok(시작 !== -1 && 끝 !== -1, '확인 쿼리 블록을 못 찾았다 — 앵커가 낡았다(이 검사는 무엇이든 통과시킨다)');
+  const 블록 = 원문.slice(시작, 끝);
+  const 정의 = new Set([...블록.matchAll(/\bas ([^\s,]+)/g)].map((m) => m[1]));
+  const 조건절 = 블록.slice(0, 블록.indexOf('from'));
+  const 참조 = [...조건절.matchAll(/([가-힣A-Za-z_][가-힣A-Za-z_0-9]*)\s*=/g)].map((m) => m[1]);
+  assert.ok(참조.length >= 5, `판정 조건에서 참조를 ${참조.length}개밖에 못 뽑았다 — 정규식이 낡았다`);
+  const 미정의 = 참조.filter((n) => !정의.has(n));
+  assert.deepEqual(미정의, [],
+    `확인 쿼리가 정의되지 않은 이름을 참조한다: ${미정의.join(', ')}\n` +
+    `  정의된 별칭: ${[...정의].join(', ')}\n` +
+    '  별칭을 바꿨으면 `case when` 절의 참조도 함께 바꿔라 — 아니면 이 SQL 은 실행 자체가 실패한다');
+});
+
 test('모든 engine 테이블에 RLS가 켜져 있다 (잊은 테이블 = 노출하는 날의 구멍)', () => {
   const 테이블 = [...SQL.matchAll(/create table if not exists engine\.(\w+)/g)].map((m) => m[1]);
   assert.ok(테이블.length >= 6, `engine 테이블을 ${테이블.length}개밖에 못 찾았다 — 정규식이 낡았다`);
