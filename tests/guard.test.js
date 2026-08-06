@@ -23,6 +23,12 @@ const MUST_BLOCK = [
   { label: 'android keystore', files: [{ path: 'android/release.keystore', text: 'x' }] },
   { label: '서비스 계정 json', files: [{ path: 'secrets/service-account-prod.json', text: '{}' }] },
   { label: '비밀번호 파일명', files: [{ path: 'docs/비밀번호모음.md', text: 'x' }] },
+  /* 2026-08-06 규칙을 좁힌 뒤 **막는 쪽이 그대로인지**를 함께 못박는다 —
+   * 좁힐 때 실제로 위험한 것까지 같이 풀리면 그게 이 변경의 사고다.
+   * 발급된 코드 목록 파일 하나 = 전 학생 계정(L0 §4-1). */
+  { label: '로그인 코드 목록(csv)', files: [{ path: 'docs/로그인코드목록.csv', text: 'a' }] },
+  { label: '로그인 정보(txt)', files: [{ path: '로그인정보.txt', text: 'a' }] },
+  { label: '로그인 백업(json)', files: [{ path: 'backup/로그인코드.json', text: '{}' }] },
   { label: 'Anthropic 키', files: [{ path: 'src/a.ts', text: 'const k = "sk-ant-' + A(24) + '"' }] },
   { label: 'OpenAI 키', files: [{ path: 'src/b.ts', text: 'key: "sk-' + A(40) + '"' }] },
   { label: 'GitHub 토큰', files: [{ path: 'ci.yml', text: 'token: gh' + 'p_' + A(36) }] },
@@ -52,6 +58,12 @@ for (const c of MUST_BLOCK) {
 const MUST_PASS = [
   { label: '.env.example', files: [{ path: '.env.example', text: 'SUPABASE_URL=\nSUPABASE_ANON_KEY=' }] },
   { label: '평범한 소스', files: [{ path: 'src/App.tsx', text: 'export default function App(){}' }] },
+  /* 이름에 「로그인」이 든 **소스**는 통과해야 한다 — 2026-08-06 이 규칙이 소스 3건을 막아
+   * 커밋이 안 됐다. 도메인 단어를 파일명에서 빼는 것은 발견가능성을 잃는 잘못된 처방이다. */
+  { label: '로그인 소스(lib)', files: [{ path: 'lib/로그인코드.js', text: 'module.exports={}' }] },
+  { label: '로그인 소스(tools)', files: [{ path: 'tools/로그인코드발급.js', text: 'x' }] },
+  { label: '로그인 소스(test)', files: [{ path: 'tests/로그인코드.test.js', text: 'x' }] },
+  { label: 'password 든 소스', files: [{ path: 'src/passwordField.tsx', text: 'export const F=()=>null' }] },
   {
     label: '키 이름만 있고 값이 없는 문서',
     files: [{ path: 'docs/설정.md', text: '`SUPABASE_SERVICE_ROLE_KEY` 는 .env 에 둔다' }],

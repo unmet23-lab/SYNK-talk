@@ -16,8 +16,16 @@ const SECRET_NAMES = [
   { re: /\.(pem|key|p8|p12|pfx|keystore|jks)$/i, why: '개인키·서명키' },
   { re: /(^|[\\/])(credentials|service-account)[\w.-]*\.json$/i, why: '서비스 계정 자격증명' },
   { re: /(^|[\\/])\.clasprc\.json$/i, why: 'clasp 로그인 토큰' },
-  { re: /(로그인|비밀번호|passwd|password)/i, why: '자격증명으로 보이는 파일명' },
+  /* ⚠ 이 규칙만 확장자를 안 본다 — 그래서 **소스까지 잡았다**(2026-08-06: `lib/로그인코드.js`·
+   *   `tools/로그인코드발급.js`·`tests/로그인코드.test.js` 3건이 커밋을 못 했다).
+   *   위 네 규칙은 전부 자격증명 **데이터 파일 모양**을 본다. 이것만 이름 조각을 봤다.
+   *   막으려던 것은 「발급된 코드 목록」이고 그건 .csv·.txt·.json 이지 .js 가 아니다.
+   *   → 소스 확장자는 이 규칙에서 뺀다(`.gitignore` 도 같은 이유로 같은 날 좁혔다). */
+  { re: /(로그인|비밀번호|passwd|password)/i, why: '자격증명으로 보이는 파일명', 소스제외: true },
 ];
+
+/** 소스 파일인가 — 자격증명 **목록**은 데이터 파일이지 소스가 아니다. */
+const isSource = (p) => /\.(js|jsx|ts|tsx|mjs|cjs)$/i.test(p);
 
 /**
  * 내용에 박힌 비밀. 이름은 「무엇이 걸렸는지」를 사람이 읽을 수 있게 짓는다.
@@ -53,6 +61,7 @@ function inspect(files) {
 
     if (!isExample(p)) {
       for (const rule of SECRET_NAMES) {
+        if (rule.소스제외 && isSource(p)) continue;
         if (rule.re.test(p)) out.push({ path: p, rule: '자격증명 파일명', why: rule.why });
       }
     }
