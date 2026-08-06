@@ -223,7 +223,7 @@
 - 자기 것만 — 서버가 토큰에서 학생을 확정한다. **쿼리로 학생을 지정할 수 없다.**
 - 🔴 **빈 상태는 오류가 아니다** — `data: []` + HTTP 200. 첫날·배치 실패·교정 미확정이 전부 정상 경로다. 404를 쓰면 앱이 오류 화면을 띄우고, 그건 학생에게 「고장」으로 보인다.
 
-#### ① `GET /v1/tasks` — 오늘 낼 것
+#### ① `GET /v1/tasks` — 오늘 낼 것 (✅구현 · **리허설 실측** 2026-08-07 · ⛔운영 미배포)
 
 | 항목 | 값 |
 |---|---|
@@ -234,6 +234,27 @@
 
 🔴 **읽을 것이 어디 있나**(2026-08-07 배치 구현으로 확정 · `P0 §6-1`): `task_snapshot`은 **`engine.submissions`**에 있고 그 행은 `event_id`로 `task.assigned` 사건에 붙는다. payload가 아니다 — 계약 필드층이 그 이름을 「내용」에 두었기 때문이고, 그래서 **계약 개정이 0**이었다.
 ⚠ 그 대가로 `submissions`에는 **제출이 아닌 행**이 산다. 이 엔드포인트를 짤 때도, 「제출 수」를 세는 `GET /v1/progress` ③을 짤 때도 **반드시 `learning_events.event_type`으로 거른다** — 안 걸면 배정 1건이 제출 1건으로 세어져 첫날부터 「어제의 나」가 거짓말을 한다.
+
+**응답 예 · 실패 표** (`supabase/functions/tasks`):
+
+```json
+{ "ok": true, "contract_ver": "c8", "date": "2026-08-07", "next_cursor": null,
+  "data": [ { "task_id": "…", "task_snapshot": { "ver": 1, "호흡": [ … ] },
+              "task_format": null, "degraded": false,
+              "intervention": { "intervention_id": "…", "output_text": "…" } } ] }
+```
+
+| 상황 | 응답 |
+|---|---|
+| `X-Contract-Ver` 없음 / 꼴 아님 | `400 CONTRACT_VER_MISSING` / `426 CONTRACT_VER_UNSUPPORTED` |
+| DB보다 새 판을 선언 | `426` (§4-1과 같은 축 — 함수가 DB보다 앞설 수 없다) |
+| 토큰 없음 · anon 키 · 학생 행 없음 | `401 AUTH_REQUIRED` |
+| `date`가 `YYYY-MM-DD`가 아님 | 🔴 `400 CONTRACT_VIOLATION` — **500이 아니다.** 모양을 먼저 안 보면 Postgres가 `22007`로 죽고, 5xx는 `retryable`이라 앱이 영구 오류를 무한 재시도한다 |
+| `GET` 아님 · `/tasks` 아래 다른 경로 | `405` / `404` (조회가 쓰기를 겸하지 않는다 · 오타 경로가 「이미 돌던 것」이 되지 않는다) |
+
+- 🔑 **`task_format`은 항상 `null`로 온다** — 배정 1건에 ②낭독 + ③자유발화 두 형식이 들어서 행에 담지 않는다(`P0 §2-1`). 형식은 `task_snapshot.호흡[]` 안에 있다.
+- 🔑 **`intervention`은 `intervention_id`로 잇는다**(시각·순서가 아니다). 하루 2건이 서는 날 시각으로 이으면 조용히 어긋난다.
+- **실측 = `tools/배달왕복시험.js` ⑧**(리허설 37/37). 배치가 쓴 것과 이 엔드포인트가 읽은 것을 **같은 실행에서** 대조한다 — 갈리면 증상은 「학생 화면이 비어 있다」 하나뿐이라 코드 독해로는 안 잡힌다. 함께 재는 것: 빈 상태 200 · **남의 배정 불가시**(`service_role`이 RLS를 우회하므로 함수의 `where`가 유일한 방어선) · anon 401 · date 오타 400 · POST 405.
 
 #### ② `GET /v1/corrections` — 나에게 온 교정
 
