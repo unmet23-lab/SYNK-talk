@@ -46,20 +46,24 @@ const 통로 = '발화녹음';
 const 봉투 = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-/** 길이를 먼저 보지 않고 전부 비교한다 — 길이 분기만으로도 키 길이가 새어 나간다. */
-function 같은키(a: string, b: string): boolean {
-  const x = new TextEncoder().encode(a);
-  const y = new TextEncoder().encode(b);
-  let 차 = x.length ^ y.length;
-  for (let i = 0; i < Math.max(x.length, y.length); i++) 차 |= (x[i] ?? 0) ^ (y[i] ?? 255);
-  return 차 === 0;
-}
-
+/* 호출자는 **JWT 의 `role` 로** 가른다 — 키 문자열 비교가 아니다.
+ *
+ * 🔴 2026-08-07 실측으로 갈렸다: 이 프로젝트의 `SUPABASE_SERVICE_ROLE_KEY`(플랫폼 주입)는
+ *   새 형식 `sb_secret_…`(41자)이고, Management API 가 주는 `service_role` 은 legacy JWT(219자)다.
+ *   **둘은 같은 값이 아니라** 문자열 비교로는 아무도 못 부른다. 그 증상은 「배치가 조용히 안 돈다」다.
+ *   서명 검증은 플랫폼이 이미 했다(`verify_jwt=true`) — 하지만 그건 **anon 키도 통과시킨다**.
+ *   갈라야 하는 것은 서명이 아니라 **권한**이고, 그 값이 `role` 이다(events 의 `토큰주체` 와 같은 층).
+ */
 function 호출자확인(req: Request): boolean {
-  const 키 = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
   const m = req.headers.get('Authorization')?.match(/^Bearer\s+(.+)$/i);
-  // 키가 없으면 **통과가 아니라 거부**다 — 설정 누락이 「전원 허용」으로 번역되면 안 된다.
-  return !!키 && !!m && 같은키(m[1].trim(), 키);
+  const 마디 = m ? m[1].trim().split('.') : [];
+  if (마디.length !== 3) return false;
+  try {
+    const p = JSON.parse(atob(마디[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return p.role === 'service_role';
+  } catch {
+    return false;
+  }
 }
 
 Deno.serve(async (req: Request) => {
