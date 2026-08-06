@@ -1,8 +1,9 @@
 name: CI
 
-# 두 갈래로 나눈다:
+# 세 갈래로 나눈다:
 #   verify — 자격증명이 없어도 항상 돈다. 지금 당장 값을 한다.
-#   build  — **손으로 부를 때만**(workflow_dispatch). 아래 🔴 참조.
+#   supabase — 로컬 Supabase 에서 기준선 마이그레이션의 물리 회귀를 검증한다.
+#   build    — **손으로 부를 때만**(workflow_dispatch). 아래 🔴 참조.
 #
 # 🔴 2026-08-06: build 를 push 게이트에서 뺐다. 원래 의도(위 5번째 줄)는 「빨간불로 남기지
 #    않는다」였는데, EXPO_TOKEN 을 등록한 뒤 **무료 플랜 Android 빌드 월 한도가 소진되자**
@@ -33,8 +34,29 @@ jobs:
       - name: 교정 엔진 평가
         run: npm run eval
 
+  supabase:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.84.2
+      - name: 로컬 Supabase 시작
+        run: |
+          supabase init
+          supabase start
+      - name: 기준선 마이그레이션 회귀
+        run: bash tools/검증_마이그레이션.sh
+      - name: 로컬 Supabase 종료
+        if: always()
+        run: supabase stop --no-backup
+
   build:
-    needs: verify
+    needs: [verify, supabase]
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # 손으로 부를 때만 도니 기다려도 된다 — 그래서 `--no-wait` 를 뺐다(아래 preview 스텝).

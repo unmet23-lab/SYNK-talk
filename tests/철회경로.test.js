@@ -61,7 +61,10 @@ test('탐지력 픽스처 — 날짜 분할 예시가 되살아나면 잡는다'
 function NOT_NULL_기본값없는열_(테이블) {
   const i = SQL.indexOf(`create table if not exists engine.${테이블} (`);
   assert.notEqual(i, -1, `스키마에서 ${테이블} 을 못 찾았다 — 이름이 바뀌었다면 이 테스트도 함께 옮겨라`);
-  const 본문 = SQL.slice(i, SQL.indexOf('\n);', i));
+  const 나머지 = SQL.slice(i);
+  const 상대끝 = 나머지.search(/\n\s*\);/);
+  assert.notEqual(상대끝, -1, `${테이블} 정의의 닫는 괄호를 못 찾았다 — 추출기가 낡았다`);
+  const 본문 = 나머지.slice(0, 상대끝);
   return 본문.split('\n')
     .map((줄) => 줄.replace(/--.*$/, '').trim())
     .filter((줄) => /^\w+\s+/.test(줄) && !/^(constraint|unique|primary|foreign|check)\b/i.test(줄))
