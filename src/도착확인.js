@@ -12,7 +12,7 @@ function show(v) {
   return String(v);
 }
 
-export default function 도착확인({ 돌아가기 }) {
+export default function 도착확인({ 돌아가기, 가기 }) {
   const 줄 = [
     ['앱 버전', require('../app.json').expo.version],
     ['런타임 버전', show(Updates.runtimeVersion)],
@@ -41,6 +41,21 @@ export default function 도착확인({ 돌아가기 }) {
         「업데이트 ID」가 바뀌면 새 코드가 도착한 것이다.{'\n'}개발 중에는 (없음)이 정상이다.
       </Text>
 
+      {/* 계정 — 이 화면이 앱의 유일한 「설정 안쪽」이라 여기 붙는다.
+          🔑 초기화는 숨기지 않는다: 권한은 화면이 아니라 서버가 정하고, 원장이 아닌 토큰은 403 을 받는다. */}
+      {가기 && (
+        <View style={s.card}>
+          <Pressable onPress={() => 가기('비번변경')} hitSlop={6}
+            style={({ pressed }) => [s.줄버튼, pressed && { opacity: 0.65 }]}>
+            <Text style={s.줄버튼글}>비밀번호 바꾸기</Text>
+          </Pressable>
+          <Pressable onPress={() => 가기('초기화')} hitSlop={6}
+            style={({ pressed }) => [s.줄버튼, pressed && { opacity: 0.65 }]}>
+            <Text style={s.줄버튼글}>학생 비밀번호 초기화 (원장)</Text>
+          </Pressable>
+        </View>
+      )}
+
       <Pressable onPress={돌아가기} style={({ pressed }) => [s.back, pressed && { opacity: 0.7 }]}>
         <Text style={s.backText}>← 말하기로 돌아가기</Text>
       </Pressable>
@@ -65,6 +80,8 @@ const s = StyleSheet.create({
     gap: 12,
   },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  줄버튼: { paddingVertical: 8 },   // 손가락이 닿는 세로 여유
+  줄버튼글: { fontFamily: 폰트.본문, fontSize: 14, color: 색.잉크 },
   key: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_서브 },
   value: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크, flexShrink: 1, textAlign: 'right' },
   note: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_메타, lineHeight: 19 },
