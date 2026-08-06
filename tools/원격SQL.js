@@ -97,6 +97,16 @@ function 안내() {
   process.exit(2);
 }
 
+/** 대상 프로젝트를 이름으로 확인시킨다 — ref 문자열만 보면 사람은 두 개를 못 가른다. */
+async function 대상알림(ref, 토큰, 쓰기) {
+  let 이름 = '(이름 조회 실패)';
+  try {
+    const r = await fetch(`${API}/${ref}`, { headers: { Authorization: `Bearer ${토큰}` } });
+    if (r.ok) 이름 = JSON.parse(await r.text()).name ?? 이름;
+  } catch { /* 조회 실패가 실행을 막지는 않는다 — 알림이지 가드가 아니다 */ }
+  console.error(`[원격SQL] 대상 ▸ ${이름}  (${ref})${쓰기 ? '  ⚠ 쓰기(--적용)' : '  읽기'}`);
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const 적용 = args.includes('--적용');
@@ -116,6 +126,10 @@ async function main() {
   const 토큰 = e.SUPABASE_ACCESS_TOKEN;
   const ref = e.SUPABASE_PROJECT_REF;
   if (!토큰 || !ref) 안내();
+
+  // 🔴 **쏘기 직전에 과녁을 소리 내어 읽는다.** 프로젝트가 둘 이상이면(리허설·운영) 환경변수
+  //    하나로 대상이 조용히 바뀐다 — 틀린 곳에 DDL 을 부어도 증상은 「성공」뿐이다.
+  await 대상알림(ref, 토큰, 적용);
 
   const res = await fetch(`${API}/${ref}/database/query`, {
     method: 'POST',

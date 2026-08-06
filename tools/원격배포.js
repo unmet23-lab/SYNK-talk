@@ -102,6 +102,12 @@ async function main() {
   if (!토큰 || !ref) 안내();
   const 헤더 = { Authorization: `Bearer ${토큰}` };
 
+  // 🔴 프로젝트가 둘 이상이면(리허설·운영) 환경변수 하나로 대상이 조용히 바뀐다 — 이름으로 확인시킨다.
+  try {
+    const r = await fetch(`${API}/${ref}`, { headers: 헤더 });
+    if (r.ok) console.error(`[원격배포] 대상 ▸ ${JSON.parse(await r.text()).name}  (${ref})`);
+  } catch { /* 알림이지 가드가 아니다 */ }
+
   if (목록) {
     const res = await fetch(`${API}/${ref}/functions`, { headers: 헤더 });
     const 본문 = await res.text();

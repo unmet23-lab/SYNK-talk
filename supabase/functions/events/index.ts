@@ -11,6 +11,14 @@
  *   필드 조합은 `lib/이벤트검증.js`, 이름·값목록은 `계약/수집_교정_계약.json` — **둘 다 저장소 정본을
  *   그대로 동봉한다**(베끼면 갈라지고, 갈라지는 방향은 언제나 「통과」다). `동봉.json` 참고.
  *
+ * ■ 계약판은 **DB 에게 묻는다** (손 상수를 두지 않는다)
+ *   초판은 `지원계약 = ['c6']` 상수였다. 그건 마이그레이션을 올릴 때마다 사람이 같이 올려야 하고,
+ *   **안 올리면 앱 전체가 426, 먼저 올리면 400 이어야 할 것이 500** 이 된다. 어느 쪽으로 틀려도
+ *   증상이 크고 원인이 안 보인다. 그래서 `engine.schema_migrations` 의 최신 조각 이름(`..._c7.sql`)
+ *   에서 판을 읽는다 — **함수가 DB 보다 앞설 수 없는 구조**가 된다.
+ *   받는 규칙: 앱이 말한 판 ≤ DB 의 판. 옛 앱은 계속 돌고(값목록이 부분집합이라 안전),
+ *   DB 보다 새 판은 거절한다(그 앱은 DB 가 모르는 값을 보낼 수 있다).
+ *
  * ■ 앱을 믿지 않는 자리 셋
  *   ① 학생은 **토큰에서** 확정한다 — 본문의 learner_id 는 400 (service_role 은 RLS 를 우회하므로
  *      본문을 믿는 순간 남의 데이터를 쓴다).
@@ -23,17 +31,13 @@ import 계약 from './계약.mjs';
 
 const { 검증 } = 검증모듈 as { 검증: (e: unknown, c: unknown) => { ok: boolean; 오류들: string[] } };
 
-/* 이 함수가 아는 계약판. 🔴 DB 의 CHECK 제약(`*_c6`)과 **같이** 올라가야 한다 —
- * 값목록이 앞서 나가면 함수는 통과시키고 DB 가 거절해서 400 이어야 할 것이 500 이 된다.
- * 계약을 올리는 사람이 이 배열에 새 판을 넣고 다시 배포한다(L0 §8-2). */
-const 지원계약 = ['c6'];
-
 const 최대건수 = 100;
 const 최대바이트 = 1_000_000;
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const 계약판 = /^c(\d+)$/;
 
 type 오류 = { code: string; message: string; retryable: boolean; field?: string };
 
@@ -43,7 +47,7 @@ function 봉투(status: number, body: Record<string, unknown>, ver: string) {
     headers: { 'Content-Type': 'application/json' },
   });
 }
-const 실패 = (status: number, e: 오류, ver = 지원계약[0]) => 봉투(status, { ok: false, error: e }, ver);
+const 실패 = (status: number, e: 오류, ver: string) => 봉투(status, { ok: false, error: e }, ver);
 
 /** JWT 의 가운데 마디만 읽는다 — 서명 검증은 플랫폼이 이미 했다(verify_jwt=true). */
 function 토큰주체(req: Request): string | null {
@@ -61,43 +65,61 @@ function 토큰주체(req: Request): string | null {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method !== 'POST') return 실패(405, { code: 'CONTRACT_VIOLATION', message: 'POST 만 받는다', retryable: false });
-
-  const ver = req.headers.get('X-Contract-Ver');
-  if (!ver) return 실패(400, { code: 'CONTRACT_VER_MISSING', message: 'X-Contract-Ver 헤더가 없습니다', retryable: false });
-  if (!지원계약.includes(ver)) {
-    return 실패(426, { code: 'CONTRACT_VER_UNSUPPORTED', message: `지원하지 않는 계약판입니다: ${ver}`, retryable: false }, ver);
+  const 선언 = req.headers.get('X-Contract-Ver') ?? '';
+  if (!선언) return 실패(400, { code: 'CONTRACT_VER_MISSING', message: 'X-Contract-Ver 헤더가 없습니다', retryable: false }, 선언);
+  const 선언판 = 계약판.exec(선언);
+  if (!선언판) {
+    return 실패(426, { code: 'CONTRACT_VER_UNSUPPORTED', message: `계약판 형식이 아닙니다: ${선언}`, retryable: false }, 선언);
   }
+  if (req.method !== 'POST') return 실패(405, { code: 'CONTRACT_VIOLATION', message: 'POST 만 받는다', retryable: false }, 선언);
 
   const 주체 = 토큰주체(req);
-  if (!주체) return 실패(401, { code: 'AUTH_REQUIRED', message: '로그인이 필요합니다', retryable: false }, ver);
+  if (!주체) return 실패(401, { code: 'AUTH_REQUIRED', message: '로그인이 필요합니다', retryable: false }, 선언);
 
   const 원문 = await req.text();
-  if (원문.length > 최대바이트) {
-    return 실패(413, { code: 'PAYLOAD_TOO_LARGE', message: '배치가 너무 큽니다 — 나눠 보내주세요', retryable: false }, ver);
+  // ⚠ 바이트로 잰다 — `length` 는 UTF-16 칸 수라 한국어·몽골어에서 상한이 조용히 헐거워진다.
+  if (new TextEncoder().encode(원문).length > 최대바이트) {
+    return 실패(413, { code: 'PAYLOAD_TOO_LARGE', message: '배치가 너무 큽니다 — 나눠 보내주세요', retryable: false }, 선언);
   }
 
   let 본문: { events?: unknown };
   try {
     본문 = JSON.parse(원문 || '{}');
   } catch {
-    return 실패(400, { code: 'CONTRACT_VIOLATION', message: 'JSON 이 아닙니다', retryable: false }, ver);
+    return 실패(400, { code: 'CONTRACT_VIOLATION', message: 'JSON 이 아닙니다', retryable: false }, 선언);
   }
   const 사건들 = 본문.events;
   if (!Array.isArray(사건들)) {
-    return 실패(400, { code: 'CONTRACT_VIOLATION', message: 'events 배열이 없습니다', field: 'events', retryable: false }, ver);
+    return 실패(400, { code: 'CONTRACT_VIOLATION', message: 'events 배열이 없습니다', field: 'events', retryable: false }, 선언);
   }
   if (사건들.length > 최대건수) {
-    return 실패(413, { code: 'PAYLOAD_TOO_LARGE', message: `한 번에 ${최대건수}건까지입니다`, retryable: false }, ver);
+    return 실패(413, { code: 'PAYLOAD_TOO_LARGE', message: `한 번에 ${최대건수}건까지입니다`, retryable: false }, 선언);
   }
 
-  // 학생 확정 — **토큰에서만**. 유효한 JWT 여도 학생 행이 없으면 학생이 아니다(직원·서비스 토큰).
-  const 학생 = await sql`
-    select learner_id from engine.learners where auth_user_id = ${주체}::uuid`;
-  if (!학생.length) {
+  // 학생 확정과 DB 계약판을 **한 번에** 읽는다(왕복 1회).
+  // 유효한 JWT 여도 학생 행이 없으면 학생이 아니다(직원·서비스 토큰).
+  const [행] = await sql`
+    select (select learner_id from engine.learners where auth_user_id = ${주체}::uuid) as learner_id,
+           (select name from engine.schema_migrations order by version desc limit 1) as 최신조각`;
+
+  const db판 = 계약판.exec(String(행?.최신조각 ?? '').match(/_(c\d+)\.sql$/)?.[1] ?? '');
+  if (!db판) {
+    console.error('[events] DB 계약판을 못 읽었다', 행?.최신조각);
+    return 실패(500, { code: 'SERVER_ERROR', message: '서버 설정 오류입니다', retryable: true }, 선언);
+  }
+  const ver = db판[0];
+
+  if (Number(선언판[1]) > Number(db판[1])) {
+    return 실패(426, {
+      code: 'CONTRACT_VER_UNSUPPORTED', retryable: false,
+      message: `서버가 아직 ${선언} 을 모릅니다(현재 ${ver}) — 잠시 뒤 다시 시도해 주세요`,
+    }, ver);
+  }
+
+  if (!행?.learner_id) {
     return 실패(401, { code: 'AUTH_REQUIRED', message: '학생 계정이 아닙니다', retryable: false }, ver);
   }
-  const learner_id: string = 학생[0].learner_id;
+  const learner_id: string = 행.learner_id;
 
   const results: Record<string, unknown>[] = [];
   for (const 사건 of 사건들 as Record<string, unknown>[]) {
@@ -138,6 +160,14 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
   if (Number.isNaN(Date.parse(occurred_at))) {
     return 거절({ code: 'CONTRACT_VIOLATION', message: 'occurred_at 이 ISO 8601 이 아닙니다', field: 'occurred_at', retryable: false });
   }
+
+  /* jsonb 는 **드라이버의 `sql.json()` 으로만** 싣는다.
+   * 🔴 실측(2026-08-06 왕복시험): `${JSON.stringify(v)}::jsonb` 로 보내면 드라이버가 그 문자열을
+   *   **한 번 더** JSON 으로 감싸서, 저장된 값이 객체가 아니라 **JSON 문자열**이 된다
+   *   (`jsonb_typeof` = `string` · `payload->>'attempt_no'` = null).
+   *   오류가 안 나고 행도 멀쩡히 생겨서 **저장된 뒤에야, 그것도 조회할 때에야** 드러난다 —
+   *   `choice.selected` 의 보기·선택 기록이 통째로 죽는 자리였다. */
+  const 제이슨 = (v: unknown) => (v == null ? null : sql.json(v as never));
 
   try {
     return await sql.begin(async (tx) => {
@@ -187,7 +217,7 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
           ${(사건.turn_no ?? null) as number | null},
           ${(사건.skill_ids ?? []) as string[]}, ${(사건.skill_taxonomy_ver ?? null) as string | null},
           ${(사건.level_snapshot ?? null) as string | null}, ${(사건.goal_snapshot ?? null) as string | null},
-          ${intervention_id}::uuid, ${동의[0].consent_ver}, ${payload as unknown as object}, ${ver}
+          ${intervention_id}::uuid, ${동의[0].consent_ver}, ${제이슨(payload)}, ${ver}
         )
         on conflict (learner_id, idempotency_key) do nothing
         returning event_id`;
@@ -210,12 +240,12 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
           ) values (
             ${event_id}::uuid, ${String(사건.task_type)}, ${(s.task_format ?? null) as string | null},
             ${(s.task_ref ?? null) as string | null},
-            ${(s.task_snapshot ?? null) as unknown as object | null},
+            ${제이슨(s.task_snapshot)},
             ${(s.task_schema_ver ?? null) as string | null},
             ${(s.body_original ?? null) as string | null},
             ${(s.image_refs ?? null) as string[] | null},
             ${(s.audio_ref ?? null) as string | null},
-            ${(s.capture_meta ?? null) as unknown as object | null},
+            ${제이슨(s.capture_meta)},
             ${occurred_at}::timestamptz, ${ver}
           )`;
       }
@@ -224,7 +254,7 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
   } catch (e) {
     const 글 = String((e as Error)?.message ?? e);
     // DB 가 막은 것은 대개 **계약 위반**이지 서버 잘못이 아니다 — 그걸 5xx 로 주면 앱이 영원히 재시도한다.
-    if (/violates check constraint|invalid input|violates foreign key/i.test(글)) {
+    if (/violates check constraint|invalid input|violates foreign key|violates not-null/i.test(글)) {
       return 거절({ code: 'CONTRACT_VIOLATION', message: 글.slice(0, 200), retryable: false });
     }
     console.error('[events] 저장 실패', 글);
