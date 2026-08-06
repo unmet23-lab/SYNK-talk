@@ -71,10 +71,32 @@ function require풀기(src, 이름, 표내용) {
   });
 }
 
+/* 🔴 `index.ts` 의 `import './x.mjs'` 도 표에 있어야 한다.
+ *
+ *   `require풀기` 는 **lib 끼리의** require 만 지고, 함수 본체가 부르는 것은 아무도 안 봤다.
+ *   빠뜨리면 Management API 는 그 파일이 없는 채로 **배포에 성공하고**, 함수는 첫 호출의
+ *   import 에서 죽는다 — 라이브가 조용히 500 이 되는데 배포 로그는 초록이다. 2026-08-07 에
+ *   함수 넷이 동시에 `토큰.mjs` 를 물면서 이 구멍이 넷으로 늘어 여기서 막는다.
+ *   던지는 이유는 `require풀기` 와 같다 — `process.exit` 하는 가드는 회귀가 탐지력을 못 잰다. */
+function 본체import검사(디렉터리, 표내용) {
+  const 본체 = path.join(디렉터리, 'index.ts');
+  if (!fs.existsSync(본체)) return;                       // 픽스처 등 본체가 없는 디렉터리
+  const src = fs.readFileSync(본체, 'utf8');
+  const 빠진 = [];
+  for (const m of src.matchAll(/^\s*import\s+[^'"]*from\s+'\.\/([^']+\.mjs)'/gm)) {
+    if (!Object.prototype.hasOwnProperty.call(표내용, m[1])) 빠진.push(m[1]);
+  }
+  if (빠진.length) {
+    throw new Error(`동봉 ${path.basename(디렉터리)}: index.ts 가 import 하는데 동봉 표에 없다 — ${빠진.join(', ')}\n`
+      + '       표에 그 항목을 더해라. 안 그러면 배포는 성공하고 함수가 첫 호출의 import 에서 죽는다.');
+  }
+}
+
 function 동봉묶기(디렉터리) {
   const 표 = path.join(디렉터리, '동봉.json');
   if (!fs.existsSync(표)) return {};
   const 표내용 = JSON.parse(fs.readFileSync(표, 'utf8'));
+  본체import검사(디렉터리, 표내용);
   const out = {};
   for (const [이름, 저장소경로] of Object.entries(표내용)) {
     let src;

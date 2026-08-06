@@ -27,7 +27,9 @@
  */
 import postgres from 'npm:postgres@3.4.4';
 import 과제모듈 from './오늘과제.mjs';
+import 토큰모듈 from './토큰.mjs';
 
+const { 서비스역할 } = 토큰모듈 as { 서비스역할: (req: Request) => boolean };
 const { 몽골날짜, 멱등키, 오늘과제, 따라말하기문장 } = 과제모듈 as {
   몽골날짜: (때?: Date) => string;
   멱등키: (종류: string, learner_id: string, 날짜: string) => string;
@@ -46,28 +48,10 @@ const 통로 = '발화녹음';
 const 봉투 = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-/* 호출자는 **JWT 의 `role` 로** 가른다 — 키 문자열 비교가 아니다.
- *
- * 🔴 2026-08-07 실측으로 갈렸다: 이 프로젝트의 `SUPABASE_SERVICE_ROLE_KEY`(플랫폼 주입)는
- *   새 형식 `sb_secret_…`(41자)이고, Management API 가 주는 `service_role` 은 legacy JWT(219자)다.
- *   **둘은 같은 값이 아니라** 문자열 비교로는 아무도 못 부른다. 그 증상은 「배치가 조용히 안 돈다」다.
- *   서명 검증은 플랫폼이 이미 했다(`verify_jwt=true`) — 하지만 그건 **anon 키도 통과시킨다**.
- *   갈라야 하는 것은 서명이 아니라 **권한**이고, 그 값이 `role` 이다(events 의 `토큰주체` 와 같은 층).
- */
-function 호출자확인(req: Request): boolean {
-  const m = req.headers.get('Authorization')?.match(/^Bearer\s+(.+)$/i);
-  const 마디 = m ? m[1].trim().split('.') : [];
-  if (마디.length !== 3) return false;
-  try {
-    const p = JSON.parse(atob(마디[1].replace(/-/g, '+').replace(/_/g, '/')));
-    return p.role === 'service_role';
-  } catch {
-    return false;
-  }
-}
-
 Deno.serve(async (req: Request) => {
-  if (!호출자확인(req)) {
+  /* 호출자는 **JWT 의 `role` 로** 가른다 — 키 문자열 비교가 아니다(정본 `lib/토큰.js`).
+   * 서명 검증은 플랫폼이 이미 했지만(`verify_jwt=true`) 그건 **anon 키도 통과시킨다**. */
+  if (!서비스역할(req)) {
     return 봉투(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: '배치 호출 권한이 없습니다' } });
   }
   const 오늘 = 몽골날짜();

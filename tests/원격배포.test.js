@@ -76,6 +76,21 @@ test('동봉 — 표에 없는 파일을 require 하면 배포 전에 멈춘다'
   }
 });
 
+test('동봉 — index.ts 가 import 하는데 표에 없으면 배포 전에 멈춘다', () => {
+  /* `require풀기` 는 lib 끼리만 봤다 — 함수 본체가 부르는 것은 아무도 안 봤고, 빠뜨리면
+   * 배포는 **성공하고** 첫 호출의 import 에서 죽는다(배포 로그는 초록이다). */
+  const 방 = fs.mkdtempSync(path.join(os.tmpdir(), 'synk-본체import-'));
+  try {
+    fs.writeFileSync(path.join(방, '동봉.json'), JSON.stringify({ '오늘과제.mjs': 'lib/오늘과제.js' }));
+    fs.writeFileSync(path.join(방, 'index.ts'),
+      "import 과제 from './오늘과제.mjs';\nimport 토큰 from './토큰.mjs';\n");   // 토큰을 일부러 뺐다
+    assert.throws(() => 동봉묶기(방), /토큰\.mjs/,
+      '본체가 import 하는데 표에 없다 — 그러면 라이브가 첫 호출에서 죽는다');
+  } finally {
+    fs.rmSync(방, { recursive: true, force: true });
+  }
+});
+
 test('동봉 — CJS 검증기가 ESM 으로 감싸여 실제로 import 된다', async () => {
   const 묶음 = 동봉묶기(함수디렉터리);
   const m = await 임시import('이벤트검증.mjs', 묶음['이벤트검증.mjs']);

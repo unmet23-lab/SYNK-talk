@@ -22,7 +22,9 @@
  */
 import postgres from 'npm:postgres@3.4.4';
 import 경로모듈 from './업로드경로.mjs';
+import 토큰모듈 from './토큰.mjs';
 
+const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
 const { 버킷, 경로만들기 } = 경로모듈 as {
   버킷: string;
   경로만들기: (a: Record<string, unknown>) => { ref: string | null; 이유: string | null };
@@ -48,21 +50,6 @@ function 봉투(status: number, body: Record<string, unknown>, ver: string) {
   });
 }
 const 실패 = (status: number, e: 오류, ver: string) => 봉투(status, { ok: false, error: e }, ver);
-
-/** JWT 의 가운데 마디만 읽는다 — 서명 검증은 플랫폼이 이미 했다(verify_jwt=true). */
-function 토큰주체(req: Request): string | null {
-  const m = req.headers.get('Authorization')?.match(/^Bearer\s+(.+)$/i);
-  if (!m) return null;
-  const 마디 = m[1].split('.');
-  if (마디.length !== 3) return null;
-  try {
-    const p = JSON.parse(atob(마디[1].replace(/-/g, '+').replace(/_/g, '/')));
-    // anon 키도 유효한 JWT 라 verify_jwt 를 통과한다 — 그건 **사람이 아니다**(sub 가 없다).
-    return typeof p.sub === 'string' && p.sub ? p.sub : null;
-  } catch {
-    return null;
-  }
-}
 
 Deno.serve(async (req: Request) => {
   const 선언 = req.headers.get('X-Contract-Ver') ?? '';

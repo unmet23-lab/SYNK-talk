@@ -23,6 +23,8 @@ const die = (m) => { console.error('[배달왕복시험] ' + m); process.exit(1)
 
 const 자격증명 = require(path.join(__dirname, '..', 'lib', '자격증명.js'));
 const { 오늘과제, 몽골날짜, 따라말하기문장 } = require(path.join(__dirname, '..', 'lib', '오늘과제.js'));
+// 합성 도메인은 정본에서 가져온다 — 여기 박으면 도메인이 바뀌는 날 조용히 갈린다.
+const { 도메인 } = require(path.join(__dirname, '..', 'lib', '로그인코드.js'));
 
 let 통과 = 0, 실패 = 0;
 function 확인(이름, 조건, 실제) {
@@ -140,7 +142,7 @@ async function main() {
   확인('실패 0', (r1.몸.실패 || []).length === 0, r1.몸.실패);
 
   const 행 = async (k) => (await sql(`
-    select e.event_type, e.actor_kind, e.degraded, e.intervention_id, e.idempotency_key,
+    select e.event_id, e.event_type, e.actor_kind, e.degraded, e.intervention_id, e.idempotency_key,
            e.payload, s.task_snapshot, s.task_format, s.task_ref
       from engine.learning_events e
       left join engine.submissions s on s.event_id = e.event_id
@@ -222,6 +224,85 @@ async function main() {
   확인('🔴 B 가 못 받았으므로 미달이 참이다 — 배치가 안 돈 것을 조용히 넘기지 않는다',
     chk.몸.미달 === true && Number(chk.몸.배정) < Number(chk.몸.재적), chk.몸);
   확인('강등이 0 이 아니다 — AI 미배선이 숫자로 보인다', Number(chk.몸.강등) > 0, chk.몸.강등);
+
+  /* ── ⑧ 조회 왕복 ──────────────────────────────────────────────
+   * 🔴 여기까지 와야 「배달 → 화면」이 닫힌다. 배치가 쓴 것과 `GET /v1/tasks` 가 읽은 것이
+   *   갈리면 증상은 「학생 화면이 비어 있다」 하나뿐이라, **같은 실행 안에서** 대조한다.
+   *
+   * 학생 토큰은 admin API 로 직접 만든다(`auth` 함수를 지나지 않는다) — 이 시험이 재는 것은
+   * 배달·조회의 대조지 등록 게이트가 아니고, 그건 `인증왕복시험.js` 가 따로 진다.
+   * 🔑 계정은 **재사용**한다 — 회차마다 새로 만들면 `auth.users` 가 회차 수만큼 쌓인다. */
+  console.log('\n■ ⑧ 조회 왕복 — GET /v1/tasks (C0 §4-3 ①)');
+  const 학생이메일 = `probe-tasks${도메인}`;
+  const 학생비번 = 'Tasks-Rehearsal-1';
+  const 유저 = async (경로, 방법, 본문) => fetch(`https://${ref}.supabase.co/auth/v1/${경로}`, {
+    method: 방법,
+    headers: { apikey: service, Authorization: `Bearer ${service}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(본문),
+  });
+  let uid = (await sql(`select id from auth.users where email='${학생이메일}'`))[0]?.id;
+  if (!uid) {
+    const cr = await 유저('admin/users', 'POST', { email: 학생이메일, password: 학생비번, email_confirm: true });
+    uid = cr.ok ? JSON.parse(await cr.text()).id : (await sql(`select id from auth.users where email='${학생이메일}'`))[0]?.id;
+    if (!uid) die('시험용 학생 계정을 못 만들었다');
+  } else {
+    // 재사용이라 비밀번호가 갈렸을 수 있다 — 매번 맞춰 두면 회차가 서로를 안 깨뜨린다.
+    await 유저(`admin/users/${uid}`, 'PUT', { password: 학생비번 });
+  }
+  // 지난 회차의 학생에게서 떼어 이번 A 에게 붙인다(auth_user_id 는 학생당 하나다).
+  await sql(`update engine.learners set auth_user_id = null where auth_user_id = '${uid}'`);
+  await sql(`update engine.learners set auth_user_id = '${uid}' where learner_id = '${id.A}'::uuid`);
+
+  const 로그인 = await fetch(`https://${ref}.supabase.co/auth/v1/token?grant_type=password`, {
+    method: 'POST', headers: { apikey: anon, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 학생이메일, password: 학생비번 }),
+  });
+  const 학생토큰 = JSON.parse(await 로그인.text()).access_token;
+  if (!학생토큰) die('학생 토큰을 못 받았다');
+
+  const 조회 = async (질의 = '', 옵션 = {}) => {
+    const h = { apikey: anon, Authorization: `Bearer ${옵션.토큰 ?? 학생토큰}` };
+    if (옵션.판 !== null) h['X-Contract-Ver'] = 옵션.판 ?? 판;
+    const r = await fetch(`https://${ref}.supabase.co/functions/v1/tasks${질의}`, {
+      method: 옵션.방법 ?? 'GET', headers: h,
+    });
+    return { status: r.status, 몸: JSON.parse((await r.text()) || '{}') };
+  };
+
+  const t = await 조회();
+  확인('학생 토큰으로 오늘 것이 1건 나온다', t.status === 200 && (t.몸.data || []).length === 1, t);
+  const 읽은 = (t.몸.data || [])[0] || {};
+  확인('🔴 앱이 읽은 task_id 가 배치가 쓴 그 배정이다 — 배달과 조회가 같은 행을 본다',
+    읽은.task_id === A배정.event_id, [읽은.task_id, A배정 && A배정.event_id]);
+  확인('🔴 앱이 읽은 문장이 배치가 쓴 그 문장이다',
+    따라말하기문장(읽은.task_snapshot) === 따라말하기문장(snap), 읽은.task_snapshot);
+  확인('①듣기 — intervention 이 같은 intervention_id 로 붙어 output_text 를 실어 온다',
+    !!읽은.intervention && 읽은.intervention.intervention_id === A배정.intervention_id
+      && 읽은.intervention.output_text === 따라말하기문장(snap), 읽은.intervention);
+  확인('행의 task_format 은 비어서 온다 — 형식은 호흡 안에 있다',
+    읽은.task_format === null && (읽은.task_snapshot.호흡 || []).length === 2, 읽은.task_format);
+  확인('강등 여부가 그대로 전달된다', 읽은.degraded === false, 읽은.degraded);
+  확인('하루 1건이라 next_cursor 는 null 이다', t.몸.next_cursor === null, t.몸.next_cursor);
+
+  /* 🔴 빈 상태는 오류가 아니다 — A 는 어제 배정이 없다. 404 를 주면 앱이 오류 화면을 띄우고,
+   *   그건 첫날 학생 전원에게 「고장」으로 보인다. */
+  const 빈 = await 조회(`?date=${어제(오늘)}`);
+  확인('🔴 어제 것이 없어도 200 + 빈 배열이다 — 404 가 아니다',
+    빈.status === 200 && Array.isArray(빈.몸.data) && 빈.몸.data.length === 0, 빈);
+
+  /* 🔴 자기 것만 — 같은 날 C·D 에게도 배정이 섰는데 A 토큰에는 안 보여야 한다.
+   *   `service_role` 은 RLS 를 우회하므로 함수의 where 절이 유일한 방어선이다. */
+  const C배정 = (await 행('C')).find((r) => r.event_type === 'task.assigned');
+  확인('🔴 남의 배정은 안 보인다 — 학생은 토큰에서 확정되고 쿼리로 못 지정한다',
+    !(t.몸.data || []).some((x) => x.task_id === C배정.event_id) && C배정.event_id !== A배정.event_id,
+    (t.몸.data || []).map((x) => x.task_id));
+
+  확인('anon 키로는 못 읽는다 — 사람이 아니다', (await 조회('', { 토큰: anon })).status === 401);
+  확인('헤더가 없으면 400 이다', (await 조회('', { 판: null })).status === 400);
+  확인('DB 보다 새 판을 말하면 426 이다', (await 조회('', { 판: 'c999' })).status === 426);
+  확인('🔴 date 가 날짜꼴이 아니면 400 이다 — 500 이면 앱이 영구 오류를 무한 재시도한다',
+    (await 조회('?date=어제')).status === 400, (await 조회('?date=어제')).몸);
+  확인('POST 는 405 다 — 조회가 쓰기를 겸하지 않는다', (await 조회('', { 방법: 'POST' })).status === 405);
 
   console.log(`\n[배달왕복시험] ${통과}/${통과 + 실패} 통과`);
   process.exit(실패 ? 1 : 0);
