@@ -37,13 +37,18 @@ const SQL = 원문.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--.*$/gm, '');
  * 탐지력은 안 깎인다 — 뒤 조각이 옛 제약을 drop 하지 않으면 그 이름이 그대로 살아 남아 잡힌다. */
 const drop된제약 = new Set(
   [...SQL.matchAll(/drop constraint (?:if exists )?(\w+)/g)].map((m) => m[1]));
-const 살아있는CHECK = () =>
-  [...SQL.matchAll(/constraint (\w+) check/g)].map((m) => m[1]).filter((n) => !drop된제약.has(n));
+/* ⚠ 이름과 `check` 사이는 **줄바꿈일 수 있다** — 값목록이 길면 그렇게 쓰게 된다.
+ * 옛 정규식은 공백 한 칸만 봐서 그런 제약을 통째로 못 봤고, 못 보면 아래 「이름이 계약 버전을
+ * 달고 있다」가 그 제약에 대해 **영원히 통과**한다(빠진 것은 위반이 아니라 무존재로 보인다).
+ * 2026-08-06 실측: `staff_role_c7` 을 두 줄로 적었더니 탐지에서 사라졌다. 픽스처로 못박는다. */
+const CHECK정의 = /constraint (\w+)\s+check/g;
+const 살아있는CHECK = (원천 = SQL) =>
+  [...원천.matchAll(CHECK정의)].map((m) => m[1]).filter((n) => !drop된제약.has(n));
 const 꼬리시작 = 원문.lastIndexOf('확인 (한 번에)');
 const 최종꼬리 = 꼬리시작 === -1 ? '' : 원문.slice(꼬리시작);
 
 function CHECK값목록_(제약이름) {
-  const i = SQL.indexOf(`constraint ${제약이름} check`);
+  const i = SQL.search(new RegExp(`constraint ${제약이름}\\s+check`));
   assert.notEqual(i, -1, `SQL에서 제약 ${제약이름}을 못 찾았다 — 이름이 바뀌었다면 이 테스트도 함께 옮겨라`);
   const 끝 = SQL.indexOf('))', i);
   assert.notEqual(끝, -1, `${제약이름}의 괄호가 안 닫힌다`);
@@ -100,6 +105,16 @@ test('CHECK 제약 이름이 계약 버전을 달고 있다 (c4 개정이 조용
     `제약 이름이 계약 버전(${계약.버전})과 안 맞는다: ${안맞는.join(', ')}\n` +
     '  계약이 올랐다면 SQL 의 CHECK 를 새 값목록으로 고치고 **이름도 새 버전으로 바꾼 뒤**,\n' +
     '  이미 선 DB 에는 alter table drop constraint / add constraint 를 따로 돌린다(재실행으론 안 바뀐다)');
+});
+
+test('탐지력 픽스처 — 이름과 check 가 줄바꿈으로 갈린 제약도 잡는다', () => {
+  /* 실저장소를 픽스처로 쓰지 않는다(버그가 아직 있을 것을 요구하게 된다) — 여기서 못박는 것은
+   * **탐지기 자체**다. 이 검사가 없으면 위 테스트는 「두 줄로 적힌 옛 이름」을 영원히 통과시킨다. */
+  const 두줄 = "  role text not null constraint stale_name_c1\n    check (role in ('a'))";
+  assert.deepEqual(살아있는CHECK(두줄), ['stale_name_c1'],
+    '줄바꿈으로 갈린 CHECK 를 탐지기가 못 본다 — 못 보는 제약은 위반이 아니라 무존재로 보인다');
+  assert.deepEqual(살아있는CHECK('constraint oneline_c1 check (x in (1))'), ['oneline_c1'],
+    '한 줄짜리를 놓치면 넓힌 정규식이 옛 형태를 깨뜨린 것이다');
 });
 
 test('확인 쿼리가 참조하는 이름이 전부 정의된 별칭이다 (별칭만 고치고 참조를 안 고치면 Run 이 깨진다)', () => {

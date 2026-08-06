@@ -14,15 +14,20 @@ with 기대열(t, c) as (values
   ('schema_migrations','checksum'), ('schema_migrations','applied_at'),
   -- 학생 로그인(L0 §4-1·§4-2 · 20260806233000_auth_c7)
   ('learners','recovery_email'), ('learners','recovery_phone'),
-  ('learners','temp_password_expires_at'), ('learners','signup_attempts')
+  ('learners','temp_password_expires_at'), ('learners','signup_attempts'),
+  -- 직원 인증·세션 폐기(L0 §4-5·§4-2 ③ · 20260806234000_staff_c7)
+  ('learners','active'), ('learners','revoked_before'),
+  ('staff','role'), ('staff','staff_id'), ('staff','active'), ('staff','revoked_before'),
+  ('staff_access_log','action'), ('staff_access_log','target_ids')
 ), 기대제약(n) as (values
   ('learning_events_event_type_c7'), ('learning_events_task_type_c7'),
   ('submissions_task_format_c7'), ('submissions_translation_source_c7'), ('corrections_verdict_c7'),
   ('learning_events_retry_same_learner'), ('learning_events_parent_same_learner'),
   ('corrections_reviewed_same_submission'), ('schema_migrations_pkey'),
-  ('learners_signup_attempts_nonneg_c7')
+  ('learners_signup_attempts_nonneg_c7'), ('staff_role_c7')
 ), 기대트리거(n) as (values
-  ('learning_events_immutable'), ('corrections_immutable'), ('submissions_original_immutable')
+  ('learning_events_immutable'), ('corrections_immutable'), ('submissions_original_immutable'),
+  ('staff_access_log_immutable')
 ), 대상역할(r) as (values ('anon'), ('authenticated'))
 , 대상권한(p) as (values
   ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE'), ('REFERENCES'), ('TRIGGER')
@@ -80,16 +85,16 @@ with 기대열(t, c) as (values
   (select count(*) from pg_policies
     where schemaname='engine' and tablename='schema_migrations') as 이력정책
 )
-select case when 테이블수=9 and RLS켜짐=9 and 정책수=5
+select case when 테이블수=11 and RLS켜짐=11 and 정책수=8
              and 새는테이블권한=0 and 새는스키마권한=0
              and 삭제차단=3 and 실패상태=1 and 이력정책=0
              and (select v from 빠진열) is null
              and (select v from 빠진제약) is null
              and (select v from 빠진트리거) is null
-             and (select version from 현재이력)='20260806233000'
-              and (select checksum from 현재이력)='c5115077c33d8b0811848988c12acab86088ff83e5ca0a91e8c3ee0e64e3ffcf' -- migration-checksum
+             and (select version from 현재이력)='20260806234000'
+              and (select checksum from 현재이력)='ff27f02b65b2685bd8b1cfc2e5f9637219cc4605fb9dda5d0ffa0ab9e93b419e' -- migration-checksum
             then '✅ 전부 통과'
-            else '❌ 아래 칸을 그대로 알려주세요 (기대: 9·9·5·0·0·3·1·0 · 빠진 칸은 전부 비어 있어야 합니다)'
+            else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·8·0·0·3·1·0 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
        (select version from 현재이력) as 현재버전,
        (select checksum from 현재이력) as checksum,
