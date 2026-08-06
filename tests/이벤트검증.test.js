@@ -14,7 +14,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const 계약 = JSON.parse(fs.readFileSync(path.join(ROOT, '계약', '수집_교정_계약.json'), 'utf8'));
-const { 검증, 공통필수, 이벤트별필수, 서버칸, 서버사건 } = require('../lib/이벤트검증.js');
+const { 검증, 공통필수, 널허용, 이벤트별필수, 서버칸, 서버사건 } = require('../lib/이벤트검증.js');
 
 /* C0 §4-1 예시 그대로 — 서버가 채우는 칸은 뺐다(앱이 보내는 모양). */
 const 정상제출 = () => ({
@@ -49,6 +49,46 @@ test('level_snapshot 은 앱이 보낸다 — 빠지면 거부(오프라인 제�
   const e = 정상제출();
   delete e.level_snapshot;
   assert.equal(검증(e, 계약).ok, false);
+});
+
+/* ── ⓑ 급수 없는 학생 (C0 §4-3 ① · 유호님 확정 2026-08-07) ──────────────────────
+ * 🔴 이 네 개가 한 벌이다. 하나만 보면 「완화」와 「ⓑ」가 구분되지 않는다 —
+ *   ⓑ 는 **「모른다(`null`)」는 받고 「앱이 빠뜨렸다(키 없음)」는 계속 막는다**이고,
+ *   그 경계가 무너지는 방향은 언제나 통과 쪽이다. */
+test('ⓑ 급수를 모르는 학생의 제출은 통과한다 — null 이 유일하게 정확한 값이다', () => {
+  const e = { ...정상제출(), level_snapshot: null };
+  const r = 검증(e, 계약);
+  assert.equal(r.ok, true, r.오류들.join(' / '));
+});
+
+test('ⓑ 그래도 키는 필수다 — 앱 결손이 「모른다」로 위장해 들어오지 못한다', () => {
+  const e = 정상제출();
+  delete e.level_snapshot;
+  assert.ok(검증(e, 계약).오류들.some((m) => m.includes('level_snapshot')));
+});
+
+test('ⓑ undefined 는 「모른다」가 아니다 — JSON 왕복에서 키가 사라져 서버만 400 을 낸다', () => {
+  const e = { ...정상제출(), level_snapshot: undefined };
+  assert.equal(검증(e, 계약).ok, false, '앱은 통과시켰는데 서버는 막는 상태를 만들면 안 된다');
+  // 실제로 사라지는지 여기서 재 둔다 — 이 전제가 깨지면 위 판정의 근거가 없어진다.
+  assert.equal('level_snapshot' in JSON.parse(JSON.stringify(e)), false);
+});
+
+test('ⓑ 빈 문자열도 아니다 — 「모른다」는 null 하나로만 적는다', () => {
+  const e = { ...정상제출(), level_snapshot: '' };
+  assert.equal(검증(e, 계약).ok, false);
+});
+
+test('ⓑ 완화는 level_snapshot 한 칸뿐 — 나머지 공통 필수는 null 도 막는다', () => {
+  /* 🔴 걸러낼 이름을 `널허용` 에서 받으면 **그 집합이 넓어지는 변이를 이 검사가 못 본다**
+   *   (가드가 자기 전처리에 눈이 먼다 — 변이 시험에서 실제로 통과해 버렸다).
+   *   그래서 이름을 여기 박아 두고 집합 자체를 대조한다. */
+  assert.deepEqual([...널허용], ['level_snapshot'], '널허용이 번졌다 — 완화가 계약 밖으로 새고 있다');
+  for (const k of 공통필수) {
+    if (k === 'level_snapshot') continue;
+    const e = { ...정상제출(), [k]: null };
+    assert.equal(검증(e, 계약).ok, false, `${k} 가 null 인데 통과했다`);
+  }
 });
 
 test('서버가 채우는 칸을 앱이 보내면 거부한다 — 위조 방지', () => {
