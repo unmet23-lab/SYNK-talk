@@ -58,19 +58,19 @@
 | 헤더 | 예 | 없으면 |
 |---|---|---|
 | `Authorization` | `Bearer <access_token>` | 401 `AUTH_REQUIRED` |
-| `X-Contract-Ver` | `c7` | 400 `CONTRACT_VER_MISSING` |
+| `X-Contract-Ver` | `c8` | 400 `CONTRACT_VER_MISSING` |
 | `X-App-Ver` | `0.3.1 (42)` | 통과(로그용) |
 
 **응답 봉투 — 성공**
 
 ```json
-{ "ok": true, "contract_ver": "c7", "results": [ ... ] }
+{ "ok": true, "contract_ver": "c8", "results": [ ... ] }
 ```
 
 **응답 봉투 — 요청 전체 실패**
 
 ```json
-{ "ok": false, "contract_ver": "c7",
+{ "ok": false, "contract_ver": "c8",
   "error": { "code": "AUTH_EXPIRED", "message": "토큰이 만료됐습니다", "retryable": true } }
 ```
 
@@ -142,12 +142,13 @@
 | `goal_snapshot` | 🔑 **`level_snapshot`과 같은 근거로 앱이 보낸다**(c6). 학생 목적은 `learners.goal_track`에 덮어써지고 그 테이블은 append-only 밖이라, 서버의 현재 값은 **그때 목적이 아니다**. 목적 이력 테이블은 만들지 않는다(파생 선행 구축 금지) — 그때 화면이 알던 값을 그때 적는 것이 유일하게 정확하다 |
 | `task_format` | 낭독·자유발화… **`task_type`과 다른 축이다**(통로 vs 형식). 🔴 발화 제출에서 빠지면 그 녹음이 낭독인지 자유발화인지 **나중에 음성만 듣고는 못 가른다** — 섀도잉 데이터로 회화 모델을 학습시키는 사고가 조용히 성립한다 |
 | `retry_of_event_id`·`parent_event_id`·`turn_no` | 있을 때만. 재시도 고리는 성과 배선의 입구(위 `intervention_id` 계승)이고, 선행 턴·턴 서수는 회화 문맥이다. 🔴 **`occurred_at` 정렬로 대신하지 않는다** — 아래 §3이 「기기 시계는 못 믿는다」를 이미 못박았다 |
+| `correction_id` | **`correction.viewed`·`correction.responded`에 필수, 나머지에는 금지**(c8 · DB CHECK `learning_events_correction_target_c8`이 같은 판정을 진다). 앱은 §4의 교정 조회 응답에서 이 값을 그대로 받아 되돌려 보낸다 — 새로 만들지 않는다.<br>🔴 **`retry_of_event_id`로 대신하지 않는다**: 그건 사건→사건(재제출) 고리라 「어느 교정을 봤나」를 못 말한다. 없으면 「학습이 일어났다」의 유일한 직접 신호(S1-8)가 학생 단위로만 남고 교정 단위 판정이 영영 불가능하다.<br>⚠ 다른 학생의 `correction_id`를 보내면 **저장되지 않는다**(트리거 `learning_events_correction_same_learner`) — 400 `CONTRACT_VIOLATION`이 아니라 서버 오류로 나오므로 앱은 조회 응답의 값을 그대로 쓰는 것으로 족하다 |
 
 **payload 규격**
 
 - `payload.ver`(정수) **필수**. 모양이 바뀌면 `2`로 올리고 과거 행은 `1`로 남는다.
   > 🔑 **이벤트 이름에 `.v1`을 붙이지 않는다**(L0 §3-2 표기 정정 요청 · §9). 이름에 붙이면 값목록이 payload 개정마다 배로 늘고, 집계가 `like 'choice.selected%'`가 된다. `payload.ver`는 **컬럼도 값목록도 늘리지 않는다.**
-- payload 필드 이름도 **현행 계약(c6) 필드 목록에서 고른다**(`confidence`·`attempt_no`·`learner_response`·`options_shown`·`position`·`recommended_option`·`selected_option`·`changed_selection`·`latency_ms`·`skipped`·**`selection_reason`**·**`rejected_all`**·**`cited_refs`**·**`output_text`**). 목록에 없는 이름이 필요하면 **다음 판 개정(c7)**이지 자유 추가가 아니다.
+- payload 필드 이름도 **현행 계약(c8) 필드 목록에서 고른다**(`confidence`·`attempt_no`·`learner_response`·`options_shown`·`position`·`recommended_option`·`selected_option`·`changed_selection`·`latency_ms`·`skipped`·**`selection_reason`**·**`rejected_all`**·**`cited_refs`**·**`output_text`**). 목록에 없는 이름이 필요하면 **다음 판 개정(c9)**이지 자유 추가가 아니다.
   > 🔴 **굵은 4개는 c4·c5가 계약에 넣었는데 이 목록이 따라오지 않았다**(2026-08-06 외부 검토가 잡았다). 계약은 「필수」라 하고 이 문서는 「목록에 없는 이름은 자유 추가가 아니다」라 해서, **앱이 그 필드를 보내는 순간 계약 위반으로 거절되는** 상태였다. 두 문서가 각자 맞는 말을 하는데 합치면 구현이 불가능한 형태 — 계약을 늘릴 때 이 목록을 함께 늘리지 않으면 반드시 재발한다.
 - **선택지는 `{option_id, label}`로 싣는다**(c6). `option_id`는 안 바뀌는 조인 키고 `label`은 그때 표시된 문구의 스냅샷이다. 문구만 문자열로 남기면 문구를 개정하는 날 **판을 가로지르는 집계가 끊긴다** — 스킬에 「이름 말고 불변 ID로 묶는다」를 적용한 것과 같은 이유이고, c5까지 선택지에만 그 규칙이 빠져 있었다.
 - 🔴 **`is_correct`(정답여부)를 만들지 않는다.** `submission.body_original`(고른 답) + `task_snapshot.정답`이 있으면 채점은 **언제든 다시 계산되는 파생**이다. 원본을 두고 파생을 저장하면 채점 규칙이 바뀌는 날 과거가 거짓말을 한다.
@@ -156,7 +157,7 @@
 **응답**
 
 ```json
-{ "ok": true, "contract_ver": "c7",
+{ "ok": true, "contract_ver": "c8",
   "results": [
     { "idempotency_key": "b6f1…", "status": "stored",    "event_id": "3c9e…" },
     { "idempotency_key": "77a2…", "status": "duplicate", "event_id": "1b40…" },
@@ -177,7 +178,7 @@
 
 ```json
 요청  { "kind": "audio", "content_type": "audio/wav", "byte_size": 482913 }
-응답  { "ok": true, "contract_ver": "c7",
+응답  { "ok": true, "contract_ver": "c8",
         "upload_url": "https://…", "audio_ref": "voice/9f2c…(learner_id)/3c9e….wav",
         "expires_at": "2026-08-05T13:35:00.000Z" }
 ```
@@ -238,7 +239,7 @@
 | 쿼리 | `since`(커서) · 기본 정렬 = 확정 시각 내림차순 |
 | `data[]` | `correction_id` · `submission_id`(원 제출) · `corrected_text` · `error_tags` · `actor_kind`(누가 확정했나) · `confirmed_at` |
 | 빈 상태 | `data: []` = 아직 확정된 교정이 없다. **화면에서 그 칸 자체를 띄우지 않는다**(빈 카드 금지) |
-| S1 사용 | 최신 1건. 열면 `correction.viewed`를 `POST /v1/events`로 보낸다(조회가 사건을 만들지 않는다 — **읽기와 쓰기를 섞지 않는다**) |
+| S1 사용 | 최신 1건. 열면 `correction.viewed`를 `POST /v1/events`로 보낸다(조회가 사건을 만들지 않는다 — **읽기와 쓰기를 섞지 않는다**). 🔑 그때 **여기서 받은 `correction_id`를 그대로 실어 보낸다**(c8 · §2 요청 표) — 그게 「어느 교정을 봤나」의 유일한 고리다 |
 
 #### ③ `GET /v1/progress` — 어제의 나와 비교
 
@@ -323,7 +324,7 @@ anon 키로 부른다. 입력 `{ student_code, temp_password, new_password }` �
 | 축 | 무엇 | 규칙 |
 |---|---|---|
 | `api_ver` | URL `/v1` | **깨는 변경만** 올린다. 올리면 구 버전을 최소 1개 릴리스 주기 병행 |
-| `contract_ver` | `c7`… | 앱이 헤더로 알리고 서버가 응답에 자기 것을 싣는다. **이 문서의 값은 예시가 아니라 정본과 대조된다**(`tests/C0계약.test.js`) |
+| `contract_ver` | `c8`… | 앱이 헤더로 알리고 서버가 응답에 자기 것을 싣는다. **이 문서의 값은 예시가 아니라 정본과 대조된다**(`tests/C0계약.test.js`) |
 | `payload.ver` | 정수 | 이벤트별 payload 모양 (§4-1) |
 
 - **값목록 추가는 하위호환이다** — 구 앱은 새 값을 안 보낼 뿐 계속 작동한다. **이름 변경·삭제는 금지**(과거 집계가 깨진다 · c3 `값목록_규칙` 승계).
@@ -362,7 +363,7 @@ anon 키로 부른다. 입력 `{ student_code, temp_password, new_password }` �
 | 값 | 왜 필요한가 |
 |---|---|
 | `intervention.delivered` | AI가 **무엇을 했는지**. 없으면 `intervention_id`가 가리킬 내용이 없어 「무엇이 효과 있었나」를 영원히 못 묻는다 |
-| `correction.viewed` | 학생이 교정을 **봤다**(채택 여부는 기존 `correction.responded`) |
+| `correction.viewed` | 학생이 교정을 **봤다**(채택 여부는 기존 `correction.responded`). 둘 다 c8부터 `correction_id` 필수 — §2 요청 표 |
 | `data_use.granted` | 훈련 데이터 승격을 **행의 신분이 아니라 사건으로** 기록(L0 §6-2 · 코어엔진 A-10 정정) |
 
 **c4를 지금 올리지 않은 이유 — 한 번에 같이 가야 한다.** 값목록은 계약 파일에만 있는 게 아니라

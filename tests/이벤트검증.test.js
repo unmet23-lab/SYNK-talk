@@ -184,6 +184,44 @@ test('서버 칸 목록도 계약에 실재하는 이름이다', () => {
   assert.deepEqual(없는것, [], `서버 칸에 계약에 없는 이름: ${없는것.join(', ')}`);
 });
 
+/* c8 — 교정 사건은 「어느 교정인가」 없이는 통과하지 못한다 (P0 §10-A-11 해소).
+ * c7 까지 `correction.viewed` 의 필수는 **빈 배열**이었다: 가리킬 이름이 계약에 없어서
+ * 지어내지 않고 비워 둔 자리다. 그 상태에서는 열람 사건이 「누가 무언가를 봤다」까지만
+ * 남고 무엇을 봤는지가 없어, 「학습이 일어났다」의 유일한 직접 신호(S1-8)가 학생 단위
+ * 집계로만 존재한다 — 그리고 그 고리는 **그때만** 얻을 수 있어 소급 복원이 안 된다. */
+const 교정사건 = (type) => ({
+  idempotency_key: 'b6f1c0a2-0000-4000-8000-00000000000c',
+  event_type: type,
+  occurred_at: '2026-08-07T04:00:00.000Z',
+  level_snapshot: 'Lv3',
+  correction_id: '9a7d3f10-0000-4000-8000-0000000000c1',
+  ...(type === 'correction.responded' ? { payload: { learner_response: '채택' } } : {}),
+});
+
+test('c8 — 교정 열람·응답은 correction_id 없이 거부된다 (양방향)', () => {
+  for (const type of ['correction.viewed', 'correction.responded']) {
+    const 있음 = 교정사건(type);
+    assert.equal(검증(있음, 계약).ok, true,
+      `${type} 이 correction_id 를 실었는데 거부됐다: ${검증(있음, 계약).오류들?.join(' / ')}`);
+
+    const 없음 = 교정사건(type);
+    delete 없음.correction_id;
+    assert.equal(검증(없음, 계약).ok, false,
+      `${type} 이 어느 교정인지 없이 통과했다 — 그 고리는 나중에 못 만든다`);
+  }
+});
+
+test('c8 — 필수로 건 correction_id 는 계약에 실재하는 이름이다 (지어낸 이름 금지)', () => {
+  // 이 규칙은 파일 위쪽 주석이 프로즈로 적어 둔 것이고, 없는 이름을 필수로 걸면
+  // 「엄격해 보이는데 아무것도 안 통과하는」 상태가 된다 — c7 이 비워 뒀던 이유 그 자체다.
+  const 실재 = new Set();
+  for (const v of Object.values(계약.learning_events.필드 || {})) {
+    if (Array.isArray(v)) v.forEach((n) => 실재.add(n));
+  }
+  assert.ok(실재.has('correction_id'),
+    'correction_id 가 계약 필드 목록에 없다 — 검증기만 올리고 계약을 안 올렸다');
+});
+
 test('자기 처방 — 거부 메시지대로 고치면 통과한다', () => {
   const e = 정상제출();
   delete e.submission.task_format;

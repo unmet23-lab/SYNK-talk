@@ -341,3 +341,39 @@ test('탐지력 픽스처 — 체인이 끊기면 잡는다', () => {
   assert.equal(조각추출('base_version 을 쓰지 않는 기준선 조각', 'base_version'), undefined,
     '없는 것을 있다고 뽑으면 첫 조각 검사가 거짓 경보를 낸다');
 });
+
+/* ── c8: 「어느 교정인가」의 판정이 두 곳에 있다 ────────────────────────────────
+ * DB CHECK(learning_events_correction_target_c8)와 앱·서버 검증기(lib/이벤트검증.js)가
+ * **각자** 「어느 event_type 에 correction_id 가 필수인가」를 적는다. 한쪽은 SQL 이고 한쪽은
+ * JS 라 목록을 하나에서 파생시킬 수 없는 자리다 — 그러면 갈라졌을 때 빨개지게 만든다.
+ * 갈라진 상태의 증상은 조용하다: 검증기가 통과시킨 사건을 DB 가 거절하거나(보이는 건 「저장 실패」뿐),
+ * 반대로 DB 는 받는데 검증기가 막는다. 이 파일 머리말의 c4 사고와 정확히 같은 형태다. */
+test('c8 — correction_id 를 요구하는 event_type 이 SQL CHECK 와 검증기에서 같다', () => {
+  const { 이벤트별필수 } = require('../lib/이벤트검증.js');
+
+  const i = SQL.search(/constraint learning_events_correction_target_c8\s+check/);
+  assert.notEqual(i, -1, 'c8 CHECK 를 SQL 에서 못 찾았다 — 이름이 바뀌었다면 이 검사도 함께 옮겨라');
+  const 끝 = SQL.indexOf(' end', i);
+  assert.notEqual(끝, -1, 'c8 CHECK 의 case 문이 안 닫힌다');
+  const SQL쪽 = [...SQL.slice(i, 끝).matchAll(/'([^']+)'/g)].map((m) => m[1]).sort();
+
+  const 검증기쪽 = Object.entries(이벤트별필수)
+    .filter(([, 필수]) => 필수.some((f) => (Array.isArray(f) ? f : [f]).includes('correction_id')))
+    .map(([type]) => type)
+    .sort();
+
+  assert.deepEqual(SQL쪽, 검증기쪽,
+    `DB 와 검증기가 다른 목록을 든다 — SQL=${SQL쪽.join(',')} / 검증기=${검증기쪽.join(',')}\n`
+    + '  갈라지면 증상은 「저장이 안 된다」뿐이고 원인이 안 보인다');
+  assert.ok(SQL쪽.length > 0, '양쪽이 나란히 비었다 — 그건 일치가 아니라 검사 대상 소실이다');
+});
+
+test('탐지력 픽스처 — c8 CHECK 목록 추출기가 실제로 값을 집는다', () => {
+  /* 위 검사는 양쪽이 「똑같이 비면」 통과한다. 추출기가 죽어 빈 배열을 내는 것과
+   * 목록이 진짜 비어 있는 것이 같은 모양이라, 추출 자체를 여기서 못박는다. */
+  const 견본 = "constraint x_c8 check (\n  case when event_type in ('a.b', 'c.d')\n"
+    + '       then correction_id is not null\n       else correction_id is null\n  end\n)';
+  const j = 견본.search(/constraint x_c8\s+check/);
+  const 값 = [...견본.slice(j, 견본.indexOf(' end', j)).matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  assert.deepEqual(값, ['a.b', 'c.d'], '추출기가 죽었다 — 그러면 위 검사는 빈 배열끼리 비교해 늘 초록이다');
+});

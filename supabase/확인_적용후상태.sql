@@ -9,9 +9,14 @@
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'), ('learning_events','skill_taxonomy_ver'),
   ('learning_events','parent_event_id'), ('learning_events','turn_no'),
+  ('learning_events','correction_id'),
   ('submissions','capture_meta'), ('skills','superseded_by'), ('daily_activity','expected'),
   ('schema_migrations','version'), ('schema_migrations','name'),
   ('schema_migrations','checksum'), ('schema_migrations','applied_at'),
+  -- ⚠ 아래 세 묶음은 c7 **뒤에 붙은 조각들**이 낸 열이다. 이 확인 블록은 앞 조각에서
+  --   베끼는 것이 아니라 **바로 앞 조각**에서 이어야 한다 — c8 초안이 20260806210000 의
+  --   블록을 베껴 이 13열을 통째로 떨어뜨렸고, 그 상태의 확인은 「빠진열 없음」으로 초록이
+  --   나온다(검사가 사라진 것이 통과와 같은 모양이 되는 자리 · 생성기 diff 가 잡았다).
   -- 학생 로그인(L0 §4-1·§4-2 · 20260806233000_auth_c7)
   ('learners','recovery_email'), ('learners','recovery_phone'),
   ('learners','temp_password_expires_at'), ('learners','signup_attempts'),
@@ -22,15 +27,16 @@ with 기대열(t, c) as (values
   -- 임시번호를 해시로 든다(L0 §4-2-2 · 20260807024500_temp_password_c7)
   ('learners','temp_password_hash')
 ), 기대제약(n) as (values
-  ('learning_events_event_type_c7'), ('learning_events_task_type_c7'),
-  ('submissions_task_format_c7'), ('submissions_translation_source_c7'), ('corrections_verdict_c7'),
+  ('learning_events_event_type_c8'), ('learning_events_task_type_c8'),
+  ('submissions_task_format_c8'), ('submissions_translation_source_c8'), ('corrections_verdict_c8'),
   ('learning_events_retry_same_learner'), ('learning_events_parent_same_learner'),
   ('corrections_reviewed_same_submission'), ('schema_migrations_pkey'),
-  ('learners_signup_attempts_nonneg_c7'), ('staff_role_c7'),
-  ('learners_temp_password_paired_c7')
+  ('learners_signup_attempts_nonneg_c8'), ('staff_role_c8'),
+  ('learners_temp_password_paired_c8'),
+  ('learning_events_correction_target_c8'), ('learning_events_correction_id_fkey')
 ), 기대트리거(n) as (values
   ('learning_events_immutable'), ('corrections_immutable'), ('submissions_original_immutable'),
-  ('staff_access_log_immutable')
+  ('staff_access_log_immutable'), ('learning_events_correction_same_learner')
 ), 대상역할(r) as (values ('anon'), ('authenticated'))
 , 대상권한(p) as (values
   ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE'), ('REFERENCES'), ('TRIGGER')
@@ -94,8 +100,8 @@ select case when 테이블수=11 and RLS켜짐=11 and 정책수=8
              and (select v from 빠진열) is null
              and (select v from 빠진제약) is null
              and (select v from 빠진트리거) is null
-             and (select version from 현재이력)='20260807024500'
-              and (select checksum from 현재이력)='a267639129d28b77a8c3e7d360727ae8ba1a9c4ccfc217626bf847feca592cf5' -- migration-checksum
+             and (select version from 현재이력)='20260807040000'
+              and (select checksum from 현재이력)='158d55f17d54ab173721dc8945935eed93c6451c3a22a3b37059de171c42fdb6' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·8·0·0·3·1·0 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
