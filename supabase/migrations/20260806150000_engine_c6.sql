@@ -127,7 +127,7 @@ do $migration$
 declare
   migration_version constant text := '20260806150000';
   migration_name constant text := '20260806150000_engine_c6.sql';
-  expected_checksum constant text := '6a9711283776940a28435984854a47dbb96a76173395fbf72aebc9765b4846a3'; -- migration-checksum
+  expected_checksum constant text := '985600739c98bdd9d755c3d9b16f3bbc3b83d09c8055a6c872df68cadc692fb6'; -- migration-checksum
   recorded_checksum text;
   pre_engine boolean;
   pre_history boolean;
@@ -273,13 +273,13 @@ begin
               and c.confdeltype = 'r');
 
     if common_exact and actual_constraints = array[
-      'corrections_pkey',
-      'corrections_reviewer_confidence_check',
-      'corrections_reviewed_correction_id_fkey',
-      'corrections_submission_id_fkey',
-      'corrections_verdict_c3',
       'consents_learner_id_fkey',
       'consents_pkey',
+      'corrections_pkey',
+      'corrections_reviewed_correction_id_fkey',
+      'corrections_reviewer_confidence_check',
+      'corrections_submission_id_fkey',
+      'corrections_verdict_c3',
       'learners_auth_user_id_fkey',
       'learners_auth_user_id_key',
       'learners_pkey',
@@ -296,13 +296,13 @@ begin
     ]::text[] then
       lower_version := 'c3';
     elsif common_exact and actual_constraints = array[
-      'corrections_pkey',
-      'corrections_reviewer_confidence_check',
-      'corrections_reviewed_correction_id_fkey',
-      'corrections_submission_id_fkey',
-      'corrections_verdict_c4',
       'consents_learner_id_fkey',
       'consents_pkey',
+      'corrections_pkey',
+      'corrections_reviewed_correction_id_fkey',
+      'corrections_reviewer_confidence_check',
+      'corrections_submission_id_fkey',
+      'corrections_verdict_c4',
       'learners_auth_user_id_fkey',
       'learners_auth_user_id_key',
       'learners_pkey',
@@ -735,7 +735,7 @@ select case when 테이블수=9 and RLS켜짐=9 and 정책수=5
              and (select v from 빠진제약) is null
              and (select v from 빠진트리거) is null
              and (select version from 현재이력)='20260806150000'
-              and (select checksum from 현재이력)='6a9711283776940a28435984854a47dbb96a76173395fbf72aebc9765b4846a3' -- migration-checksum
+              and (select checksum from 현재이력)='985600739c98bdd9d755c3d9b16f3bbc3b83d09c8055a6c872df68cadc692fb6' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 9·9·5·0·0·3·1·0 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,

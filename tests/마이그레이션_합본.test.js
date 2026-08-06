@@ -38,6 +38,37 @@ test('각 마이그레이션 checksum은 checksum 슬롯만 0으로 치환한 �
   }
 });
 
+test('카탈로그 ORDER BY 결과와 대조하는 기대 배열은 이름순이다', () => {
+  /*
+   * PostgreSQL 쪽은 pg_constraint.conname을 ORDER BY 한 뒤 배열로 만든다.
+   * 기대 배열이 같은 이름을 모두 갖고 있어도 순서가 다르면 정확한 c3/c4가 거절된다.
+   * 2026-08-06 실측: reviewed...가 reviewer...보다 먼저인데 기대 배열만 역순이었다.
+   */
+  const sql = concatenate().toString('utf8');
+  const arrays = [...sql.matchAll(/actual_constraints\s*=\s*array\[([\s\S]*?)\]::text\[\]/g)]
+    .map((match) => [...match[1].matchAll(/'([^']+)'/g)].map((name) => name[1]));
+
+  assert.equal(arrays.length, 2, 'c3·c4 제약 지문 배열을 둘 다 찾아야 한다');
+
+  const 이름순검사 = (names, label) => {
+    assert.ok(names.length > 0, `${label}: 빈 배열이면 검사가 무엇이든 통과한다`);
+    assert.ok(names.every((name) => /^[a-z0-9_]+$/u.test(name)),
+      `${label}: JS와 PostgreSQL 정렬을 직접 비교할 수 없는 이름이 있다`);
+    assert.deepEqual(names, [...names].sort(),
+      `${label}: 실제 카탈로그는 ORDER BY conname인데 기대 배열 순서가 다르다`);
+  };
+
+  arrays.forEach((names, index) => 이름순검사(names, index === 0 ? 'c3' : 'c4'));
+  assert.throws(
+    () => 이름순검사([
+      'corrections_reviewer_confidence_check',
+      'corrections_reviewed_correction_id_fkey',
+    ], '역순 픽스처'),
+    /기대 배열 순서가 다르다/,
+    '탐지력 픽스처가 실제 역순 결함을 잡아야 한다',
+  );
+});
+
 test('탐지력 픽스처 — 합본 1바이트 변이는 바이트 동일성 가드가 거절한다', () => {
   const expected = concatenate();
   const mutated = Buffer.from(expected);
