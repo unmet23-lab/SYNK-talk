@@ -60,6 +60,39 @@ test('서버가 채우는 칸을 앱이 보내면 거부한다 — 위조 방지
   }
 });
 
+/* capture_meta 의 두 갈래 — 이 넷이 함께 서야 「관측」이 관측으로 남는다.
+ * 이 칸이 생긴 이유가 「AGC off 였다는 증거가 행에 없다」였는데, 앱이 그 증거를 스스로 적을 수
+ * 있으면 c6 이 이 열을 만든 이유가 통째로 사라진다. */
+test('앱이 capture_meta.server 를 보내면 거부한다 — 관측이 주장으로 바뀌는 자리', () => {
+  const e = 정상제출();
+  e.submission.capture_meta = { app: { agc: 'off' }, server: { sample_rate: 16000, agc_verified: false } };
+  const r = 검증(e, 계약);
+  assert.equal(r.ok, false, '앱이 잰 척한 값이 통과했다');
+  assert.ok(r.오류들.join(' ').includes('capture_meta.server'), `어느 칸인지 안 알려준다: ${r.오류들.join(' / ')}`);
+});
+
+test('탐지력 픽스처 — capture_meta.server 가 null 이어도 잡는다 (존재로 재야 한다)', () => {
+  const e = 정상제출();
+  e.submission.capture_meta = { app: { agc: 'off' }, server: null };
+  assert.equal(검증(e, 계약).ok, false, '값으로 재고 있다 — null 로 보내면 뚫린다');
+});
+
+test('거짓양성 — app 갈래만 보내는 정상 앱은 그대로 통과한다', () => {
+  const e = 정상제출();
+  e.submission.capture_meta = { app: { device: 'Pixel 7', agc_requested: 'off', mic: 'bottom' } };
+  const r = 검증(e, 계약);
+  assert.equal(r.ok, true, `정상 앱을 막았다: ${r.오류들.join(' / ')}`);
+});
+
+test('자기 처방 — capture_meta.server 를 빼라는 거부대로 고치면 통과한다', () => {
+  const e = 정상제출();
+  e.submission.capture_meta = { app: { agc_requested: 'off' }, server: { sample_rate: 16000 } };
+  assert.equal(검증(e, 계약).ok, false);
+  delete e.submission.capture_meta.server;   // 메시지가 지목한 칸만 뺀다
+  const r = 검증(e, 계약);
+  assert.equal(r.ok, true, `처방대로 고쳤는데 아직 거부한다: ${r.오류들.join(' / ')}`);
+});
+
 test('서버만 만드는 사건을 앱이 보내면 거부한다', () => {
   for (const et of 서버사건) {
     const e = { ...정상제출(), event_type: et };
