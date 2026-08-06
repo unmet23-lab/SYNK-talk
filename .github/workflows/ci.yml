@@ -37,6 +37,10 @@ jobs:
     needs: verify
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    # 손으로 부를 때만 도니 기다려도 된다 — 그래서 `--no-wait` 를 뺐다(아래 preview 스텝).
+    # 상한을 두는 이유: 무료 플랜은 큐 우선순위가 낮아 대기가 길어질 수 있는데, 상한이 없으면
+    # 잡이 기본 6시간을 문다. 90분을 넘긴다는 것 자체가 **「유료로 올릴 때가 됐다」는 신호**다.
+    timeout-minutes: 90
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
     steps:
@@ -83,8 +87,16 @@ jobs:
 
       # 커밋 해시를 앱 안으로 넣는다 — 「도착 확인 화면」이 이 값을 보여준다.
       # 이게 없으면 「밀었다」와 「도착했다」를 화면에서 구별할 수 없다.
+      #
+      # 🔴 `--no-wait` 를 **쓰지 않는다**(2026-08-06 제거). 그것을 붙이면 이 잡은 **제출에
+      #    성공한 순간 초록**이 되고, 진짜 빌드 실패는 Expo 화면에만 남는다 — CI 는 영원히
+      #    초록이라 **「빨간 것을 세어 수리한다」가 성립하지 않는다.** 손으로 부를 때만 도는
+      #    잡이라 기다리는 비용은 월 1회 수준이다(위 timeout-minutes 참조).
+      #    ⚠ 이 잡의 빨강은 두 원인이 같은 색이다 — **빌드 실패**(eas 가 비0으로 끝남)와
+      #      **90분 초과**(잡이 끊김). 로그 끝 줄로 가른다: 전자는 eas 오류, 후자는 무음 중단.
+      #    회귀 = tests/출시가드.test.js (`--no-wait` 부활 차단).
       - name: preview 빌드
         if: steps.gate.outputs.have == 'true'
         env:
           EXPO_PUBLIC_COMMIT: ${{ github.sha }}
-        run: eas build --platform android --profile preview --non-interactive --no-wait
+        run: eas build --platform android --profile preview --non-interactive

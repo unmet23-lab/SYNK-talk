@@ -43,7 +43,7 @@ test('출시가드: 운영 명령 표기 변형을 전부 잡는다', () => {
 // ── 통과 목록 — preview·일상 명령은 열려 있어야 한다 ──────────
 test('출시가드: preview 빌드·일반 명령은 통과', () => {
   const ok = [
-    'run: eas build --platform android --profile preview --non-interactive --no-wait',
+    'run: eas build --platform android --profile preview --non-interactive',
     'channel: preview',
     'run: npm test',
     'run: npm run eval',
@@ -67,6 +67,34 @@ test('탐지력 픽스처 — projectId 가 빠지면 잡는다', () => {
   const 빠진판 = { expo: { extra: { eas: {} } } };
   const id = 빠진판.expo && 빠진판.expo.extra && 빠진판.expo.extra.eas && 빠진판.expo.extra.eas.projectId;
   assert.ok(!id, '추출기가 죽었다 — 그러면 위 검사는 무엇이든 통과시킨다');
+});
+
+/* ── `--no-wait` 부활 차단 (2026-08-06) ───────────────────────────────────
+ * 붙어 있으면 이 잡은 **제출에 성공한 순간 초록**이 되고 진짜 빌드 실패는 Expo 화면에만
+ * 남는다 — CI 가 영원히 초록이라 「9/1·1/25에 켜서 빨간 것을 수리한다」는 계획이 통째로
+ * 성립하지 않는다. 실패가 **초록으로 보이는** 형태라 사람 눈으로는 영원히 안 잡힌다.
+ * 무해해 보이는 플래그 하나가 눈을 감기므로 기계로 막는다. */
+test('빌드 명령에 --no-wait 가 없다 (붙으면 CI 초록이 「제출됨」까지만 뜻한다)', () => {
+  const dir = path.join(__dirname, '..', '.github', 'workflows');
+  const 빌드줄 = fs.readdirSync(dir)
+    .filter((f) => /\.ya?ml$/.test(f))
+    .flatMap((f) => fs.readFileSync(path.join(dir, f), 'utf8').split('\n').map((l) => [f, l]))
+    .filter(([, l]) => /^\s*(run:\s*)?eas build\b/.test(l));
+  assert.ok(빌드줄.length > 0, 'eas build 줄을 못 찾았다 — 스캔 대상 소실은 통과가 아니다');
+  const 걸린것 = 빌드줄.filter(([, l]) => /--no-wait\b/.test(l)).map(([f, l]) => `${f}: ${l.trim()}`);
+  assert.deepStrictEqual(걸린것, [],
+    `빌드가 결과를 안 기다린다: ${걸린것.join(' / ')}\n` +
+    '  그러면 CI 초록 = 「제출됐다」뿐이고 빌드 실패는 CI 에 영원히 안 나타난다.\n' +
+    '  손으로 부를 때만 도는 잡이라 기다려도 된다(ci.yml timeout-minutes 참조).');
+});
+
+test('탐지력 픽스처 — --no-wait 가 되살아나면 잡는다', () => {
+  const 줄인식 = (l) => /^\s*(run:\s*)?eas build\b/.test(l);
+  const 되살아난판 = '        run: eas build --platform android --profile preview --no-wait';
+  const 정상판 = '        run: eas build --platform android --profile preview --non-interactive';
+  assert.ok(줄인식(되살아난판) && 줄인식(정상판), '줄 인식이 죽었다 — 그러면 스캔 대상이 0이 된다');
+  assert.ok(/--no-wait\b/.test(되살아난판), '추출기가 죽었다 — 그러면 위 검사는 무엇이든 통과시킨다');
+  assert.ok(!/--no-wait\b/.test(정상판), '정상 명령을 위반으로 잡으면 거짓 경보가 된다(F103)');
 });
 
 // ── 실워크플로 — 운영 명령 0 (들어오는 날 여기가 빨개진다) ────
