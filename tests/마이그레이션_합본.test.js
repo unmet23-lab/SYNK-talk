@@ -97,14 +97,24 @@ test('탐지력 픽스처 — migration 본문 1바이트 변이는 checksum을 
   assert.throws(() => validateChecksum(mutated, '1바이트 변이'), /checksum 불일치/);
 });
 
-test('합본은 단일 명시 트랜잭션이며 금지 문장을 쓰지 않는다', () => {
-  const sql = concatenate().toString('utf8');
-  const body = sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--.*$/gm, '');
-  assert.equal((body.match(/\bbegin\s*;/gi) || []).length, 1, 'begin;은 정확히 1개여야 한다');
-  assert.equal((body.match(/\bcommit\s*;/gi) || []).length, 1, 'commit;은 정확히 1개여야 한다');
-  assert.match(body, /^\s*begin\s*;/i, '첫 실행 문장은 begin;이어야 한다');
-  assert.match(body, /commit\s*;\s*$/i, '마지막 실행 문장은 commit;이어야 한다');
-  assert.doesNotMatch(body, /create\s+(?:unique\s+)?index\s+concurrently/i);
-  assert.doesNotMatch(body, /\b(vacuum|alter\s+system)\b/i);
-  assert.doesNotMatch(sql, /\\(?:if|set|echo|quit)\b/i, 'SQL Editor가 모르는 psql 지시자를 쓰면 안 된다');
+test('조각마다 단일 명시 트랜잭션이며 금지 문장을 쓰지 않는다', () => {
+  /* 합본은 조각의 이음이라 트랜잭션도 조각 수만큼 열린다 — 그게 체인의 정상이다.
+   * 앞 조각이 커밋된 뒤 뒤 조각이 실패하면 이력이 「거기까지」로 남아 **정합한 상태**가 되고,
+   * 뒤 조각만 고쳐 다시 부으면 된다. 단일 트랜잭션이면 뒤의 실패가 앞까지 되돌린다.
+   * 대신 조각 단위로 보면 검사가 더 강해진다: **감싸지지 않은 조각 하나**는 자동커밋으로 돌아
+   * 진짜 부분 적용을 만드는데, 합본을 통째로 세던 옛 판은 그것을 못 봤다(총합만 맞으면 통과). */
+  const 조각들 = migrationFiles();
+  assert.ok(조각들.length >= 1, '마이그레이션 조각이 0개다');
+  for (const file of 조각들) {
+    const 이름 = file.split(/[\\/]/).pop();
+    const sql = fs.readFileSync(file, 'utf8');
+    const body = sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--.*$/gm, '');
+    assert.equal((body.match(/\bbegin\s*;/gi) || []).length, 1, `${이름}: begin;은 정확히 1개여야 한다`);
+    assert.equal((body.match(/\bcommit\s*;/gi) || []).length, 1, `${이름}: commit;은 정확히 1개여야 한다`);
+    assert.match(body, /^\s*begin\s*;/i, `${이름}: 첫 실행 문장은 begin;이어야 한다`);
+    assert.match(body, /commit\s*;\s*$/i, `${이름}: 마지막 실행 문장은 commit;이어야 한다`);
+    assert.doesNotMatch(body, /create\s+(?:unique\s+)?index\s+concurrently/i, `${이름}: 트랜잭션 안에서 못 돈다`);
+    assert.doesNotMatch(body, /\b(vacuum|alter\s+system)\b/i, `${이름}: 트랜잭션 안에서 못 돈다`);
+    assert.doesNotMatch(sql, /\\(?:if|set|echo|quit)\b/i, `${이름}: SQL Editor가 모르는 psql 지시자를 쓰면 안 된다`);
+  }
 });

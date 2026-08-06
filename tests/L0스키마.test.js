@@ -27,6 +27,21 @@ const 계약 = JSON.parse(fs.readFileSync(path.join(ROOT, '계약', '수집_교�
 const 원문 = fs.readFileSync(path.join(ROOT, 'supabase', 'L0_스키마.sql'), 'utf8');
 const SQL = 원문.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--.*$/gm, '');
 
+/* ── 합본은 체인이다 ────────────────────────────────────────────────────────
+ * L0_스키마.sql 은 migrations/ 조각을 **이어붙인** 생성물이라, 옛 조각의 add 문·확인 블록·
+ * 안내 주석이 그대로 남는다 — 그 조각들은 고칠 수 없다(checksum 이 봉인한다).
+ * 그래서 「지금 DB 에 무엇이 서 있는가」를 보는 검사는 둘을 지켜야 한다:
+ *   ① 뒤 조각이 drop 한 제약은 최종 상태에 없다 — 세면 「옛 이름이 살아 있다」는 **거짓 판정**이 된다.
+ *   ② 확인 블록·안내 주석은 **마지막 조각의 것**이 현행이다.
+ * 2026-08-06 c7(체인의 첫 두 번째 조각) 착지에서 실측: 안 지키면 3개가 빨개진다.
+ * 탐지력은 안 깎인다 — 뒤 조각이 옛 제약을 drop 하지 않으면 그 이름이 그대로 살아 남아 잡힌다. */
+const drop된제약 = new Set(
+  [...SQL.matchAll(/drop constraint (?:if exists )?(\w+)/g)].map((m) => m[1]));
+const 살아있는CHECK = () =>
+  [...SQL.matchAll(/constraint (\w+) check/g)].map((m) => m[1]).filter((n) => !drop된제약.has(n));
+const 꼬리시작 = 원문.lastIndexOf('확인 (한 번에)');
+const 최종꼬리 = 꼬리시작 === -1 ? '' : 원문.slice(꼬리시작);
+
 function CHECK값목록_(제약이름) {
   const i = SQL.indexOf(`constraint ${제약이름} check`);
   assert.notEqual(i, -1, `SQL에서 제약 ${제약이름}을 못 찾았다 — 이름이 바뀌었다면 이 테스트도 함께 옮겨라`);
@@ -77,8 +92,9 @@ test('CHECK 제약 이름이 계약 버전을 달고 있다 (c4 개정이 조용
    * CHECK 를 고치고 재실행해도 **아무 일도 안 일어나는데 초록으로 보인다.**
    * 이름에 버전을 박아두면 ①계약이 c4로 오를 때 이 테스트가 빨개져 rename 을 강제하고
    * ②DB 쪽은 확인 ④ 가 옛 이름을 드러낸다. 파일과 DB 양쪽에 눈을 하나씩 둔다. */
-  const 이름들 = [...SQL.matchAll(/constraint (\w+) check/g)].map((m) => m[1]);
-  assert.ok(이름들.length >= 3, `CHECK 제약을 ${이름들.length}개밖에 못 찾았다 — 정규식이 낡았다`);
+  const 이름들 = 살아있는CHECK();
+  assert.ok(이름들.length >= 3,
+    `살아 있는 CHECK 제약을 ${이름들.length}개밖에 못 찾았다 — 정규식이 낡았거나 뒤 조각이 전부 drop 했다`);
   const 안맞는 = 이름들.filter((n) => !n.endsWith(`_${계약.버전}`));
   assert.deepEqual(안맞는, [],
     `제약 이름이 계약 버전(${계약.버전})과 안 맞는다: ${안맞는.join(', ')}\n` +
@@ -96,10 +112,10 @@ test('확인 쿼리가 참조하는 이름이 전부 정의된 별칭이다 (별
   /* c6: 확인 쿼리가 「개수 세기」에서 「이름 대조」(CTE)로 바뀌면서 옛 앵커(`) t;`)가 죽었다.
    * 앵커를 넓히면서 참조 검사도 함께 넓힌다 — CTE 이름은 `from 빠진열` 처럼 `=` 없이 참조되므로
    * `=` 만 보던 옛 정규식은 그것을 통째로 놓쳤다(별칭을 지워도 통과했다). */
-  const 시작 = 원문.indexOf('with 기대열');
-  const 끝 = 원문.indexOf('from 셈;', 시작);
+  const 시작 = 최종꼬리.indexOf('with 기대열');
+  const 끝 = 최종꼬리.indexOf('from 셈;', 시작);
   assert.ok(시작 !== -1 && 끝 !== -1, '확인 쿼리 블록을 못 찾았다 — 앵커가 낡았다(이 검사는 무엇이든 통과시킨다)');
-  const 블록 = 원문.slice(시작, 끝);
+  const 블록 = 최종꼬리.slice(시작, 끝);
   const 정의 = new Set([...블록.matchAll(/\bas ([가-힣A-Za-z_][가-힣A-Za-z_0-9]*)/g)].map((m) => m[1]));
   // CTE 이름도 정의다: `with 이름(...) as (` · `), 이름 as (`
   for (const m of 블록.matchAll(/(?:with|,)\s*([가-힣A-Za-z_][가-힣A-Za-z_0-9]*)\s*(?:\([^)]*\))?\s*as\s*\(/g)) {
@@ -122,11 +138,11 @@ test('확인 쿼리의 기대 테이블·RLS 수가 실제 create table 수와 �
    * **스키마는 멀쩡하다** — 「기대값이 낡았다」와 「적용이 덜 됐다」가 같은 모양으로 보인다.
    * 진짜 미적용을 못 믿게 만드는 게 더 큰 손해라 여기서 못박는다. */
   const 테이블수 = [...SQL.matchAll(/create table if not exists engine\.\w+/g)].length;
-  const 기대 = /테이블수=(\d+) and RLS켜짐=(\d+)/.exec(원문);
+  const 기대 = /테이블수=(\d+) and RLS켜짐=(\d+)/.exec(최종꼬리);
   assert.ok(기대, '꼬리 확인 쿼리의 판정 조건을 못 찾았다 — 앵커가 낡았다');
   assert.equal(Number(기대[1]), 테이블수, `확인 쿼리는 테이블 ${기대[1]}개를 기대하는데 SQL은 ${테이블수}개를 만든다`);
   assert.equal(Number(기대[2]), 테이블수, `RLS 기대값(${기대[2]})이 테이블 수(${테이블수})와 다르다 — 모든 테이블에 RLS를 켠다`);
-  const 안내 = /기대: (\d+)·(\d+)·/.exec(원문);
+  const 안내 = /기대: (\d+)·(\d+)·/.exec(최종꼬리);
   assert.ok(안내 && Number(안내[1]) === 테이블수 && Number(안내[2]) === 테이블수,
     `❌ 안내문의 기대값이 낡았다(${안내 && 안내[0]}) — 유호님이 읽는 숫자라 판정 조건보다 더 틀리면 안 된다`);
 });
@@ -214,11 +230,11 @@ test('탐지력 픽스처 — 발주 문서에 기대값 튜플이 되살아나�
  * 그런데 그 줄이 정확히 ①에서 낡았던 자리다. 유호님이 ❌를 받았을 때 붙여넣는 화면이라,
  * 여기가 낡으면 **정상 DB를 「고장」으로 보고**하게 만든다(판정을 뒤집어 보여주는 유일한 창). */
 test('확인 ④ 「기대:」 줄의 제약 이름이 실제 CHECK 이름과 정확히 같다', () => {
-  const 실제 = [...SQL.matchAll(/constraint (\w+_c\d+) check/g)].map((m) => m[1]).sort();
+  const 실제 = 살아있는CHECK().filter((n) => /_c\d+$/.test(n)).sort();
   assert.ok(실제.length >= 3, `버전 접미사 제약을 ${실제.length}개밖에 못 찾았다 — 정규식이 낡았다`);
-  const 시작 = 원문.lastIndexOf('기대:');
+  const 시작 = 최종꼬리.lastIndexOf('기대:');
   assert.ok(시작 !== -1, '확인 ④의 「기대:」 줄을 못 찾았다 — 앵커가 낡았다(이 검사는 무엇이든 통과시킨다)');
-  const 적힌것 = [...new Set([...원문.slice(시작).matchAll(/(\w+_c\d+)/g)].map((m) => m[1]))].sort();
+  const 적힌것 = [...new Set([...최종꼬리.slice(시작).matchAll(/(\w+_c\d+)/g)].map((m) => m[1]))].sort();
   assert.deepEqual(적힌것, 실제,
     `「기대:」 줄이 적은 이름과 실제 제약이 다르다\n  적힘: ${적힌것.join(' · ')}\n  실제: ${실제.join(' · ')}\n` +
     `  계약은 지금 ${계약.버전}다. 제약을 새 버전으로 바꿨으면 이 안내 줄도 함께 바꿔라 —\n` +
@@ -244,7 +260,11 @@ test('확인_적용전상태.sql 은 읽기 전용이다 (쓰기 동사 0)', () 
  * SQL 엔 include 가 없어 하나에서 파생시킬 수 없으니, 갈라지면 빨개지게 만든다.
  * 2026-08-06 기준선 적용 때 이 사본을 신설하면서 함께 넣었다(사본을 만든 커밋이 가드도 낸다). */
 function 꼬리확인쿼리(sql) {
-  const m = sql.match(/확인 \(한 번에\)[\s\S]*?\/\*([\s\S]*?)\*\//);
+  /* 체인: 옛 조각의 확인 블록이 앞에 그대로 남아 있다 — **마지막** 조각의 것이 현행이다.
+   * 첫 블록을 잡으면 사후 확인 파일을 갱신해도 영원히 「갈라졌다」가 나온다(c7 착지에서 실측). */
+  const 시작 = sql.lastIndexOf('확인 (한 번에)');
+  if (시작 === -1) return null;
+  const m = sql.slice(시작).match(/\/\*([\s\S]*?)\*\//);
   return m ? m[1] : null;
 }
 const 쿼리정규화 = (s) => s.replace(/^\s*--.*$/gm, '').replace(/\s+/g, ' ').trim();
@@ -267,4 +287,42 @@ test('탐지력 픽스처 — 사본이 한 글자라도 어긋나면 잡는다'
     '비교가 죽었다 — 한 글자 차이를 못 잡으면 갈라짐이 조용히 지나간다');
   assert.equal(쿼리정규화('select 1 as 판정\n  from 셈;'), 쿼리정규화('select   1 as 판정 from 셈;'),
     '공백·줄바꿈 차이를 불일치로 잡으면 거짓 경보가 된다');
+});
+
+/* ── 체인 무결성 ─────────────────────────────────────────────────────────────
+ * 두 번째 조각부터는 「앞 판이 서 있어야 한다」를 자기 안에 적는다(base_version).
+ * 그 값이 실제 앞 조각의 version 과 어긋나면 **파일은 멀쩡해 보이는데 원격에서만** 터진다
+ * (「이력에 그 판이 없다 — 부분·혼합·불명이라 중단한다」). 파일로 잴 수 있는 것을 Run 에 미루지 않는다.
+ * 파일명 ↔ migration_version 도 같이 본다: 합본 순서는 **파일명**으로 정해지는데 이력에 남는 것은
+ * **변수 값**이라, 둘이 갈리면 적용 순서와 기록이 서로 다른 이야기를 한다. */
+const 조각추출 = (s, 이름) => (new RegExp(`${이름} constant text := '(\\d{14})'`).exec(s) || [])[1];
+
+test('마이그레이션 체인: 파일명·version·base_version 이 한 줄로 이어진다', () => {
+  const dir = path.join(ROOT, 'supabase', 'migrations');
+  const 조각 = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
+  assert.ok(조각.length >= 1, '마이그레이션 조각이 0개다 — 합본의 원천이 사라졌다');
+  let 앞 = null;
+  for (const 이름 of 조각) {
+    const s = fs.readFileSync(path.join(dir, 이름), 'utf8');
+    assert.equal(조각추출(s, 'migration_version'), 이름.slice(0, 14),
+      `${이름}: 파일명과 migration_version 이 다르다 — 적용 순서(파일명)와 이력(변수)이 갈린다`);
+    const base = 조각추출(s, 'base_version');
+    if (앞 === null) {
+      assert.equal(base, undefined, `${이름}: 첫 조각은 기준선이라 base_version 을 갖지 않는다`);
+    } else {
+      assert.equal(base, 앞,
+        `${이름}: base_version 이 앞 조각(${앞})과 다르다 — 로컬은 초록인데 원격에서만 중단된다`);
+    }
+    앞 = 조각추출(s, 'migration_version');
+  }
+});
+
+test('탐지력 픽스처 — 체인이 끊기면 잡는다', () => {
+  /* 실저장소가 지금 이어져 있는 것과 검사가 도는 것은 다르다. */
+  const 끊긴조각 = "  migration_version constant text := '20260806210000';\n"
+    + "  base_version constant text := '19990101000000';";
+  assert.equal(조각추출(끊긴조각, 'base_version'), '19990101000000',
+    '추출기가 죽었다 — 그러면 위 검사는 무엇이든 통과시킨다');
+  assert.equal(조각추출('base_version 을 쓰지 않는 기준선 조각', 'base_version'), undefined,
+    '없는 것을 있다고 뽑으면 첫 조각 검사가 거짓 경보를 낸다');
 });

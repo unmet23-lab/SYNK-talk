@@ -49,19 +49,19 @@
 | 헤더 | 예 | 없으면 |
 |---|---|---|
 | `Authorization` | `Bearer <access_token>` | 401 `AUTH_REQUIRED` |
-| `X-Contract-Ver` | `c6` | 400 `CONTRACT_VER_MISSING` |
+| `X-Contract-Ver` | `c7` | 400 `CONTRACT_VER_MISSING` |
 | `X-App-Ver` | `0.3.1 (42)` | 통과(로그용) |
 
 **응답 봉투 — 성공**
 
 ```json
-{ "ok": true, "contract_ver": "c6", "results": [ ... ] }
+{ "ok": true, "contract_ver": "c7", "results": [ ... ] }
 ```
 
 **응답 봉투 — 요청 전체 실패**
 
 ```json
-{ "ok": false, "contract_ver": "c6",
+{ "ok": false, "contract_ver": "c7",
   "error": { "code": "AUTH_EXPIRED", "message": "토큰이 만료됐습니다", "retryable": true } }
 ```
 
@@ -147,7 +147,7 @@
 **응답**
 
 ```json
-{ "ok": true, "contract_ver": "c6",
+{ "ok": true, "contract_ver": "c7",
   "results": [
     { "idempotency_key": "b6f1…", "status": "stored",    "event_id": "3c9e…" },
     { "idempotency_key": "77a2…", "status": "duplicate", "event_id": "1b40…" },
@@ -168,7 +168,7 @@
 
 ```json
 요청  { "kind": "audio", "content_type": "audio/wav", "byte_size": 482913 }
-응답  { "ok": true, "contract_ver": "c6",
+응답  { "ok": true, "contract_ver": "c7",
         "upload_url": "https://…", "audio_ref": "voice/9f2c…(learner_id)/3c9e….wav",
         "expires_at": "2026-08-05T13:35:00.000Z" }
 ```
@@ -262,7 +262,7 @@
 | 축 | 무엇 | 규칙 |
 |---|---|---|
 | `api_ver` | URL `/v1` | **깨는 변경만** 올린다. 올리면 구 버전을 최소 1개 릴리스 주기 병행 |
-| `contract_ver` | `c6`… | 앱이 헤더로 알리고 서버가 응답에 자기 것을 싣는다. **이 문서의 값은 예시가 아니라 정본과 대조된다**(`tests/C0계약.test.js`) |
+| `contract_ver` | `c7`… | 앱이 헤더로 알리고 서버가 응답에 자기 것을 싣는다. **이 문서의 값은 예시가 아니라 정본과 대조된다**(`tests/C0계약.test.js`) |
 | `payload.ver` | 정수 | 이벤트별 payload 모양 (§4-1) |
 
 - **값목록 추가는 하위호환이다** — 구 앱은 새 값을 안 보낼 뿐 계속 작동한다. **이름 변경·삭제는 금지**(과거 집계가 깨진다 · c3 `값목록_규칙` 승계).

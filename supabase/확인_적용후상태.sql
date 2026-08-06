@@ -13,8 +13,8 @@ with 기대열(t, c) as (values
   ('schema_migrations','version'), ('schema_migrations','name'),
   ('schema_migrations','checksum'), ('schema_migrations','applied_at')
 ), 기대제약(n) as (values
-  ('learning_events_event_type_c6'), ('learning_events_task_type_c6'),
-  ('submissions_task_format_c6'), ('corrections_verdict_c6'),
+  ('learning_events_event_type_c7'), ('learning_events_task_type_c7'),
+  ('submissions_task_format_c7'), ('submissions_translation_source_c7'), ('corrections_verdict_c7'),
   ('learning_events_retry_same_learner'), ('learning_events_parent_same_learner'),
   ('corrections_reviewed_same_submission'), ('schema_migrations_pkey')
 ), 기대트리거(n) as (values
@@ -82,8 +82,8 @@ select case when 테이블수=9 and RLS켜짐=9 and 정책수=5
              and (select v from 빠진열) is null
              and (select v from 빠진제약) is null
              and (select v from 빠진트리거) is null
-             and (select version from 현재이력)='20260806150000'
-              and (select checksum from 현재이력)='551d9a9e8d4327ff4d0731794c6a19eef90177038ff129dd53be3ec96ba442e3' -- migration-checksum
+             and (select version from 현재이력)='20260806210000'
+              and (select checksum from 현재이력)='f7c53ce43e94220ca07e1156875825913923fe55a119cf16cd83f9ddce84eb56' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 9·9·5·0·0·3·1·0 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
