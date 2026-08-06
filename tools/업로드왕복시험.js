@@ -15,6 +15,9 @@
 const fs = require('fs');
 const path = require('path');
 const { 경로검사 } = require('../lib/업로드경로.js');
+const { 화면과제, 제출사건 } = require('../lib/오늘과제.js');
+const { 항목추가 } = require('../lib/제출로그.js');
+const 계약정본 = require('../계약/수집_교정_계약.json');
 
 const API = 'https://api.supabase.com/v1/projects';
 const die = (m) => { console.error(`[업로드왕복] ${m}`); process.exit(1); };
@@ -194,6 +197,94 @@ async function main() {
   잰다('파일이 없어도 행은 저장된다 — 수집이 채점보다 우선', 없는것.저장 === true, 없는것.곁 || '');
   잰다('그리고 「파일 없음」이 행에 남는다', 없는것.server?.state === 'missing',
     JSON.stringify(없는것.server ?? null).slice(0, 200));
+
+  /* ⑩ 앱 체인 — **배치가 쓴 것 → 앱이 읽은 것 → 앱이 되돌린 것**을 같은 실행에서 대조한다.
+   *   회귀(`tests/오늘과제.test.js`)는 조립 함수가 계약을 지키는지까지만 잰다. 그 봉투가
+   *   **진짜 서버를 통과하고 그 행이 배정과 같은 과제를 가리키는지**는 여기서만 드러난다 —
+   *   갈리면 증상은 「학생이 제출했는데 원장 화면에 안 보인다」 하나뿐이라 코드 독해로는 안 잡힌다.
+   *   🔑 앱이 실제로 선언하는 판(`계약.버전`)으로 부른다. 위 갈래들의 `c7` 은 「옛 앱도 돈다」를
+   *     재는 것이고, 이 갈래는 **지금 앱**이다. */
+  const 판 = 계약정본.버전;
+  const 큐r = await fetch(`${base}/functions/v1/tasks`, {
+    headers: { apikey: anon, Authorization: `Bearer ${jwt}`, 'X-Contract-Ver': 판 },
+  });
+  const 큐b = await 큐r.json().catch(() => ({}));
+  const 배정 = Array.isArray(큐b.data) && 큐b.data.length ? 큐b.data[0] : null;
+
+  if (!배정) {
+    /* 🔴 배정이 없으면 **건너뛴 것을 드러낸다** — 통과와 미실행이 같은 모양이면 안 된다.
+     *   실패로 세지 않는 이유: 그건 이 학생에게 오늘 배달이 안 돈 것이지 앱 체인의 결함이 아니다. */
+    console.log(`  ⏭ 앱 체인 — 오늘 배정이 없어 건너뛴다 (HTTP ${큐r.status} · 먼저 배달왕복시험을 돌린다)`);
+  } else {
+    // 폴백은 이 갈래에서 **쓰이면 안 되는** 값이다 — 쓰였는지는 바로 아래 `출처` 로 잰다.
+    const 폴백 = { id: null, 본문: '·', 핵심문장: '·', 질문: '·', 선택지: null };
+    const 본 = 화면과제(배정, 폴백);
+    잰다('앱이 배정을 서버 과제로 읽는다(폴백으로 안 내려간다)', 본.출처 === '서버', 본.사유 || '');
+    잰다('배정이 봉투 재료를 함께 준다 — 앱이 지어내는 값이 0 이다',
+      !!본.제출재료 && !!본.제출재료.task_ref && !!본.제출재료.level_snapshot,
+      JSON.stringify(본.제출재료));
+
+    if (본.제출재료) {
+      const 지금 = new Date().toISOString();
+      const { 항목 } = 항목추가([], {
+        date: 본.제출재료.task_ref.replace(/^task-/, ''),
+        step: '답하기',
+        status: 'submitted',
+        duration_ms: 4200, hesitation_ms: 800, spoke: true, threshold_db: -40,
+        text: null, audio: 'file:///rec.m4a', prompt_id: 본.task_id, created_at: 지금,
+        task_meta: 본.제출재료,
+        capture_app: { platform: 'node-rehearsal', extension: '.wav', agc_requested: null },
+      });
+
+      // 앱이 하는 그대로: 먼저 올리고(서명→PUT), 그 참조로 사건을 보낸다(C0 §4-2 순서).
+      const s앱 = await (await 부르기({ kind: 'audio', content_type: 'audio/wav', byte_size: 3244 })).json();
+      await fetch(s앱.upload_url, { method: 'PUT', headers: { 'Content-Type': 'audio/wav' }, body: wav() });
+
+      const 사건 = 제출사건(항목, s앱.audio_ref);
+      const er = await fetch(`${base}/functions/v1/events`, {
+        method: 'POST',
+        headers: { apikey: anon, Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json', 'X-Contract-Ver': 판 },
+        body: JSON.stringify({ events: [사건] }),
+      });
+      const eb = await er.json().catch(() => ({}));
+      const 한건 = eb.results && eb.results[0];
+      잰다('앱이 조립한 봉투가 서버를 실제로 통과한다', 한건?.status === 'stored',
+        `HTTP ${er.status} · ${JSON.stringify(한건 ?? eb).slice(0, 200)}`);
+
+      if (한건?.event_id) {
+        const [행] = await 질의(
+          `select s.task_ref, s.task_format, e.level_snapshot, e.goal_snapshot,
+                  e.payload->>'attempt_no' as attempt_no, s.capture_meta
+             from engine.learning_events e join engine.submissions s on s.event_id = e.event_id
+            where e.event_id = '${한건.event_id}'::uuid`);
+        // 🔑 이 한 줄이 이 갈래의 존재 이유다 — 제출 행이 **배정과 같은 과제**를 가리키는가.
+        잰다('제출 행이 배정과 같은 task_ref 를 가리킨다', 행?.task_ref === 본.제출재료.task_ref,
+          `제출 ${행?.task_ref} vs 배정 ${본.제출재료.task_ref}`);
+        잰다('③답하기 행의 형식이 자유발화다 — 낭독과 안 섞인다(P0 §2-1)',
+          행?.task_format === '자유발화', String(행?.task_format));
+        잰다('그때 급수·목적이 그대로 행에 남는다', 행?.level_snapshot === 본.제출재료.level_snapshot
+          && 행?.goal_snapshot === 본.제출재료.goal_snapshot,
+          `${행?.level_snapshot} · ${행?.goal_snapshot}`);
+        잰다('재시도 축(attempt_no)이 payload 에 산다 — 「어제의 나」가 이걸로 갈린다',
+          행?.attempt_no === '1', String(행?.attempt_no));
+        // 앱이 보낸 `app` 칸은 그대로 두고 서버가 `server` 만 얹는다(C0 §4-2).
+        잰다('앱이 요청한 설정과 서버가 잰 값이 한 행에 나란히 선다',
+          행?.capture_meta?.app?.platform === 'node-rehearsal' && !!행?.capture_meta?.server,
+          JSON.stringify(행?.capture_meta ?? null).slice(0, 200));
+
+        // 같은 항목을 다시 보낸다 — 멱등키가 결정론이라 **새 행이 생기면 안 된다**.
+        const er2 = await fetch(`${base}/functions/v1/events`, {
+          method: 'POST',
+          headers: { apikey: anon, Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json', 'X-Contract-Ver': 판 },
+          body: JSON.stringify({ events: [제출사건(항목, s앱.audio_ref)] }),
+        });
+        const 둘째 = (await er2.json().catch(() => ({}))).results?.[0];
+        잰다('재전송이 같은 행으로 접힌다 — 회선이 끊겨도 중복이 안 쌓인다',
+          둘째?.status === 'duplicate' && 둘째?.event_id === 한건.event_id,
+          JSON.stringify(둘째 ?? null).slice(0, 200));
+      }
+    }
+  }
 
   const 실패 = 결과.filter((r) => !r.통과);
   console.log(`\n[업로드왕복] ${결과.length - 실패.length}/${결과.length}`);

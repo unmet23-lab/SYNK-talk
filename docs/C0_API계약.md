@@ -228,7 +228,7 @@
 | 항목 | 값 |
 |---|---|
 | 쿼리 | `date`(생략 시 오늘 · **몽골 시간대 기준 날짜**) |
-| `data[]` | `task_id`(= 그 `task.assigned` 이벤트 id) · `task_snapshot`(그날 학생이 본 것 그대로) · `task_format` · `intervention`(①듣기용 · `output_text`·`intervention_id`) · `degraded`(강등으로 나온 과제인가) |
+| `data[]` | `task_id`(= 그 `task.assigned` 이벤트 id) · `task_snapshot`(그날 학생이 본 것 그대로) · `task_format` · **`task_ref`·`level_snapshot`·`goal_snapshot`**(제출에 **되돌려 실을** 값 — 아래 🔑) · `intervention`(①듣기용 · `output_text`·`intervention_id`) · `degraded`(강등으로 나온 과제인가) |
 | 빈 상태 | `data: []` = **오늘 배정이 없다.** 앱은 고정 도입 과제로 내려간다(`P0 §6-4`) — 오류로 취급하지 않는다 |
 | S1 사용 | 1건만 읽는다(하루 1건이므로 `next_cursor`는 항상 `null`) |
 
@@ -240,7 +240,8 @@
 ```json
 { "ok": true, "contract_ver": "c8", "date": "2026-08-07", "next_cursor": null,
   "data": [ { "task_id": "…", "task_snapshot": { "ver": 1, "호흡": [ … ] },
-              "task_format": null, "degraded": false,
+              "task_format": null, "task_ref": "task-2026-08-07",
+              "level_snapshot": "Lv2", "goal_snapshot": "study", "degraded": false,
               "intervention": { "intervention_id": "…", "output_text": "…" } } ] }
 ```
 
@@ -254,7 +255,10 @@
 
 - 🔑 **`task_format`은 항상 `null`로 온다** — 배정 1건에 ②낭독 + ③자유발화 두 형식이 들어서 행에 담지 않는다(`P0 §2-1`). 형식은 `task_snapshot.호흡[]` 안에 있다.
 - 🔑 **`intervention`은 `intervention_id`로 잇는다**(시각·순서가 아니다). 하루 2건이 서는 날 시각으로 이으면 조용히 어긋난다.
+- 🔑 **`task_ref`·`level_snapshot`·`goal_snapshot`은 「되돌려 주려고」 싣는다**(2026-08-07 · S1-b 쓰기 절반). 셋 다 제출 사건에서 **앱이 채우는 칸**인데(§4-1 — 3일 전 오프라인 제출을 오늘 올리면 서버의 현재 급수는 그때 급수가 아니다) 앱은 알 길이 없었다: 급수는 로그인 응답에도 없고, `task_ref`는 배치의 작명 규칙(`task-{날짜}`)이라 앱이 지어내면 **규칙의 사본**이 된다. 사본은 배치가 규칙을 바꾸는 날 갈라지고 증상은 「제출이 큐와 안 이어지는 것」뿐이라 어디에도 오류로 안 남는다. 🔴 **`task_ref`가 없으면 앱은 그날 발화를 보내지 않는다**(지어내는 것보다 안 보내는 편이 옳다 · `lib/오늘과제.js` 화면과제).
+- ⚠ **급수 없는 학생은 배정은 받는데 제출을 못 한다**(2026-08-07 실왕복이 적발 · ⏳처방 대기). 배치는 `learners.level_current ?? null`을 배정 행에 넣는데 §4-1은 `level_snapshot`을 **공통 필수**로 요구한다 → 그 학생 화면엔 오늘 과제가 뜨고, 말하면 `400 CONTRACT_VIOLATION`으로 막힌다. **개원 첫 주(반 배정 전)가 정확히 이 상태**라 §4-5 「첫 발화 기준선」(소급 불가)을 통째로 잃는다. 처방 후보: ⓐ등록 시 급수 필수(계약·앱 변경 0 · 기계 강제 없음) ⓑ`level_snapshot`을 선택으로 완화(=「모른다」를 null로 · 「수집이 채점보다 우선」에 맞지만 **계약 개정**) ⓒ배치가 급수 없는 학생을 건너뜀(발화는 여전히 못 올라간다).
 - **실측 = `tools/배달왕복시험.js` ⑧**(리허설 37/37). 배치가 쓴 것과 이 엔드포인트가 읽은 것을 **같은 실행에서** 대조한다 — 갈리면 증상은 「학생 화면이 비어 있다」 하나뿐이라 코드 독해로는 안 잡힌다. 함께 재는 것: 빈 상태 200 · **남의 배정 불가시**(`service_role`이 RLS를 우회하므로 함수의 `where`가 유일한 방어선) · anon 401 · date 오타 400 · POST 405.
+- **앱 체인 실측 = `tools/업로드왕복시험.js` ⑩**(리허설 27/27 · 2026-08-07). 배치가 쓴 것 → 앱이 읽은 것 → **앱이 되돌린 것**을 한 실행에서 잇는다: 제출 행이 배정과 **같은 `task_ref`**를 가리키는가 · ③행의 형식이 `자유발화`인가(낭독과 안 섞이는가 · `P0 §2-1`) · 그때 급수·목적이 행에 남는가 · `payload.attempt_no` · `capture_meta`의 `app`(요청)과 `server`(관측)가 나란히 서는가 · **재전송이 `duplicate`로 접히는가**(멱등키가 결정론이라 회선이 끊겨도 중복이 안 쌓인다). ⚠ 오늘 배정이 없으면 **건너뛴 것을 출력으로 드러낸다** — 통과와 미실행이 같은 모양이면 안 된다.
 
 #### ② `GET /v1/corrections` — 나에게 온 교정 (✅구현 · **리허설 실측** 2026-08-07 · ⛔운영 미배포)
 
