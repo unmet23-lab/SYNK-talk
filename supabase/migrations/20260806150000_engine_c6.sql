@@ -123,11 +123,20 @@ create table if not exists engine.schema_migrations (
 alter table engine.schema_migrations enable row level security;
 revoke all on table engine.schema_migrations from anon, authenticated;
 
+-- 아래 부트스트랩 판정이 기대 목록을 **손으로 정렬한 순서**에 기대면 안 된다.
+-- `array_agg(... order by ...)` 는 DB 콜레이션 순인데 사람은 눈으로 정렬하다 틀린다
+-- (실측: `corrections` 를 `consents` 앞에 적어 표·인덱스·정책 세 축이 동시에 어긋났고,
+--  증상은 「부분·혼합·불명」 한 줄이라 어느 축인지 안 보였다). 양쪽을 같은 자리에서
+-- 정렬해 **순서가 판정에 영향을 못 주게** 만든다.
+create or replace function pg_temp.synk_sorted(names text[]) returns text[]
+  language sql stable as
+$$ select coalesce(array_agg(n order by n), array[]::text[]) from unnest(names) as n $$;
+
 do $migration$
 declare
   migration_version constant text := '20260806150000';
   migration_name constant text := '20260806150000_engine_c6.sql';
-  expected_checksum constant text := '985600739c98bdd9d755c3d9b16f3bbc3b83d09c8055a6c872df68cadc692fb6'; -- migration-checksum
+  expected_checksum constant text := '551d9a9e8d4327ff4d0731794c6a19eef90177038ff129dd53be3ec96ba442e3'; -- migration-checksum
   recorded_checksum text;
   pre_engine boolean;
   pre_history boolean;
@@ -140,6 +149,7 @@ declare
   actual_policies text[];
   actor_values text[];
   common_exact boolean;
+  mismatched text[] := array[]::text[];
   lower_version text;
 begin
   select engine_existed, history_existed, public_table_count, auth_user_count
@@ -221,58 +231,94 @@ begin
       join pg_namespace n on n.oid = t.typnamespace
      where n.nspname = 'engine' and t.typname = 'actor_kind';
 
-    common_exact :=
-      actual_tables = array[
-        'corrections','consents','learners','learning_events','skills','submissions'
-      ]::text[]
-      and actual_columns_exact
-      and actual_indexes = array[
-        'corrections_pkey',
-        'corrections_submission_idx',
-        'consents_learner_idx',
-        'consents_pkey',
-        'learners_auth_user_id_key',
-        'learners_pkey',
-        'learners_student_code_key',
-        'learning_events_intervention_idx',
-        'learning_events_learner_id_idempotency_key_key',
-        'learning_events_learner_time_idx',
-        'learning_events_pkey',
-        'learning_events_skills_idx',
-        'learning_events_type_time_idx',
-        'skills_pkey',
-        'submissions_event_idx',
-        'submissions_pkey'
-      ]::text[]
-      and actual_policies = array[
-        'corrections.learner_self_corrections.SELECT',
-        'consents.learner_self_consents.SELECT',
-        'learners.learner_self.SELECT',
-        'learning_events.learner_self_events.SELECT',
-        'submissions.learner_self_submissions.SELECT'
-      ]::text[]
-      and actor_values = array['learner','ai','teacher']::text[]
-      and to_regtype('engine.job_status') is null
-      and to_regprocedure('engine.current_learner_id()') is not null
-      and (select count(*) = 6 and bool_and(rowsecurity)
-             from pg_tables
-            where schemaname = 'engine' and tablename <> 'schema_migrations')
-      and (select count(*) = 0
-             from pg_trigger g
-             join pg_class r on r.oid = g.tgrelid
-            where r.relnamespace = 'engine'::regnamespace and not g.tgisinternal)
-      and (select count(*) = 2
-             from pg_constraint c
-            where c.connamespace = 'engine'::regnamespace
-              and c.conname in ('learning_events_learner_id_fkey','consents_learner_id_fkey')
-              and c.confdeltype = 'c')
-      and (select count(*) = 2
-             from pg_constraint c
-            where c.connamespace = 'engine'::regnamespace
-              and c.conname in ('submissions_event_id_fkey','corrections_submission_id_fkey')
-              and c.confdeltype = 'r');
+    -- 축마다 따로 재서 어긋난 이름을 모은다. 한 덩어리 boolean 이면 「아니다」만 남고
+    -- 어디가 아닌지가 사라진다 — 그게 이 판정을 두 번 헛돌게 했다.
+    if actual_tables <> pg_temp.synk_sorted(array[
+      'consents','corrections','learners','learning_events','skills','submissions'
+    ]) then
+      mismatched := mismatched || '표';
+    end if;
 
-    if common_exact and actual_constraints = array[
+    if not actual_columns_exact then
+      mismatched := mismatched || '열';
+    end if;
+
+    if actual_indexes <> pg_temp.synk_sorted(array[
+      'consents_learner_idx',
+      'consents_pkey',
+      'corrections_pkey',
+      'corrections_submission_idx',
+      'learners_auth_user_id_key',
+      'learners_pkey',
+      'learners_student_code_key',
+      'learning_events_intervention_idx',
+      'learning_events_learner_id_idempotency_key_key',
+      'learning_events_learner_time_idx',
+      'learning_events_pkey',
+      'learning_events_skills_idx',
+      'learning_events_type_time_idx',
+      'skills_pkey',
+      'submissions_event_idx',
+      'submissions_pkey'
+    ]) then
+      mismatched := mismatched || '인덱스';
+    end if;
+
+    if actual_policies <> pg_temp.synk_sorted(array[
+      'consents.learner_self_consents.SELECT',
+      'corrections.learner_self_corrections.SELECT',
+      'learners.learner_self.SELECT',
+      'learning_events.learner_self_events.SELECT',
+      'submissions.learner_self_submissions.SELECT'
+    ]) then
+      mismatched := mismatched || '정책';
+    end if;
+
+    -- enum 은 선언 순서가 값의 일부라 정렬하지 않는다.
+    if actor_values <> array['learner','ai','teacher']::text[] then
+      mismatched := mismatched || 'actor_kind 값';
+    end if;
+
+    if to_regtype('engine.job_status') is not null then
+      mismatched := mismatched || 'job_status 가 이미 있다';
+    end if;
+
+    if to_regprocedure('engine.current_learner_id()') is null then
+      mismatched := mismatched || 'current_learner_id() 없음';
+    end if;
+
+    if not (select count(*) = 6 and bool_and(rowsecurity)
+              from pg_tables
+             where schemaname = 'engine' and tablename <> 'schema_migrations') then
+      mismatched := mismatched || 'RLS';
+    end if;
+
+    if (select count(*)
+          from pg_trigger g
+          join pg_class r on r.oid = g.tgrelid
+         where r.relnamespace = 'engine'::regnamespace and not g.tgisinternal) <> 0 then
+      mismatched := mismatched || '트리거';
+    end if;
+
+    if (select count(*)
+          from pg_constraint c
+         where c.connamespace = 'engine'::regnamespace
+           and c.conname in ('learning_events_learner_id_fkey','consents_learner_id_fkey')
+           and c.confdeltype = 'c') <> 2 then
+      mismatched := mismatched || 'FK on delete cascade';
+    end if;
+
+    if (select count(*)
+          from pg_constraint c
+         where c.connamespace = 'engine'::regnamespace
+           and c.conname in ('submissions_event_id_fkey','corrections_submission_id_fkey')
+           and c.confdeltype = 'r') <> 2 then
+      mismatched := mismatched || 'FK on delete restrict';
+    end if;
+
+    common_exact := cardinality(mismatched) = 0;
+
+    if common_exact and actual_constraints = pg_temp.synk_sorted(array[
       'consents_learner_id_fkey',
       'consents_pkey',
       'corrections_pkey',
@@ -293,9 +339,9 @@ begin
       'skills_pkey',
       'submissions_event_id_fkey',
       'submissions_pkey'
-    ]::text[] then
+    ]) then
       lower_version := 'c3';
-    elsif common_exact and actual_constraints = array[
+    elsif common_exact and actual_constraints = pg_temp.synk_sorted(array[
       'consents_learner_id_fkey',
       'consents_pkey',
       'corrections_pkey',
@@ -316,11 +362,16 @@ begin
       'skills_pkey',
       'submissions_event_id_fkey',
       'submissions_pkey'
-    ]::text[] then
+    ]) then
       lower_version := 'c4';
     else
+      if common_exact then
+        mismatched := mismatched || '제약(c3·c4 목록 어느 쪽과도 다르다)';
+      end if;
       raise exception
-        'engine이 정확한 c3/c4가 아니다 — 부분·혼합·불명 상태라 중단한다';
+        'engine이 정확한 c3/c4가 아니다 — 어긋난 축: % · 실제 제약: %',
+        array_to_string(mismatched, ', '),
+        array_to_string(actual_constraints, ', ');
     end if;
   end if;
 
@@ -735,7 +786,7 @@ select case when 테이블수=9 and RLS켜짐=9 and 정책수=5
              and (select v from 빠진제약) is null
              and (select v from 빠진트리거) is null
              and (select version from 현재이력)='20260806150000'
-              and (select checksum from 현재이력)='985600739c98bdd9d755c3d9b16f3bbc3b83d09c8055a6c872df68cadc692fb6' -- migration-checksum
+              and (select checksum from 현재이력)='551d9a9e8d4327ff4d0731794c6a19eef90177038ff129dd53be3ec96ba442e3' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 9·9·5·0·0·3·1·0 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,

@@ -38,35 +38,40 @@ test('각 마이그레이션 checksum은 checksum 슬롯만 0으로 치환한 �
   }
 });
 
-test('카탈로그 ORDER BY 결과와 대조하는 기대 배열은 이름순이다', () => {
-  /*
-   * PostgreSQL 쪽은 pg_constraint.conname을 ORDER BY 한 뒤 배열로 만든다.
-   * 기대 배열이 같은 이름을 모두 갖고 있어도 순서가 다르면 정확한 c3/c4가 거절된다.
-   * 2026-08-06 실측: reviewed...가 reviewer...보다 먼저인데 기대 배열만 역순이었다.
-   */
+/*
+ * 카탈로그(pg_tables·pg_indexes·pg_policies·pg_constraint)와 대조하는 기대 배열은
+ * **손으로 정렬한 순서에 기대면 안 된다.** 같은 이름을 다 갖고 있어도 순서가 다르면
+ * 정확한 c3/c4가 거절되고, 중단 메시지는 「부분·혼합·불명」 한 줄뿐이라 어느 축인지 안 보인다.
+ *
+ * 실측 2번(08-06): ① reviewed…가 reviewer…보다 먼저인데 기대 배열만 역순 → 제약 축
+ *                  ② corrections를 consents 앞에 적음 → 표·인덱스·정책 세 축이 동시에
+ * 세 번째다. 그래서 「순서를 맞춰라」를 검사하는 대신 **순서에 의존하는 통로 자체를 금지**하고
+ * 양쪽을 pg_temp.synk_sorted()로 같은 자리에서 정렬한다.
+ */
+const 비교대상 = 'actual_(?:tables|indexes|policies|constraints)\\s*(?:<>|=)\\s*';
+const 순서의존비교 = new RegExp(`${비교대상}array\\[`, 'g');
+const 정렬통로 = new RegExp(`${비교대상}pg_temp\\.synk_sorted\\(array\\[([\\s\\S]*?)\\]\\)`, 'g');
+
+test('카탈로그 기대 배열은 순서에 의존하는 옛 통로를 쓰지 않는다', () => {
   const sql = concatenate().toString('utf8');
-  const arrays = [...sql.matchAll(/actual_constraints\s*=\s*array\[([\s\S]*?)\]::text\[\]/g)]
+
+  assert.deepEqual([...sql.matchAll(순서의존비교)].map((m) => m[0]), [],
+    '기대 배열을 카탈로그 정렬 순서에 맞춰 손으로 적는 통로다 — pg_temp.synk_sorted()로 감싼다');
+
+  const arrays = [...sql.matchAll(정렬통로)]
     .map((match) => [...match[1].matchAll(/'([^']+)'/g)].map((name) => name[1]));
+  assert.equal(arrays.length, 5, '표·인덱스·정책·제약(c3·c4) 다섯 지문을 다 찾아야 한다');
+  arrays.forEach((names, index) => {
+    assert.ok(names.length > 0, `${index}번째: 빈 배열이면 검사가 무엇이든 통과한다`);
+  });
+});
 
-  assert.equal(arrays.length, 2, 'c3·c4 제약 지문 배열을 둘 다 찾아야 한다');
-
-  const 이름순검사 = (names, label) => {
-    assert.ok(names.length > 0, `${label}: 빈 배열이면 검사가 무엇이든 통과한다`);
-    assert.ok(names.every((name) => /^[a-z0-9_]+$/u.test(name)),
-      `${label}: JS와 PostgreSQL 정렬을 직접 비교할 수 없는 이름이 있다`);
-    assert.deepEqual(names, [...names].sort(),
-      `${label}: 실제 카탈로그는 ORDER BY conname인데 기대 배열 순서가 다르다`);
-  };
-
-  arrays.forEach((names, index) => 이름순검사(names, index === 0 ? 'c3' : 'c4'));
-  assert.throws(
-    () => 이름순검사([
-      'corrections_reviewer_confidence_check',
-      'corrections_reviewed_correction_id_fkey',
-    ], '역순 픽스처'),
-    /기대 배열 순서가 다르다/,
-    '탐지력 픽스처가 실제 역순 결함을 잡아야 한다',
-  );
+test('탐지력 픽스처 — 옛 통로가 한 줄이라도 살아 있으면 잡는다', () => {
+  const 옛통로 = "    if common_exact and actual_constraints = array[\n      'consents_pkey'\n    ]::text[] then";
+  assert.notDeepEqual([...옛통로.matchAll(순서의존비교)].map((m) => m[0]), [],
+    '금지 패턴이 실제 옛 통로 문장을 못 잡는다');
+  assert.deepEqual([...옛통로.matchAll(정렬통로)], [],
+    '옛 통로가 정렬 통로로 잘못 세어진다');
 });
 
 test('탐지력 픽스처 — 합본 1바이트 변이는 바이트 동일성 가드가 거절한다', () => {
