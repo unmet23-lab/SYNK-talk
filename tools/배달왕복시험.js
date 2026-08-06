@@ -263,7 +263,7 @@ async function main() {
   const 조회 = async (질의 = '', 옵션 = {}) => {
     const h = { apikey: anon, Authorization: `Bearer ${옵션.토큰 ?? 학생토큰}` };
     if (옵션.판 !== null) h['X-Contract-Ver'] = 옵션.판 ?? 판;
-    const r = await fetch(`https://${ref}.supabase.co/functions/v1/tasks${질의}`, {
+    const r = await fetch(`https://${ref}.supabase.co/functions/v1/${옵션.함수 ?? 'tasks'}${질의}`, {
       method: 옵션.방법 ?? 'GET', headers: h,
     });
     return { status: r.status, 몸: JSON.parse((await r.text()) || '{}') };
@@ -303,6 +303,90 @@ async function main() {
   확인('🔴 date 가 날짜꼴이 아니면 400 이다 — 500 이면 앱이 영구 오류를 무한 재시도한다',
     (await 조회('?date=어제')).status === 400, (await 조회('?date=어제')).몸);
   확인('POST 는 405 다 — 조회가 쓰기를 겸하지 않는다', (await 조회('', { 방법: 'POST' })).status === 405);
+
+  /* ── ⑨ 교정 조회 (C0 §4-3 ②) ─────────────────────────────────────
+   * c8 이 `correction_id` 를 깔았지만 **교정을 꺼내 보여주는 통로**가 없어 앱은 자기가 받은
+   * 교정의 id 를 알 길이 없었다 — 모르면 `correction.viewed` 를 못 보내고, 그건 S1-8
+   * 「학습이 일어났다」의 **유일한 직접 신호**다. 그 통로가 서는지를 여기서 잰다. */
+  console.log('\n■ ⑨ 교정 조회 — GET /v1/corrections');
+
+  const A제출 = (await sql(`
+    select s.submission_id from engine.submissions s
+      join engine.learning_events e on e.event_id = s.event_id
+     where e.learner_id = '${id.A}'::uuid order by s.occurred_at limit 1`))[0].submission_id;
+
+  /* 22 건을 심는다 — 쪽크기(20)를 **넘겨야** 커서가 실제로 선다. 안 넘기면 `next_cursor` 는
+   * 언제나 null 이라 「커서가 있다」는 초록이 **미실행과 같은 모양**이 된다. */
+  await sql(`
+    insert into engine.corrections (submission_id, actor_kind, corrected_text, error_tags, created_at, schema_ver)
+    select '${A제출}'::uuid, 'ai', '고친 문장 ' || g, '{"조사:주격(이/가·은/는)"}'::text[],
+           '${어제날}T10:00:00Z'::timestamptz + (g || ' minutes')::interval, '${판}'
+      from generate_series(1, 21) g`);
+  /* 뒤엣것은 **보여줄 것이 없는 행**이다(강사가 판정만 남긴 골든셋 행의 모양). 일부러 **가장
+   * 최근**으로 심는다 — 필터가 죽으면 맨 앞에 빈 카드로 튀어나와 아래 정렬 검사까지 함께 빨개진다. */
+  await sql(`
+    insert into engine.corrections (submission_id, actor_kind, corrected_text, error_tags, created_at, schema_ver)
+    values ('${A제출}'::uuid, 'teacher', '강사가 고친 문장', '{}'::text[],
+            '${어제날}T12:00:00Z'::timestamptz, '${판}'),
+           ('${A제출}'::uuid, 'ai', null, '{}'::text[],
+            '${어제날}T13:00:00Z'::timestamptz, '${판}')`);
+
+  const c1 = await 조회('', { 함수: 'corrections' });
+  확인('학생 토큰으로 내 교정이 한 쪽(20건) 나온다',
+    c1.status === 200 && (c1.몸.data || []).length === 20, c1.status);
+  const 첫 = (c1.몸.data || [])[0] || {};
+  확인('🔴 정렬은 확정 시각 내림차순 — 가장 최근 교정이 맨 앞이다',
+    첫.actor_kind === 'teacher' && 첫.corrected_text === '강사가 고친 문장', 첫);
+  확인('🔑 confirmed_at 은 새 열이 아니라 created_at 그대로다 — corrections 는 생성 후 불변',
+    new Date(첫.confirmed_at).toISOString() === new Date(`${어제날}T12:00:00Z`).toISOString(), 첫.confirmed_at);
+  확인('원 제출을 가리키는 submission_id 가 실려 온다 — 어느 발화의 교정인지',
+    첫.submission_id === A제출, 첫.submission_id);
+  확인('error_tags 는 배열 그대로 온다',
+    Array.isArray(첫.error_tags) && ((c1.몸.data || [])[1] || {}).error_tags?.[0] === '조사:주격(이/가·은/는)',
+    (c1.몸.data || [])[1]);
+  확인('🔴 빈 카드가 될 행은 목록에 없다 — 계약이 빈 상태에 대해 금지한 그 모양이다',
+    !(c1.몸.data || []).some((x) => !x.corrected_text && (x.error_tags || []).length === 0), c1.몸.data);
+
+  확인('한 쪽을 넘기면 next_cursor 가 선다', typeof c1.몸.next_cursor === 'string', c1.몸.next_cursor);
+  const c2 = await 조회(`?since=${encodeURIComponent(c1.몸.next_cursor)}`, { 함수: 'corrections' });
+  확인('커서를 실으면 다음 쪽이 이어진다 — 남은 2건',
+    c2.status === 200 && (c2.몸.data || []).length === 2, c2.status);
+  const ids1 = new Set((c1.몸.data || []).map((x) => x.correction_id));
+  확인('🔴 두 쪽이 겹치지도 빠뜨리지도 않는다 — 커서가 시각뿐이면 같은 밀리초에서 한 건이 샌다',
+    !(c2.몸.data || []).some((x) => ids1.has(x.correction_id))
+      && ids1.size + (c2.몸.data || []).length === 22, [ids1.size, (c2.몸.data || []).length]);
+  확인('마지막 쪽의 next_cursor 는 null 이다', c2.몸.next_cursor === null, c2.몸.next_cursor);
+
+  /* 🔴 빈 상태는 오류가 아니다(C0 §4-3 공통) — 더 오래된 것이 없는 커서는 200 + 빈 배열이다. */
+  const 끝쪽 = (c2.몸.data || [])[(c2.몸.data || []).length - 1] || {};
+  const 빈교정 = await 조회(
+    `?since=${encodeURIComponent(`${new Date(끝쪽.confirmed_at).toISOString()}|${끝쪽.correction_id}`)}`,
+    { 함수: 'corrections' });
+  확인('🔴 더 볼 것이 없어도 200 + 빈 배열이다 — 404 가 아니다',
+    빈교정.status === 200 && Array.isArray(빈교정.몸.data) && 빈교정.몸.data.length === 0, 빈교정);
+
+  /* 🔴 자기 것만 — D 에게도 교정이 있는데(위 준비) A 토큰에는 안 보여야 한다.
+   *   `service_role` 은 RLS 를 우회하므로 함수가 걷는 사슬이 유일한 방어선이다. */
+  const D교정 = (await sql(`
+    select c.correction_id from engine.corrections c
+      join engine.submissions s on s.submission_id = c.submission_id
+      join engine.learning_events e on e.event_id = s.event_id
+     where e.learner_id = '${id.D}'::uuid limit 1`))[0];
+  확인('🔴 남의 교정은 안 보인다 — 학생은 토큰에서 확정되고 쿼리로 못 지정한다',
+    !!D교정 && !ids1.has(D교정.correction_id)
+      && !(c2.몸.data || []).some((x) => x.correction_id === D교정.correction_id), D교정);
+
+  확인('anon 키로는 못 읽는다 — 사람이 아니다',
+    (await 조회('', { 함수: 'corrections', 토큰: anon })).status === 401);
+  확인('헤더가 없으면 400 이다', (await 조회('', { 함수: 'corrections', 판: null })).status === 400);
+  확인('DB 보다 새 판을 말하면 426 이다', (await 조회('', { 함수: 'corrections', 판: 'c999' })).status === 426);
+  확인('🔴 since 가 커서꼴이 아니면 400 이다 — 500 이면 앱이 영구 오류를 무한 재시도한다',
+    (await 조회('?since=어제', { 함수: 'corrections' })).status === 400,
+    (await 조회('?since=어제', { 함수: 'corrections' })).몸);
+  확인('POST 는 405 다 — 조회가 쓰기를 겸하지 않는다',
+    (await 조회('', { 함수: 'corrections', 방법: 'POST' })).status === 405);
+  확인('없는 뒷마디는 404 다 — 오타 경로가 「이미 돌던 것」이 되지 않는다',
+    (await 조회('/아무거나', { 함수: 'corrections' })).status === 404);
 
   console.log(`\n[배달왕복시험] ${통과}/${통과 + 실패} 통과`);
   process.exit(실패 ? 1 : 0);
