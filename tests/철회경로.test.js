@@ -85,6 +85,26 @@ test('철회 절차의 insert 가 learning_events 의 NOT NULL 열을 전부 채
     `  L0 §9-3-2 의 insert 열 목록에 추가하고, values 쪽도 같은 개수로 맞춰라(현재 ${적힌열.length}개).`);
 });
 
+/* 치환을 잊었을 때 **아무 일도 안 일어나야** 한다.
+ * 초판은 예시로 `'SYNK-001'` 을 적었는데 그건 1번 학생의 진짜 코드다 — 그대로 돌리면
+ * 엉뚱한 학생의 동의가 철회된다. 실패는 안전한 쪽(0행)으로 떨어져야 한다. */
+test('철회 절차의 학생 코드가 실재할 수 없는 자리표시자다', () => {
+  const 절 = L0.slice(L0.indexOf('#### 9-3-2.'), L0.indexOf('### 9-4.'));
+  const 값들 = [...절.matchAll(/student_code\s*=\s*'([^']*)'/g)].map((m) => m[1]);
+  assert.ok(값들.length >= 2, `철회 절차에서 student_code 리터럴을 ${값들.length}개밖에 못 찾았다 — 절차가 바뀌었다`);
+  const 실재가능 = 값들.filter((v) => !v.includes('@@'));
+  assert.deepEqual(실재가능, [],
+    `치환을 잊으면 진짜 학생에게 맞는 값이 적혀 있다: ${실재가능.join(', ')}\n` +
+    '  자리표시자는 실재할 수 없는 형태여야 한다(@@…@@) — 그래야 잊었을 때 0행으로 끝난다.');
+});
+
+test('탐지력 픽스처 — 진짜 학생 코드가 절차에 되살아나면 잡는다', () => {
+  const 되살아난판 = "where student_code = 'SYNK-001'";
+  const 값 = [...되살아난판.matchAll(/student_code\s*=\s*'([^']*)'/g)].map((m) => m[1]);
+  assert.deepEqual(값.filter((v) => !v.includes('@@')), ['SYNK-001'],
+    '추출기가 죽었다 — 그러면 위 검사는 진짜 코드도 통과시킨다');
+});
+
 test('철회 절차가 두 번 Run 해도 안전하다고 적힌 형태를 유지한다', () => {
   const 블록 = L0.slice(L0.indexOf('insert into engine.learning_events'));
   assert.match(블록.slice(0, 900), /on conflict[\s\S]*do nothing/,
