@@ -28,7 +28,10 @@ with 상태 as (
       where schema_name = 'engine')                                as engine_스키마,
     (select count(*) from information_schema.tables
       where table_schema = 'engine')                               as engine_테이블,
-    -- CHECK 제약 이름은 계약 버전을 달고 있다(_c4). 이미 부었다면 여기서 몇 개가 잡힌다.
+    -- CHECK 제약 이름은 **계약 버전을 접미사로** 달고 있다. 이미 부었다면 여기서 몇 개가 잡힌다.
+    -- 🔴 여기에 버전을 숫자로 적지 않는다 — 개정 때마다 낡고, 낡은 기대값은 **정상 상태를
+    --    이상으로 보이게** 만든다(같은 형태 3회 · 발주_기준선마이그레이션.md §2-1). 이 쿼리는
+    --    이름을 안 보고 **개수만** 세므로 버전과 무관하게 옳다.
     (select count(*) from pg_constraint c
        join pg_namespace n on n.oid = c.connamespace
       where n.nspname = 'engine' and c.contype = 'c')              as engine_제약,
