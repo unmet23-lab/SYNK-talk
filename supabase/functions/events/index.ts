@@ -29,14 +29,23 @@ import postgres from 'npm:postgres@3.4.4';
 import 검증모듈 from './이벤트검증.mjs';
 import 계약 from './계약.mjs';
 import 경로모듈 from './업로드경로.mjs';
+import 헤더모듈 from './음성헤더.mjs';
 
 const { 검증 } = 검증모듈 as { 검증: (e: unknown, c: unknown) => { ok: boolean; 오류들: string[] } };
-const { 경로검사 } = 경로모듈 as {
+const { 버킷, 경로검사 } = 경로모듈 as {
+  버킷: string;
   경로검사: (ref: string, learner_id: string) => { ok: boolean; 이유: string | null };
+};
+const { 헤더읽기 } = 헤더모듈 as {
+  헤더읽기: (앞머리: Uint8Array, 전체바이트: number | null) => Record<string, unknown>;
 };
 
 const 최대건수 = 100;
 const 최대바이트 = 1_000_000;
+
+/* 헤더는 앞머리에 있다 — 25MB 를 통째로 받을 이유가 없다(함수 메모리가 곧 상한이다). */
+const 앞머리바이트 = 4096;
+const 측정제한밀리 = 5000;
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
 
@@ -65,6 +74,76 @@ function 토큰주체(req: Request): string | null {
     return typeof p.sub === 'string' && p.sub ? p.sub : null;
   } catch {
     return null;
+  }
+}
+
+/** 응답 스트림에서 앞 n 바이트만 받고 끊는다 — 상류가 `Range` 를 무시해도 상한이 지켜진다. */
+async function 앞부분(r: Response, n: number): Promise<Uint8Array> {
+  const reader = r.body?.getReader();
+  if (!reader) return new Uint8Array(0);
+  const 조각: Uint8Array[] = [];
+  let 길이 = 0;
+  while (길이 < n) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    조각.push(value);
+    길이 += value.length;
+  }
+  await reader.cancel().catch(() => {});
+  const out = new Uint8Array(길이);
+  let off = 0;
+  for (const c of 조각) { out.set(c, off); off += c.length; }
+  return out.subarray(0, Math.min(길이, n));
+}
+
+/** 객체 전체 크기 — 206 이면 `Content-Range` 의 분모, 200 이면 `Content-Length`. 없으면 **모른다**. */
+function 총바이트(r: Response): number | null {
+  const m = r.headers.get('Content-Range')?.match(/\/(\d+)\s*$/);
+  if (m) return Number(m[1]);
+  const cl = r.headers.get('Content-Length');
+  return r.status === 200 && cl ? Number(cl) : null;
+}
+
+/* 🔴 서버가 **파일을 직접 열어** 잰다 — 앱이 적은 값은 관측이 아니라 주장이고, c6 가
+ *   `capture_meta` 를 만든 이유가 정확히 그 구분이다(`이벤트검증` 이 `.server` 를 앱에게서 거부한다).
+ *
+ * 못 재도 **행은 저장한다** — 「수집이 채점보다 우선」(C0 §4-2). Storage 가 흔들린다고 학생의
+ * 발화를 버리지 않는다. 대신 못 잰 사실을 `state` 로 남긴다: 조용히 비우면 「측정 실패」와
+ * 「규격 정상」이 빈 칸 하나로 같아진다.
+ * 🔑 `state:'missing'` 은 덤이 아니라 이 자리의 두 번째 값이다 — **참조가 가리키는 파일이 없는
+ *   행**을 ingest 시점에 못 박는다. 안 적으면 그 행은 나중에 「전사 실패」와 구분되지 않는다
+ *   (C0 §4-2 가 업로드를 먼저 하라고 못박은 그 사고다).
+ */
+async function 헤더측정(ref: string): Promise<Record<string, unknown>> {
+  // `agc_verified` 는 언제나 `unknown` 이다 — AGC·노이즈 억제는 헤더에 흔적이 없다(C0 §4-2).
+  // 모르는 것을 `false` 로 적으면 그 행이 「off 였다」는 거짓 증거가 된다.
+  const 봉 = (v: Record<string, unknown>) => ({ measured_at: new Date().toISOString(), agc_verified: 'unknown', ...v });
+  const base = Deno.env.get('SUPABASE_URL') ?? '';
+  const 키 = Deno.env.get('STORAGE_SIGN_KEY') ?? '';
+  // 모양을 **먼저** 본다 — `SUPABASE_SERVICE_ROLE_KEY` 는 새 형식(`sb_secret_…`)이라 Storage 가
+  // 거절하고, 증상은 「측정만 안 됨」이라 원인이 어디에도 안 남는다(2026-08-06 실측 · uploads 와 같은 자리).
+  if (!base || 키.split('.').length !== 3) {
+    console.error('[events] STORAGE_SIGN_KEY 가 JWT 형태가 아니다 — capture_meta.server 를 못 잰다');
+    return 봉({ state: 'unmeasured', reason: 'storage_key' });
+  }
+  try {
+    const r = await fetch(`${base}/storage/v1/object/${버킷}/${ref}`, {
+      headers: { Authorization: `Bearer ${키}`, Range: `bytes=0-${앞머리바이트 - 1}` },
+      signal: AbortSignal.timeout(측정제한밀리),
+    });
+    if (r.status === 404) {
+      await r.body?.cancel().catch(() => {});
+      return 봉({ state: 'missing' });
+    }
+    if (!r.ok) {
+      console.error('[events] 헤더 측정 실패', r.status, (await r.text()).slice(0, 200));
+      return 봉({ state: 'unmeasured', reason: `storage_${r.status}` });
+    }
+    const 전체 = 총바이트(r);
+    return 봉({ state: 'measured', byte_size: 전체, ...헤더읽기(await 앞부분(r, 앞머리바이트), 전체) });
+  } catch (e) {
+    console.error('[events] 헤더 측정 예외', String((e as Error)?.message ?? e));
+    return 봉({ state: 'unmeasured', reason: 'fetch' });
   }
 }
 
@@ -180,6 +259,22 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
     }
   }
 
+  /* `capture_meta` 는 두 갈래다(C0 §4-2): `app` = 앱이 **요청한** 설정 / `server` = 서버가 파일
+   * 헤더에서 **실제로 잰** 값. 앱 것은 그대로 두고 `server` 만 얹는다 — 덮으면 「요청」과 「관측」이
+   * 한 칸에서 섞이고, 그 둘이 다르다는 것이 이 열의 존재 이유다.
+   * ⚠ 측정은 **트랜잭션 밖**에서 한다(네트워크 왕복 동안 DB 트랜잭션을 붙들지 않는다). */
+  let capture_meta: unknown = s참조 ? (s참조.capture_meta ?? null) : null;
+  if (capture_meta != null && (typeof capture_meta !== 'object' || Array.isArray(capture_meta))) {
+    // 객체가 아니면 여기서 막는다 — 아니면 문자열 하나가 `server` 측정을 통째로 삼킨다.
+    return 거절({
+      code: 'PAYLOAD_INVALID', field: 'submission.capture_meta', retryable: false,
+      message: 'capture_meta 는 객체여야 합니다',
+    });
+  }
+  if (s참조?.audio_ref) {
+    capture_meta = { ...((capture_meta as Record<string, unknown>) ?? {}), server: await 헤더측정(String(s참조.audio_ref)) };
+  }
+
   const occurred_at = String(사건.occurred_at);
   if (Number.isNaN(Date.parse(occurred_at))) {
     return 거절({ code: 'CONTRACT_VIOLATION', message: 'occurred_at 이 ISO 8601 이 아닙니다', field: 'occurred_at', retryable: false });
@@ -269,7 +364,7 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
             ${(s.body_original ?? null) as string | null},
             ${(s.image_refs ?? null) as string[] | null},
             ${(s.audio_ref ?? null) as string | null},
-            ${제이슨(s.capture_meta)},
+            ${제이슨(capture_meta)},
             ${occurred_at}::timestamptz, ${ver}
           )`;
       }

@@ -1,0 +1,155 @@
+/* lib/음성헤더.js — C0 §4-2 「서버가 파일 헤더에서 실제 값을 파생해 저장한다」.
+ *
+ * 이 회귀가 지는 것: **규격이 관측값으로 남는 것.** 앱 프리셋이 조용히 바뀌면 그 뒤 녹음이
+ * 전량 오염되는데 증상이 없다 — 유일한 방어선이 행마다 붙는 이 측정이다. 그래서 여기서 재는 것은
+ * 「파서가 안 죽는가」가 아니라 **「규격 밖을 실제로 규격 밖이라고 적는가」**(그리고 그 반대편,
+ * 멀쩡한 녹음을 위반으로 세지 않는가 — 오탐은 진짜 오염을 소음에 묻는다)다.
+ *
+ * 픽스처는 전부 **여기서 조립한다.** 실파일에 기대면 탐지력이 그 파일의 존재에 걸리고,
+ * CI 에는 녹음이 없다.
+ */
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert');
+const { 정본, 헤더읽기 } = require('../lib/음성헤더.js');
+
+const 청크 = (id, 본문) => {
+  const h = Buffer.alloc(8);
+  h.write(id, 0, 'ascii');
+  h.writeUInt32LE(본문.length, 4);
+  return Buffer.concat([h, 본문, 본문.length % 2 ? Buffer.alloc(1) : Buffer.alloc(0)]);
+};
+const 데이터머리 = (선언크기) => {
+  const h = Buffer.alloc(8);
+  h.write('data', 0, 'ascii');
+  h.writeUInt32LE(선언크기, 4);
+  return h;
+};
+
+/** 진짜 WAV 를 조립한다 — `data` 본문은 붙이지 않는다(앞머리만 읽는 것이 구현의 전제다). */
+function wav(opt = {}) {
+  const {
+    포맷 = 1, 채널 = 1, 레이트 = 16000, 비트 = 16,
+    실제데이터 = 32000, 선언데이터 = null, 앞청크 = null, 서브포맷 = null, fmt생략 = false,
+  } = opt;
+
+  const fmt = Buffer.alloc(서브포맷 == null ? 16 : 40);
+  fmt.writeUInt16LE(포맷, 0);
+  fmt.writeUInt16LE(채널, 2);
+  fmt.writeUInt32LE(레이트, 4);
+  fmt.writeUInt32LE(레이트 * 채널 * (비트 / 8), 8);   // byteRate
+  fmt.writeUInt16LE(채널 * (비트 / 8), 12);           // blockAlign
+  fmt.writeUInt16LE(비트, 14);
+  if (서브포맷 != null) {
+    fmt.writeUInt16LE(22, 16);        // cbSize
+    fmt.writeUInt16LE(비트, 18);      // validBitsPerSample
+    fmt.writeUInt32LE(3, 20);         // channelMask
+    fmt.writeUInt16LE(서브포맷, 24);  // SubFormat GUID 의 앞 2바이트 = 진짜 포맷
+  }
+
+  const 머리 = Buffer.alloc(12);
+  머리.write('RIFF', 0, 'ascii');
+  머리.write('WAVE', 8, 'ascii');
+
+  const 조각 = [머리];
+  if (앞청크) 조각.push(청크(앞청크[0], Buffer.from(앞청크[1])));
+  if (!fmt생략) 조각.push(청크('fmt ', fmt));
+  조각.push(데이터머리(선언데이터 == null ? 실제데이터 : 선언데이터));
+
+  const 앞 = Buffer.concat(조각);
+  return { 앞머리: new Uint8Array(앞), 전체: 앞.length + 실제데이터 };
+}
+
+test('정본 규격 그대로면 위반이 하나도 없다', () => {
+  const { 앞머리, 전체 } = wav();
+  const r = 헤더읽기(앞머리, 전체);
+  assert.deepStrictEqual(r.spec_violations, [], '멀쩡한 녹음을 위반으로 세면 진짜 오염이 소음에 묻힌다');
+  assert.strictEqual(r.codec, 정본.codec);
+  assert.strictEqual(r.sample_rate, 16000);
+  assert.strictEqual(r.bit_depth, 16);
+  assert.strictEqual(r.channels, 1);
+});
+
+test('duration 은 데이터 크기로 잰다 — 16k·16bit·mono 32000B = 1초', () => {
+  const { 앞머리, 전체 } = wav({ 실제데이터: 32000 });
+  assert.strictEqual(헤더읽기(앞머리, 전체).duration_ms, 1000);
+});
+
+test('🔴 규격 밖은 값 그대로 적힌다 — 44.1k·스테레오·8bit', () => {
+  const { 앞머리, 전체 } = wav({ 레이트: 44100, 채널: 2, 비트: 8 });
+  const r = 헤더읽기(앞머리, 전체);
+  assert.strictEqual(r.sample_rate, 44100);
+  assert.strictEqual(r.channels, 2);
+  assert.strictEqual(r.bit_depth, 8);
+  for (const 기대 of ['sample_rate:44100', 'channels:2', 'bit_depth:8']) {
+    assert.ok(r.spec_violations.includes(기대), `${기대} 가 안 적혔다 — ${JSON.stringify(r.spec_violations)}`);
+  }
+});
+
+test('🔴 m4a(Expo 기본 프리셋)를 무엇인지 적는다 — 그리고 모르는 칸은 지어내지 않는다', () => {
+  const b = Buffer.alloc(32);
+  b.write('ftyp', 4, 'ascii');
+  b.write('M4A ', 8, 'ascii');
+  const r = 헤더읽기(new Uint8Array(b), 32);
+  assert.strictEqual(r.codec, 'm4a');
+  assert.ok(r.spec_violations.includes('codec:m4a'));
+  // 🔑 MP4 박스를 파지 않는다 — 대신 **0 이나 추정값을 적지 않는다**(틀린 관측이 영구히 쌓인다).
+  assert.strictEqual(r.sample_rate, null);
+  assert.strictEqual(r.bit_depth, null);
+  assert.strictEqual(r.channels, null);
+});
+
+test('탐지력 — 앞에 LIST 청크가 끼어도 fmt 를 찾는다(고정 44바이트 파서면 여기서 죽는다)', () => {
+  const { 앞머리, 전체 } = wav({ 앞청크: ['LIST', 'INFOISFT-recorder'] });
+  const r = 헤더읽기(앞머리, 전체);
+  assert.deepStrictEqual(r.spec_violations, [], '엉뚱한 바이트를 fmt 로 읽었다');
+  assert.strictEqual(r.sample_rate, 16000);
+});
+
+test('🔴 EXTENSIBLE(0xFFFE) PCM 을 규격 위반으로 세지 않는다 — 오탐이 가짜 신호를 만든다', () => {
+  const { 앞머리, 전체 } = wav({ 포맷: 0xfffe, 서브포맷: 1 });
+  const r = 헤더읽기(앞머리, 전체);
+  assert.strictEqual(r.codec, 'pcm_wav');
+  assert.deepStrictEqual(r.spec_violations, []);
+});
+
+test('🔴 길이 불일치 — 선언보다 파일이 짧으면 잘림으로 적고 실제 길이를 쓴다', () => {
+  const { 앞머리, 전체 } = wav({ 실제데이터: 16000, 선언데이터: 32000 });
+  const r = 헤더읽기(앞머리, 전체);
+  assert.ok(r.spec_violations.includes('truncated'), '녹음이 끊긴 것을 못 잡았다');
+  assert.strictEqual(r.duration_ms, 500, '없는 초를 가진 행이 남으면 「전사 실패」와 구분되지 않는다');
+  assert.strictEqual(r.declared_duration_ms, 1000, '헤더가 뭐라 했는지도 남긴다');
+});
+
+test('전체 크기를 모르면 잘림 검사를 건너뛴다 — 모른다고 위반으로 적지 않는다', () => {
+  const { 앞머리 } = wav({ 실제데이터: 16000, 선언데이터: 32000 });
+  const r = 헤더읽기(앞머리, null);
+  assert.ok(!r.spec_violations.includes('truncated'));
+  assert.strictEqual(r.duration_ms, 1000);
+});
+
+test('읽을 수 없으면 unparsable — 조용히 「정상」이 되지 않는다', () => {
+  assert.deepStrictEqual(헤더읽기(new Uint8Array([1, 2, 3]), 3).spec_violations, ['unparsable']);
+
+  const { 앞머리, 전체 } = wav({ fmt생략: true });
+  const r = 헤더읽기(앞머리, 전체);
+  assert.strictEqual(r.codec, 'wav');
+  assert.deepStrictEqual(r.spec_violations, ['unparsable']);
+  assert.strictEqual(r.sample_rate, null, '못 읽었는데 값이 들어갔다');
+});
+
+test('망가진 청크 크기(0)에서 멈춘다 — 무한루프도 엉뚱한 값도 아니다', () => {
+  const 머리 = Buffer.alloc(12);
+  머리.write('RIFF', 0, 'ascii');
+  머리.write('WAVE', 8, 'ascii');
+  const 빈청크 = Buffer.alloc(8);
+  빈청크.write('junk', 0, 'ascii');            // size = 0
+  const r = 헤더읽기(new Uint8Array(Buffer.concat([머리, 빈청크])), 20);
+  assert.deepStrictEqual(r.spec_violations, ['unparsable']);
+});
+
+test('🔴 AGC 는 여기서 적지 않는다 — 헤더에 흔적이 없다(모르는 것을 안다고 쓰지 않는다)', () => {
+  const { 앞머리, 전체 } = wav();
+  assert.ok(!('agc_verified' in 헤더읽기(앞머리, 전체)),
+    'agc 를 헤더에서 「쟀다」고 적으면 그 행이 거짓 증거가 된다 — 봉투(functions/events) 몫이다');
+});
