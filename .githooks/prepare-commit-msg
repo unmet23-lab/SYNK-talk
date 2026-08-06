@@ -1,0 +1,38 @@
+#!/bin/sh
+# SYNK-talk prepare-commit-msg — 커밋에 세션 ID 트레일러를 박는다.
+#
+# 왜 여기 생겼나 (2026-08-07 실측):
+#   CLAUDE.md 는 「커밋 주인은 추정하지 말고 Session-Id 트레일러를 읽는다(prepare-commit-msg
+#   훅이 자동으로 박는다)」고 적는데, **그게 참인 곳은 appsscript 뿐이었다.** 이 저장소는
+#   core.hooksPath=.githooks 로 갈아탔고 그 폴더에는 pre-commit 하나만 있어서, 여기서 난
+#   커밋은 **전부 주인이 없었다.** 규칙은 하나인데 장치가 한쪽에만 있던 것이다.
+#
+#   그래서 두 가지가 조용히 새고 있었다:
+#     · 인계문이 형제 저장소를 읽도록 고친 뒤(F142)에도 **여기서 한 작업은 안 보인다** —
+#       읽기는 고쳤는데 박는 쪽이 없어 `--grep=Session-Id:` 가 0건을 문다. 트랙 절반이
+#       talk 에서 도는 날 인계문은 그 절반을 잃는다.
+#     · board-move 의 생사 판정(F146)이 「트레일러 없는 talk 커밋은 못 본다」로 남았다.
+#   즉 이 파일이 없어서 난 구멍을, 저쪽 두 장치가 각자 예외로 떠안고 있었다.
+#
+# 정본은 appsscript `tools/githooks/prepare-commit-msg` 와 **같은 내용**이다(판정을 두 곳에
+#   적지 않는다 — 다르게 박으면 두 저장소의 주인 판정이 갈린다).
+#
+# 설계 원칙(원본 그대로):
+#   · 환경변수가 없으면 아무것도 하지 않는다(유호님 손커밋·CI·다른 도구를 방해하지 않는다).
+#   · 이미 트레일러가 있으면 덧붙이지 않는다(amend·rebase 중복 방지).
+#   · 실패해도 커밋을 막지 않는다 — 귀속은 편의지 안전장치가 아니다.
+
+MSG_FILE="$1"
+
+[ -n "$MSG_FILE" ] || exit 0
+[ -f "$MSG_FILE" ] || exit 0
+[ -n "$CLAUDE_CODE_HOST_SESSION_ID" ] || exit 0
+
+# git interpret-trailers를 쓴다 — 손으로 append하면 주석 블록·빈 줄 때문에 트레일러 문단이
+# 갈라져 `%(trailers)`로 안 읽힌다(그러면 박아도 못 찾는 셈이라 목적이 통째로 무너진다).
+git interpret-trailers --in-place \
+  --if-exists doNothing \
+  --trailer "Session-Id: $CLAUDE_CODE_HOST_SESSION_ID" \
+  "$MSG_FILE" 2>/dev/null
+
+exit 0

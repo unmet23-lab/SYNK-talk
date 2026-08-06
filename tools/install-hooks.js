@@ -12,17 +12,23 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
-const hook = path.join(root, '.githooks', 'pre-commit');
+/* 목록은 하나에서 파생시킨다 — 훅을 늘리고 이 배열을 안 늘리면 그 훅은 실행 비트도 못 받고
+ * 온전성 검사에서도 빠진다. 증상은 「그 훅만 조용히 안 돈다」라 통과와 같은 모양이다. */
+const 훅들 = ['pre-commit', 'prepare-commit-msg'];
 
-if (!fs.existsSync(hook)) {
-  console.error('[install-hooks] .githooks/pre-commit 이 없다. 저장소가 온전한지 확인하라.');
-  process.exit(1);
+for (const 이름 of 훅들) {
+  if (!fs.existsSync(path.join(root, '.githooks', 이름))) {
+    console.error(`[install-hooks] .githooks/${이름} 이 없다. 저장소가 온전한지 확인하라.`);
+    process.exit(1);
+  }
 }
 
 execFileSync('git', ['config', 'core.hooksPath', '.githooks'], { cwd: root, stdio: 'inherit' });
-try {
-  fs.chmodSync(hook, 0o755); // Windows에서는 무의미하지만 해가 없다
-} catch (_) {}
+for (const 이름 of 훅들) {
+  try {
+    fs.chmodSync(path.join(root, '.githooks', 이름), 0o755); // Windows에서는 무의미하지만 해가 없다
+  } catch (_) {}
+}
 
 const now = execFileSync('git', ['config', '--get', 'core.hooksPath'], {
   cwd: root,
