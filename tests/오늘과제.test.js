@@ -14,7 +14,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const 계약 = JSON.parse(fs.readFileSync(path.join(ROOT, '계약', '수집_교정_계약.json'), 'utf8'));
-const { 몽골날짜, 멱등키, 오늘과제, 따라말하기문장, 도입 } = require('../lib/오늘과제.js');
+const { 몽골날짜, 멱등키, 오늘과제, 따라말하기문장, 화면과제, 도입 } = require('../lib/오늘과제.js');
 
 const 날짜 = '2026-08-07';
 const 호흡 = (r, 차례) => r.task_snapshot.호흡.find((h) => h.차례 === 차례);
@@ -113,4 +113,70 @@ test('따라말하기문장은 모양이 어긋난 스냅샷에 null 을 준다'
 
 test('task_ref 는 날짜를 물고 있다 — 제출이 어느 배정에 대한 것인지 잇는 유일한 끈', () => {
   assert.equal(오늘과제({ 날짜, 첫날: true }).task_ref, 'task-2026-08-07');
+});
+
+/* ── 화면이 읽는 자리 (S1-b) ─────────────────────────────────────────
+ * 🔑 재료를 **`오늘과제()` 가 직접 만든 것**으로 쓴다 — 손으로 적은 픽스처를 쓰면 배치가
+ *   호흡 키를 바꾸는 날 이 검사만 초록으로 남고, 그 조합이 정확히 「빈 화면」의 원인이다. */
+const 서버항목 = (덧 = {}) => {
+  const r = 오늘과제({ 날짜, 첫날: true });
+  return {
+    task_id: '11111111-1111-4111-8111-111111111111',
+    task_snapshot: r.task_snapshot,
+    task_format: null,
+    degraded: r.degraded,
+    intervention: { intervention_id: '22222222-2222-4222-8222-222222222222', output_text: '오늘 온 말' },
+    ...덧,
+  };
+};
+const 폴백 = { id: 'seed-beginner-v1', 본문: '고정 본문', 핵심문장: '고정 문장', 질문: '고정 질문', 선택지: ['가', '나'] };
+
+test('서버 과제를 받으면 화면이 그것을 쓴다 — ②③이 스냅샷에서 그대로 온다', () => {
+  const v = 화면과제(서버항목(), 폴백);
+  assert.equal(v.출처, '서버');
+  assert.equal(v.사유, null);
+  assert.equal(v.편지.핵심문장, 도입.따라말하기, '②는 스냅샷의 문장이다');
+  assert.equal(v.편지.질문, 도입.답하기, '③은 스냅샷의 프롬프트다');
+  assert.equal(v.편지.본문, '오늘 온 말', '①듣기는 AI 가 실제로 한 말이다');
+  assert.equal(v.task_id, '11111111-1111-4111-8111-111111111111');
+  assert.equal(v.intervention_id, '22222222-2222-4222-8222-222222222222');
+});
+
+test('🔴 선택지를 지어내지 않는다 — 서버가 안 내면 없다', () => {
+  assert.equal(화면과제(서버항목(), 폴백).편지.선택지, null,
+    '폴백의 선택지가 서버 과제에 새어들면 급수 1~2 골라서 답하기가 거짓으로 뜬다');
+});
+
+test('①듣기가 비면 ②문장이 그날 나간 말이다 — 강등 경로(§6-4)', () => {
+  const v = 화면과제(서버항목({ intervention: null }), 폴백);
+  assert.equal(v.편지.본문, 도입.따라말하기);
+  assert.equal(v.intervention_id, null);
+});
+
+/* 🔴 빈 상태·깨진 스냅샷은 **내려가되 말한다.** 조용히 폴백을 쓰면 배치가 며칠 안 돌아도
+ *   화면은 늘 멀쩡해 보인다 — P0 §4-1 이 경계한 「막힌 것이 통과한 것처럼 보이는 상태」. */
+test('배정이 없으면 고정 과제로 내려가고 그 사실을 낸다', () => {
+  const v = 화면과제(null, 폴백);
+  assert.equal(v.출처, '고정');
+  assert.equal(v.편지, 폴백);
+  assert.ok(v.사유 && v.사유.length > 0, '사유가 없으면 화면이 조용히 내려간다');
+  assert.equal(v.degraded, true);
+});
+
+test('스냅샷이 반쪽이면 내려간다 — ②③은 쌍이라서 값이 있다(P0 §2-1)', () => {
+  for (const 깨진 of [
+    { ver: 1, 호흡: [] },
+    { ver: 1, 호흡: [{ 차례: 2, 문장: '있다' }] },                 // ③이 없다
+    { ver: 1, 호흡: [{ 차례: 3, 프롬프트: '있다' }] },              // ②가 없다
+    { ver: 1, 호흡: [{ 차례: 2, 문장: '', 프롬프트: '' }] },
+    null,
+  ]) {
+    const v = 화면과제(서버항목({ task_snapshot: 깨진 }), 폴백);
+    assert.equal(v.출처, '고정', `깨진 스냅샷이 통과했다: ${JSON.stringify(깨진)}`);
+    assert.ok(v.사유, '사유 없이 내려가면 원인이 화면에 안 남는다');
+  }
+});
+
+test('폴백 없이는 부른 쪽이 즉시 안다 — 빈 화면을 내지 않는다', () => {
+  assert.throws(() => 화면과제(null, null), /폴백/);
 });

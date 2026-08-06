@@ -22,7 +22,9 @@ import { 색, 폰트, 모노트래킹 } from './테마';
 import { 머뭇거림추적, 발화문턱_DB, 다음호흡 } from '../lib/세호흡.js';
 import { 마이크준비, 마이크끄기 } from '../lib/마이크권한.js';
 import { 항목추가, 다음시도번호, 학습출석 } from '../lib/제출로그.js';
+import { 화면과제 } from '../lib/오늘과제.js';
 import { 로그읽기, 로그쓰기, 음성보관, 지속저장 } from './저장.js';
+import { 오늘과제받기 } from './과제API.js';
 import { 급수편지 } from '../contents/첫편지.js';
 
 /**
@@ -47,34 +49,66 @@ function 초표시(ms) {
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
-export default function 말하기화면({ 급수 = 0 }) {
-  const 편지 = useMemo(() => 급수편지(급수), [급수]);
-  const date = useMemo(오늘, []);
+export default function 말하기화면({ 급수 = 0, 토큰 = null }) {
+  const 폴백 = useMemo(() => 급수편지(급수), [급수]);
 
+  const [과제, set과제] = useState(null); // null = **아직 모른다**(빈 화면과 다른 상태다)
+  const [date, setDate] = useState(오늘); // 서버가 답하면 **서버 날짜**로 바꾼다(아래)
   const [호흡, set호흡] = useState('듣기');
   const [로그, set로그] = useState([]);
   const [오류, set오류] = useState(null); // 「모름」을 「정상」으로 바꾸지 않는다 — 실패는 글자로 보인다
   const [저장경고, set저장경고] = useState(!지속저장());
 
   useEffect(() => {
+    let 살아있음 = true;
     (async () => {
+      let 기록 = [];
       try {
         const r = await 로그읽기();
-        set로그(r.로그);
+        기록 = r.로그;
+        if (!살아있음) return;
+        set로그(기록);
         if (r.깨진줄 > 0) set오류(`저장된 기록 중 ${r.깨진줄}줄을 읽지 못했다`);
-        if (학습출석(r.로그, date)) set호흡('완료');
       } catch (e) {
-        set오류(String(e.message || e));
+        if (살아있음) set오류(String(e.message || e));
       }
+
+      /* 오늘 낼 것을 **서버에서** 받는다(C0 §4-3 ①). 못 받아도 화면은 선다 —
+       * 고정 과제로 내려가되 그 사실을 글자로 낸다(`화면과제` 가 사유를 함께 낸다). */
+      let 결과;
+      let 그날 = 오늘();
+      try {
+        if (!토큰) throw new Error('토큰 없음');
+        const { 항목 } = await 오늘과제받기(토큰);
+        결과 = 화면과제(항목, 폴백);
+        // 🔴 날짜의 정본은 **서버**다 — 기기 시계로 끊으면 몽골 아침에 어제 것이 오늘이 된다.
+        //   로그 키까지 여기서 맞춰 둬야 「학습 출석」과 서버 배정이 같은 날을 가리킨다.
+        if (항목 && 항목.task_snapshot && 항목.task_snapshot.날짜) 그날 = String(항목.task_snapshot.날짜);
+      } catch (e) {
+        결과 = 화면과제(null, 폴백);
+        결과.사유 = 토큰
+          ? `오늘 과제를 받지 못했어요 — ${String(e.message || e)}`
+          : '오늘 과제를 받지 못했어요';
+      }
+      if (!살아있음) return;
+      set과제(결과);
+      setDate(그날);
+      if (학습출석(기록, 그날)) set호흡('완료');
+
       // 마이크 권한은 여기서 묻지 않는다 — 녹음 버튼을 누를 때 묻는다(lib/마이크권한.js).
       // 여기서 켜는 건 재생뿐이다: 무음 스위치가 켜진 폰에서도 ①듣기가 들려야 한다.
       try {
         await setAudioModeAsync({ playsInSilentMode: true });
       } catch (e) {
-        set오류('소리를 준비하지 못했어요: ' + String(e.message || e));
+        if (살아있음) set오류('소리를 준비하지 못했어요: ' + String(e.message || e));
       }
     })();
-  }, [date]);
+    return () => {
+      살아있음 = false;
+    };
+  }, [폴백, 토큰]);
+
+  const 편지 = 과제 ? 과제.편지 : 폴백;
 
   const 기록추가 = async (항목입력) => {
     const { 로그: 새로그 } = 항목추가(로그, 항목입력);
@@ -94,15 +128,26 @@ export default function 말하기화면({ 급수 = 0 }) {
         <Text style={s.경고}>웹 미리보기 — 기록이 기기에 남지 않아요. 실사용은 앱에서.</Text>
       )}
       {오류 && <Text style={s.오류}>{오류}</Text>}
+      {/* 🔴 고정 과제로 내려간 사실을 숨기지 않는다 — 조용히 내려가면 배치가 며칠 안 돌아도
+          화면은 늘 멀쩡해 보인다(P0 §4-1 「막힌 것이 통과한 것처럼 보이는 상태」). */}
+      {과제 && 과제.출처 === '고정' && <Text style={s.메모}>{과제.사유} · 오늘은 연습 문장으로 해요</Text>}
 
-      {호흡 === '듣기' && <듣기카드 편지={편지} 다음={() => set호흡('따라')} />}
+      {!과제 && <불러오는중 />}
+
+      {과제 && 호흡 === '듣기' && (
+        <듣기카드
+          편지={편지}
+          라벨={과제.출처 === '서버' ? '오늘의 문장이에요' : '편지가 왔어요'}
+          다음={() => set호흡('따라')}
+        />
+      )}
 
       {호흡 === '따라' && (
         <녹음카드
           key="따라"
           step="따라"
           제시문={편지.핵심문장}
-          안내="편지의 이 문장을, 신호가 끝나면 따라 말해요"
+          안내="이 문장을, 신호가 끝나면 따라 말해요"
           date={date}
           로그={로그}
           기록추가={기록추가}
@@ -152,8 +197,21 @@ function 머리({ 호흡 }) {
   );
 }
 
+/* ── 불러오는 동안 ──────────────────────────────────────────────
+ * 스피너를 두지 않는다. 이 화면의 신호(코랄)는 녹음 버튼 하나뿐이고(테마 `신호자리`),
+ * 도는 것이 하나 더 생기면 눈이 그리로 간다. 카드 자리를 그대로 잡아 두면 도착했을 때
+ * 레이아웃이 안 튄다 — 위계는 움직임이 아니라 밀도로. */
+function 불러오는중() {
+  return (
+    <View style={s.카드}>
+      <Text style={s.카드라벨}>01</Text>
+      <Text style={s.불러오는글}>오늘 온 말을 가져오는 중이에요…</Text>
+    </View>
+  );
+}
+
 /* ── ① 듣기 ── */
-function 듣기카드({ 편지, 다음 }) {
+function 듣기카드({ 편지, 라벨 = '편지가 왔어요', 다음 }) {
   const [읽는중, set읽는중] = useState(false);
   const [들었다, set들었다] = useState(false);
 
@@ -178,7 +236,7 @@ function 듣기카드({ 편지, 다음 }) {
 
   return (
     <View style={s.카드}>
-      <Text style={s.카드라벨}>{호흡번호.듣기} · 편지가 왔어요</Text>
+      <Text style={s.카드라벨}>{호흡번호.듣기} · {라벨}</Text>
       <Text style={s.편지문}>{편지.본문}</Text>
       <Pressable onPress={재생} style={({ pressed }) => [s.보조버튼, pressed && s.눌림]}>
         <Text style={s.보조버튼글}>{읽는중 ? '읽는 중…' : '♪ 들어보기'}</Text>
@@ -458,9 +516,13 @@ const s = StyleSheet.create({
 
   경고: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_서브, lineHeight: 18 },
   오류: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크, lineHeight: 19 },
+  /* 3번째 글자 층(Slate) — 상태 메모는 본문도 오류도 아니다. 바닥이 Navy 2 라 허용 안이다.
+     🔴 코랄로 칠하지 않는다: 이 화면의 신호 1점은 녹음 버튼이다(테마 `신호자리`). */
+  메모: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조, lineHeight: 18 },
 
   카드: { backgroundColor: 색.바탕띄움, borderRadius: 20, padding: 22, gap: 16 },
   카드라벨: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_태그 },
+  불러오는글: { fontFamily: 폰트.본문, fontSize: 17, lineHeight: 28, color: 색.잉크_메타 },
   편지문: { fontFamily: 폰트.본문, fontSize: 19, lineHeight: 31, color: 색.잉크 },
   제시문: { fontFamily: 폰트.헤드, fontSize: 23, lineHeight: 34, color: 색.잉크 },
 
