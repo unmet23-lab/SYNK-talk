@@ -151,9 +151,26 @@ Deno.serve(async (req: Request) => {
     return 실패(400, { code: 'CONTRACT_VIOLATION', message: String(이유), field: 'content_type', retryable: false }, ver);
   }
 
-  /* 서명 발급 — Storage REST. `engine` 스키마 미노출과 무관하다(Storage 는 PostgREST 를 안 지난다). */
+  /* 서명 발급 — Storage REST. `engine` 스키마 미노출과 무관하다(Storage 는 PostgREST 를 안 지난다).
+   *
+   * 🔴 **`SUPABASE_SERVICE_ROLE_KEY` 를 쓰지 않는다.** 2026-08-06 리허설 실측:
+   *   플랫폼이 그 이름에 넣어주는 값이 **새 형식(`sb_secret_…`)** 이고, Storage 는 그걸 거절한다
+   *   (`Invalid Compact JWS`). 헤더 조합 5가지를 전부 쏴 봤고 통과한 것은 **레거시 JWT 키뿐**이다
+   *   (`Authorization` 단독·`apikey`+`Authorization` 둘 다 200 · 새 키는 세 조합 모두 400).
+   *   그래서 **명시 시크릿**으로 받는다 — 이름이 뜻하는 바가 플랫폼 사정으로 조용히 바뀌는 것을
+   *   그대로 맞는 대신, 우리가 이름을 정하고 모양까지 검사한다(`tools/스토리지키_설정.js`).
+   */
   const base = Deno.env.get('SUPABASE_URL')!;
-  const 키 = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const 키 = Deno.env.get('STORAGE_SIGN_KEY') ?? '';
+  /* 모양을 **먼저** 본다. 안 그러면 증상이 「업로드만 안 됨」이고 원인이 키 형식이라는 게
+   * 어디에도 안 적힌다 — 오늘 그걸로 한 바퀴 돌았다. 같은 실수를 기계가 막는다. */
+  if (키.split('.').length !== 3) {
+    console.error('[uploads-sign] STORAGE_SIGN_KEY 가 JWT 형태가 아니다 — 레거시 service_role 키여야 한다');
+    return 실패(500, {
+      code: 'SERVER_ERROR', retryable: false,
+      message: 'STORAGE_SIGN_KEY 설정 오류입니다 — 레거시 service_role(JWT) 키가 필요합니다',
+    }, ver);
+  }
   const r = await fetch(`${base}/storage/v1/object/upload/sign/${버킷}/${ref}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${키}`, 'Content-Type': 'application/json' },
