@@ -393,6 +393,83 @@ async function main() {
   확인('없는 뒷마디는 404 다 — 오타 경로가 「이미 돌던 것」이 되지 않는다',
     (await 조회('/아무거나', { 함수: 'corrections' })).status === 404);
 
+  /* ── ⑩ 어제의 나 (C0 §4-3 ③) ────────────────────────────────────
+   * S1 조회 3종의 **마지막 칸**. 여기서 재는 것은 「숫자가 나온다」가 아니라 **어느 행을 세는가**다 —
+   * `submissions` 에는 배정 행이 살아서(P0 §6-1), 그걸 세면 배정 1건이 제출 1건이 되고
+   * **첫날부터 「어제의 나」가 거짓말**을 한다. 증상은 「숫자가 좀 크다」뿐이라 아무도 못 본다. */
+  console.log('\n■ ⑩ 어제의 나 — GET /v1/progress');
+
+  /* 🔴 **빈 상태를 먼저** 잰다 — 지금 A 의 사건은 오늘 배정뿐이라 「어제」라는 시점이 없다.
+   *   아래에서 어제 사건을 심고 나면 이 상태는 다시 못 만든다(append-only). */
+  const g0 = await 조회('', { 함수: 'progress' });
+  확인('🔴 어제가 없는 학생은 200 + 빈 배열이다 — 없는 과거를 0 으로 지어내지 않는다',
+    g0.status === 200 && Array.isArray(g0.몸.data) && g0.몸.data.length === 0, g0);
+
+  /* A 에게 어제 1건·오늘 3건. 오늘 배정(+개입)은 이미 서 있고, 그것이 제출로 안 세어지는 것이
+   * 이 갈래의 본론이다. 어제 것의 `attempt_no` 는 **일부러 숫자가 아니다** — payload 는 자유
+   * JSON 이라 바로 `::int` 로 캐스팅하면 행 하나가 조회 전체를 500 으로 만든다. */
+  const 어제제출 = (await sql(`
+    insert into engine.learning_events
+      (learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
+       level_snapshot, consent_ver, degraded, payload, schema_ver)
+    values ('${id.A}'::uuid,'submission.created','발화녹음','learner',
+            '${어제날}T05:00:00Z'::timestamptz,'sub:${표}:A:1','Lv2','v18.9', false,
+            '{"ver":1,"attempt_no":"많이"}'::jsonb,'${판}')
+    returning event_id`))[0].event_id;
+
+  await sql(`
+    insert into engine.learning_events
+      (learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
+       level_snapshot, consent_ver, degraded, payload, retry_of_event_id, schema_ver)
+    values ('${id.A}'::uuid,'submission.created','발화녹음','learner','${오늘}T05:00:00Z'::timestamptz,
+            'sub:${표}:A:2','Lv2','v18.9', false,'{"ver":1,"attempt_no":1}'::jsonb, null,'${판}'),
+           ('${id.A}'::uuid,'submission.created','발화녹음','learner','${오늘}T05:10:00Z'::timestamptz,
+            'sub:${표}:A:3','Lv2','v18.9', false,'{"ver":1,"attempt_no":3}'::jsonb, null,'${판}'),
+           ('${id.A}'::uuid,'submission.created','발화녹음','learner','${오늘}T05:20:00Z'::timestamptz,
+            'sub:${표}:A:4','Lv2','v18.9', false,'{"ver":1,"attempt_no":1}'::jsonb,
+            '${어제제출}'::uuid,'${판}')`);
+
+  const g1 = await 조회('', { 함수: 'progress' });
+  확인('어제가 생기면 비교값이 1건 온다',
+    g1.status === 200 && (g1.몸.data || []).length === 1, g1.status);
+  const 오늘값 = ((g1.몸.data || [])[0] || {}).today || {};
+  const 어제값 = ((g1.몸.data || [])[0] || {}).yesterday || {};
+
+  const [{ 오늘사건 }] = await sql(`
+    select count(*) as 오늘사건 from engine.learning_events
+     where learner_id = '${id.A}'::uuid
+       and (occurred_at at time zone 'Asia/Ulaanbaatar')::date = '${오늘}'::date`);
+  확인(`🔴 배정·개입이 제출로 안 세어진다 — 오늘 사건 ${오늘사건}건 중 제출은 3건이다`,
+    Number(오늘사건) > 3 && 오늘값.submission_count === 3, [오늘사건, 오늘값]);
+  확인('재시도는 attempt_no >= 2 인 것만 — 한 과제 안의 반복이다',
+    오늘값.retry_count === 1, 오늘값);
+  확인('🔴 교정 재발화는 retry_of_event_id 가 달린 제출 — 지금 설계의 결과 변수는 이것 하나뿐이다',
+    오늘값.correction_retry === true, 오늘값);
+  확인('🔴 attempt_no 가 숫자꼴이 아니면 첫 시도로 본다 — 캐스팅하면 그 행이 조회 전체를 500 으로 만든다',
+    어제값.submission_count === 1 && 어제값.retry_count === 0, 어제값);
+  확인('교정 재발화는 날마다 따로 판정한다 — 어제는 없었다',
+    어제값.correction_retry === false, 어제값);
+
+  /* 🔴 자기 것만 — D 가 오늘 낸 것이 A 의 숫자를 밀어 올리면 안 된다. */
+  await sql(`
+    insert into engine.learning_events
+      (learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
+       level_snapshot, consent_ver, degraded, payload, schema_ver)
+    values ('${id.D}'::uuid,'submission.created','발화녹음','learner','${오늘}T06:00:00Z'::timestamptz,
+            'sub:${표}:D:1','Lv2','v18.9', false,'{"ver":1,"attempt_no":1}'::jsonb,'${판}')`);
+  const g2 = await 조회('', { 함수: 'progress' });
+  확인('🔴 남의 제출은 안 세어진다 — 학생은 토큰에서 확정되고 쿼리로 못 지정한다',
+    (((g2.몸.data || [])[0] || {}).today || {}).submission_count === 3, g2.몸.data);
+
+  확인('anon 키로는 못 읽는다 — 사람이 아니다',
+    (await 조회('', { 함수: 'progress', 토큰: anon })).status === 401);
+  확인('헤더가 없으면 400 이다', (await 조회('', { 함수: 'progress', 판: null })).status === 400);
+  확인('DB 보다 새 판을 말하면 426 이다', (await 조회('', { 함수: 'progress', 판: 'c999' })).status === 426);
+  확인('POST 는 405 다 — 조회가 쓰기를 겸하지 않는다',
+    (await 조회('', { 함수: 'progress', 방법: 'POST' })).status === 405);
+  확인('없는 뒷마디는 404 다 — 오타 경로가 「이미 돌던 것」이 되지 않는다',
+    (await 조회('/아무거나', { 함수: 'progress' })).status === 404);
+
   console.log(`\n[배달왕복시험] ${통과}/${통과 + 실패} 통과`);
   process.exit(실패 ? 1 : 0);
 }

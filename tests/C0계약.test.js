@@ -99,6 +99,36 @@ test('오디오 업로드 포맷이 C0와 발주서에서 갈라지지 않았다
     '발주서 스펙에 압축 오디오 포맷이 되살아났다 — 배선①(소급 불가)과 충돌한다');
 });
 
+/* 조회 3종이 내기로 한 이름. **정본은 C0 §4-3** 이고 여기는 그 이름이 문서·함수 두 곳에
+ * 살아 있는지만 본다(값목록처럼 계약 파일에서 파생되는 종류가 아니라, 이 API 만의 이름이다). */
+const 조회필드 = {
+  progress: ['submission_count', 'retry_count', 'correction_retry'],
+  corrections: ['correction_id', 'submission_id', 'corrected_text', 'error_tags', 'confirmed_at'],
+  tasks: ['task_id', 'task_snapshot', 'task_format', 'degraded'],
+};
+const 빠진이름 = (소스, 문서, 키들) => 키들.filter((k) => !소스.includes(k) || !문서.includes(k));
+
+test('탐지력 픽스처 — 이름이 사라지면 실제로 잡는다', () => {
+  assert.deepEqual(빠진이름('{ a: 1 }', 'C0 문서에는 있다: retry_count', ['retry_count']), ['retry_count'],
+    '함수에서 사라진 이름을 못 잡으면 아래 실저장소 초록은 「깨끗함」이 아니라 「안 봄」이다');
+  assert.deepEqual(빠진이름('retry_count: 1', '문서에는 없다', ['retry_count']), ['retry_count'],
+    '문서 쪽이 낡은 경우도 같은 사고다 — 앱은 문서를 읽는다');
+  assert.deepEqual(빠진이름('retry_count: 1', 'retry_count', ['retry_count']), []);
+});
+
+test('조회 응답의 필드 이름이 C0와 함수 양쪽에 살아 있다 (없으면 증상은 「화면이 빈다」뿐이다)', () => {
+  /* 왜 있나 — 조회 3종은 실왕복으로만 증명되는데 그 왕복은 **자격증명이 있어야 돌아** CI 에서
+   * 안 돈다. 그래서 이름이 통째로 사라지는 것만이라도 파일 층에서 잡는다.
+   * ⚠ **부분 개명은 여기서 못 잡는다** — `today` 만 갈고 `yesterday` 를 두면 파일에 이름이
+   *   남아 있어 통과한다(2026-08-07 변이로 실측). 그 자리는 왕복 ⑩ 이 진다(두 날을 각각 잰다). */
+  const md = fs.readFileSync(C0경로, 'utf8');
+  for (const [이름, 키들] of Object.entries(조회필드)) {
+    const 소스 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 이름, 'index.ts'), 'utf8');
+    assert.deepEqual(빠진이름(소스, md, 키들), [],
+      `functions/${이름} 과 C0 §4-3 중 한쪽에만 있는 이름이 있다 — 앱은 문서를 읽고 서버는 코드대로 낸다`);
+  }
+});
+
 test('C0가 값목록을 통째로 복사하지 않았다 (복사본은 계약이 개정되는 날 갈라진다)', () => {
   const md = fs.readFileSync(C0경로, 'utf8');
   const 값목록 = 계약.learning_events.값목록;
