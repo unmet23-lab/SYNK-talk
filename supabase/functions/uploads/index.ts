@@ -160,8 +160,15 @@ Deno.serve(async (req: Request) => {
     body: JSON.stringify({ expiresIn: 서명수명초 }),
   });
   if (!r.ok) {
-    console.error('[uploads-sign] 서명 실패', r.status, (await r.text()).slice(0, 300));
-    return 실패(502, { code: 'SERVER_ERROR', message: '업로드 주소를 만들지 못했습니다', retryable: true }, ver);
+    /* 🔑 상류 상태를 **응답에도** 싣는다(본문은 아니다 — 거기엔 키가 섞일 수 있다).
+     * 「업로드 주소를 만들지 못했습니다」만 있으면 버킷이 없는 것과 키가 틀린 것과 경로가
+     * 잘못된 것이 전부 같은 모양이 된다. 로그는 지연·유실되지만 응답은 그 자리에 있다. */
+    const 본문글 = (await r.text()).slice(0, 200);
+    console.error('[uploads-sign] 서명 실패', r.status, 본문글);
+    return 실패(502, {
+      code: 'SERVER_ERROR', retryable: true,
+      message: `업로드 주소를 만들지 못했습니다 (storage ${r.status})`,
+    }, ver);
   }
   const { url } = JSON.parse(await r.text()) as { url: string };
 
