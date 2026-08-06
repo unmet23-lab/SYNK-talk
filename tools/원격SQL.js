@@ -1,0 +1,109 @@
+#!/usr/bin/env node
+/* 원격SQL — Supabase Management API 로 SQL 을 원격 실행한다.
+ *
+ * 왜 있나 (유호님 지시 2026-08-06 「전부 원격으로 해줘」):
+ *   발주 §6 은 「A = 유호님이 SQL Editor 에 붙여넣고 Run」으로 확정돼 있었고, 그 대가가
+ *   **유호님 손 4회**(확인 Run → 본체 붙여넣기 → 확인 Run → RLS 재확인)였다.
+ *   이 도구는 그 4회를 **1회(액세스 토큰 1개 발급)**로 줄인다 — 한 번 넣으면 그 뒤의
+ *   확인·적용·재확인이 전부 원격에서 돈다. 유호님 PC 에는 아무것도 설치하지 않는다
+ *   (발주 §3-1 ③ 이 금지한 것은 「유호님께」 CLI·Docker 를 요구하는 것이고, 이건 AI 쪽 도구다).
+ *
+ * 자격증명은 `.env` 에만 산다 — `.gitignore` 의 `.env.*` 가 막는다. 인자로 받지 않고
+ * (셸 이력에 남는다) stdout·에러에도 찍지 않는다.
+ *
+ * 안전 — 이 도구의 존재 이유이자 그 자체가 위험이다:
+ *   · 기본은 **읽기 전용**. 쓰기(DDL·DML)로 판정되면 `--적용` 없이 거부한다.
+ *   · 판정이 애매하면 **쓰기로 본다**. 「애매하면 통과」하는 가드는 가드가 아니다.
+ *   · `--적용` 은 비가역이다. 유호님 명시 승인 뒤에만 붙인다.
+ *
+ * 사용:
+ *   node tools/원격SQL.js supabase/확인_적용전상태.sql        # 읽기 — 그대로 실행
+ *   node tools/원격SQL.js supabase/L0_스키마.sql --적용        # 쓰기 — 명시 승인 필요
+ */
+'use strict';
+const fs = require('fs');
+const path = require('path');
+
+const ROOT = path.join(__dirname, '..');
+const API = 'https://api.supabase.com/v1/projects';
+
+/** `.env` 를 읽는다. 없으면 빈 객체 — 도구가 안내문을 내고 멈춘다. */
+function env읽기() {
+  const p = path.join(ROOT, '.env');
+  if (!fs.existsSync(p)) return {};
+  const out = {};
+  for (const 줄 of fs.readFileSync(p, 'utf8').split(/\r?\n/)) {
+    const m = 줄.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
+    if (m) out[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
+  }
+  return out;
+}
+
+/* 주석 안의 단어가 판정을 흔들지 않게 먼저 지운다 — 실제 SQL 에 `-- 학생=자기 행 insert` 같은
+ * 설명이 있고, 그걸 그대로 세면 읽기 쿼리가 영원히 쓰기로 잡힌다. */
+const 주석제거 = (s) => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ');
+const 쓰기어 = /\b(create|alter|drop|insert|update|delete|truncate|grant|revoke|do|call|vacuum|reindex|refresh|comment\s+on|security\s+label)\b/i;
+
+/** 읽기 전용인가 — **애매하면 false**(쓰기로 본다). */
+function 읽기전용(sql) {
+  return !쓰기어.test(주석제거(sql));
+}
+
+const die = (msg) => { console.error('[원격SQL] ' + msg); process.exit(1); };
+
+/** 자격증명이 없을 때 — 유호님이 그대로 밟을 수 있는 클릭 절차만 낸다. */
+function 안내() {
+  console.error(`[원격SQL] 아직 원격으로 못 돕니다 — .env 에 값 2개가 필요합니다.
+
+유호님 손 1회 (약 2분 · 설치할 것 없음):
+  1. https://supabase.com/dashboard/account/tokens 를 엽니다
+  2. [Generate new token] → 이름에 아무거나(예: claude-remote) → [Generate token]
+  3. 나오는 \`sbp_\` 로 시작하는 값을 복사합니다 (창을 닫으면 다시 못 봅니다)
+  4. Supabase 에서 「synk talk」 프로젝트를 열고, 주소창의 \`/project/\` 뒤 문자열을 복사합니다
+  5. ${path.join(ROOT, '.env')} 파일에 아래 두 줄을 붙여넣고 저장합니다
+
+     SUPABASE_ACCESS_TOKEN=sbp_붙여넣기
+     SUPABASE_PROJECT_REF=주소창에서_복사한_문자열
+
+이 파일은 .gitignore 가 막아 git 에 올라가지 않습니다.
+그 뒤로는 확인·적용·재확인이 전부 원격에서 돕니다.`);
+  process.exit(2);
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const 적용 = args.includes('--적용');
+  const 파일 = args.find((a) => !a.startsWith('--'));
+  if (!파일) die('실행할 .sql 파일 경로를 달라. 예: node tools/원격SQL.js supabase/확인_적용전상태.sql');
+
+  const 절대 = path.resolve(ROOT, 파일);
+  if (!fs.existsSync(절대)) die(`파일이 없다: ${절대}`);
+  const sql = fs.readFileSync(절대, 'utf8');
+
+  if (!읽기전용(sql) && !적용) {
+    die(`이 SQL 은 상태를 바꾼다(쓰기). 되돌리기 어려우므로 --적용 없이는 안 보낸다.
+     유호님 승인을 받은 뒤: node tools/원격SQL.js ${파일} --적용`);
+  }
+
+  const e = { ...env읽기(), ...process.env };
+  const 토큰 = e.SUPABASE_ACCESS_TOKEN;
+  const ref = e.SUPABASE_PROJECT_REF;
+  if (!토큰 || !ref) 안내();
+
+  const res = await fetch(`${API}/${ref}/database/query`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${토큰}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: sql }),
+  });
+  const 본문 = await res.text();
+  if (!res.ok) {
+    // 토큰은 헤더에만 있어 여기 안 찍힌다. 본문은 잘라서 낸다(대량 덤프 방지).
+    console.error(`[원격SQL] HTTP ${res.status} — 실행되지 않았다`);
+    console.error(본문.slice(0, 2000));
+    process.exit(1);
+  }
+  console.log(본문);
+}
+
+module.exports = { 읽기전용 };
+if (require.main === module) main().catch((err) => die(String(err && err.message || err)));
