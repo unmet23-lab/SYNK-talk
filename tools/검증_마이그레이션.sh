@@ -11,6 +11,14 @@ DATA_FP="$ROOT/tests/supabase/데이터_지문.sql"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+# 버전을 손으로 적지 않는다 — 조각 파일명이 정본이다.
+# 「낡은 기대값」이 이 저장소에서 세 번 났고 증상은 셋 다 **정상 적용이 ❌로 보인다**였다.
+# BASE = 기준선(부트스트랩 갈래를 지는 조각) · LATEST = 체인 끝(사후 확인이 보는 현재버전).
+mapfile -t MIGRATIONS < <(ls "$ROOT"/supabase/migrations/*.sql | sort)
+(( ${#MIGRATIONS[@]} >= 1 )) || { echo "마이그레이션 조각이 0개다" >&2; exit 2; }
+BASE_VERSION="$(basename "${MIGRATIONS[0]}" | cut -c1-14)"
+LATEST_VERSION="$(basename "${MIGRATIONS[-1]}" | cut -c1-14)"
+
 # status의 값은 로컬 스택 자격증명뿐이며 출력하지 않는다.
 eval "$(supabase status -o env)"
 DATABASE_URL="${DB_URL:?supabase status가 DB_URL을 내지 않았다}"
@@ -40,7 +48,7 @@ assert_postcheck() {
   row="$("${PSQL[@]}" -AtF '|' -f "$POSTCHECK")"
   IFS='|' read -r verdict version checksum _rest <<<"$row"
   [[ "$verdict" == '✅ 전부 통과' ]] || fail "$label: 사후 판정=$verdict"
-  [[ "$version" == '20260806150000' ]] || fail "$label: 현재버전=$version"
+  [[ "$version" == "$LATEST_VERSION" ]] || fail "$label: 현재버전=$version (기대 $LATEST_VERSION)"
   [[ "$checksum" =~ ^[0-9a-f]{64}$ ]] || fail "$label: checksum 형식 오류"
 }
 
@@ -142,22 +150,22 @@ echo '② 같은 DB 연속 재실행 — 이력·구조·데이터 불변'
 seed_current
 before_schema="$(fingerprint "$SCHEMA_FP")"
 before_data="$(fingerprint "$DATA_FP")"
-before_applied_at="$(scalar "select applied_at::text from engine.schema_migrations where version='20260806150000'")"
+before_applied_at="$(scalar "select applied_at::text from engine.schema_migrations where version='$BASE_VERSION'")"
 run_file "$BUNDLE"
 [[ "$(fingerprint "$SCHEMA_FP")" == "$before_schema" ]] || fail '재실행 뒤 구조가 바뀌었다'
 [[ "$(fingerprint "$DATA_FP")" == "$before_data" ]] || fail '재실행 뒤 데이터가 바뀌었다'
-[[ "$(scalar "select applied_at::text from engine.schema_migrations where version='20260806150000'")" == "$before_applied_at" ]] \
+[[ "$(scalar "select applied_at::text from engine.schema_migrations where version='$BASE_VERSION'")" == "$before_applied_at" ]] \
   || fail '재실행이 applied_at을 다시 썼다'
 
 echo '②-b 같은 version checksum 불일치 중단'
-good_checksum="$(scalar "select checksum from engine.schema_migrations where version='20260806150000'")"
-"${PSQL[@]}" -c "update engine.schema_migrations set checksum=repeat('0',64) where version='20260806150000'" >/dev/null
+good_checksum="$(scalar "select checksum from engine.schema_migrations where version='$BASE_VERSION'")"
+"${PSQL[@]}" -c "update engine.schema_migrations set checksum=repeat('0',64) where version='$BASE_VERSION'" >/dev/null
 expect_file_failure "$BUNDLE" 'checksum 불일치'
-[[ "$(scalar "select checksum from engine.schema_migrations where version='20260806150000'")" == "$(printf '0%.0s' {1..64})" ]] \
+[[ "$(scalar "select checksum from engine.schema_migrations where version='$BASE_VERSION'")" == "$(printf '0%.0s' {1..64})" ]] \
   || fail '실패한 재실행이 이력 행을 바꿨다'
 [[ "$good_checksum" =~ ^[0-9a-f]{64}$ ]] || fail '원래 checksum 형식 오류'
 "${PSQL[@]}" -c \
-  "update engine.schema_migrations set checksum='$good_checksum' where version='20260806150000'" >/dev/null
+  "update engine.schema_migrations set checksum='$good_checksum' where version='$BASE_VERSION'" >/dev/null
 
 echo '③ commit 전 실패 주입 — 전부 롤백'
 drop_engine
@@ -209,9 +217,12 @@ expect_file_failure "$BUNDLE" '혼합 상태'
 echo '부트스트랩 중단 — 이력 없는 현행 c6 전용 갈래 없음'
 drop_engine
 run_file "$BUNDLE"
-"${PSQL[@]}" -c "delete from engine.schema_migrations where version='20260806150000'" >/dev/null
-expect_file_failure "$BUNDLE" '이력 없는 현행 c6'
-[[ "$(scalar 'select count(*) from engine.schema_migrations')" == '0' ]] || fail '금지 갈래가 이력을 만들었다'
+"${PSQL[@]}" -c "delete from engine.schema_migrations where version='$BASE_VERSION'" >/dev/null
+expect_file_failure "$BUNDLE" '이력 없는 현행판'
+# 기준선 조각이 중단됐으니 **그 이력이 다시 생기면 안 된다**.
+# 전체 개수로 세면 안 된다 — 체인이 둘 이상이면 뒤 조각의 행은 그대로 남는다(c7에서 실측).
+[[ "$(scalar "select count(*) from engine.schema_migrations where version='$BASE_VERSION'")" == '0' ]] \
+  || fail '금지 갈래가 이력을 만들었다'
 
 echo '④ Supabase reset이 빈 DB를 복원'
 supabase db reset --local >/dev/null
