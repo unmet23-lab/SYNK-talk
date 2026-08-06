@@ -28,6 +28,16 @@ const SECRET_NAMES = [
 const isSource = (p) => /\.(js|jsx|ts|tsx|mjs|cjs)$/i.test(p);
 
 /**
+ * 빌드가 앱 번들에 실어 보내는 파일인가.
+ * 문서가 위험한 이름을 **설명**하는 것은 막지 않는다 — 설명을 막으면 그 이름을 못 쓰게 되고,
+ * 그러면 위험이 문서에서 사라질 뿐 코드에서 사라지지 않는다.
+ */
+const isBundled = (p) =>
+  isSource(p)
+  || /(^|\/)app\.(json|config\.[jt]s)$/i.test(p)
+  || /(^|\/)\.env(\.|$)/i.test(p);
+
+/**
  * 내용에 박힌 비밀. 이름은 「무엇이 걸렸는지」를 사람이 읽을 수 있게 짓는다.
  * 주의: 이 목록의 픽스처는 테스트 코드에서 **조립**한다(리터럴 실토큰을 소스에 두지 않는다).
  */
@@ -40,6 +50,15 @@ const SECRET_CONTENT = [
   { name: 'JWT(서비스 키로 보임)', re: /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/ },
   { name: '개인키 블록', re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/ },
   { name: 'Expo 토큰', re: /EXPO_TOKEN\s*[:=]\s*['"]?[A-Za-z0-9_-]{16,}/ },
+  /* L0 §4-5 수용기준 ⑤. `EXPO_PUBLIC_` 은 값이 **번들에 인라인**되므로 그 접두사를 단 비밀은
+   * 앱과 함께 사용자 기기로 나가고 **회수할 수 없다**. 값이 리터럴로 없어도 새기 때문에
+   * 위의 「service_role + JWT」 규칙이 이것을 못 잡는다 — 이름 하나로 이미 결정된다. */
+  {
+    name: 'EXPO_PUBLIC_ 접두사를 단 비밀 — 번들에 인라인된다. '
+      + '접두사를 떼고 서버(Edge Function) 환경변수로 옮긴다',
+    re: /EXPO_PUBLIC_[A-Z0-9_]*(SERVICE_ROLE|SERVICE_KEY|SECRET)/,
+    번들파일만: true,
+  },
 ];
 
 const MAX_BYTES = 1024 * 1024; // 1MB
@@ -76,6 +95,7 @@ function inspect(files) {
 
     if (typeof f.text === 'string') {
       for (const rule of SECRET_CONTENT) {
+        if (rule.번들파일만 && !isBundled(p)) continue;
         if (rule.re.test(f.text)) {
           out.push({ path: p, rule: '내용에 박힌 비밀', why: rule.name });
         }

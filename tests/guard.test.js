@@ -44,6 +44,21 @@ const MUST_BLOCK = [
     files: [{ path: 'k.txt', text: '-----BEGIN RSA ' + 'PRIVATE' + ' KEY-----\nabc\n' }],
   },
   { label: 'Expo 토큰', files: [{ path: '.ci', text: 'EXPO_TOKEN=' + A(24) }] },
+  /* L0 §4-5 수용기준 ⑤. 값이 리터럴로 없어도 **이름 하나로** 샌다 — `EXPO_PUBLIC_` 은
+   * 빌드가 번들에 인라인하므로 위의 「service_role + JWT」 규칙이 이것을 못 잡는다.
+   * 이름은 조립한다(리터럴로 두면 이 테스트 파일 자신이 가드에 걸린다 — 위 개인키와 같은 이유). */
+  {
+    label: 'EXPO_PUBLIC service_role (app.json extra)',
+    files: [{ path: 'app.json', text: '{"extra":{"EXPO_' + 'PUBLIC_SUPABASE_SERVICE_ROLE_KEY":"x"}}' }],
+  },
+  {
+    label: 'EXPO_PUBLIC service_role (소스)',
+    files: [{ path: 'src/db.ts', text: 'const k = process.env.EXPO_' + 'PUBLIC_SERVICE_ROLE_KEY' }],
+  },
+  {
+    label: 'EXPO_PUBLIC 임의 비밀 (소스)',
+    files: [{ path: 'lib/x.js', text: 'process.env.EXPO_' + 'PUBLIC_API_SECRET' }],
+  },
   { label: '1MB 초과', files: [{ path: 'assets/big.mp3', bytes: 3 * 1024 * 1024 }] },
 ];
 
@@ -67,6 +82,25 @@ const MUST_PASS = [
   {
     label: '키 이름만 있고 값이 없는 문서',
     files: [{ path: 'docs/설정.md', text: '`SUPABASE_SERVICE_ROLE_KEY` 는 .env 에 둔다' }],
+  },
+  /* EXPO_PUBLIC 규칙의 거짓양성 셋 — 이 셋을 막으면 규칙이 우회 습관을 만든다. */
+  {
+    /* 문서가 위험한 이름을 **설명**하는 것은 막지 않는다. 막으면 위험이 문서에서만 사라진다. */
+    label: '위험을 설명하는 문서',
+    files: [{ path: 'docs/보안.md', text: 'EXPO_' + 'PUBLIC_SERVICE_ROLE_KEY 는 절대 쓰지 않는다' }],
+  },
+  {
+    /* anon 키는 **공개가 설계**다 — 이 접두사를 다는 것이 정상이다. */
+    label: 'EXPO_PUBLIC anon 키',
+    files: [{ path: 'lib/supabase.js', text: 'process.env.EXPO_' + 'PUBLIC_SUPABASE_ANON_KEY' }],
+  },
+  {
+    /* 자기 처방 — 거부 메시지가 시키는 대로(접두사 떼고 서버로) 고치면 통과해야 한다. */
+    label: '처방대로 고친 서버 코드',
+    files: [{
+      path: 'supabase/functions/ingest/index.ts',
+      text: "Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')",
+    }],
   },
   {
     label: 'env를 코드에서 읽는 정상 패턴',
