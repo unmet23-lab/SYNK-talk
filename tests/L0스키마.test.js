@@ -136,7 +136,10 @@ test('확인 쿼리가 참조하는 이름이 전부 정의된 별칭이다 (별
   for (const m of 블록.matchAll(/(?:with|,)\s*([가-힣A-Za-z_][가-힣A-Za-z_0-9]*)\s*(?:\([^)]*\))?\s*as\s*\(/g)) {
     정의.add(m[1]);
   }
-  const 조건절 = 블록.slice(블록.indexOf('case when'));
+  /* ⚠ **마지막** `case when` 이 판정절이다. 처음 것을 잡으면 CTE 안의 case(2026-08-07:
+   *   빠진트리거가 「없음/꺼짐」을 가르느라 하나 들였다)부터 끝까지가 조건절이 되고,
+   *   그러면 `where schemaname='engine'` 같은 컬럼명이 전부 「미정의 참조」로 잡혀 거짓 적색이 된다. */
+  const 조건절 = 블록.slice(블록.lastIndexOf('case when'));
   const 참조 = [...조건절.matchAll(/([가-힣A-Za-z_][가-힣A-Za-z_0-9]*)\s*=/g)].map((m) => m[1]);
   for (const m of 조건절.matchAll(/from\s+([가-힣A-Za-z_][가-힣A-Za-z_0-9]*)/g)) 참조.push(m[1]);
   assert.ok(참조.length >= 5, `판정 조건에서 참조를 ${참조.length}개밖에 못 뽑았다 — 정규식이 낡았다`);
@@ -302,6 +305,30 @@ test('탐지력 픽스처 — 사본이 한 글자라도 어긋나면 잡는다'
     '비교가 죽었다 — 한 글자 차이를 못 잡으면 갈라짐이 조용히 지나간다');
   assert.equal(쿼리정규화('select 1 as 판정\n  from 셈;'), 쿼리정규화('select   1 as 판정 from 셈;'),
     '공백·줄바꿈 차이를 불일치로 잡으면 거짓 경보가 된다');
+});
+
+/* ── 확인 쿼리가 「꺼진 트리거」를 보는가 ───────────────────────────────────
+ * 2026-08-07 리허설 변이 실측: c8 트리거를 실제로 끄고 확인_적용후상태.sql 을 돌렸더니
+ * 「✅ 전부 통과」가 나왔다. `pg_trigger` 는 **꺼진 트리거의 행을 그대로 들고 있어서**
+ * 존재 검사(not exists)에는 안 걸린다 — 새는 방향은 언제나 「통과」다.
+ * 걸린 것은 c8 하나가 아니다: 기대트리거 5개 중 넷이 append-only 를 지는 불변식 트리거라,
+ * 그것들이 꺼진 DB 를 이 확인이 초록으로 보고한다. 다음 조각이 옛 블록을 베끼면 같은 자리로
+ * 돌아가므로(「베낄 곳은 바로 앞 조각」 사고와 같은 형태) 파일 층에 못을 박는다. */
+const 트리거상태를보는가 = (sql) => /tgenabled/.test(sql.replace(/^\s*--.*$/gm, ''));
+
+test('사후 확인이 트리거의 「꺼짐」을 본다 — 존재만 물으면 disable 이 초록으로 지나간다', () => {
+  const 사후 = fs.readFileSync(path.join(ROOT, 'supabase', '확인_적용후상태.sql'), 'utf8');
+  assert.ok(트리거상태를보는가(사후),
+    '확인 쿼리가 tgenabled 를 안 본다 — 꺼진 트리거가 「빠진트리거 없음」으로 보고된다.\n'
+    + '  정본은 마지막 마이그레이션 조각의 꼬리다. 거기서 고치고 합본을 다시 만들어라.');
+});
+
+test('탐지력 픽스처 — tgenabled 를 안 보는 옛 블록을 실제로 잡는다', () => {
+  assert.equal(트리거상태를보는가('select 1 from pg_trigger g where g.tgname=e.n'), false,
+    '존재 검사만 하는 블록을 통과시키면 이 검사는 무엇이든 통과시킨다');
+  assert.equal(트리거상태를보는가('-- tgenabled 를 봐야 한다\nselect 1 from pg_trigger'), false,
+    '주석에 적힌 것을 실제 검사로 세면 「고치겠다는 메모」가 픽스를 대신한다');
+  assert.equal(트리거상태를보는가("select g.tgenabled from pg_trigger g"), true);
 });
 
 /* ── 체인 무결성 ─────────────────────────────────────────────────────────────
