@@ -8,7 +8,7 @@
 
 | 묻는 것 | 정본 | 여기서 하는 일 |
 |---|---|---|
-| 무엇이 **필수 필드**인가 · 값목록 | `계약/수집_교정_계약.json`(**현행 c5**) | **참조만.** 값을 복사하지 않는다 |
+| 무엇이 **필수 필드**인가 · 값목록 | `계약/수집_교정_계약.json`(**현행 c6**) | **참조만.** 값을 복사하지 않는다 |
 | DB에 **어떤 모양**으로 앉나 · 권한 | `docs/L0_데이터계약.md` | 참조만 |
 | 앱이 **무엇을 보내고 받나** | **이 문서** | 정한다 |
 
@@ -48,19 +48,19 @@
 | 헤더 | 예 | 없으면 |
 |---|---|---|
 | `Authorization` | `Bearer <access_token>` | 401 `AUTH_REQUIRED` |
-| `X-Contract-Ver` | `c5` | 400 `CONTRACT_VER_MISSING` |
+| `X-Contract-Ver` | `c6` | 400 `CONTRACT_VER_MISSING` |
 | `X-App-Ver` | `0.3.1 (42)` | 통과(로그용) |
 
 **응답 봉투 — 성공**
 
 ```json
-{ "ok": true, "contract_ver": "c5", "results": [ ... ] }
+{ "ok": true, "contract_ver": "c6", "results": [ ... ] }
 ```
 
 **응답 봉투 — 요청 전체 실패**
 
 ```json
-{ "ok": false, "contract_ver": "c5",
+{ "ok": false, "contract_ver": "c6",
   "error": { "code": "AUTH_EXPIRED", "message": "토큰이 만료됐습니다", "retryable": true } }
 ```
 
@@ -89,14 +89,21 @@
       "session_id": "9a22…",
       "content_id": "c-hw-0031",
       "skill_ids": ["skill-ko-grammar-particle-topic"],
+      "skill_taxonomy_ver": "kt.2026-08",
       "level_snapshot": "Lv3",
+      "goal_snapshot": "study",
+      "retry_of_event_id": null,
+      "parent_event_id": null,
+      "turn_no": null,
       "payload": { "ver": 1, "attempt_no": 1 },
       "submission": {
         "task_ref": "hw-2026-08-05-3",
+        "task_format": "자유발화",
         "task_snapshot": { "지시문": "…", "문항": "…", "보기": ["…"], "정답": "…" },
         "task_schema_ver": "hw.v1",
         "body_original": "어제 친구를 만나서 밥을 먹었어요",
-        "audio_ref": null
+        "audio_ref": null,
+        "capture_meta": null
       }
     }
   ]
@@ -111,7 +118,7 @@
 | `learner_id` | **토큰에서**(§2) |
 | `consent_ver` | 위조 방지 + `occurred_at` 시점의 **유효한 동의**로 확정(L0 §3-6). 유효 동의가 없으면 저장하지 않는다 |
 | `schema_ver` | 계약 파일 버전을 **저장 시 자동 기입**(A-8 · 유호님 확정) |
-| `model`·`prompt_ver`·`intervention_id`·`degraded` | AI 호출이 서버에서 나므로 앱은 알 수 없다 |
+| `model`·`prompt_ver`·`intervention_id`·`degraded` | AI 호출이 서버에서 나므로 앱은 알 수 없다. 🔑 **성과 이벤트의 `intervention_id`는 서버가 계승한다**(c6): 앱이 `retry_of_event_id`로 「무엇에 대한 재시도인가」만 말하면, 서버가 그 사건의 `intervention_id`를 읽어 이 행에 적는다. c5까지는 앱이 못 보내고 서버도 이을 근거가 없어서, 「성과는 같은 개입 ID를 가리킨다」는 규칙에 **실행 경로 자체가 없었다** |
 | `source_kind`·`estimator_*` | 추정 메타 — 추정하는 쪽이 적는다 |
 
 | 앱이 반드시 채운다 | 왜 |
@@ -121,19 +128,24 @@
 | `occurred_at` | 서버 수신 시각과 **다르다**(오프라인) |
 | `level_snapshot` | 🔑 **앱이 보낸다.** 3일 전 오프라인 제출을 오늘 올리면 서버의 현재 급수는 **그때 급수가 아니다.** 급수 이력 테이블은 만들지 않는다(파생 선행 구축 금지) — 그때 화면이 알던 값을 그때 적는 것이 유일하게 정확하다. 빠지면 400 |
 | `task_type` | 값은 계약 값목록. **어느 이벤트에 필수인지는 payload 검증 스키마가 이벤트별로 정한다**(F0 Zod · §4-1 아래) — 여기 이벤트별 표를 적으면 검증 로직과 두 벌이 되어 갈라진다 |
+| `goal_snapshot` | 🔑 **`level_snapshot`과 같은 근거로 앱이 보낸다**(c6). 학생 목적은 `learners.goal_track`에 덮어써지고 그 테이블은 append-only 밖이라, 서버의 현재 값은 **그때 목적이 아니다**. 목적 이력 테이블은 만들지 않는다(파생 선행 구축 금지) — 그때 화면이 알던 값을 그때 적는 것이 유일하게 정확하다 |
+| `task_format` | 낭독·자유발화… **`task_type`과 다른 축이다**(통로 vs 형식). 🔴 발화 제출에서 빠지면 그 녹음이 낭독인지 자유발화인지 **나중에 음성만 듣고는 못 가른다** — 섀도잉 데이터로 회화 모델을 학습시키는 사고가 조용히 성립한다 |
+| `retry_of_event_id`·`parent_event_id`·`turn_no` | 있을 때만. 재시도 고리는 성과 배선의 입구(위 `intervention_id` 계승)이고, 선행 턴·턴 서수는 회화 문맥이다. 🔴 **`occurred_at` 정렬로 대신하지 않는다** — 아래 §3이 「기기 시계는 못 믿는다」를 이미 못박았다 |
 
 **payload 규격**
 
 - `payload.ver`(정수) **필수**. 모양이 바뀌면 `2`로 올리고 과거 행은 `1`로 남는다.
   > 🔑 **이벤트 이름에 `.v1`을 붙이지 않는다**(L0 §3-2 표기 정정 요청 · §9). 이름에 붙이면 값목록이 payload 개정마다 배로 늘고, 집계가 `like 'choice.selected%'`가 된다. `payload.ver`는 **컬럼도 값목록도 늘리지 않는다.**
-- payload 필드 이름도 **현행 계약(c5) 필드 목록에서 고른다**(`confidence`·`attempt_no`·`learner_response`·`options_shown`·`position`·`recommended_option`·`selected_option`·`changed_selection`·`latency_ms`·`skipped`). 목록에 없는 이름이 필요하면 **다음 판 개정(c6)**이지 자유 추가가 아니다.
+- payload 필드 이름도 **현행 계약(c6) 필드 목록에서 고른다**(`confidence`·`attempt_no`·`learner_response`·`options_shown`·`position`·`recommended_option`·`selected_option`·`changed_selection`·`latency_ms`·`skipped`·**`selection_reason`**·**`rejected_all`**·**`cited_refs`**·**`output_text`**). 목록에 없는 이름이 필요하면 **다음 판 개정(c7)**이지 자유 추가가 아니다.
+  > 🔴 **굵은 4개는 c4·c5가 계약에 넣었는데 이 목록이 따라오지 않았다**(2026-08-06 외부 검토가 잡았다). 계약은 「필수」라 하고 이 문서는 「목록에 없는 이름은 자유 추가가 아니다」라 해서, **앱이 그 필드를 보내는 순간 계약 위반으로 거절되는** 상태였다. 두 문서가 각자 맞는 말을 하는데 합치면 구현이 불가능한 형태 — 계약을 늘릴 때 이 목록을 함께 늘리지 않으면 반드시 재발한다.
+- **선택지는 `{option_id, label}`로 싣는다**(c6). `option_id`는 안 바뀌는 조인 키고 `label`은 그때 표시된 문구의 스냅샷이다. 문구만 문자열로 남기면 문구를 개정하는 날 **판을 가로지르는 집계가 끊긴다** — 스킬에 「이름 말고 불변 ID로 묶는다」를 적용한 것과 같은 이유이고, c5까지 선택지에만 그 규칙이 빠져 있었다.
 - 🔴 **`is_correct`(정답여부)를 만들지 않는다.** `submission.body_original`(고른 답) + `task_snapshot.정답`이 있으면 채점은 **언제든 다시 계산되는 파생**이다. 원본을 두고 파생을 저장하면 채점 규칙이 바뀌는 날 과거가 거짓말을 한다.
 - 빈 껍데기 방지: `event_type`이 요구하는 payload가 비면 **저장하지 않는다**(L0 §3-2 두 층 검증). 검증은 이 함수 한 곳에만 있다.
 
 **응답**
 
 ```json
-{ "ok": true, "contract_ver": "c5",
+{ "ok": true, "contract_ver": "c6",
   "results": [
     { "idempotency_key": "b6f1…", "status": "stored",    "event_id": "3c9e…" },
     { "idempotency_key": "77a2…", "status": "duplicate", "event_id": "1b40…" },
@@ -154,7 +166,7 @@
 
 ```json
 요청  { "kind": "audio", "content_type": "audio/wav", "byte_size": 482913 }
-응답  { "ok": true, "contract_ver": "c5",
+응답  { "ok": true, "contract_ver": "c6",
         "upload_url": "https://…", "audio_ref": "voice/9f2c…(learner_id)/3c9e….wav",
         "expires_at": "2026-08-05T13:35:00.000Z" }
 ```
@@ -167,6 +179,8 @@
 - 🔴 **정본 포맷 = PCM WAV 16kHz / 16bit / mono · 기기 음성처리(AGC·노이즈 억제·에코 제거) off.** 소급 불가 배선①이다 — 압축과 자동 게인이 **떨림·미세 발음을 지우고**, 지워진 신호는 원본이 없으므로 영영 복원되지 않는다.
   - ⚠ **Expo 기본 녹음 프리셋은 m4a/AAC다.** 설정을 안 바꾸면 조용히 압축본이 쌓인다 — 「WAV로 하기로 했다」는 문서 문장이지 실측이 아니다.
   - 🔑 **규격 밖이어도 업로드를 거부하지 않는다.** 거부하면 학생의 발화가 영영 사라지고, 「수집이 채점보다 우선」 원칙에 어긋난다. 대신 **서버가 파일 헤더에서 실제 값을 파생해 저장**하고(`codec`·`sample_rate`·`bit_depth`·`channels`), 규격 밖이면 **경고를 남긴다**. 규격은 사람이 지키는 약속이 아니라 **행마다 붙는 관측값**이어야 한다.
+  - 🔴 **저장 자리 = `submissions.capture_meta`**(c6 신설). c5까지 이 문단은 「서버가 파생해 저장한다」고 약속만 하고 **담을 열이 없었다.** 두 갈래를 **분리해서** 적는다: `server`(헤더에서 실제로 잰 값 · 길이 불일치 포함) / `app`(기기·OS·앱 빌드·마이크 경로·**요청한** 처리 설정·녹음 중단 여부). 🔑 **AGC·노이즈 억제는 WAV 헤더에 흔적이 없다** — 앱이 「off로 요청했다」는 것과 「실제로 off였다」는 것은 다른 사실이므로, 검증할 수 없으면 `agc_verified: "unknown"`으로 남긴다. 모르는 것을 `false`로 적으면 그 행이 **「off였다」는 거짓 증거**가 되고, 떨림·미세 발음이 학생 특성인지 기기 처리 결과인지 영영 못 가른다.
+  - ⚠ **인수 조건은 「2대 1회 실측」이 아니라 「매 건 기록」이다.** 앱 업데이트로 설정이 조용히 켜지면 그 뒤 전량이 오염되는데 증상이 없다 — 1회 검사는 그 순간만 증명한다.
   - 인수 조건: 실기기 2대(iOS/Android)의 실제 파일 **헤더**로 검사한다. 앱 설정 코드를 읽는 것은 검사가 아니다.
 - 재생은 조회용 서명 URL로 — 버킷은 공개하지 않는다.
 - 🔴 **경로 규칙 = `{voice|image}/{learner_id}/{uuid}.{ext}` — 첫 칸 뒤가 반드시 `learner_id`다**(정본 L0 §9-3).
@@ -197,7 +211,7 @@
 |---|---|---|---|
 | `AUTH_REQUIRED` | 401 | ✗ | 로그인 화면 |
 | `AUTH_EXPIRED` | 401 | ✓ **1회** | 토큰 갱신 후 재전송. 또 실패하면 로그인 화면 |
-| `CONSENT_MISSING` | 409 | ✗ | 동의 화면. **이벤트는 로컬에 보관**하고 동의 후 재전송 — 학생이 거부하면 **파기** |
+| `CONSENT_MISSING` | 409 | ✗ | 🔴 **재전송으로 풀리지 않는다**(c6 정정). 서버 검사가 `agreed_at <= occurred_at`이라 **사후 동의는 과거 사건을 유효하게 만들지 못한다** — c5까지 이 칸은 「보관하고 동의 후 재전송」이라 적혀 있었고, 그대로 구현하면 앱이 **영원히 거절되는 큐**를 안고 돌거나 학생 기록을 조용히 잃는다. 정답은 **수집 전에 막는 것**이다: 녹음·제출 화면에 들어갈 때 유효 동의를 확인하고 없으면 동의 화면을 먼저 띄운다(그 뒤 사건은 동의 시각 이후라 통과한다). 이 오류가 실제로 뜨면 **앱 게이트가 뚫린 것**이므로 개발자 보고 대상이고, 그 이벤트는 파기한다 |
 | `CONTRACT_VIOLATION` | 400 | ✗ | 그 항목만 격리 + 개발자 보고. 값목록·필수 필드 위반 |
 | `PAYLOAD_INVALID` | 400 | ✗ | 〃 (payload 모양) |
 | `CONTRACT_VER_MISSING` | 400 | ✗ | 헤더 누락 — 앱 버그 |
@@ -216,7 +230,7 @@
 | 축 | 무엇 | 규칙 |
 |---|---|---|
 | `api_ver` | URL `/v1` | **깨는 변경만** 올린다. 올리면 구 버전을 최소 1개 릴리스 주기 병행 |
-| `contract_ver` | `c5`… | 앱이 헤더로 알리고 서버가 응답에 자기 것을 싣는다. **이 문서의 값은 예시가 아니라 정본과 대조된다**(`tests/C0계약.test.js`) |
+| `contract_ver` | `c6`… | 앱이 헤더로 알리고 서버가 응답에 자기 것을 싣는다. **이 문서의 값은 예시가 아니라 정본과 대조된다**(`tests/C0계약.test.js`) |
 | `payload.ver` | 정수 | 이벤트별 payload 모양 (§4-1) |
 
 - **값목록 추가는 하위호환이다** — 구 앱은 새 값을 안 보낼 뿐 계속 작동한다. **이름 변경·삭제는 금지**(과거 집계가 깨진다 · c3 `값목록_규칙` 승계).

@@ -93,13 +93,21 @@ test('확인 쿼리가 참조하는 이름이 전부 정의된 별칭이다 (별
    * 「column c3제약 does not exist」가 뜬다. 텍스트 검사로 잡을 수 있는 것을 사람 손에 미루지 않는다. */
   /* ⚠ `SQL`이 아니라 `원문`을 본다 — 확인 쿼리는 **블록 주석 안**에 살고, 위 SQL 상수는
    *   그 주석을 벗겨낸 것이라 여기선 아무것도 안 보인다(그러면 이 검사는 영원히 통과한다). */
-  const 시작 = 원문.indexOf('select case when');
-  const 끝 = 원문.indexOf(') t;', 시작);
+  /* c6: 확인 쿼리가 「개수 세기」에서 「이름 대조」(CTE)로 바뀌면서 옛 앵커(`) t;`)가 죽었다.
+   * 앵커를 넓히면서 참조 검사도 함께 넓힌다 — CTE 이름은 `from 빠진열` 처럼 `=` 없이 참조되므로
+   * `=` 만 보던 옛 정규식은 그것을 통째로 놓쳤다(별칭을 지워도 통과했다). */
+  const 시작 = 원문.indexOf('with 기대열');
+  const 끝 = 원문.indexOf('from 셈;', 시작);
   assert.ok(시작 !== -1 && 끝 !== -1, '확인 쿼리 블록을 못 찾았다 — 앵커가 낡았다(이 검사는 무엇이든 통과시킨다)');
   const 블록 = 원문.slice(시작, 끝);
-  const 정의 = new Set([...블록.matchAll(/\bas ([^\s,]+)/g)].map((m) => m[1]));
-  const 조건절 = 블록.slice(0, 블록.indexOf('from'));
+  const 정의 = new Set([...블록.matchAll(/\bas ([가-힣A-Za-z_][가-힣A-Za-z_0-9]*)/g)].map((m) => m[1]));
+  // CTE 이름도 정의다: `with 이름(...) as (` · `), 이름 as (`
+  for (const m of 블록.matchAll(/(?:with|,)\s*([가-힣A-Za-z_][가-힣A-Za-z_0-9]*)\s*(?:\([^)]*\))?\s*as\s*\(/g)) {
+    정의.add(m[1]);
+  }
+  const 조건절 = 블록.slice(블록.indexOf('case when'));
   const 참조 = [...조건절.matchAll(/([가-힣A-Za-z_][가-힣A-Za-z_0-9]*)\s*=/g)].map((m) => m[1]);
+  for (const m of 조건절.matchAll(/from\s+([가-힣A-Za-z_][가-힣A-Za-z_0-9]*)/g)) 참조.push(m[1]);
   assert.ok(참조.length >= 5, `판정 조건에서 참조를 ${참조.length}개밖에 못 뽑았다 — 정규식이 낡았다`);
   const 미정의 = 참조.filter((n) => !정의.has(n));
   assert.deepEqual(미정의, [],
