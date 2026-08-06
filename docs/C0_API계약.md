@@ -8,7 +8,7 @@
 
 | 묻는 것 | 정본 | 여기서 하는 일 |
 |---|---|---|
-| 무엇이 **필수 필드**인가 · 값목록 | `계약/수집_교정_계약.json`(c3) | **참조만.** 값을 복사하지 않는다 |
+| 무엇이 **필수 필드**인가 · 값목록 | `계약/수집_교정_계약.json`(**현행 c4**) | **참조만.** 값을 복사하지 않는다 |
 | DB에 **어떤 모양**으로 앉나 · 권한 | `docs/L0_데이터계약.md` | 참조만 |
 | 앱이 **무엇을 보내고 받나** | **이 문서** | 정한다 |
 
@@ -48,19 +48,19 @@
 | 헤더 | 예 | 없으면 |
 |---|---|---|
 | `Authorization` | `Bearer <access_token>` | 401 `AUTH_REQUIRED` |
-| `X-Contract-Ver` | `c3` | 400 `CONTRACT_VER_MISSING` |
+| `X-Contract-Ver` | `c4` | 400 `CONTRACT_VER_MISSING` |
 | `X-App-Ver` | `0.3.1 (42)` | 통과(로그용) |
 
 **응답 봉투 — 성공**
 
 ```json
-{ "ok": true, "contract_ver": "c3", "results": [ ... ] }
+{ "ok": true, "contract_ver": "c4", "results": [ ... ] }
 ```
 
 **응답 봉투 — 요청 전체 실패**
 
 ```json
-{ "ok": false, "contract_ver": "c3",
+{ "ok": false, "contract_ver": "c4",
   "error": { "code": "AUTH_EXPIRED", "message": "토큰이 만료됐습니다", "retryable": true } }
 ```
 
@@ -126,14 +126,14 @@
 
 - `payload.ver`(정수) **필수**. 모양이 바뀌면 `2`로 올리고 과거 행은 `1`로 남는다.
   > 🔑 **이벤트 이름에 `.v1`을 붙이지 않는다**(L0 §3-2 표기 정정 요청 · §9). 이름에 붙이면 값목록이 payload 개정마다 배로 늘고, 집계가 `like 'choice.selected%'`가 된다. `payload.ver`는 **컬럼도 값목록도 늘리지 않는다.**
-- payload 필드 이름도 **c3 필드 목록에서 고른다**(`confidence`·`attempt_no`·`learner_response`·`options_shown`·`position`·`recommended_option`·`selected_option`·`changed_selection`·`latency_ms`·`skipped`). 목록에 없는 이름이 필요하면 **c4 개정**이지 자유 추가가 아니다.
+- payload 필드 이름도 **현행 계약(c4) 필드 목록에서 고른다**(`confidence`·`attempt_no`·`learner_response`·`options_shown`·`position`·`recommended_option`·`selected_option`·`changed_selection`·`latency_ms`·`skipped`). 목록에 없는 이름이 필요하면 **다음 판 개정(c5)**이지 자유 추가가 아니다.
 - 🔴 **`is_correct`(정답여부)를 만들지 않는다.** `submission.body_original`(고른 답) + `task_snapshot.정답`이 있으면 채점은 **언제든 다시 계산되는 파생**이다. 원본을 두고 파생을 저장하면 채점 규칙이 바뀌는 날 과거가 거짓말을 한다.
 - 빈 껍데기 방지: `event_type`이 요구하는 payload가 비면 **저장하지 않는다**(L0 §3-2 두 층 검증). 검증은 이 함수 한 곳에만 있다.
 
 **응답**
 
 ```json
-{ "ok": true, "contract_ver": "c3",
+{ "ok": true, "contract_ver": "c4",
   "results": [
     { "idempotency_key": "b6f1…", "status": "stored",    "event_id": "3c9e…" },
     { "idempotency_key": "77a2…", "status": "duplicate", "event_id": "1b40…" },
@@ -153,9 +153,9 @@
 발화 과업(`발화녹음`·`출석발화`)의 원본은 **Storage 비공개 버킷**에 있고, 이벤트에는 참조만 실린다.
 
 ```json
-요청  { "kind": "audio", "content_type": "audio/m4a", "byte_size": 482913 }
-응답  { "ok": true, "contract_ver": "c3",
-        "upload_url": "https://…", "audio_ref": "voice/2026/08/3c9e….m4a",
+요청  { "kind": "audio", "content_type": "audio/wav", "byte_size": 482913 }
+응답  { "ok": true, "contract_ver": "c4",
+        "upload_url": "https://…", "audio_ref": "voice/2026/08/3c9e….wav",
         "expires_at": "2026-08-05T13:35:00.000Z" }
 ```
 
@@ -164,6 +164,10 @@
 - 🔑 **업로드 성공 뒤에 이벤트를 보낸다.** 반대로 하면 참조가 가리키는 파일이 없는 행이 남고, 그건 나중에 「전사 실패」와 구분되지 않는다.
 - 오프라인이면 로컬 파일을 큐에 두고 복귀 시 ①②③을 그대로 밟는다.
 - 서버가 `content_type`·`byte_size`를 검증한다(상한 **25MB**, 임의값). 음성은 **보존 무제한**(유호님 확정)이라 용량 실수의 비용이 **영구적**이다.
+- 🔴 **정본 포맷 = PCM WAV 16kHz / 16bit / mono · 기기 음성처리(AGC·노이즈 억제·에코 제거) off.** 소급 불가 배선①이다 — 압축과 자동 게인이 **떨림·미세 발음을 지우고**, 지워진 신호는 원본이 없으므로 영영 복원되지 않는다.
+  - ⚠ **Expo 기본 녹음 프리셋은 m4a/AAC다.** 설정을 안 바꾸면 조용히 압축본이 쌓인다 — 「WAV로 하기로 했다」는 문서 문장이지 실측이 아니다.
+  - 🔑 **규격 밖이어도 업로드를 거부하지 않는다.** 거부하면 학생의 발화가 영영 사라지고, 「수집이 채점보다 우선」 원칙에 어긋난다. 대신 **서버가 파일 헤더에서 실제 값을 파생해 저장**하고(`codec`·`sample_rate`·`bit_depth`·`channels`), 규격 밖이면 **경고를 남긴다**. 규격은 사람이 지키는 약속이 아니라 **행마다 붙는 관측값**이어야 한다.
+  - 인수 조건: 실기기 2대(iOS/Android)의 실제 파일 **헤더**로 검사한다. 앱 설정 코드를 읽는 것은 검사가 아니다.
 - 재생은 조회용 서명 URL로 — 버킷은 공개하지 않는다.
 
 ### 4-3. 조회 — S1에서 정한다 (지금은 형태만)
@@ -204,7 +208,7 @@
 | 축 | 무엇 | 규칙 |
 |---|---|---|
 | `api_ver` | URL `/v1` | **깨는 변경만** 올린다. 올리면 구 버전을 최소 1개 릴리스 주기 병행 |
-| `contract_ver` | `c3`… | 앱이 헤더로 알리고 서버가 응답에 자기 것을 싣는다 |
+| `contract_ver` | `c4`… | 앱이 헤더로 알리고 서버가 응답에 자기 것을 싣는다. **이 문서의 값은 예시가 아니라 정본과 대조된다**(`tests/C0계약.test.js`) |
 | `payload.ver` | 정수 | 이벤트별 payload 모양 (§4-1) |
 
 - **값목록 추가는 하위호환이다** — 구 앱은 새 값을 안 보낼 뿐 계속 작동한다. **이름 변경·삭제는 금지**(과거 집계가 깨진다 · c3 `값목록_규칙` 승계).

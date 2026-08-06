@@ -50,6 +50,55 @@ test('C0 예시의 event_type·task_type이 전부 계약 값목록 안에 있�
     `C0에서 값목록 예시를 ${예시수}개밖에 못 뽑았다 — 예시가 사라졌거나 문서 경로가 바뀌었다`);
 });
 
+// ─── 계약 판·오디오 포맷이 문서마다 갈라지는 것을 막는다 ──────────────────────
+// 🔴 실측 근거(2026-08-06 GPT 이종 검수 failed_p0): 계약 파일이 c4로 개정된 뒤에도
+//   C0 본문은 c3, 업로드 예시는 `audio/m4a`인데 발주서는 PCM WAV였다.
+//   한 문서 안에서도 §9 이력은 「c4 실행됨」이라 적고 본문은 c3였다 —
+//   **어느 문서를 읽느냐로 서로 다른 앱이 만들어지는 상태**였고, 그건 앱을 다 만든 뒤에 드러난다.
+//   사람이 세 문서를 나란히 놓고 읽어야 발동하는 장치는 안 돈다.
+
+const 발주경로 = path.join(ROOT, 'docs', '발주_수집파이프라인.md');
+const 정본오디오 = 'audio/wav';   // PCM WAV 16k/16bit/mono — 소급 불가 배선①
+
+test('탐지력 픽스처 — 낡은 판·압축 포맷을 실제로 잡는다 (검사가 죽은 것과 문서가 깨끗한 것은 다르다)', () => {
+  assert.deepEqual(뽑기('{ "contract_ver": "c3" }', 'contract_ver'), ['c3']);
+  assert.deepEqual(뽑기('{ "content_type": "audio/m4a" }', 'content_type'), ['audio/m4a']);
+  assert.deepEqual(뽑기('`contract_ver`는 판 번호다', 'contract_ver'), []);
+});
+
+test('C0의 contract_ver 예시가 전부 계약 파일의 현행 판과 같다', () => {
+  const md = fs.readFileSync(C0경로, 'utf8');
+  const 쓰인 = 뽑기(md, 'contract_ver');
+  assert.ok(쓰인.length > 0, 'C0에서 contract_ver 예시를 하나도 못 뽑았다 — 예시가 사라졌거나 문서 경로가 바뀌었다');
+  assert.deepEqual(쓰인.filter((v) => v !== 계약.버전), [],
+    `C0 예시가 낡은 판을 가리킨다(현행 ${계약.버전}). 구현자는 이 문서를 보고 헤더를 박는다.\n` +
+    '  고치는 법: 계약 파일의 `버전`을 올렸으면 C0 본문 예시와 `X-Contract-Ver` 행을 같은 커밋에서 함께 올린다');
+
+  // 헤더 표의 값도 같은 판이어야 한다(JSON 예시만 고치고 표를 두고 가는 것이 실제 사고 형태였다)
+  const 헤더행 = md.match(/\|\s*`X-Contract-Ver`\s*\|\s*`([^`]+)`/);
+  assert.ok(헤더행, '`X-Contract-Ver` 헤더 행을 못 찾았다 — 표가 바뀌었으면 이 검사부터 고친다');
+  assert.equal(헤더행[1], 계약.버전, `\`X-Contract-Ver\` 행이 ${헤더행[1]} 인데 현행은 ${계약.버전} 이다`);
+});
+
+test('오디오 업로드 포맷이 C0와 발주서에서 갈라지지 않았다', () => {
+  const md = fs.readFileSync(C0경로, 'utf8');
+  const 쓰인 = 뽑기(md, 'content_type').filter((v) => v.startsWith('audio/'));
+  assert.ok(쓰인.length > 0, 'C0에서 오디오 content_type 예시를 못 뽑았다 — §4-2가 사라졌거나 예시 표기가 바뀌었다');
+  assert.deepEqual(쓰인.filter((v) => v !== 정본오디오), [],
+    `C0가 정본(${정본오디오}) 아닌 오디오 포맷을 예시로 보여준다.\n` +
+    '  압축 포맷은 떨림·미세 발음을 지우고, 지워진 신호는 원본이 없어 영영 복원되지 않는다(배선①).');
+
+  if (!fs.existsSync(발주경로)) return;   // 발주서는 이 저장소 밖으로 옮겨질 수 있다
+  const 발주 = fs.readFileSync(발주경로, 'utf8');
+  assert.ok(/PCM WAV/.test(발주),
+    '발주서가 PCM WAV를 요구하지 않는다 — C0와 갈라지면 구현자가 읽는 문서에 따라 다른 앱이 나온다');
+  // 산문이 아니라 **스펙(코드 블록)만** 본다 — 과거 결함을 서술한 문장까지 잡으면
+  // 거짓 경보가 되고, 거짓 경보를 내는 가드는 곧 꺼진다.
+  const 스펙 = (발주.match(/```[\s\S]*?```/g) || []).join('\n');
+  assert.ok(!/audio\/m4a|audio\/aac/.test(스펙),
+    '발주서 스펙에 압축 오디오 포맷이 되살아났다 — 배선①(소급 불가)과 충돌한다');
+});
+
 test('C0가 값목록을 통째로 복사하지 않았다 (복사본은 계약이 개정되는 날 갈라진다)', () => {
   const md = fs.readFileSync(C0경로, 'utf8');
   const 값목록 = 계약.learning_events.값목록;
