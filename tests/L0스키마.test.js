@@ -144,6 +144,36 @@ test('학생에게 쓰기 정책을 열지 않았다 (쓰기는 전부 Edge Func
  * 「읽기만 한다」고 적어두고 Run 하시게 하는 파일이다. 여기에 쓰기 문장이 한 줄이라도 섞이면
  * **재려던 「실행 전 상태」를 재는 행위가 오염시킨다** — 그러면 무엇이 원래 있었는지 영영 모른다.
  * 프로즈로 "읽기 전용"이라 적는 것으로는 안 지켜지므로 기계로 막는다. */
+/* ── F124: 스키마 정본은 L0 하나다 ──────────────────────────────────────────
+ * 2026-08-06 실측: 발주서가 `student_homeworks`·`ai_processing_logs`·
+ * `verified_learning_datasets` 3테이블을 DDL 로 신설했는데 **셋 다 이미 있는
+ * submissions·corrections 의 재발명**이었다(GPT 이종 검수 `failed_p0`).
+ * 원인은 「L0 를 Grep 조각으로만 읽고 **이 테이블이 존재해야 하는가**를 한 번도 안 물은 것」이다 —
+ * 사람이 물어야 발동하는 규칙이라 안 돌았다. 그래서 기계로 옮긴다:
+ * **발주서는 스키마를 정의하지 않는다.** 정의가 필요하면 L0 를 고치는 것이 유일한 통로다.
+ *
+ * ⚠ 검수의뢰 문서는 제외한다 — 「무엇을 검수에 부쳤나」의 기록이라 원문이 남아야 하고,
+ *   머리말에 ⛔ 스탬프가 붙어 있다. 잡는 것은 **구현자가 읽는 문서**뿐이다(F103: 거짓 경보를 내는 가드는 꺼진다). */
+test('발주서가 테이블을 정의하지 않는다 (스키마 정본은 L0 하나 · F124)', () => {
+  const 발주경로 = path.join(ROOT, 'docs', '발주_수집파이프라인.md');
+  if (!fs.existsSync(발주경로)) return;
+  const sql블록 = (fs.readFileSync(발주경로, 'utf8').match(/```sql[\s\S]*?```/g) || []).join('\n');
+  const 정의 = [...sql블록.matchAll(/create table (?:if not exists )?([\w.]+)/gi)].map((m) => m[1]);
+  assert.deepEqual(정의, [],
+    `발주서가 테이블을 정의한다: ${정의.join(', ')}\n` +
+    '  스키마 정본은 supabase/L0_스키마.sql 하나다 — 발주서가 따로 정의하면 정본이 둘이 되고,\n' +
+    '  어긋나는 날 어느 쪽이 진실인지 알 방법이 없다(F124). 필요한 테이블이면 L0 를 고쳐라.');
+});
+
+test('탐지력 픽스처 — 발주서에 DDL 이 되살아나면 잡는다', () => {
+  /* 실저장소가 깨끗한 것과 검사가 도는 것은 다르다. 위 검사가 쓰는 바로 그 추출을 픽스처로 확인한다. */
+  const 되살아난판 = '```sql\ncreate table student_homeworks (\n  id uuid primary key\n);\n```';
+  const 뽑힘 = [...되살아난판.matchAll(/create table (?:if not exists )?([\w.]+)/gi)].map((m) => m[1]);
+  assert.deepEqual(뽑힘, ['student_homeworks'], '추출기가 죽었다 — 그러면 위 검사는 무엇이든 통과시킨다');
+  const 산문만 = '`create table` 을 여기 쓰지 않는다는 규칙이 있다';
+  assert.deepEqual((산문만.match(/```sql[\s\S]*?```/g) || []), [], '산문을 sql 블록으로 잡으면 거짓 경보가 된다');
+});
+
 test('확인_적용전상태.sql 은 읽기 전용이다 (쓰기 동사 0)', () => {
   const 확인원문 = fs.readFileSync(path.join(ROOT, 'supabase', '확인_적용전상태.sql'), 'utf8');
   const 확인본문 = 확인원문.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--.*$/gm, '');
