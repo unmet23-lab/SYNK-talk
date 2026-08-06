@@ -2,7 +2,16 @@ name: CI
 
 # 두 갈래로 나눈다:
 #   verify — 자격증명이 없어도 항상 돈다. 지금 당장 값을 한다.
-#   build  — EXPO_TOKEN 이 등록된 뒤에만 돈다. 없으면 조용히 건너뛴다(빨간불로 남기지 않는다).
+#   build  — **손으로 부를 때만**(workflow_dispatch). 아래 🔴 참조.
+#
+# 🔴 2026-08-06: build 를 push 게이트에서 뺐다. 원래 의도(위 5번째 줄)는 「빨간불로 남기지
+#    않는다」였는데, EXPO_TOKEN 을 등록한 뒤 **무료 플랜 Android 빌드 월 한도가 소진되자**
+#    `eas build` 가 제출 단계에서 실패해 push 마다 CI 가 빨개졌다(리셋 = 매월 1일).
+#    주인 없이 남은 적색은 남의 배포 게이트를 막는다 — 그리고 이 빌드는 `--no-wait` 라
+#    **초록이어도 「걸었다」까지만 뜻한다**(결과는 Expo 화면에서만 보인다).
+#    즉 push 마다 크레딧을 태우면서 아무도 안 읽는 답을 만들고 있었다. 필요할 때 부른다:
+#      gh workflow run CI --repo unmet23-lab/SYNK-talk   (또는 Actions 탭 → Run workflow)
+#    ⚠ 되돌리려면 build 의 `if:` 한 줄만 지우면 된다.
 on:
   push:
     branches: [master]
@@ -26,6 +35,7 @@ jobs:
 
   build:
     needs: verify
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}

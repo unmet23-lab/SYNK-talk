@@ -51,6 +51,24 @@ test('출시가드: preview 빌드·일반 명령은 통과', () => {
   for (const line of ok) assert.deepStrictEqual(scan(line), [], `과잉 차단: ${line}`);
 });
 
+/* ── EAS 프로젝트 링크 — CI 에서 여기로 옮겨 왔다 (2026-08-06) ──────────────
+ * 원래 이 검사는 ci.yml `build` 잡 안에 살았는데, build 를 push 게이트에서 빼면서
+ * **매 push 마다 돌던 것이 손으로 부를 때만 도는 것**이 될 뻔했다. 정적 파일 단언이라
+ * 애초에 CI YAML 이 아니라 테스트의 몫이다 — 여기 있으면 로컬에서도 돈다.
+ * projectId 가 사라지면 빌드는 「토큰이 잘못됐나」로 오독되는 낯선 오류로 죽는다. */
+test('app.json 에 EAS projectId 가 있다 (없으면 빌드가 엉뚱한 원인으로 죽는다)', () => {
+  const app = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'app.json'), 'utf8'));
+  const id = app.expo && app.expo.extra && app.expo.extra.eas && app.expo.extra.eas.projectId;
+  assert.ok(id, 'app.json 에 extra.eas.projectId 가 없다 — 이 앱이 EAS 프로젝트와 연결돼 있지 않다. ' +
+    '토큰 문제가 아니다. 로컬에서 eas init 을 1회 돌려 나온 값을 커밋한다(docs/배포_경로.md)');
+});
+
+test('탐지력 픽스처 — projectId 가 빠지면 잡는다', () => {
+  const 빠진판 = { expo: { extra: { eas: {} } } };
+  const id = 빠진판.expo && 빠진판.expo.extra && 빠진판.expo.extra.eas && 빠진판.expo.extra.eas.projectId;
+  assert.ok(!id, '추출기가 죽었다 — 그러면 위 검사는 무엇이든 통과시킨다');
+});
+
 // ── 실워크플로 — 운영 명령 0 (들어오는 날 여기가 빨개진다) ────
 test('출시가드: .github/workflows 전체에 운영 배포 명령 0', () => {
   const dir = path.join(__dirname, '..', '.github', 'workflows');
