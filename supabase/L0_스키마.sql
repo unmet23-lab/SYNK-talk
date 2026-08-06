@@ -1251,7 +1251,7 @@ do $migration$
 declare
   migration_version constant text := '20260806234000';
   migration_name constant text := '20260806234000_staff_c7.sql';
-  expected_checksum constant text := 'ff27f02b65b2685bd8b1cfc2e5f9637219cc4605fb9dda5d0ffa0ab9e93b419e'; -- migration-checksum
+  expected_checksum constant text := 'f3099646ca81e6636bd574de18092a90e9ced8046b3c45ba44b71a07a5376d1c'; -- migration-checksum
   base_version constant text := '20260806233000';
   recorded_checksum text;
 begin
@@ -1325,15 +1325,22 @@ begin
   alter table engine.staff_access_log enable row level security;
 
   -- ── 세션 유효 판정 — 두 축이 함께 부르는 한 곳 (§4-2 ③ · §4-5 ③) ──────────
-  -- 🔴 `iat`(토큰 발급 시각)가 없거나 읽히지 않으면 결과는 null이고 정책은 **거부**한다 —
-  --   모르는 토큰이 통과하는 쪽으로 기울지 않는다.
+  -- 🔴 **`iat`는 폐기된 계정에서만 본다.** 초판은 `coalesce(revoked_before,'-infinity')`로
+  --   **언제나** `iat`와 비교했다 — 그러면 토큰에 `iat`가 없거나 안 읽히는 순간 결과가 null이라
+  --   **폐기된 적 없는 전원이 함께 잠긴다.** 막으려던 것(폐기 1명)보다 사고가 크고 더 잦다
+  --   (2026-08-06 CI 실측: `iat` 없는 주장으로 학생이 자기 행을 0행 봤다).
+  --   `revoked_before`가 null이면 폐기된 적이 없으니 **비교할 것 자체가 없다.**
+  -- 🔴 그래도 **폐기된 계정에서는 그대로 fail-closed다** — 값이 있는데 `iat`를 못 읽으면
+  --   null이라 거부된다. 모르는 토큰이 통과하는 쪽으로는 기울지 않는다.
   -- ⚠ 이것은 RLS의 방어선이다. **`service_role`은 RLS를 우회하므로** Edge Function은
   --   같은 판정을 자기 손으로 한 번 더 해야 한다(§4-3 ⚠).
   create or replace function engine.session_alive(active boolean, revoked_before timestamptz)
     returns boolean language sql stable security invoker set search_path = engine, public as
   $function$
-    select active
-       and to_timestamp((auth.jwt()->>'iat')::bigint) >= coalesce(revoked_before, '-infinity')
+    select active and (
+      revoked_before is null
+      or to_timestamp((auth.jwt()->>'iat')::bigint) >= revoked_before
+    )
   $function$;
 
   -- 학생 축: `current_learner_id()`는 **RLS를 지나** learners를 읽으므로(security invoker),
@@ -1482,7 +1489,7 @@ select case when 테이블수=11 and RLS켜짐=11 and 정책수=8
              and (select v from 빠진제약) is null
              and (select v from 빠진트리거) is null
              and (select version from 현재이력)='20260806234000'
-              and (select checksum from 현재이력)='ff27f02b65b2685bd8b1cfc2e5f9637219cc4605fb9dda5d0ffa0ab9e93b419e' -- migration-checksum
+              and (select checksum from 현재이력)='f3099646ca81e6636bd574de18092a90e9ced8046b3c45ba44b71a07a5376d1c' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·8·0·0·3·1·0 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,

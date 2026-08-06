@@ -291,6 +291,59 @@ reset role;
 rollback;
 SQL
 
+# ── 세션 폐기(L0 §4-2 ③ · §4-5 ③) — `revoked_before` 가 옛 토큰을 실제로 죽이는가 ──────
+# 🔴 여기가 없으면 CI 는 폐기에 눈이 하나도 없다. `session_alive()` 를 통째로 `select true` 로
+#    바꿔도 위 검사들은 전부 초록이다 — 「보인다」만 재고 「안 보여야 할 때」를 안 재기 때문이다.
+# ⚠ 위 검사들과 달리 `iat` 를 **주장에 넣는다**. 실제 Supabase 토큰엔 항상 있고, 폐기 판정은
+#    그때만 그 값을 본다(없으면 폐기된 계정이 fail-closed 로 막힌다 — 그것도 아래에서 잰다).
+"${PSQL[@]}" -v uid1="$uid1" <<'SQL' >/dev/null
+begin;
+grant usage on schema engine to authenticated;
+grant select on engine.learners to authenticated;
+update engine.learners set revoked_before = now() + interval '1 hour'
+ where auth_user_id = :'uid1';
+select set_config('request.jwt.claims',
+  json_build_object('sub', :'uid1', 'role', 'authenticated',
+                    'iat', extract(epoch from now())::bigint)::text, true);
+set local role authenticated;
+do $rls$
+begin
+  if (select count(*) from engine.learners) <> 0 then
+    raise exception '폐기 뒤에도 옛 토큰이 자기 행을 본다 — revoked_before 가 안 먹는다';
+  end if;
+end
+$rls$;
+reset role;
+
+-- 폐기된 계정 + `iat` 를 못 읽는 주장 = **막히는 쪽**이어야 한다(fail-closed).
+select set_config('request.jwt.claims',
+  json_build_object('sub', :'uid1', 'role', 'authenticated')::text, true);
+set local role authenticated;
+do $rls$
+begin
+  if (select count(*) from engine.learners) <> 0 then
+    raise exception '폐기된 계정이 iat 없는 주장으로 통과했다 — 모르면 막아야 한다';
+  end if;
+end
+$rls$;
+reset role;
+
+-- 되돌리면 다시 보여야 한다 — 「전부 잠갔다」로 초록이 나는 것을 막는 반대편 눈이다.
+update engine.learners set revoked_before = null where auth_user_id = :'uid1';
+select set_config('request.jwt.claims',
+  json_build_object('sub', :'uid1', 'role', 'authenticated')::text, true);
+set local role authenticated;
+do $rls$
+begin
+  if (select count(*) from engine.learners) <> 1 then
+    raise exception '폐기를 풀었는데 자기 행이 안 보인다 — 폐기 판정이 너무 넓다';
+  end if;
+end
+$rls$;
+reset role;
+rollback;
+SQL
+
 if "${PSQL[@]}" -v uid1="$uid1" >"$TMP/write-denied.log" 2>&1 <<'SQL'
 begin;
 grant usage on schema engine to authenticated;
