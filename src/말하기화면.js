@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,10 +22,11 @@ import * as Speech from 'expo-speech';
 import { 색, 폰트, 모노트래킹 } from './테마';
 import { 머뭇거림추적, 발화문턱_DB, 다음호흡 } from '../lib/세호흡.js';
 import { 마이크준비, 마이크끄기 } from '../lib/마이크권한.js';
-import { 항목추가, 다음시도번호, 학습출석 } from '../lib/제출로그.js';
+import { 항목추가, 다음시도번호, 학습출석, 전송기록, 밀린것 } from '../lib/제출로그.js';
 import { 화면과제 } from '../lib/오늘과제.js';
 import { 로그읽기, 로그쓰기, 음성보관, 지속저장 } from './저장.js';
 import { 오늘과제받기 } from './과제API.js';
+import { 발화보내기 } from './제출API.js';
 import { 급수편지 } from '../contents/첫편지.js';
 
 /**
@@ -37,6 +39,28 @@ import { 급수편지 } from '../contents/첫편지.js';
 
 const 호흡라벨 = { 듣기: '듣기', 따라: '따라 말하기', 답하기: '답하기' };
 const 호흡번호 = { 듣기: '01', 따라: '02', 답하기: '03' };
+
+/* 앱이 **요청하는** 녹음 설정. 상수로 뺀 이유는 두 곳이 같은 것을 봐야 하기 때문이다 —
+ * 녹음기와 `capture_meta.app`(그때 무엇을 요청했나 · C0 §4-2). 인라인으로 두면 한쪽만 바뀐다.
+ *
+ * ⚠ **정본 규격은 PCM WAV 16kHz/mono 인데 이건 그게 아니다**(HIGH_QUALITY = m4a/AAC).
+ *   C0 §4-2 가 「설정을 안 바꾸면 조용히 압축본이 쌓인다」고 미리 적어 둔 그 상태다.
+ *   숨기지 않는다: 서버가 파일 헤더를 재서 `spec_violations` 로 **행마다** 남기고, 요청한 설정은
+ *   아래 `녹음요청()` 이 함께 실어 보낸다. 프리셋 교체는 실기기 2대 검사가 붙는 별도 칸이다.
+ */
+const 녹음설정 = { ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true };
+
+/** 요청한 설정을 **있는 그대로** 적는다 — 잰 값이 아니다(C0 §4-2 `capture_meta.app`). */
+const 녹음요청 = () => ({
+  platform: Platform.OS,
+  os_version: String(Platform.Version ?? ''),
+  extension: 녹음설정.extension ?? null,
+  sample_rate: 녹음설정.sampleRate ?? null,
+  channels: 녹음설정.numberOfChannels ?? null,
+  bit_rate: 녹음설정.bitRate ?? null,
+  // 🔴 AGC 를 끄라고 **요청한 적이 없다.** `false` 로 적으면 그 행이 「off 였다」는 거짓 증거가 된다.
+  agc_requested: null,
+});
 
 function 오늘() {
   const d = new Date();
@@ -58,6 +82,37 @@ export default function 말하기화면({ 급수 = 0, 토큰 = null }) {
   const [로그, set로그] = useState([]);
   const [오류, set오류] = useState(null); // 「모름」을 「정상」으로 바꾸지 않는다 — 실패는 글자로 보인다
   const [저장경고, set저장경고] = useState(!지속저장());
+  /* 🔑 로그의 **최신본은 ref 가 쥔다.** 전송은 배경에서 끝나므로, state 클로저로 쓰면
+   *   「보내는 동안 학생이 다시 녹음」한 경우 나중에 끝난 쪽이 앞선 항목을 통째로 덮는다. */
+  const 로그참조 = useRef([]);
+
+  /** 로그를 갱신하고 기기에 쓴다 — 최신본은 언제나 `로그참조` 다. */
+  const 로그갱신 = async (새로그) => {
+    로그참조.current = 새로그;
+    set로그(새로그);
+    try {
+      await 로그쓰기(새로그);
+    } catch (e) {
+      set오류('저장하지 못했어요: ' + String(e.message || e)); // 화면은 진행하되 실패를 숨기지 않는다
+    }
+  };
+
+  /**
+   * 항목 하나를 서버로 보내고 **결과를 그 항목에 적는다**(C0 §4-1).
+   * 🔴 실패를 조용히 두지 않는다 — 사유가 화면에 서고 로그에도 남는다. 조용하면 학생도 우리도
+   *   「말했으니 저장됐겠지」로 알고, 그 착각은 데이터가 없다는 걸 몇 주 뒤에 알게 만든다(P0 §4-1).
+   */
+  const 보내기 = async (항목) => {
+    let r;
+    try {
+      r = await 발화보내기(토큰, 항목);
+    } catch (e) {
+      // 예상 못한 실패는 **재시도 대상**이다 — 원인을 모르는 것을 「소용없다」로 접지 않는다.
+      r = { 오류: String((e && e.message) || e), 끝: false };
+    }
+    await 로그갱신(전송기록(로그참조.current, 항목.id, r));
+    if (r.오류) set오류(r.오류);
+  };
 
   useEffect(() => {
     let 살아있음 = true;
@@ -67,6 +122,7 @@ export default function 말하기화면({ 급수 = 0, 토큰 = null }) {
         const r = await 로그읽기();
         기록 = r.로그;
         if (!살아있음) return;
+        로그참조.current = 기록;
         set로그(기록);
         if (r.깨진줄 > 0) set오류(`저장된 기록 중 ${r.깨진줄}줄을 읽지 못했다`);
       } catch (e) {
@@ -102,6 +158,14 @@ export default function 말하기화면({ 급수 = 0, 토큰 = null }) {
       } catch (e) {
         if (살아있음) set오류('소리를 준비하지 못했어요: ' + String(e.message || e));
       }
+
+      /* 🔑 **밀린 것을 여기서 올린다** — 몽골 회선에서 제출 순간 전송이 실패하는 것은 예외가
+       *   아니라 상시다. 재시도가 없으면 그 발화는 기기에만 남고, 앱을 지우는 날 사라진다.
+       *   순서 그대로 보낸다(각 항목이 자기 `task_meta` 를 들고 있어 며칠 밀려도 정확하다). */
+      for (const e of 밀린것(기록)) {
+        if (!살아있음) return;
+        await 보내기(e);
+      }
     })();
     return () => {
       살아있음 = false;
@@ -111,13 +175,16 @@ export default function 말하기화면({ 급수 = 0, 토큰 = null }) {
   const 편지 = 과제 ? 과제.편지 : 폴백;
 
   const 기록추가 = async (항목입력) => {
-    const { 로그: 새로그 } = 항목추가(로그, 항목입력);
-    set로그(새로그);
-    try {
-      await 로그쓰기(새로그);
-    } catch (e) {
-      set오류('저장하지 못했어요: ' + String(e.message || e)); // 화면은 진행하되 실패를 숨기지 않는다
-    }
+    const { 로그: 새로그, 항목 } = 항목추가(로그참조.current, {
+      ...항목입력,
+      // 그때 서버가 준 봉투 재료와 그때 요청한 녹음 설정을 **항목이 들고 간다**(C0 §4-1 · §4-2).
+      task_meta: 과제 ? 과제.제출재료 : null,
+      capture_app: 녹음요청(),
+    });
+    await 로그갱신(새로그);
+    /* 🔑 **전송을 기다리지 않는다.** 업로드는 회선에 따라 수 초가 걸리고, 기다리면 「다시 말하기」를
+     *   누른 학생 앞에서 화면이 멈춘다. 기기 저장은 이미 끝났으니 데이터는 그 사이에도 안전하다. */
+    보내기(항목);
     return 새로그;
   };
 
@@ -253,7 +320,7 @@ function 듣기카드({ 편지, 라벨 = '편지가 왔어요', 다음 }) {
 
 /* ── ②③ 녹음 — 코랄이 사는 유일한 곳 ── */
 function 녹음카드({ step, 제시문, 안내, 선택지, 텍스트병기, date, 로그, 기록추가, 완료, prompt_id }) {
-  const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
+  const recorder = useAudioRecorder(녹음설정);
   const rState = useAudioRecorderState(recorder, 100);
   const [단계, set단계] = useState('대기'); // 대기 | 녹음중 | 확인 | 무발화
   const [녹음, set녹음] = useState(null); // { uri, duration_ms, hesitation_ms, spoke }

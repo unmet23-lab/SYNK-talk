@@ -4,7 +4,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { 발화문턱_DB, 머뭇거림추적, 호흡순서, 다음호흡 } = require('../lib/세호흡.js');
-const { 다음시도번호, 항목추가, 직렬화, 역직렬화, 학습출석 } = require('../lib/제출로그.js');
+const { 다음시도번호, 항목추가, 직렬화, 역직렬화, 학습출석, 전송기록, 밀린것 } = require('../lib/제출로그.js');
 
 // ── 머뭇거림 (설계 §5 — 퀴즈 확신도의 대체물) ──────────────────
 
@@ -127,4 +127,52 @@ test('학습 출석 = 답하기 submitted (설계 §2)', () => {
   r = 항목추가(r.로그, { ...기본, step: '답하기' });
   assert.equal(학습출석(r.로그, '2026-08-03'), true);
   assert.equal(학습출석(r.로그, '2026-08-04'), false);
+});
+
+// ── 서버 전송 상태 (S1-b 쓰기 절반 · C0 §4-1) ─────────────────────
+// 이 로그가 사실상 오프라인 큐다. 세 칸이 각각 다른 사실을 지므로 합칠 수 없다.
+
+/* 🔴 오늘 재료로 3일 밀린 항목을 보내면 **어제 발화가 오늘 과제에 붙는다** — 오류 없이,
+ *   조회할 때에야 어긋나 보인다. 그래서 봉투 재료는 항목이 자기 것을 들고 간다(C0 §4-1). */
+test('항목이 그때의 봉투 재료와 녹음 설정을 들고 간다', () => {
+  const 재료 = { task_ref: 'task-2026-08-03', level_snapshot: 'Lv2' };
+  const { 항목 } = 항목추가([], { ...기본, task_meta: 재료, capture_app: { platform: 'ios' } });
+  assert.deepEqual(항목.task_meta, 재료);
+  assert.equal(항목.capture_app.platform, 'ios');
+  // 안 넘기면 null 이다 — `{}` 로 채우면 「재료가 있다」와 「없다」가 같은 모양이 된다.
+  assert.equal(항목추가([], 기본).항목.task_meta, null);
+});
+
+test('새 항목은 아직 서버에 닿지 않은 상태로 선다', () => {
+  const { 항목 } = 항목추가([], 기본);
+  assert.equal(항목.event_id, null);
+  assert.equal(항목.send_error, null);
+  assert.equal(항목.send_final, false);
+});
+
+test('전송기록은 그 항목만 고친다 — 나머지는 글자 하나 안 바뀐다', () => {
+  let r = 항목추가([], 기본);
+  r = 항목추가(r.로그, { ...기본, step: '답하기' });
+  const 앞 = JSON.stringify(r.로그[0]);
+  const 새 = 전송기록(r.로그, r.로그[1].id, { event_id: 'e-1' });
+  assert.equal(JSON.stringify(새[0]), 앞, '남의 항목이 바뀌었다 — 데이터 파괴');
+  assert.equal(새[1].event_id, 'e-1');
+  assert.notEqual(새, r.로그, '원본 배열을 그대로 돌려주면 화면이 갱신을 못 본다');
+});
+
+/* 🔴 계약 위반은 100번 보내도 계약 위반이다. `send_final` 이 없으면 그 항목이 앱을 열 때마다
+ *   재전송돼 몽골 모바일 회선을 태우고, 실패는 매번 같은 자리에서 난다. */
+test('밀린 것 = 아직 안 닿았고 다시 보낼 값이 있는 것 — 순서 그대로', () => {
+  let r = 항목추가([], 기본);                                   // ① 보낼 것
+  r = 항목추가(r.로그, { ...기본, step: '답하기' });              // ② 이미 닿음
+  r = 항목추가(r.로그, { ...기본, step: '답하기' });              // ③ 영구 실패
+  let 로그 = 전송기록(r.로그, r.로그[1].id, { event_id: 'e-1' });
+  로그 = 전송기록(로그, r.로그[2].id, { 오류: '계약 위반', 끝: true });
+
+  assert.deepEqual(밀린것(로그).map((e) => e.id), [r.로그[0].id]);
+
+  // 재시도 가능한 실패는 다시 대상이 된다 — 사유는 남기되 포기하지 않는다.
+  const 재시도 = 전송기록(로그, r.로그[0].id, { 오류: '인터넷 연결을 확인해 주세요' });
+  assert.deepEqual(밀린것(재시도).map((e) => e.id), [r.로그[0].id]);
+  assert.equal(재시도[0].send_error, '인터넷 연결을 확인해 주세요', '사유 없이 실패하면 원인이 안 남는다');
 });

@@ -62,3 +62,36 @@ export async function 음성보관(uri, 이름) {
   src.copy(dst); // move 가 아니라 copy — 레코더의 임시 파일 수명은 레코더에게 맡긴다
   return dst.uri;
 }
+
+/**
+ * 파일 바이트 수 — `uploads/sign` 이 `byte_size` 를 요구한다(C0 §4-2).
+ * 없거나 못 읽으면 `null`. 🔴 0 이나 추정값을 돌려주지 않는다 — 서명은 나오는데 올라간 것이
+ * 다른 크기면, 그 어긋남은 아무 데도 안 남고 나중에 「업로드가 왜 실패하지」로만 보인다.
+ */
+export async function 음성크기(경로) {
+  if (웹 || !경로) return null;
+  try {
+    const f = new FS.File(경로);
+    return f.exists ? f.size ?? null : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 서명 URL 로 파일을 **그대로** 올린다(PUT · C0 §4-2).
+ * 🔑 `fetch` 에 바이트를 실어 보내지 않는다 — 25MB 상한짜리 녹음을 통째로 메모리에 올리면
+ *   저가 안드로이드에서 그 순간 앱이 죽고, 증상은 「제출하면 꺼져요」가 된다.
+ *   `File.upload` 는 네이티브가 스트리밍으로 보낸다(기본 `BINARY_CONTENT`).
+ */
+export async function 음성올리기(경로, url, content_type) {
+  if (웹) throw new Error('이 기기에서는 녹음 파일을 올릴 수 없어요 — 앱에서 해주세요');
+  const r = await new FS.File(경로).upload(url, {
+    httpMethod: 'PUT',
+    headers: { 'Content-Type': content_type },
+  });
+  // 2xx 가 아니면 던진다 — `upload` 는 4xx·5xx 도 **정상 resolve** 한다(그게 이 API 의 규약이다).
+  if (r.status < 200 || r.status >= 300) {
+    throw new Error(`업로드 실패 HTTP ${r.status} — ${String(r.body || '').slice(0, 120)}`);
+  }
+}

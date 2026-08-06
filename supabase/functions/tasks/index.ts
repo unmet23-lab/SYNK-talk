@@ -108,7 +108,8 @@ Deno.serve(async (req: Request) => {
      *   붙어 있다. 시각·순서로 잇지 않는다 — 그건 하루 2건이 서는 날 조용히 어긋난다. */
     const 행들 = await sql`
       select e.event_id as task_id, e.degraded, e.intervention_id,
-             s.task_snapshot, s.task_format,
+             s.task_snapshot, s.task_format, s.task_ref,
+             e.level_snapshot, e.goal_snapshot,
              개입.payload->>'output_text' as output_text
         from engine.learning_events e
         join engine.submissions s on s.event_id = e.event_id
@@ -123,10 +124,20 @@ Deno.serve(async (req: Request) => {
          and (e.occurred_at at time zone 'Asia/Ulaanbaatar')::date = ${날짜}::date
        order by e.occurred_at desc`;
 
+    /* 🔑 `task_ref`·`level_snapshot`·`goal_snapshot` 은 **되돌려 주려고** 싣는다(C0 §4-1).
+     *   셋 다 제출 사건의 필드인데 **앱이 채우는 칸**이다 — 그때 화면이 알던 값을 그때 적는 것이
+     *   유일하게 정확하기 때문이다(3일 전 오프라인 제출을 오늘 올리면 서버의 현재 급수는 그때 급수가
+     *   아니다). 문제는 앱이 그 값을 **알 길이 없었다**는 것이다: 급수는 로그인 응답에도 없고,
+     *   `task_ref` 는 배치의 작명 규칙(`task-{날짜}`)이라 앱이 지어내면 그건 규칙의 사본이다.
+     *   🔴 사본은 배치가 규칙을 바꾸는 날 조용히 갈라지고, 증상은 **제출이 큐와 안 이어지는 것**
+     *   뿐이라 어디에도 오류로 안 남는다. 그래서 배정 행의 값을 그대로 실어 보내고 앱은 되돌린다. */
     const data = 행들.map((r: Record<string, unknown>) => ({
       task_id: r.task_id,
+      task_ref: r.task_ref,
       task_snapshot: r.task_snapshot,
       task_format: r.task_format,          // 🔴 배정 행은 비어 있다 — 형식은 호흡마다다(P0 §2-1)
+      level_snapshot: r.level_snapshot ?? null,
+      goal_snapshot: r.goal_snapshot ?? null,
       degraded: r.degraded,
       intervention: r.intervention_id
         ? { intervention_id: r.intervention_id, output_text: r.output_text ?? null }
