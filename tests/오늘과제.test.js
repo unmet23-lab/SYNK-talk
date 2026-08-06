@@ -285,3 +285,30 @@ test('내용물이 하나도 없으면 검증이 막는다 — 빈 제출 행을
   const e = 제출사건(항목({ audio: null, text: null }));
   assert.equal(검증(e, 계약).ok, false);
 });
+
+/* ── 한 앉음을 묶는 고리 (P0 §3-1 ④) ────────────────────────────────
+ * 「②와 ③이 같은 세션에서 쌍으로 저장된다」는 **그 순간에만** 알 수 있다. 안 실어 보내면
+ * 나중에 남는 근거가 `task_ref`(그날 배정)뿐인데, 그건 아침에 ②·저녁에 ③ 을 낸 날과
+ * 한 흐름으로 낸 날을 같은 모양으로 만든다 — 소급 복구가 안 된다. */
+const 흐름값 = '1f0c9c1e-6a2d-4c3b-8f11-2b7a5d9e0c44';
+
+test('②③이 한 흐름이면 correlation_id 가 같고 task_format 은 다르다', () => {
+  const 쌍 = ['따라', '답하기'].map((step) =>
+    제출사건(항목({ step, id: `${날짜}-${step}-1`, correlation_id: 흐름값 }), `voice/x/${step}.m4a`));
+  assert.equal(쌍[0].correlation_id, 흐름값);
+  assert.equal(쌍[1].correlation_id, 흐름값);
+  assert.notEqual(쌍[0].submission.task_format, 쌍[1].submission.task_format);
+  for (const e of 쌍) assert.ok(검증(e, 계약).ok, 검증(e, 계약).오류들.join(' · '));
+});
+
+/* 무발화도 그 앉음의 일부다 — 빼면 「두 번 막히고 세 번째에 말했다」가 흐름 밖으로 흩어지고,
+ * 이탈 예측(S1-6)이 보는 것이 「막힌 앉음」이 아니라 「막힌 학생」이 된다. */
+test('무발화(session.abandoned)도 같은 흐름을 든다', () => {
+  const e = 제출사건(항목({ status: 'abandoned', audio: null, correlation_id: 흐름값 }));
+  assert.equal(e.correlation_id, 흐름값);
+  assert.ok(검증(e, 계약).ok);
+});
+
+test('흐름이 없으면 null 로 나간다 — 없던 앉음을 지어내지 않는다', () => {
+  assert.equal(제출사건(항목(), 'voice/x/1.m4a').correlation_id, null);
+});

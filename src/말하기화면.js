@@ -22,7 +22,7 @@ import * as Speech from 'expo-speech';
 import { 색, 폰트, 모노트래킹 } from './테마';
 import { 머뭇거림추적, 발화문턱_DB, 다음호흡 } from '../lib/세호흡.js';
 import { 마이크준비, 마이크끄기 } from '../lib/마이크권한.js';
-import { 항목추가, 다음시도번호, 학습출석, 전송기록, 밀린것, 배달상태 } from '../lib/제출로그.js';
+import { 흐름id, 항목추가, 다음시도번호, 학습출석, 전송기록, 밀린것, 배달상태 } from '../lib/제출로그.js';
 import { 화면과제 } from '../lib/오늘과제.js';
 import { 로그읽기, 로그쓰기, 음성보관, 지속저장 } from './저장.js';
 import { 오늘과제받기 } from './과제API.js';
@@ -174,12 +174,23 @@ export default function 말하기화면({ 급수 = 0, 토큰 = null }) {
 
   const 편지 = 과제 ? 과제.편지 : 폴백;
 
+  /* 한 앉음 = 한 `correlation_id` (P0 §3-1 ④). ②따라와 ③답하기, 그 사이 재시도·무발화까지
+   * 같은 값을 든다 — 이 화면이 곧 「한 흐름」이라 그 경계를 아는 곳은 여기뿐이다(서버는 못 안다).
+   * 🔑 날짜가 바뀌면 새 흐름이다: 앱을 켠 채 자정을 넘긴 학생의 어제와 오늘이 한 덩어리가
+   *   되지 않게. 반대로 같은 날 다시 열면 **새 앉음**이 맞다(마운트가 곧 그 경계다). */
+  const 흐름 = useRef({ date: null, id: null });
+  const 흐름잡기 = (그날) => {
+    if (흐름.current.date !== 그날) 흐름.current = { date: 그날, id: 흐름id() };
+    return 흐름.current.id;
+  };
+
   const 기록추가 = async (항목입력) => {
     const { 로그: 새로그, 항목 } = 항목추가(로그참조.current, {
       ...항목입력,
       // 그때 서버가 준 봉투 재료와 그때 요청한 녹음 설정을 **항목이 들고 간다**(C0 §4-1 · §4-2).
       task_meta: 과제 ? 과제.제출재료 : null,
       capture_app: 녹음요청(),
+      correlation_id: 흐름잡기(항목입력.date),
     });
     await 로그갱신(새로그);
     /* 🔑 **전송을 기다리지 않는다.** 업로드는 회선에 따라 수 초가 걸리고, 기다리면 「다시 말하기」를

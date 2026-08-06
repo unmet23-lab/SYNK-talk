@@ -3,8 +3,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
 const { 발화문턱_DB, 머뭇거림추적, 호흡순서, 다음호흡 } = require('../lib/세호흡.js');
-const { 다음시도번호, 항목추가, 직렬화, 역직렬화, 학습출석, 전송기록, 밀린것, 배달상태 } = require('../lib/제출로그.js');
+const { 흐름id, 다음시도번호, 항목추가, 직렬화, 역직렬화, 학습출석, 전송기록, 밀린것, 배달상태 } = require('../lib/제출로그.js');
 
 // ── 머뭇거림 (설계 §5 — 퀴즈 확신도의 대체물) ──────────────────
 
@@ -60,6 +62,44 @@ const 기본 = {
   threshold_db: 발화문턱_DB,
   created_at: '2026-08-03T12:00:00Z',
 };
+
+/* ── 한 앉음을 묶는 고리 (P0 §3-1 ④) ──────────────────────────────
+ * 🔑 서버는 이 칸의 **모양을 먼저** 본다(uuid 아니면 400 `retryable:false` — 그 발화는 다시
+ *   보내지지도 않는다). 그래서 판정 기준을 여기 베껴 적지 않고 **그 가드에서 읽어 온다** —
+ *   서버가 규칙을 조이면 이 검사가 따라 조여지고, 갈라지는 일이 없다. */
+const 서버모양 = (() => {
+  const 원문 = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'events', 'index.ts'), 'utf8');
+  const m = 원문.match(/const UUID = \/(.+?)\/([a-z]*);/);
+  assert.ok(m, 'functions/events 의 UUID 가드를 못 찾았다 — 이름이 바뀌었으면 이 검사가 헛돈다');
+  return new RegExp(m[1], m[2]);
+})();
+
+test('흐름id: 서버 uuid 가드를 통과한다 — 기기에 crypto 가 없어도', () => {
+  // 탐지력은 픽스처로 못박는다(버그가 아직 있을 것을 요구하지 않는다):
+  // 읽히는 키를 쓰고 싶어지는 자리라, 그게 실제로 막히는지 먼저 보인다.
+  assert.equal(서버모양.test(`submission:2026-08-03:따라:1`), false);
+  assert.equal(서버모양.test('1f0c9c1e6a2d4c3b8f112b7a5d9e0c44'), false, '하이픈 없는 32자도 uuid 가 아니다');
+
+  const 값 = 흐름id();
+  assert.ok(서버모양.test(값), `uuid 가 아니다: ${값}`);
+  assert.notEqual(값, 흐름id(), '두 앉음이 같은 값을 들면 남의 발화가 내 흐름에 묶인다');
+});
+
+/* 이 로그가 곧 오프라인 큐다 — 3일 뒤에 올라가는 항목이 있다. 보낼 때 「지금 흐름」을 붙이면
+ * 그 항목이 남의 앉음에 묶이고, 오류 없이 조회할 때에야 어긋나 보인다. */
+test('흐름은 항목이 들고 간다 — 같은 앉음의 ②③이 한 값을 든다', () => {
+  const 흐름 = 흐름id();
+  let r = 항목추가([], { ...기본, correlation_id: 흐름 });
+  r = 항목추가(r.로그, { ...기본, step: '답하기', correlation_id: 흐름 });
+  assert.equal(r.로그[0].correlation_id, 흐름);
+  assert.equal(r.로그[1].correlation_id, 흐름);
+
+  // 왕복(직렬화→역직렬화)에서 살아남아야 오프라인 큐에서 의미가 있다.
+  assert.equal(역직렬화(직렬화(r.로그)).로그[1].correlation_id, 흐름);
+
+  // 안 주면 지어내지 않는다 — 옛 판 항목이 큐에 남아 있을 수 있다.
+  assert.equal(항목추가([], 기본).항목.correlation_id, null);
+});
 
 test('재시도는 attempt 를 올린 새 항목 — 이전 항목이 그대로 남는다', () => {
   let r = 항목추가([], 기본);

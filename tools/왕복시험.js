@@ -171,8 +171,30 @@ async function main() {
   확인('성공 2 · 거절 1', 배치.body.results?.filter((x) => x.status === 'stored').length === 2
     && 배치.body.results?.filter((x) => x.status === 'rejected').length === 1, 배치.body.results);
 
-  // ── ⑦ append-only — 저장된 학습 사건은 고칠 수도 지울 수도 없다
-  console.log('\n⑦ append-only');
+  /* ── ⑦ 한 앉음이 쌍으로 저장된다 (P0 §3-1 ④) ─────────────────────
+   *   앱이 조립까지는 맞게 해도, 그 값이 **행에 남았는가**는 DB 에서만 증명된다.
+   *   깨지면 증상이 조용하다: 두 행은 멀쩡히 저장되고 조회도 200 이라, ②낭독과 ③자유발화가
+   *   같은 90초에서 나온 쌍이라는 사실만 사라진다 — 그리고 그건 **소급 복구가 안 된다**
+   *   (`task_ref` 는 그날 배정이라 아침·저녁으로 나눠 낸 날과 구분이 안 되고, `occurred_at`
+   *   정렬은 C0 §4-1 이 「기기 시계는 못 믿는다」로 이미 근거에서 뺐다). */
+  console.log('\n⑦ 한 앉음(correlation_id)');
+  const 흐름 = crypto.randomUUID();
+  const 쌍 = await 부르기({ events: [
+    기본({ correlation_id: 흐름, submission: { task_ref: 'hw-리허설-1', task_format: '낭독', body_original: '어제 친구를 만났어요' } }),
+    기본({ correlation_id: 흐름, submission: { task_ref: 'hw-리허설-1', task_format: '자유발화', body_original: '저는 밥을 먹었어요' } }),
+  ] });
+  확인('둘 다 저장됐다', 쌍.body.results?.every((x) => x.status === 'stored'), 쌍.body.results);
+  const 묶임 = await sql(`select e.correlation_id::text c, s.task_format
+                            from engine.learning_events e join engine.submissions s on s.event_id = e.event_id
+                           where e.correlation_id = '${흐름}' order by s.task_format`);
+  확인('두 행이 같은 correlation_id 로 묶였다', 묶임.length === 2 && 묶임[0].c === 흐름 && 묶임[1].c === 흐름, 묶임);
+  확인('형식은 서로 다르다(낭독 ≠ 자유발화)', 묶임[0]?.task_format === '낭독' && 묶임[1]?.task_format === '자유발화', 묶임);
+  // uuid 가 아니면 400 이어야 한다 — 500 이면 `retryable` 이라 앱이 영구 오류를 무한 재시도한다.
+  const 나쁜흐름 = await 부르기({ events: [기본({ correlation_id: `submission:${new Date().toISOString().slice(0, 10)}:따라:1` })] });
+  확인('uuid 가 아니면 CONTRACT_VIOLATION(400 계열)', 나쁜흐름.body.results?.[0]?.error?.code === 'CONTRACT_VIOLATION', 나쁜흐름.body.results?.[0]);
+
+  // ── ⑧ append-only — 저장된 학습 사건은 고칠 수도 지울 수도 없다
+  console.log('\n⑧ append-only');
   for (const [이름, q] of [
     ['update 거부', `update engine.learning_events set level_snapshot='Lv9' where event_id='${첫?.event_id}'`],
     ['delete 거부', `delete from engine.learning_events where event_id='${첫?.event_id}'`],
