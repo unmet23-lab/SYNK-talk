@@ -317,10 +317,15 @@ async function main() {
 
   /* 22 건을 심는다 — 쪽크기(20)를 **넘겨야** 커서가 실제로 선다. 안 넘기면 `next_cursor` 는
    * 언제나 null 이라 「커서가 있다」는 초록이 **미실행과 같은 모양**이 된다. */
+  /* 🔴 **2·3 번을 같은 시각에 겹쳐 둔다 — 그 둘이 정확히 쪽 경계에 선다.**
+   *   전부 다른 시각이면 커서가 `created_at` 하나뿐이어도 두 쪽이 멀쩡히 이어져서,
+   *   아래 「겹치지도 빠뜨리지도 않는다」가 **자기가 말하는 것을 못 재는 초록**이 된다.
+   *   겹쳐 두면 시각만 쓰는 커서는 경계의 한 건을 건너뛰고 총계가 22 에서 어긋난다. */
   await sql(`
     insert into engine.corrections (submission_id, actor_kind, corrected_text, error_tags, created_at, schema_ver)
     select '${A제출}'::uuid, 'ai', '고친 문장 ' || g, '{"조사:주격(이/가·은/는)"}'::text[],
-           '${어제날}T10:00:00Z'::timestamptz + (g || ' minutes')::interval, '${판}'
+           '${어제날}T10:00:00Z'::timestamptz
+             + ((case when g = 2 then 3 else g end) || ' minutes')::interval, '${판}'
       from generate_series(1, 21) g`);
   /* 뒤엣것은 **보여줄 것이 없는 행**이다(강사가 판정만 남긴 골든셋 행의 모양). 일부러 **가장
    * 최근**으로 심는다 — 필터가 죽으면 맨 앞에 빈 카드로 튀어나와 아래 정렬 검사까지 함께 빨개진다. */
