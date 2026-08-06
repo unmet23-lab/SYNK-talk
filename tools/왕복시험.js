@@ -3,7 +3,13 @@
 /**
  * 왕복시험 — `POST /v1/events` 의 보증을 **실제 DB 왕복으로** 증명한다.
  *
- *   node tools/왕복시험.js SYNK-T01 TK4Y-YGAK        # 리허설 대상
+ *   SUPABASE_PROJECT_REF=<리허설ref> node tools/왕복시험.js <student_code> <로그인코드>
+ *
+ * ⚠ **`.env` 의 `SUPABASE_PROJECT_REF` 는 운영(`Synk Core`)을 가리킨다** — 안 덮으면 아래 게이트가
+ *   거부한다(옳게 막힌다). 리허설 ref 의 정본은 `tests/앱환경변수.test.js`·`docs/배포_경로.md`.
+ * ⚠ 여기 **살아 있는 계정을 예시로 적지 않는다** — 로그인 코드는 화면에 1회뿐이고 첫 등록 판이
+ *   바뀌면 조용히 죽는다(2026-08-07 에 옛 예시가 그렇게 죽어 한 세션이 헛돌았다).
+ *   새로 뽑는다: `node tools/로그인코드발급.js SYNK-T0N --적용`
  *
  * ■ 왜 이게 필요한가
  *   쓰기 통로의 보증(멱등·동의 게이트·위조 거부·제출물 연결)은 **전부 DB 안에서** 성립한다.
