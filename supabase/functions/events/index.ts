@@ -36,8 +36,9 @@ const { 버킷, 경로검사 } = 경로모듈 as {
   버킷: string;
   경로검사: (ref: string, learner_id: string) => { ok: boolean; 이유: string | null };
 };
-const { 헤더읽기 } = 헤더모듈 as {
+const { 헤더읽기, 파일없음 } = 헤더모듈 as {
   헤더읽기: (앞머리: Uint8Array, 전체바이트: number | null) => Record<string, unknown>;
+  파일없음: (status: number, 본문: string) => boolean;
 };
 
 const 최대건수 = 100;
@@ -131,12 +132,12 @@ async function 헤더측정(ref: string): Promise<Record<string, unknown>> {
       headers: { Authorization: `Bearer ${키}`, Range: `bytes=0-${앞머리바이트 - 1}` },
       signal: AbortSignal.timeout(측정제한밀리),
     });
-    if (r.status === 404) {
-      await r.body?.cancel().catch(() => {});
-      return 봉({ state: 'missing' });
-    }
     if (!r.ok) {
-      console.error('[events] 헤더 측정 실패', r.status, (await r.text()).slice(0, 200));
+      /* 🔴 없는 객체는 **404 가 아니라 400** 이고 404 는 본문 안에만 있다(2026-08-07 리허설 실측).
+       *   판정은 `lib/음성헤더.js` 가 진다 — 여기 적으면 리허설을 쏴야만 검증된다. */
+      const 글 = (await r.text()).slice(0, 300);
+      if (파일없음(r.status, 글)) return 봉({ state: 'missing' });
+      console.error('[events] 헤더 측정 실패', r.status, 글);
       return 봉({ state: 'unmeasured', reason: `storage_${r.status}` });
     }
     const 전체 = 총바이트(r);

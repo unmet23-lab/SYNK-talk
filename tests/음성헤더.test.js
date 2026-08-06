@@ -11,7 +11,11 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
-const { 정본, 헤더읽기 } = require('../lib/음성헤더.js');
+const { 정본, 헤더읽기, 파일없음 } = require('../lib/음성헤더.js');
+
+/* 2026-08-07 리허설에서 **실제로 받은** 본문 그대로. 지어낸 문자열로 재면 다음에 형식이 바뀌어도
+ * 회귀는 계속 초록이다 — 픽스처는 실측을 박제하는 자리다. */
+const 없음본문 = '{"statusCode":"404","error":"not_found","message":"Object not found","code":"NoSuchKey"}';
 
 const 청크 = (id, 본문) => {
   const h = Buffer.alloc(8);
@@ -146,6 +150,23 @@ test('망가진 청크 크기(0)에서 멈춘다 — 무한루프도 엉뚱한 �
   빈청크.write('junk', 0, 'ascii');            // size = 0
   const r = 헤더읽기(new Uint8Array(Buffer.concat([머리, 빈청크])), 20);
   assert.deepStrictEqual(r.spec_violations, ['unparsable']);
+});
+
+/* ── 파일 없음 판정 ────────────────────────────────────────────────────────
+ * 🔴 이 검사가 있는 이유가 실사고다: 초판은 `r.status === 404` 만 봤고, 리허설 왕복이
+ *   **「파일 없음」을 「일시 실패」로 적고 있는 것**을 잡았다. 상태 코드만으로는 안 갈린다. */
+test('🔴 없는 객체는 400 으로 온다 — 404 는 본문 안에만 있다(실측 픽스처)', () => {
+  assert.strictEqual(파일없음(400, 없음본문), true,
+    '상태 코드만 보면 「파일 없음」이 「일시 실패」에 섞이고, ingest 시점에 못 박는 능력이 사라진다');
+  assert.strictEqual(파일없음(404, ''), true, '진짜 404 도 없는 것이다');
+});
+
+test('🔴 400 밖은 「없다」로 접지 않는다 — 살아 있는 파일을 사라졌다고 적지 않는다', () => {
+  assert.strictEqual(파일없음(403, 없음본문), false, '권한 실패를 「없음」으로 적으면 반대 방향의 거짓말이다');
+  assert.strictEqual(파일없음(500, 없음본문), false);
+  assert.strictEqual(파일없음(400, '{"error":"invalid_jwt","message":"Invalid Compact JWS"}'), false,
+    '키가 틀린 것은 파일이 없는 것이 아니다 — 08-06 에 하루를 태운 그 실패다');
+  assert.strictEqual(파일없음(400, ''), false);
 });
 
 test('🔴 AGC 는 여기서 적지 않는다 — 헤더에 흔적이 없다(모르는 것을 안다고 쓰지 않는다)', () => {

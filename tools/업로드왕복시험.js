@@ -21,14 +21,14 @@ const die = (m) => { console.error(`[업로드왕복] ${m}`); process.exit(1); }
 
 const 자격증명 = require('../lib/자격증명.js');   // .env 읽기 + 토큰 만료 게이트(공용 통로)
 
-/** 16kHz·16bit·mono PCM WAV 한 조각 — 규격 정본(C0 §4-2)과 같은 모양으로 만든다. */
-function wav(샘플수 = 1600) {
-  const 데이터 = 샘플수 * 2;
+/** 16kHz·16bit·mono PCM WAV 한 조각 — 기본값이 규격 정본(C0 §4-2)과 같은 모양이다. */
+function wav(샘플수 = 1600, { 레이트 = 16000, 채널 = 1 } = {}) {
+  const 데이터 = 샘플수 * 2 * 채널;
   const b = Buffer.alloc(44 + 데이터);
   b.write('RIFF', 0); b.writeUInt32LE(36 + 데이터, 4); b.write('WAVE', 8);
   b.write('fmt ', 12); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20);
-  b.writeUInt16LE(1, 22); b.writeUInt32LE(16000, 24); b.writeUInt32LE(32000, 28);
-  b.writeUInt16LE(2, 32); b.writeUInt16LE(16, 34);
+  b.writeUInt16LE(채널, 22); b.writeUInt32LE(레이트, 24); b.writeUInt32LE(레이트 * 채널 * 2, 28);
+  b.writeUInt16LE(채널 * 2, 32); b.writeUInt16LE(16, 34);
   b.write('data', 36); b.writeUInt32LE(데이터, 40);
   return b;
 }
@@ -131,6 +131,69 @@ async function main() {
   잰다('확장자는 실제 그것으로 적는다(.wav 로 위장하지 않는다)', String(b4.audio_ref || '').endsWith('.m4a'), b4.audio_ref || '');
   const r5 = await 부르기({ kind: 'audio', content_type: 'audio/wav', byte_size: 100 }, 'c99');
   잰다('DB 보다 새 계약판은 거절한다', r5.status === 426, `HTTP ${r5.status}`);
+
+  /* ⑦ capture_meta.server — 서버가 **그 파일을 실제로 열어 재는가**(C0 §4-2 · P0 §10-A-5).
+   *   여기까지 와야 증명이 끝난다: 회귀는 헤더 파서만 재고, 「함수가 Storage 를 정말 읽는가」는
+   *   08-06 에 하루를 태운 자리다(서비스키가 Storage 에서 안 먹었고 증상은 「측정만 안 됨」뿐이었다).
+   *   그리고 읽어서 **행에 적히는 것**까지 봐야 한다 — jsonb 는 오류 없이 조용히 죽는 자리다. */
+  const 질의 = async (q) => {
+    const r = await fetch(`${API}/${ref}/database/query`, {
+      method: 'POST', headers: { ...헤더, 'Content-Type': 'application/json' }, body: JSON.stringify({ query: q }),
+    });
+    if (!r.ok) die(`질의 HTTP ${r.status} — ${(await r.text()).slice(0, 200)}`);
+    return r.json();
+  };
+
+  const 제출 = async (audio_ref) => {
+    const r = await fetch(`${base}/functions/v1/events`, {
+      method: 'POST',
+      headers: { apikey: anon, Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json', 'X-Contract-Ver': 'c7' },
+      body: JSON.stringify({
+        events: [{
+          idempotency_key: crypto.randomUUID(),
+          event_type: 'submission.created',
+          occurred_at: new Date().toISOString(),
+          level_snapshot: 'Lv1',
+          task_type: '발화녹음',
+          submission: { task_ref: 'rehearsal-capture', task_format: '낭독', audio_ref },
+        }],
+      }),
+    });
+    const b = await r.json();
+    const 한건 = b.results && b.results[0];
+    if (!한건 || 한건.status !== 'stored') {
+      return { 저장: false, 곁: `HTTP ${r.status} · ${JSON.stringify(한건 ?? b).slice(0, 200)}` };
+    }
+    const [행] = await 질의(`select capture_meta from engine.submissions where event_id = '${한건.event_id}'::uuid`);
+    return { 저장: true, server: (행 && 행.capture_meta && 행.capture_meta.server) || null };
+  };
+
+  const 정본잰것 = await 제출(b1.audio_ref);
+  잰다('정본 WAV 를 올리면 서버가 헤더를 실제로 잰다', 정본잰것.server?.state === 'measured',
+    정본잰것.저장 ? JSON.stringify(정본잰것.server ?? null).slice(0, 200) : 정본잰것.곁);
+  잰다('잰 값이 정본 규격 그대로다 — 멀쩡한 녹음을 위반으로 세지 않는다',
+    정본잰것.server?.sample_rate === 16000 && Array.isArray(정본잰것.server?.spec_violations)
+      && 정본잰것.server.spec_violations.length === 0,
+    `${정본잰것.server?.sample_rate}Hz · ${JSON.stringify(정본잰것.server?.spec_violations)}`);
+  잰다('AGC 는 모른다고 적는다 — 헤더에 흔적이 없다', 정본잰것.server?.agc_verified === 'unknown',
+    String(정본잰것.server?.agc_verified));
+
+  // ⑧ 규격 밖 — 「앱 프리셋이 조용히 바뀌었다」가 행에서 보여야 한다. 이게 이 열의 존재 이유다.
+  const s2 = await (await 부르기({ kind: 'audio', content_type: 'audio/wav', byte_size: 6444 })).json();
+  await fetch(s2.upload_url, { method: 'PUT', headers: { 'Content-Type': 'audio/wav' }, body: wav(1600, { 레이트: 44100, 채널: 2 }) });
+  const 밖잰것 = await 제출(s2.audio_ref);
+  잰다('규격 밖 녹음이 행에 규격 밖으로 적힌다', (밖잰것.server?.spec_violations || []).includes('sample_rate:44100')
+    && (밖잰것.server?.spec_violations || []).includes('channels:2'),
+    JSON.stringify(밖잰것.server?.spec_violations ?? null));
+
+  /* ⑨ 파일 없는 참조 — 서명만 받고 **올리지 않은** 자리. 두 가지를 동시에 잰다:
+   *   ①행은 저장된다(수집이 채점보다 우선 — Storage 사정으로 학생 발화를 버리지 않는다)
+   *   ②그런데 「파일이 없다」가 행에 남는다(안 남기면 나중에 「전사 실패」와 구분되지 않는다). */
+  const s3 = await (await 부르기({ kind: 'audio', content_type: 'audio/wav', byte_size: 3244 })).json();
+  const 없는것 = await 제출(s3.audio_ref);
+  잰다('파일이 없어도 행은 저장된다 — 수집이 채점보다 우선', 없는것.저장 === true, 없는것.곁 || '');
+  잰다('그리고 「파일 없음」이 행에 남는다', 없는것.server?.state === 'missing',
+    JSON.stringify(없는것.server ?? null).slice(0, 200));
 
   const 실패 = 결과.filter((r) => !r.통과);
   console.log(`\n[업로드왕복] ${결과.length - 실패.length}/${결과.length}`);
