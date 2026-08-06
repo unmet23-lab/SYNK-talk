@@ -25,16 +25,7 @@ const ROOT = path.resolve(__dirname, '..');
 const API = 'https://api.supabase.com/v1/projects';
 const die = (m) => { console.error('[왕복시험] ' + m); process.exit(1); };
 
-function env읽기() {
-  const p = path.join(ROOT, '.env');
-  if (!fs.existsSync(p)) return {};
-  const out = {};
-  for (const 줄 of fs.readFileSync(p, 'utf8').split(/\r?\n/)) {
-    const m = 줄.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
-    if (m) out[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
-  }
-  return out;
-}
+const 자격증명 = require('../lib/자격증명.js');   // .env 읽기 + 토큰 만료 게이트(공용 통로)
 
 let 통과 = 0, 실패 = 0;
 function 확인(이름, 조건, 실제) {
@@ -47,7 +38,7 @@ async function main() {
   const [code용학생, 평문코드] = args.filter((a) => !a.startsWith('--'));
   if (!code용학생 || !평문코드) die('사용: node tools/왕복시험.js <student_code> <로그인코드>');
 
-  const e = { ...env읽기(), ...process.env };
+  const e = 자격증명.읽기('왕복시험');
   const 토큰 = e.SUPABASE_ACCESS_TOKEN, ref = e.SUPABASE_PROJECT_REF;
   if (!토큰 || !ref) die('.env 에 SUPABASE_ACCESS_TOKEN·SUPABASE_PROJECT_REF 가 필요하다');
   const M = { Authorization: `Bearer ${토큰}`, 'Content-Type': 'application/json' };

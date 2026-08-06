@@ -25,20 +25,11 @@ const path = require('path');
 const API = 'https://api.supabase.com/v1/projects';
 const die = (m) => { console.error(`[스토리지키] ${m}`); process.exit(1); };
 
-function env읽기() {
-  const p = path.join(__dirname, '..', '.env');
-  if (!fs.existsSync(p)) return {};
-  const out = {};
-  for (const 줄 of fs.readFileSync(p, 'utf8').split(/\r?\n/)) {
-    const m = 줄.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
-    if (m) out[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
-  }
-  return out;
-}
+const 자격증명 = require('../lib/자격증명.js');   // .env 읽기 + 토큰 만료 게이트(공용 통로)
 
 async function main() {
   const 적용 = process.argv.includes('--적용');
-  const e = { ...env읽기(), ...process.env };
+  const e = 자격증명.읽기('스토리지키');
   const 토큰 = e.SUPABASE_ACCESS_TOKEN;
   const ref = e.SUPABASE_PROJECT_REF;
   if (!토큰 || !ref) die('.env 에 SUPABASE_ACCESS_TOKEN·SUPABASE_PROJECT_REF 가 필요하다');

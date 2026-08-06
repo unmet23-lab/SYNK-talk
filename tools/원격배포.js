@@ -24,17 +24,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const API = 'https://api.supabase.com/v1/projects';
 
-/** `.env` 를 읽는다 — `원격SQL.js` 와 같은 형식(같은 파일을 본다). */
-function env읽기() {
-  const p = path.join(ROOT, '.env');
-  if (!fs.existsSync(p)) return {};
-  const out = {};
-  for (const 줄 of fs.readFileSync(p, 'utf8').split(/\r?\n/)) {
-    const m = 줄.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
-    if (m) out[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
-  }
-  return out;
-}
+const 자격증명 = require('../lib/자격증명.js');   // .env 읽기 + 토큰 만료 게이트(공용 통로)
 
 const die = (msg) => { console.error('[원격배포] ' + msg); process.exit(1); };
 
@@ -47,12 +37,37 @@ const die = (msg) => { console.error('[원격배포] ' + msg); process.exit(1); 
  *
  * CJS(`module.exports`)를 Deno(ESM)에서 쓰려면 껍데기가 필요하다 — `.mjs` 로 동봉하면 감싼다.
  * 이름 목록을 여기 적지 않는다(적으면 그게 또 두 벌이다) — `export default module.exports`.
+ *
+ * 🔴 **lib 파일끼리의 `require('./옆.js')` 도 푼다.** 안 풀면 Deno 에 `require` 가 없어
+ *   **배포는 성공하고 import 시점에 죽는다** — 그 실패 모양이 이 파일이 이미 한 번 겪은 것이다.
+ *   피하려고 정본을 베끼면 갈라지고, 갈라지는 방향은 언제나 「통과」다(L0 §4-2 가 앱·서버에
+ *   같은 함수 하나를 쓰라고 못박은 이유). 그래서 **정적 import 로 바꿔 준다** — 그러려면
+ *   그 옆 파일도 동봉 표에 있어야 하고, 없으면 **여기서 멈춘다**(런타임까지 미루지 않는다).
  */
+const REQUIRE문 = /(?:const|let|var)\s+(\{[^}]*\}|[\w$]+)\s*=\s*require\(\s*'\.\/([^']+?)\.js'\s*\)\s*;?/g;
+
+function require풀기(src, 이름, 표내용) {
+  const 있는mjs = new Map(
+    Object.entries(표내용)
+      .filter(([n]) => n.endsWith('.mjs'))
+      .map(([n, p]) => [String(p).replace(/^.*\//, '').replace(/\.js$/, ''), n]),
+  );
+  return src.replace(REQUIRE문, (전체, 묶음, 파일명) => {
+    const 대상 = 있는mjs.get(파일명);
+    if (!대상) {
+      die(`동봉 ${이름}: \`require('./${파일명}.js')\` 를 풀 수 없다 — 그 파일이 동봉 표에 없다.\n`
+        + `       표에 "${파일명}.mjs": "lib/${파일명}.js" 를 더해라. 안 그러면 배포는 성공하고 함수가 import 에서 죽는다.`);
+    }
+    return `import ${묶음} from './${대상}';`;
+  });
+}
+
 function 동봉묶기(디렉터리) {
   const 표 = path.join(디렉터리, '동봉.json');
   if (!fs.existsSync(표)) return {};
+  const 표내용 = JSON.parse(fs.readFileSync(표, 'utf8'));
   const out = {};
-  for (const [이름, 저장소경로] of Object.entries(JSON.parse(fs.readFileSync(표, 'utf8')))) {
+  for (const [이름, 저장소경로] of Object.entries(표내용)) {
     let src;
     try {
       src = require('child_process')
@@ -66,7 +81,8 @@ function 동봉묶기(디렉터리) {
     }
     if (!이름.endsWith('.mjs')) out[이름] = src;                    // 그대로
     else if (저장소경로.endsWith('.json')) out[이름] = `export default ${src};\n`;  // JSON → ESM
-    else out[이름] = `const module = { exports: {} };\nconst exports = module.exports;\n${src}\nexport default module.exports;\n`;
+    // ⚠ `import` 는 호이스팅되므로 껍데기 뒤에 와도 된다 — 순서를 바꾸지 않는다(바꾸면 diff 가 커진다).
+    else out[이름] = `const module = { exports: {} };\nconst exports = module.exports;\n${require풀기(src, 이름, 표내용)}\nexport default module.exports;\n`;
   }
   return out;
 }
@@ -96,7 +112,7 @@ async function main() {
   const 적용 = args.includes('--적용');
   const 대상 = args.find((a) => !a.startsWith('--'));
 
-  const e = { ...env읽기(), ...process.env };
+  const e = 자격증명.읽기('원격배포');
   const 토큰 = e.SUPABASE_ACCESS_TOKEN;
   const ref = e.SUPABASE_PROJECT_REF;
   if (!토큰 || !ref) 안내();

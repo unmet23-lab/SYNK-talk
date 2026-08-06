@@ -32,17 +32,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const API = 'https://api.supabase.com/v1/projects';
 
-/** `.env` 를 읽는다. 없으면 빈 객체 — 도구가 안내문을 내고 멈춘다. */
-function env읽기() {
-  const p = path.join(ROOT, '.env');
-  if (!fs.existsSync(p)) return {};
-  const out = {};
-  for (const 줄 of fs.readFileSync(p, 'utf8').split(/\r?\n/)) {
-    const m = 줄.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
-    if (m) out[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
-  }
-  return out;
-}
+const 자격증명 = require('../lib/자격증명.js');   // .env 읽기 + 토큰 만료 게이트(공용 통로)
 
 /* 주석 안의 단어가 판정을 흔들지 않게 먼저 지운다 — 실제 SQL 에 `-- 학생=자기 행 insert` 같은
  * 설명이 있고, 그걸 그대로 세면 읽기 쿼리가 영원히 쓰기로 잡힌다. */
@@ -89,10 +79,11 @@ function 안내() {
 그 뒤로는 확인·적용·재확인이 전부 원격에서 돕니다.
 
 🔴 이 토큰의 범위를 알고 주십시오 — 좁힐 수단이 Supabase 쪽에 없습니다:
-   · 계정 전체 권한입니다. 지금은 프로젝트가 「synk talk」 하나뿐이라 실질 범위도 하나지만,
-     개원 전 운영 프로젝트를 만들면 **같은 토큰이 거기도 닿습니다.**
-   · 그래서 권한이 아니라 시간으로 가둡니다 — **작업이 끝나면 폐기해 주십시오**:
-     같은 화면(account/tokens)에서 그 토큰 줄의 [Revoke] 를 누르면 됩니다.
+   · 계정 전체 권한입니다. 지금 계정에는 프로젝트가 **둘**이고(운영 Synk Core · 리허설),
+     같은 토큰이 **둘 다**에 닿습니다 — 삭제까지 됩니다.
+   · 그래서 권한이 아니라 시간으로 가둡니다. 이건 이제 부탁이 아니라 **장치**입니다 —
+     \`.env\` 의 SUPABASE_TOKEN_EXPIRES 가 지나면 이 도구들이 멈추고 폐기 절차를 냅니다.
+     폐기는 같은 화면(account/tokens)에서 그 토큰 줄의 [Revoke] 입니다.
    · 폐기해도 이 도구는 안 망가집니다. 다음에 필요할 때 새로 발급하면 그대로 돕니다.`);
   process.exit(2);
 }
@@ -122,7 +113,7 @@ async function main() {
      유호님 승인을 받은 뒤: node tools/원격SQL.js ${파일} --적용`);
   }
 
-  const e = { ...env읽기(), ...process.env };
+  const e = 자격증명.읽기('원격SQL');
   const 토큰 = e.SUPABASE_ACCESS_TOKEN;
   const ref = e.SUPABASE_PROJECT_REF;
   if (!토큰 || !ref) 안내();

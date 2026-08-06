@@ -19,16 +19,7 @@ const { 경로검사 } = require('../lib/업로드경로.js');
 const API = 'https://api.supabase.com/v1/projects';
 const die = (m) => { console.error(`[업로드왕복] ${m}`); process.exit(1); };
 
-function env읽기() {
-  const p = path.join(__dirname, '..', '.env');
-  if (!fs.existsSync(p)) return {};
-  const out = {};
-  for (const 줄 of fs.readFileSync(p, 'utf8').split(/\r?\n/)) {
-    const m = 줄.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
-    if (m) out[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
-  }
-  return out;
-}
+const 자격증명 = require('../lib/자격증명.js');   // .env 읽기 + 토큰 만료 게이트(공용 통로)
 
 /** 16kHz·16bit·mono PCM WAV 한 조각 — 규격 정본(C0 §4-2)과 같은 모양으로 만든다. */
 function wav(샘플수 = 1600) {
@@ -52,7 +43,7 @@ async function main() {
   const [auth_user_id, learner_id] = process.argv.slice(2);
   if (!auth_user_id || !learner_id) die('사용: node tools/업로드왕복시험.js <auth_user_id> <learner_id>');
 
-  const e = { ...env읽기(), ...process.env };
+  const e = 자격증명.읽기('업로드왕복');
   const 토큰 = e.SUPABASE_ACCESS_TOKEN;
   const ref = e.SUPABASE_PROJECT_REF;
   if (!토큰 || !ref) die('.env 에 SUPABASE_ACCESS_TOKEN·SUPABASE_PROJECT_REF 가 필요하다');

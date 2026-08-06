@@ -27,16 +27,7 @@ const { 집합, 길이, 정규형, 표기형, 형식맞나, 이메일, 비밀번
 const ROOT = path.resolve(__dirname, '..');
 const die = (msg) => { console.error('[발급] ' + msg); process.exit(1); };
 
-function env읽기() {
-  const p = path.join(ROOT, '.env');
-  if (!fs.existsSync(p)) return {};
-  const out = {};
-  for (const 줄 of fs.readFileSync(p, 'utf8').split(/\r?\n/)) {
-    const m = 줄.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
-    if (m) out[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
-  }
-  return out;
-}
+const 자격증명 = require('../lib/자격증명.js');   // .env 읽기 + 토큰 만료 게이트(공용 통로)
 
 /** 계약 버전은 정본에서 읽는다 — 여기 박으면 계약이 올라갈 때 조용히 낡는다. */
 function 계약버전() {
@@ -98,7 +89,7 @@ async function main() {
     die(`학생 코드 형식이 아니다: ${student} (영숫자·하이픈·밑줄 1~32자)`);
   }
 
-  const e = { ...env읽기(), ...process.env };
+  const e = 자격증명.읽기('로그인코드발급');
   if (!e.SUPABASE_ACCESS_TOKEN || !e.SUPABASE_PROJECT_REF) {
     die('.env 에 SUPABASE_ACCESS_TOKEN·SUPABASE_PROJECT_REF 가 필요하다 (tools/원격SQL.js 안내 참조)');
   }
