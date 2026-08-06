@@ -13,6 +13,9 @@
 'use strict';
 const 자격증명 = require('../lib/자격증명.js');
 const { 이메일 } = require('../lib/학생계정.js');
+// 🔑 합성 도메인은 **정본에서 가져온다** — 여기 문자열로 박으면 도메인이 바뀌는 날 조용히
+//   갈라진다(`tests/로그인코드.test.js` 가 그 사본을 기계로 막는다).
+const { 도메인 } = require('../lib/로그인코드.js');
 
 const API = 'https://api.supabase.com/v1/projects';
 const die = (m) => { console.error('[인증왕복시험] ' + m); process.exit(1); };
@@ -51,7 +54,10 @@ async function main() {
   };
 
   const kr = await fetch(`${API}/${ref}/api-keys`, { headers: M });
-  const anon = JSON.parse(await kr.text()).find((k) => k.name === 'anon').api_key;
+  const 키들 = JSON.parse(await kr.text());
+  const anon = 키들.find((k) => k.name === 'anon').api_key;
+  // 원장 계정을 세우는 데만 쓴다(시험 판 깔기) — 함수를 부를 때는 절대 안 싣는다.
+  const 서비스키 = 키들.find((k) => k.name === 'service_role').api_key;
 
   const 부르기 = async (본문) => {
     const r = await fetch(`https://${ref}.supabase.co/functions/v1/auth/first-login`, {
@@ -132,11 +138,137 @@ async function main() {
     확인(잠긴뒤.status === 401, '🔴 뒷자리가 **맞아도** 잠긴 뒤에는 안 열린다');
     확인(!(await sql(`select auth_user_id from engine.learners where student_code='${학생번호}'`))[0].auth_user_id,
       '잠긴 채로는 계정이 안 생긴다');
+    console.log('\n⑦ 원장 초기화 — 임시번호는 GoTrue 가 아니라 해시로 산다 (L0 §4-2-2)');
+    // 판 다시 깔기: 등록된 학생 + 원장 직원 하나.
+    await sql(`update engine.learners set signup_attempts = 0 where student_code='${학생번호}'`);
+    const 재등록 = await 부르기({ student_code: 학생번호, phone_last4: 뒷자리, password: 새비번 });
+    확인(재등록.status === 200, '시험용 학생을 다시 등록했다');
+
+    /* 🔑 **원장은 만들고 지우지 않는다 — 재사용한다.**
+     *   `staff_access_log` 가 append-only(트리거)이고 `staff_id` FK 가 `on delete restrict` 라
+     *   **감사 행이 있는 직원은 지울 수 없다.** 그건 결함이 아니라 감사 무결성이 설계대로 도는
+     *   것이다(누가 무엇을 했는지가 사람 행보다 오래 살아야 한다). 지우려 들면 시험이
+     *   2회차부터 영원히 빨개진다 — 재실행 안 되는 시험은 한 번 쓰고 버리는 시험이다. */
+    const 원장이메일 = `probe-director${도메인}`;
+    const 원장비번 = 'Director-Rehearsal-1';
+    let 원장uid = (await sql(`select auth_user_id from engine.staff where display_name='리허설 원장'`))[0]?.auth_user_id;
+    if (!원장uid) {
+      const cr = await fetch(`https://${ref}.supabase.co/auth/v1/admin/users`, {
+        method: 'POST',
+        headers: { apikey: 서비스키, Authorization: `Bearer ${서비스키}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 원장이메일, password: 원장비번, email_confirm: true }),
+      });
+      원장uid = cr.ok
+        ? JSON.parse(await cr.text()).id
+        : (await sql(`select id from auth.users where email='${원장이메일}'`))[0]?.id;
+      if (!원장uid) die('리허설 원장 계정을 못 만들었다');
+      await sql(`insert into engine.staff(auth_user_id, role, display_name)
+                 values ('${원장uid}', 'director', '리허설 원장')
+                 on conflict (auth_user_id) do nothing`);
+    }
+    // 재사용이라 비밀번호가 갈렸을 수 있다 — 매번 맞춰 두면 회차가 서로를 안 깨뜨린다.
+    await fetch(`https://${ref}.supabase.co/auth/v1/admin/users/${원장uid}`, {
+      method: 'PUT',
+      headers: { apikey: 서비스키, Authorization: `Bearer ${서비스키}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: 원장비번 }),
+    });
+    const dr = await fetch(`https://${ref}.supabase.co/auth/v1/token?grant_type=password`, {
+      method: 'POST', headers: { apikey: anon, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 원장이메일, password: 원장비번 }),
+    });
+    const 원장토큰 = JSON.parse(await dr.text()).access_token;
+
+    const 초기화하기 = async (토큰, 본문) => {
+      const r = await fetch(`https://${ref}.supabase.co/functions/v1/auth/reset`, {
+        method: 'POST',
+        headers: { apikey: anon, Authorization: `Bearer ${토큰}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(본문),
+      });
+      return { status: r.status, body: JSON.parse((await r.text()) || '{}') };
+    };
+
+    확인((await 초기화하기(anon, { student_code: 학생번호 })).status === 401,
+      'anon 키로는 초기화가 안 된다(사람이 아니다)');
+    const 학생토큰 = JSON.parse(await (await fetch(`https://${ref}.supabase.co/auth/v1/token?grant_type=password`, {
+      method: 'POST', headers: { apikey: anon, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 이메일(학생번호), password: 새비번 }),
+    })).text()).access_token;
+    확인((await 초기화하기(학생토큰, { student_code: 학생번호 })).status === 403,
+      '🔴 학생 토큰으로는 초기화가 안 된다 — 역할은 서버가 표에서 확정한다');
+
+    // 🔑 **절대 개수로 재지 않는다** — 감사표는 append-only 라 앞 회차가 남아 있고,
+    //   `=1` 로 재면 2회차부터 영원히 빨개진다(왕복시험이 이미 밟은 함정이다). 증분으로 잰다.
+    const 감사전 = (await sql(`select count(*)::int c from engine.staff_access_log
+                                 where action='learner.password_reset'`))[0].c;
+    const 초기화 = await 초기화하기(원장토큰, { student_code: 학생번호 });
+    확인(초기화.status === 200 && /^\d{6}$/.test(String(초기화.body.temp_password || '')),
+      '원장 토큰으로 6자리 임시번호가 1회 나온다');
+    const 임시 = 초기화.body.temp_password;
+
+    const [보관] = await sql(`select temp_password_hash, temp_password_expires_at > now() as 살아있나
+                                from engine.learners where student_code='${학생번호}'`);
+    확인(!!보관.temp_password_hash && !String(보관.temp_password_hash).includes(임시),
+      '🔴 평문이 DB 에 없다 — 해시로만 있다');
+    확인(보관.살아있나 === true, '만료 시각이 미래로 찍혔다');
+    확인((await sql(`select count(*)::int c from engine.staff_access_log
+                      where action='learner.password_reset'`))[0].c === 감사전 + 1,
+      '감사가 정확히 1행 늘었다');
+    확인(!(await sql(`select count(*)::int c from engine.staff_access_log
+                       where target_ids::text like '%${임시}%' or action like '%${임시}%'`))[0].c,
+      '🔴 감사표에 평문 임시번호가 안 적혔다');
+
+    const 옛비번로그인 = await fetch(`https://${ref}.supabase.co/auth/v1/token?grant_type=password`, {
+      method: 'POST', headers: { apikey: anon, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 이메일(학생번호), password: 새비번 }),
+    });
+    확인(!옛비번로그인.ok, '🔴 초기화가 **옛 비밀번호도 죽였다**(아는 사람이 있어도 못 들어온다)');
+
+    const 임시로그인하기 = async (본문) => {
+      const r = await fetch(`https://${ref}.supabase.co/functions/v1/auth/temp-login`, {
+        method: 'POST',
+        headers: { apikey: anon, Authorization: `Bearer ${anon}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(본문),
+      });
+      return { status: r.status, body: JSON.parse((await r.text()) || '{}') };
+    };
+
+    확인((await 임시로그인하기({ student_code: 학생번호, temp_password: '000000', new_password: '아무거나12' })).status === 401
+      || 임시 === '000000', '틀린 임시번호는 막힌다');
+    const 최종비번 = 'Synk-After-Reset-1';
+    const 통과함 = await 임시로그인하기({ student_code: 학생번호, temp_password: 임시, new_password: 최종비번 });
+    확인(통과함.status === 200, '맞는 임시번호로 새 비밀번호가 선다');
+
+    const 새로그인 = await fetch(`https://${ref}.supabase.co/auth/v1/token?grant_type=password`, {
+      method: 'POST', headers: { apikey: anon, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 이메일(학생번호), password: 최종비번 }),
+    });
+    확인(새로그인.ok, '학생이 정한 새 비밀번호로 실제 로그인된다');
+
+    const 재사용 = await 임시로그인하기({ student_code: 학생번호, temp_password: 임시, new_password: '또다른비번1' });
+    확인(재사용.status === 401, '🔴 임시번호는 **1회용** — 같은 번호가 두 번 안 통한다');
+    const [뒤] = await sql(`select temp_password_hash, temp_password_expires_at
+                              from engine.learners where student_code='${학생번호}'`);
+    확인(!뒤.temp_password_hash && !뒤.temp_password_expires_at, '쓰고 나면 해시·만료가 지워진다');
+
+    console.log('\n⑧ 만료가 **참**인가 — 이 판이 존재하는 이유');
+    const 초기화2 = await 초기화하기(원장토큰, { student_code: 학생번호 });
+    await sql(`update engine.learners set temp_password_expires_at = now() - interval '1 minute'
+                where student_code='${학생번호}'`);
+    const 만료뒤 = await 임시로그인하기({
+      student_code: 학생번호, temp_password: 초기화2.body.temp_password, new_password: '만료테스트1',
+    });
+    확인(만료뒤.status === 401, '🔴 만료된 임시번호는 **맞아도** 안 통한다 — 30분이 장식이 아니다');
+
+    // 감사 행이 실제로 안 지워지는지도 재 둔다 — 이게 append-only 의 값이다.
+    let 감사삭제됨 = true;
+    try { await sql(`delete from engine.staff_access_log where staff_id is not null`); }
+    catch { 감사삭제됨 = false; }
+    확인(!감사삭제됨, '🔴 감사 행은 지워지지 않는다(append-only) — 그래서 원장도 못 지운다');
   } finally {
-    await 치우기();
+    await 치우기();   // 학생과 그 계정만 치운다. 원장은 감사가 물고 있어 남긴다(설계대로다).
   }
 
-  console.log(`\n[인증왕복시험] ✅ ${통과}/${통과} 통과 · 시험 학생과 계정은 지웠다`);
+  console.log(`\n[인증왕복시험] ✅ ${통과}/${통과} 통과 · 시험 학생·계정 정리 · 원장은 감사 때문에 존치`);
 }
 
 main().catch((err) => die(String((err && err.message) || err)));

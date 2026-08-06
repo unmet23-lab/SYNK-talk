@@ -7,6 +7,7 @@ const path = require('node:path');
 const ROOT = path.join(__dirname, '..');
 const MIGRATIONS_DIR = path.join(ROOT, 'supabase', 'migrations');
 const OUTPUT = path.join(ROOT, 'supabase', 'L0_스키마.sql');
+const CHECK_FILE = path.join(ROOT, 'supabase', '확인_적용후상태.sql');
 const FILE_NAME = /^\d{14}_.+_c\d+\.sql$/u;
 const CHECKSUM_SLOT = /'([0-9a-f]{64})'([;]?\s*--\s*migration-checksum\b)/g;
 const ZERO_CHECKSUM = '0'.repeat(64);
@@ -92,6 +93,22 @@ function assertByteIdentical(actual, expected, label = '합본') {
   );
 }
 
+/* 확인 쿼리는 **마지막 조각의 꼬리**가 정본이고 `supabase/확인_적용후상태.sql` 은 그 사본이다.
+ * 조각을 하나 올릴 때마다 사람이 손으로 옮겨 왔는데, 2026-08-06~07 에만 **네 번** 반복했고
+ * 한 번은 옮기는 걸 잊어 **정상 DB 가 ❌ 로 보고**됐다(기대 checksum 이 낡아서). 손으로 옮기는
+ * 자리는 다음번에 빠뜨리는 자리라, 합본을 만드는 그 자리에서 함께 파생시킨다.
+ * `tests/L0스키마.test.js` 의 대조는 그대로 둔다 — 파생이 죽어도 검사가 남아야 한다. */
+function syncCheckFile(bundle) {
+  const 꼬리 = bundle.toString('utf8');
+  const 시작 = 꼬리.lastIndexOf('with 기대열');
+  const 끝 = 꼬리.indexOf('*/', 시작);
+  if (시작 === -1 || 끝 === -1) throw new Error('마지막 조각에서 확인 쿼리 블록을 못 찾았다');
+  const 머리 = fs.readFileSync(CHECK_FILE, 'utf8').split('with 기대열')[0];
+  const 새것 = 머리 + 꼬리.slice(시작, 끝);
+  fs.writeFileSync(CHECK_FILE, 새것);
+  return 새것;
+}
+
 function generate({ check = false } = {}) {
   const bundle = concatenate();
   if (check) {
@@ -101,6 +118,7 @@ function generate({ check = false } = {}) {
   }
 
   fs.writeFileSync(OUTPUT, bundle);
+  syncCheckFile(bundle);
   return bundle;
 }
 
@@ -122,9 +140,11 @@ if (require.main === module) {
 }
 
 module.exports = {
+  CHECK_FILE,
   FILE_NAME,
   MIGRATIONS_DIR,
   OUTPUT,
+  syncCheckFile,
   assertByteIdentical,
   checksumInfo,
   concatenate,

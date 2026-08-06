@@ -1,4 +1,19 @@
-/* POST /v1/auth/first-login — 학생의 첫 등록 (L0 §4-1-1 · §4-2)
+/* POST /v1/auth/* — 학생 계정이 서고 되살아나는 통로 (L0 §4-1-1 · §4-2 · §4-2-2)
+ *
+ *   /first-login  학생의 첫 등록 (anon)
+ *   /reset        원장의 「비밀번호 초기화」 — 6자리 임시번호를 **1회** 낸다 (director 토큰)
+ *   /temp-login   학생이 그 번호로 들어와 새 비밀번호를 정한다 (anon)
+ *
+ * ■ 임시번호는 **GoTrue에 넣지 않는다**(유호님 확정 2026-08-07 「해시로 들고 있는 방식」)
+ *   넣으면 만료라는 개념이 없어 30분이 지나도 영원히 유효하고, `temp_password_expires_at`은
+ *   아무도 안 보는 장식이 된다 — 그건 **영구히 발급된 두 번째 비밀번호**다.
+ *   대신 우리가 **해시+만료로** 들고 있다가 `/temp-login`에서 검증한다. 우리 코드가 반드시
+ *   지나가므로 시각을 볼 수 있고, 그래서 30분이 **참**이 된다.
+ *   🔑 원장 화면 흐름(버튼 → 6자리 → 말로 전달)은 한 글자도 안 바뀐다.
+ *
+ * ■ 초기화는 **옛 비밀번호도 죽인다** — GoTrue 비밀번호를 아무도 모르는 난수로 갈아끼운다.
+ *   초기화가 필요한 현실적 사고는 「친구가 내 비번을 안다」이기도 한데, 옛 값을 살려 두면
+ *   그 경우에 초기화가 아무것도 안 한 것이 된다. 세션은 `revoked_before`가 함께 끊는다.
  *
  * ■ 이 함수가 존재하는 이유
  *   계정은 **첫 로그인 때 만든다**(유호님 확정 2026-08-06). 미리 만들면 그 순간 전달해야 할
@@ -64,20 +79,204 @@ const 게이트실패 = (ver: string) =>
     retryable: false,
   }, ver);
 
+const 관리자헤더 = () => ({
+  apikey: 서비스키,
+  Authorization: `Bearer ${서비스키}`,
+  'Content-Type': 'application/json',
+});
+
 /** GoTrue 관리자 API — PostgREST 가 아니라 Auth 통로라 `engine` 미노출과 무관하다. */
 async function 계정만들기(email: string, password: string) {
   const r = await fetch(`${AUTH}/admin/users`, {
     method: 'POST',
-    headers: {
-      apikey: 서비스키,
-      Authorization: `Bearer ${서비스키}`,
-      'Content-Type': 'application/json',
-    },
+    headers: 관리자헤더(),
     // `email_confirm: true` 는 대시보드의 「이메일 확인」 설정과 무관하게 확인된 계정을 만든다(§4-2 실측).
     body: JSON.stringify({ email, password, email_confirm: true }),
   });
   return { ok: r.ok, status: r.status, 본문: await r.text() };
 }
+
+async function 비밀번호갈기(uid: string, password: string) {
+  const r = await fetch(`${AUTH}/admin/users/${uid}`, {
+    method: 'PUT', headers: 관리자헤더(), body: JSON.stringify({ password }),
+  });
+  return { ok: r.ok, status: r.status, 본문: await r.text() };
+}
+
+/** 🔴 `Math.random()` 이 아니다 — 임시번호는 비밀이고, 예측 가능한 난수는 비밀이 아니다. */
+function 임시번호() {
+  const b = new Uint32Array(1);
+  crypto.getRandomValues(b);
+  return String(b[0] % 1_000_000).padStart(6, '0');
+}
+/** 초기화가 옛 비밀번호를 죽일 때 넣는, **아무도 모르는** 값. */
+function 아무도모르는값() {
+  const b = new Uint8Array(32);
+  crypto.getRandomValues(b);
+  return [...b].map((n) => n.toString(16).padStart(2, '0')).join('');
+}
+
+/** JWT 가운데 마디 — 서명 검증은 플랫폼이 이미 했다(verify_jwt). */
+function 토큰주장(req: Request): { sub: string; iat: number } | null {
+  const m = req.headers.get('Authorization')?.match(/^Bearer\s+(.+)$/i);
+  if (!m) return null;
+  const 마디 = m[1].split('.');
+  if (마디.length !== 3) return null;
+  try {
+    const p = JSON.parse(atob(마디[1].replace(/-/g, '+').replace(/_/g, '/')));
+    // anon 키도 유효한 JWT 라 verify_jwt 를 통과한다 — 그건 **사람이 아니다**(sub 가 없다).
+    if (typeof p.sub !== 'string' || !p.sub) return null;
+    return { sub: p.sub, iat: Number(p.iat) || 0 };
+  } catch {
+    return null;
+  }
+}
+
+async function 계약판읽기() {
+  const [판] = await sql`select name from engine.schema_migrations order by version desc limit 1`;
+  return String(판?.name ?? '').match(/_(c\d+)\.sql$/)?.[1] ?? '';
+}
+
+/** 임시번호가 사는 시간 (L0 §4-2-2). 이 값이 참이 되려면 우리 코드가 로그인 길목에 있어야 한다. */
+const 만료분 = 30;
+
+/* ── POST /auth/reset — 원장의 「비밀번호 초기화」 (L0 §4-2-2) ────────────────
+ * 🔴 **서버가 역할을 확정한다.** 클라이언트는 자기가 원장이라고 주장만 하고,
+ *   `service_role` 은 RLS 를 우회하므로 그 주장을 믿는 순간 아무나 남의 비밀번호를 초기화한다.
+ * 🔑 살아 있는지 판정은 `engine.session_alive()` **한 곳**에서 온다 — 토큰 주장을
+ *   `request.jwt.claims` 에 넣어 두면 RLS 가 쓰는 그 함수를 그대로 부를 수 있다.
+ *   여기서 조건을 다시 적으면 두 축이 갈라지고, 갈라지는 방향은 언제나 「통과」다.
+ */
+async function 초기화(req: Request, 본문: Record<string, unknown>) {
+  const ver = await 계약판읽기();
+  const 주장 = 토큰주장(req);
+  const 거부 = () => 실패(403, {
+    code: 'FORBIDDEN', message: '권한이 없습니다', retryable: false,
+  }, ver);
+  if (!주장) return 실패(401, { code: 'AUTH_REQUIRED', message: '로그인이 필요합니다', retryable: false }, ver);
+
+  const 학생번호 = String(본문.student_code ?? '');
+  if (!학생번호맞나(학생번호)) {
+    return 실패(400, {
+      code: 'CONTRACT_VIOLATION', field: 'student_code', retryable: false,
+      message: '학생번호 형식이 아닙니다',
+    }, ver);
+  }
+
+  const 코드 = 임시번호();
+
+  type 대상 = { learner_id: string; auth_user_id: string; student_code: string };
+  const 결과 = (await sql.begin(async (tx) => {
+    // 트랜잭션 안에서만 사는 주장(`true`) — 커넥션이 재사용돼도 남지 않는다.
+    await tx`select set_config('request.jwt.claims', ${JSON.stringify({ sub: 주장.sub, role: 'authenticated', iat: 주장.iat })}, true)`;
+    // ⚠ `current_staff()` 는 못 찾으면 **전 칸이 null 인 행 하나**를 낸다 — 「행이 없다」가 아니다.
+    //   그래서 존재가 아니라 **role 값**을 본다(행 유무만 보면 아무나 통과한다).
+    const [직원] = await tx`select staff_id, role from engine.current_staff()`;
+    if (!직원 || 직원.role !== 'director') return null;
+
+    const [학생] = await tx`
+      update engine.learners
+         set temp_password_hash = extensions.crypt(${코드}, extensions.gen_salt('bf')),
+             temp_password_expires_at = now() + ${`${만료분} minutes`}::interval,
+             signup_attempts = 0,
+             revoked_before = now()
+       where upper(replace(student_code, '-', '')) = ${정규화(학생번호)}
+         and auth_user_id is not null
+      returning learner_id, auth_user_id, student_code`;
+    if (!학생) return null;
+
+    // 🔴 평문 임시번호는 **적지 않는다** — 감사표 하나가 다수 계정이 되면 안 된다.
+    await tx`
+      insert into engine.staff_access_log(staff_id, action, target_ids)
+      values (${직원.staff_id}, 'learner.password_reset', ${[학생.learner_id]}::uuid[])`;
+
+    return 학생;
+  })) as 대상 | null;
+
+  // 🔑 「원장이 아니다」와 「그런 학생이 없다」를 **가르지 않는다** — 가르면 원장 아닌 토큰으로
+  //    학생번호의 실재 여부를 훑을 수 있다. 둘 다 403 이다.
+  if (!결과) return 거부();
+
+  /* 🔴 **옛 비밀번호도 죽인다.** 초기화가 필요한 현실적 사고 중 하나는 「누가 내 비번을 안다」인데,
+   *   옛 값을 살려 두면 그 경우 초기화가 아무것도 안 한 것이 된다. 아무도 모르는 값으로 갈아끼운다 —
+   *   이제 이 계정을 여는 길은 임시번호(우리 검증)뿐이다. */
+  const 갈기 = await 비밀번호갈기(결과.auth_user_id, 아무도모르는값());
+  if (!갈기.ok) {
+    console.error('[auth] 초기화 — 옛 비밀번호 무효화 실패', 갈기.status, 갈기.본문.slice(0, 200));
+    return 실패(500, { code: 'SERVER_ERROR', message: '잠시 뒤 다시 시도해 주세요', retryable: true }, ver);
+  }
+
+  return 봉투(200, {
+    ok: true,
+    student_code: 결과.student_code,
+    temp_password: 코드,            // 🔴 화면이 1회 보여주고 끝. 저장·전달 금지(L0 §4-2-2 ⚠).
+    expires_in_minutes: 만료분,
+  }, ver);
+}
+
+/* ── POST /auth/temp-login — 학생이 임시번호로 들어와 새 비밀번호를 정한다 ──── */
+async function 임시로그인(본문: Record<string, unknown>) {
+  const ver = await 계약판읽기();
+  const 학생번호 = String(본문.student_code ?? '');
+  const 임시 = String(본문.temp_password ?? '');
+  const 새비번 = typeof 본문.new_password === 'string' ? 본문.new_password : '';
+
+  const 규격 = 비번규격(새비번, ver);
+  if (규격) return 규격;
+  if (!학생번호맞나(학생번호)) return 게이트실패(ver);
+
+  const [학생] = await sql`
+    select learner_id, auth_user_id, signup_attempts,
+           temp_password_hash is not null
+             and temp_password_expires_at > now()
+             and temp_password_hash = extensions.crypt(${임시}, temp_password_hash) as 맞나
+      from engine.learners
+     where upper(replace(student_code, '-', '')) = ${정규화(학생번호)}`;
+
+  // 없는 번호 · 초기화된 적 없음 · 만료 · 틀림 · 잠김 — **전부 같은 응답**이다(§4-1-1 ③과 같은 축).
+  if (!학생 || !학생.auth_user_id) return 게이트실패(ver);
+  if (Number(학생.signup_attempts) >= 시도상한) return 게이트실패(ver);
+  if (!학생.맞나) {
+    // 🔴 세지 않으면 6자리(100만 가지)를 만료 전까지 마음껏 대입할 수 있다.
+    await sql`update engine.learners set signup_attempts = signup_attempts + 1
+               where learner_id = ${학생.learner_id}`;
+    return 게이트실패(ver);
+  }
+
+  const 갈기 = await 비밀번호갈기(String(학생.auth_user_id), 새비번);
+  if (!갈기.ok) {
+    console.error('[auth] 임시로그인 — 비밀번호 설정 실패', 갈기.status, 갈기.본문.slice(0, 200));
+    return 실패(500, { code: 'SERVER_ERROR', message: '잠시 뒤 다시 시도해 주세요', retryable: true }, ver);
+  }
+
+  // 🔴 **1회용이다** — 쓰고 나면 지운다. 안 지우면 만료까지 계속 되는 두 번째 비밀번호가 된다.
+  await sql`
+    update engine.learners
+       set temp_password_hash = null, temp_password_expires_at = null, signup_attempts = 0
+     where learner_id = ${학생.learner_id}`;
+
+  return 봉투(200, { ok: true }, ver);
+}
+
+/** 비밀번호 규격 — 통과하면 null. 게이트와 **별개로** 알려준다(본인이 방금 정한 값이다). */
+function 비번규격(비밀번호: string, ver: string) {
+  if (비밀번호.length < 최소비번) {
+    return 실패(400, {
+      code: 'PASSWORD_TOO_SHORT', field: 'password', retryable: false,
+      message: `비밀번호는 ${최소비번}자 이상으로 정해 주세요`,
+    }, ver);
+  }
+  if (new TextEncoder().encode(비밀번호).length > 최대비번바이트) {
+    return 실패(400, {
+      code: 'PASSWORD_TOO_LONG', field: 'password', retryable: false,
+      message: '비밀번호가 너무 깁니다 — 짧게 정해 주세요',
+    }, ver);
+  }
+  return null;
+}
+
+/** `student_code` 의 저장 형태는 우리 발급기가 낸 `SYNK-042` 하나뿐이라 정규화가 단순하다. */
+const 정규화 = (v: string) => v.trim().replace(/[-\s]/g, '').toUpperCase();
 
 Deno.serve(async (req: Request) => {
   let ver = '';
@@ -85,7 +284,9 @@ Deno.serve(async (req: Request) => {
     if (req.method !== 'POST') {
       return 실패(405, { code: 'CONTRACT_VIOLATION', message: 'POST 만 받는다', retryable: false }, ver);
     }
-    if (!new URL(req.url).pathname.replace(/\/+$/, '').endsWith('/first-login')) {
+    const 경로 = new URL(req.url).pathname.replace(/\/+$/, '');
+    const 갈래 = ['first-login', 'reset', 'temp-login'].find((g) => 경로.endsWith(`/${g}`));
+    if (!갈래) {
       return 실패(404, { code: 'NOT_FOUND', message: '없는 경로입니다', retryable: false }, ver);
     }
 
@@ -97,6 +298,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // 🔴 앱은 자기가 누구인지 본문에 적지 않는다(C0 §2). 적으면 그 자체가 계약 위반이다.
+    // ⚠ 세 갈래 **전부**에 건다 — 한 갈래만 열어 두면 그쪽이 우회로가 된다.
     for (const 금지 of ['learner_id', 'auth_user_id']) {
       if (금지 in 본문) {
         return 실패(400, {
@@ -106,30 +308,18 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    if (갈래 === 'reset') return await 초기화(req, 본문);
+    if (갈래 === 'temp-login') return await 임시로그인(본문);
+
     const 학생번호 = String(본문.student_code ?? '');
     const 뒷자리 = String(본문.phone_last4 ?? '');
     const 비밀번호 = typeof 본문.password === 'string' ? 본문.password : '';
 
-    // 비밀번호 규격은 **게이트와 별개로** 알려준다 — 이건 학생 본인이 방금 정한 값이라
-    // 알려줘도 새는 정보가 없고, 안 알려주면 「왜 안 되는지 모르는」 화면이 된다.
-    const 바이트 = new TextEncoder().encode(비밀번호).length;
-    if (비밀번호.length < 최소비번) {
-      return 실패(400, {
-        code: 'PASSWORD_TOO_SHORT', field: 'password', retryable: false,
-        message: `비밀번호는 ${최소비번}자 이상으로 정해 주세요`,
-      }, ver);
-    }
-    if (바이트 > 최대비번바이트) {
-      return 실패(400, {
-        code: 'PASSWORD_TOO_LONG', field: 'password', retryable: false,
-        message: '비밀번호가 너무 깁니다 — 짧게 정해 주세요',
-      }, ver);
-    }
+    const 규격 = 비번규격(비밀번호, ver);
+    if (규격) return 규격;
 
     // DB 계약판은 봉투용으로만 읽는다(게이트가 아니다).
-    const [판] = await sql`
-      select name from engine.schema_migrations order by version desc limit 1`;
-    ver = String(판?.name ?? '').match(/_(c\d+)\.sql$/)?.[1] ?? '';
+    ver = await 계약판읽기();
 
     // 규격 밖 학생번호는 **DB 를 건드리기 전에** 게이트 실패로 접는다 — 같은 응답이라
     // 「형식이 틀렸다」와 「없는 번호다」가 밖에서 구분되지 않는다.
@@ -138,7 +328,7 @@ Deno.serve(async (req: Request) => {
     // 🔑 `student_code` 의 저장 형태는 **우리 발급기가 낸 것**이라 `SYNK-042` 하나뿐이다
     //    (`학생ID_포맷_`). 그래서 정규화는 하이픈 제거·대문자로 끝난다 — 임의 입력을
     //    맞추는 것이 아니라 **우리 형식**을 맞추는 것이라 SQL 쪽이 단순하고 갈라질 여지가 없다.
-    const 정규 = 학생번호.trim().replace(/[-\s]/g, '').toUpperCase();
+    const 정규 = 정규화(학생번호);
 
     const [학생] = await sql`
       select learner_id, contact, auth_user_id, signup_attempts

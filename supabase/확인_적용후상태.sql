@@ -18,13 +18,16 @@ with 기대열(t, c) as (values
   -- 직원 인증·세션 폐기(L0 §4-5·§4-2 ③ · 20260806234000_staff_c7)
   ('learners','active'), ('learners','revoked_before'),
   ('staff','role'), ('staff','staff_id'), ('staff','active'), ('staff','revoked_before'),
-  ('staff_access_log','action'), ('staff_access_log','target_ids')
+  ('staff_access_log','action'), ('staff_access_log','target_ids'),
+  -- 임시번호를 해시로 든다(L0 §4-2-2 · 20260807024500_temp_password_c7)
+  ('learners','temp_password_hash')
 ), 기대제약(n) as (values
   ('learning_events_event_type_c7'), ('learning_events_task_type_c7'),
   ('submissions_task_format_c7'), ('submissions_translation_source_c7'), ('corrections_verdict_c7'),
   ('learning_events_retry_same_learner'), ('learning_events_parent_same_learner'),
   ('corrections_reviewed_same_submission'), ('schema_migrations_pkey'),
-  ('learners_signup_attempts_nonneg_c7'), ('staff_role_c7')
+  ('learners_signup_attempts_nonneg_c7'), ('staff_role_c7'),
+  ('learners_temp_password_paired_c7')
 ), 기대트리거(n) as (values
   ('learning_events_immutable'), ('corrections_immutable'), ('submissions_original_immutable'),
   ('staff_access_log_immutable')
@@ -91,8 +94,8 @@ select case when 테이블수=11 and RLS켜짐=11 and 정책수=8
              and (select v from 빠진열) is null
              and (select v from 빠진제약) is null
              and (select v from 빠진트리거) is null
-             and (select version from 현재이력)='20260806234000'
-              and (select checksum from 현재이력)='f3099646ca81e6636bd574de18092a90e9ced8046b3c45ba44b71a07a5376d1c' -- migration-checksum
+             and (select version from 현재이력)='20260807024500'
+              and (select checksum from 현재이력)='a267639129d28b77a8c3e7d360727ae8ba1a9c4ccfc217626bf847feca592cf5' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·8·0·0·3·1·0 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
