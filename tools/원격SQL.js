@@ -47,7 +47,13 @@ function env읽기() {
 /* 주석 안의 단어가 판정을 흔들지 않게 먼저 지운다 — 실제 SQL 에 `-- 학생=자기 행 insert` 같은
  * 설명이 있고, 그걸 그대로 세면 읽기 쿼리가 영원히 쓰기로 잡힌다. */
 const 주석제거 = (s) => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ');
-const 쓰기어 = /\b(create|alter|drop|insert|update|delete|truncate|grant|revoke|do|call|vacuum|reindex|refresh|comment\s+on|security\s+label)\b/i;
+/* ⚠ `into`·`copy` 가 목록에 있는 이유 — **`select` 로 시작하는데 쓰는** 두 형태다.
+ *   · `select * into 새표 from auth.users`  → Postgres 에서 **테이블을 만든다**
+ *   · `copy engine.learners from '...'`      → **데이터를 넣는다**
+ *   둘 다 `create`·`insert` 가 한 글자도 없어서 옛 목록을 그냥 통과했다(2026-08-06 실측:
+ *   「읽기로 판정」). 즉 **승인 없이 나가는 쓰기**였다 — 이 도구가 막겠다고 한 바로 그것이다.
+ *   거짓양성(문자열 안의 into 등)은 「막힘」 방향이라 안전하다 — 애매하면 쓰기로 본다. */
+const 쓰기어 = /\b(create|alter|drop|insert|update|delete|truncate|grant|revoke|do|call|vacuum|reindex|refresh|into|copy|comment\s+on|security\s+label)\b/i;
 
 /** 읽기 전용인가 — **애매하면 false**(쓰기로 본다). */
 function 읽기전용(sql) {

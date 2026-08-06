@@ -37,6 +37,17 @@ test('쓰기 SQL 을 쓰기로 잡는다', () => {
   }
 });
 
+test('`select` 로 시작하는데 쓰는 형태를 잡는다 (2026-08-06 실측 구멍)', () => {
+  /* 🔴 이 둘은 `create`·`insert` 가 한 글자도 없어서 옛 목록을 **읽기로 통과했다.**
+   * 즉 유호님 승인(`--적용`) 없이 나가는 쓰기였다 — 이 도구가 막겠다고 한 바로 그것이다.
+   * 계정 전체 권한 토큰을 쥔 통로라 여기가 새면 조용히 스키마가 바뀐다. */
+  assert.strictEqual(읽기전용('select * into engine.훔친표 from auth.users;'), false,
+    'select ... into 는 테이블을 만든다');
+  assert.strictEqual(읽기전용("copy engine.learners from '/tmp/x.csv';"), false,
+    'copy ... from 은 데이터를 넣는다');
+  assert.strictEqual(읽기전용('SELECT a INTO b FROM c;'), false, '대문자 표기도 같다');
+});
+
 test('순수 조회는 읽기로 통과한다', () => {
   assert.strictEqual(읽기전용('select count(*) from auth.users;'), true);
   assert.strictEqual(읽기전용('with s as (select 1 as a) select * from s;'), true);
