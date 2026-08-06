@@ -1,0 +1,233 @@
+/* POST /v1/events — C0 §4-1 「유일한 쓰기 통로」.
+ *
+ * ■ 왜 supabase-js 가 아니라 Postgres 직결인가 (2026-08-06 실측으로 갈랐다)
+ *   `engine` 스키마는 **API 에 노출돼 있지 않다**(L0 §4-3 — 노출을 미루면 정책 실수의 영향 범위가 0).
+ *   그래서 PostgREST 를 지나는 `supabase.from()` 은 **service_role 이어도** 닿지 않는다:
+ *       PGRST106 · Only the following schemas are exposed: public, graphql_public
+ *   추측이 아니라 진단 함수로 재고 확인했다. 대신 플랫폼이 넣어주는 `SUPABASE_DB_URL` 로
+ *   직접 붙는다(역할 `postgres` · PG 17.6 실측). 스키마 노출도, 새 SQL 객체도 필요 없다.
+ *
+ * ■ 검증은 여기 한 곳 (C0 §4-1)
+ *   필드 조합은 `lib/이벤트검증.js`, 이름·값목록은 `계약/수집_교정_계약.json` — **둘 다 저장소 정본을
+ *   그대로 동봉한다**(베끼면 갈라지고, 갈라지는 방향은 언제나 「통과」다). `동봉.json` 참고.
+ *
+ * ■ 앱을 믿지 않는 자리 셋
+ *   ① 학생은 **토큰에서** 확정한다 — 본문의 learner_id 는 400 (service_role 은 RLS 를 우회하므로
+ *      본문을 믿는 순간 남의 데이터를 쓴다).
+ *   ② 서버 칸·서버 사건은 앱이 못 보낸다(위조 방지).
+ *   ③ 동의는 `occurred_at` 시점 기준으로 서버가 고른다 — 사후 동의가 과거를 유효하게 만들지 않는다.
+ */
+import postgres from 'npm:postgres@3.4.4';
+import 검증모듈 from './이벤트검증.mjs';
+import 계약 from './계약.mjs';
+
+const { 검증 } = 검증모듈 as { 검증: (e: unknown, c: unknown) => { ok: boolean; 오류들: string[] } };
+
+/* 이 함수가 아는 계약판. 🔴 DB 의 CHECK 제약(`*_c6`)과 **같이** 올라가야 한다 —
+ * 값목록이 앞서 나가면 함수는 통과시키고 DB 가 거절해서 400 이어야 할 것이 500 이 된다.
+ * 계약을 올리는 사람이 이 배열에 새 판을 넣고 다시 배포한다(L0 §8-2). */
+const 지원계약 = ['c6'];
+
+const 최대건수 = 100;
+const 최대바이트 = 1_000_000;
+
+const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type 오류 = { code: string; message: string; retryable: boolean; field?: string };
+
+function 봉투(status: number, body: Record<string, unknown>, ver: string) {
+  return new Response(JSON.stringify({ contract_ver: ver, ...body }), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+const 실패 = (status: number, e: 오류, ver = 지원계약[0]) => 봉투(status, { ok: false, error: e }, ver);
+
+/** JWT 의 가운데 마디만 읽는다 — 서명 검증은 플랫폼이 이미 했다(verify_jwt=true). */
+function 토큰주체(req: Request): string | null {
+  const m = req.headers.get('Authorization')?.match(/^Bearer\s+(.+)$/i);
+  if (!m) return null;
+  const 마디 = m[1].split('.');
+  if (마디.length !== 3) return null;
+  try {
+    const p = JSON.parse(atob(마디[1].replace(/-/g, '+').replace(/_/g, '/')));
+    // anon 키도 유효한 JWT 라 verify_jwt 를 통과한다 — 그건 **사람이 아니다**(sub 가 없다).
+    return typeof p.sub === 'string' && p.sub ? p.sub : null;
+  } catch {
+    return null;
+  }
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method !== 'POST') return 실패(405, { code: 'CONTRACT_VIOLATION', message: 'POST 만 받는다', retryable: false });
+
+  const ver = req.headers.get('X-Contract-Ver');
+  if (!ver) return 실패(400, { code: 'CONTRACT_VER_MISSING', message: 'X-Contract-Ver 헤더가 없습니다', retryable: false });
+  if (!지원계약.includes(ver)) {
+    return 실패(426, { code: 'CONTRACT_VER_UNSUPPORTED', message: `지원하지 않는 계약판입니다: ${ver}`, retryable: false }, ver);
+  }
+
+  const 주체 = 토큰주체(req);
+  if (!주체) return 실패(401, { code: 'AUTH_REQUIRED', message: '로그인이 필요합니다', retryable: false }, ver);
+
+  const 원문 = await req.text();
+  if (원문.length > 최대바이트) {
+    return 실패(413, { code: 'PAYLOAD_TOO_LARGE', message: '배치가 너무 큽니다 — 나눠 보내주세요', retryable: false }, ver);
+  }
+
+  let 본문: { events?: unknown };
+  try {
+    본문 = JSON.parse(원문 || '{}');
+  } catch {
+    return 실패(400, { code: 'CONTRACT_VIOLATION', message: 'JSON 이 아닙니다', retryable: false }, ver);
+  }
+  const 사건들 = 본문.events;
+  if (!Array.isArray(사건들)) {
+    return 실패(400, { code: 'CONTRACT_VIOLATION', message: 'events 배열이 없습니다', field: 'events', retryable: false }, ver);
+  }
+  if (사건들.length > 최대건수) {
+    return 실패(413, { code: 'PAYLOAD_TOO_LARGE', message: `한 번에 ${최대건수}건까지입니다`, retryable: false }, ver);
+  }
+
+  // 학생 확정 — **토큰에서만**. 유효한 JWT 여도 학생 행이 없으면 학생이 아니다(직원·서비스 토큰).
+  const 학생 = await sql`
+    select learner_id from engine.learners where auth_user_id = ${주체}::uuid`;
+  if (!학생.length) {
+    return 실패(401, { code: 'AUTH_REQUIRED', message: '학생 계정이 아닙니다', retryable: false }, ver);
+  }
+  const learner_id: string = 학생[0].learner_id;
+
+  const results: Record<string, unknown>[] = [];
+  for (const 사건 of 사건들 as Record<string, unknown>[]) {
+    results.push(await 한건(사건, learner_id, ver));
+  }
+  return 봉투(200, { ok: true, results }, ver);
+});
+
+/** 한 건 = 한 트랜잭션. learning_events 와 submissions 는 같이 서거나 같이 없다. */
+async function 한건(사건: Record<string, unknown>, learner_id: string, ver: string) {
+  const key = 사건.idempotency_key;
+  const 거절 = (e: 오류) => ({ idempotency_key: key, status: 'rejected', error: e });
+
+  const r = 검증(사건, 계약);
+  if (!r.ok) {
+    return 거절({ code: 'CONTRACT_VIOLATION', message: r.오류들.join(' · '), retryable: false });
+  }
+
+  // payload 는 **있으면 판이 붙어야 한다**(C0 §4-1 payload 규격). 빈 payload 는 규격 밖이 아니다 —
+  // 모양이 없는 사건도 있다. 여기 있는 이유: `이벤트검증` 은 조합을 지고 판은 봉투 규칙이다.
+  const payload = (사건.payload ?? {}) as Record<string, unknown>;
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return 거절({ code: 'PAYLOAD_INVALID', message: 'payload 는 객체여야 합니다', field: 'payload', retryable: false });
+  }
+  if (Object.keys(payload).length && !Number.isInteger(payload.ver)) {
+    return 거절({ code: 'PAYLOAD_INVALID', message: 'payload.ver(정수)가 필요합니다', field: 'payload.ver', retryable: false });
+  }
+
+  // uuid 칸은 모양을 먼저 본다 — 안 그러면 DB 가 22P02 로 죽어 500 이 되고, 앱은 영구 오류를 재시도한다.
+  for (const 칸 of ['correlation_id', 'session_id', 'content_id', 'retry_of_event_id', 'parent_event_id']) {
+    const v = 사건[칸];
+    if (v != null && v !== '' && !UUID.test(String(v))) {
+      return 거절({ code: 'CONTRACT_VIOLATION', message: `${칸} 는 uuid 여야 합니다`, field: 칸, retryable: false });
+    }
+  }
+
+  const occurred_at = String(사건.occurred_at);
+  if (Number.isNaN(Date.parse(occurred_at))) {
+    return 거절({ code: 'CONTRACT_VIOLATION', message: 'occurred_at 이 ISO 8601 이 아닙니다', field: 'occurred_at', retryable: false });
+  }
+
+  try {
+    return await sql.begin(async (tx) => {
+      // ① 동의 — `occurred_at` 시점에 살아 있던 것만. 사후 동의는 과거를 유효하게 만들지 못한다(C0 §5).
+      const 동의 = await tx`
+        select consent_ver from engine.consents
+         where learner_id = ${learner_id}::uuid
+           and agreed_at <= ${occurred_at}::timestamptz
+           and (revoked_at is null or revoked_at > ${occurred_at}::timestamptz)
+         order by agreed_at desc limit 1`;
+      if (!동의.length) {
+        return 거절({
+          code: 'CONSENT_MISSING', field: 'consent_ver', retryable: false,
+          message: '이 시점에 유효한 동의가 없습니다 — 동의 화면을 먼저 띄워야 합니다',
+        });
+      }
+
+      // ② 개입 계승(c6) — 앱은 「무엇에 대한 재시도인가」만 말하고, 그 사건의 intervention_id 는 서버가 잇는다.
+      let intervention_id: string | null = null;
+      if (사건.retry_of_event_id) {
+        const 원 = await tx`
+          select intervention_id from engine.learning_events
+           where learner_id = ${learner_id}::uuid and event_id = ${String(사건.retry_of_event_id)}::uuid`;
+        if (!원.length) {
+          return 거절({
+            code: 'CONTRACT_VIOLATION', field: 'retry_of_event_id', retryable: false,
+            message: 'retry_of_event_id 가 이 학생의 사건이 아닙니다',
+          });
+        }
+        intervention_id = 원[0].intervention_id;
+      }
+
+      // ③ 멱등 — 같은 (학생, key) 재전송은 오류가 아니라 원래 event_id 를 돌려준다.
+      const 넣기 = await tx`
+        insert into engine.learning_events (
+          learner_id, event_type, task_type, actor_kind, occurred_at, correlation_id,
+          idempotency_key, session_id, content_id, retry_of_event_id, parent_event_id, turn_no,
+          skill_ids, skill_taxonomy_ver, level_snapshot, goal_snapshot,
+          intervention_id, consent_ver, payload, schema_ver
+        ) values (
+          ${learner_id}::uuid, ${String(사건.event_type)}, ${(사건.task_type ?? null) as string | null},
+          'learner', ${occurred_at}::timestamptz, ${(사건.correlation_id ?? null) as string | null}::uuid,
+          ${String(key)}, ${(사건.session_id ?? null) as string | null}::uuid,
+          ${(사건.content_id ?? null) as string | null}::uuid,
+          ${(사건.retry_of_event_id ?? null) as string | null}::uuid,
+          ${(사건.parent_event_id ?? null) as string | null}::uuid,
+          ${(사건.turn_no ?? null) as number | null},
+          ${(사건.skill_ids ?? []) as string[]}, ${(사건.skill_taxonomy_ver ?? null) as string | null},
+          ${(사건.level_snapshot ?? null) as string | null}, ${(사건.goal_snapshot ?? null) as string | null},
+          ${intervention_id}::uuid, ${동의[0].consent_ver}, ${payload as unknown as object}, ${ver}
+        )
+        on conflict (learner_id, idempotency_key) do nothing
+        returning event_id`;
+
+      if (!넣기.length) {
+        const 기존 = await tx`
+          select event_id from engine.learning_events
+           where learner_id = ${learner_id}::uuid and idempotency_key = ${String(key)}`;
+        return { idempotency_key: key, status: 'duplicate', event_id: 기존[0].event_id };
+      }
+      const event_id: string = 넣기[0].event_id;
+
+      // ④ 제출물 원문 — 있을 때만. task_type 은 not null 이라 사건에서 받아 온다.
+      const s = 사건.submission as Record<string, unknown> | undefined;
+      if (s) {
+        await tx`
+          insert into engine.submissions (
+            event_id, task_type, task_format, task_ref, task_snapshot, task_schema_ver,
+            body_original, image_refs, audio_ref, capture_meta, occurred_at, schema_ver
+          ) values (
+            ${event_id}::uuid, ${String(사건.task_type)}, ${(s.task_format ?? null) as string | null},
+            ${(s.task_ref ?? null) as string | null},
+            ${(s.task_snapshot ?? null) as unknown as object | null},
+            ${(s.task_schema_ver ?? null) as string | null},
+            ${(s.body_original ?? null) as string | null},
+            ${(s.image_refs ?? null) as string[] | null},
+            ${(s.audio_ref ?? null) as string | null},
+            ${(s.capture_meta ?? null) as unknown as object | null},
+            ${occurred_at}::timestamptz, ${ver}
+          )`;
+      }
+      return { idempotency_key: key, status: 'stored', event_id };
+    });
+  } catch (e) {
+    const 글 = String((e as Error)?.message ?? e);
+    // DB 가 막은 것은 대개 **계약 위반**이지 서버 잘못이 아니다 — 그걸 5xx 로 주면 앱이 영원히 재시도한다.
+    if (/violates check constraint|invalid input|violates foreign key/i.test(글)) {
+      return 거절({ code: 'CONTRACT_VIOLATION', message: 글.slice(0, 200), retryable: false });
+    }
+    console.error('[events] 저장 실패', 글);
+    return { idempotency_key: key, status: 'rejected', error: { code: 'SERVER_ERROR', message: '저장하지 못했습니다', retryable: true } };
+  }
+}
