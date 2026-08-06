@@ -102,7 +102,7 @@
     "미구현": [
       "event_id", "correlation_id", "idempotency_key", "schema_ver",
       "skill_ids", "skill_taxonomy_ver", "task_type", "task_format", "event_type",
-      "retry_of_event_id", "parent_event_id", "turn_no", "goal_snapshot",
+      "retry_of_event_id", "parent_event_id", "turn_no", "goal_snapshot", "correction_id",
       "transcript", "transcript_verified", "capture_meta", "output_text",
       "attempt_no", "learner_response",
       "options_shown", "position", "recommended_option", "selected_option", "changed_selection", "latency_ms", "skipped", "selection_reason", "rejected_all",
