@@ -25,6 +25,7 @@
 
 - **쓰기는 전부 Edge Function**을 지난다(L0 §4-3). 학생 토큰에는 쓰기 정책이 아예 없다.
 - **조회도 Edge Function**이다 — `engine` 스키마는 지금 **API에 노출돼 있지 않다**(L0 §4-3). 앱이 `supabase.from('learning_events')`를 부르면 실패한다. **Codex는 이 경로를 쓰지 않는다.**
+- 🔴 **그럼 Edge Function 자신은 어떻게 `engine`에 닿나 — `SUPABASE_DB_URL` 직결이다**(2026-08-06 실측으로 확정). 노출되지 않은 스키마는 **`service_role`이어도** PostgREST를 통과하지 못한다: `PGRST106 · Only the following schemas are exposed: public, graphql_public`. 즉 함수 안에서 `createClient(...).from()`을 쓰면 **모든 쓰기가 런타임에 죽는다** — 그런데 그게 생태계의 기본 예제라 아무 의심 없이 그렇게 짜게 된다. 플랫폼이 함수에 넣어주는 `SUPABASE_DB_URL`로 Postgres에 직접 붙으면(실측: 역할 `postgres` · PG 17.6) 스키마 노출도 새 SQL 객체도 필요 없다. **`engine`을 API에 노출하는 것으로 푸는 길은 쓰지 않는다** — L0 §4-3이 미룬 이유(정책 실수의 영향 범위가 0)를 되돌리는 값이다.
 - 예외 하나: **인증**과 **Storage 업로드**는 Supabase SDK를 직접 쓴다(§2·§4-2).
 - 경로 매핑: `POST /v1/events` = Edge Function 이름 `events` → 실제 URL `https://<project>.supabase.co/functions/v1/events`.
 
@@ -65,6 +66,7 @@
 ```
 
 - 시각은 전부 **ISO 8601 UTC**(`2026-08-05T13:20:11.412Z`). `occurred_at`=앱이 관찰한 발생 시각, `ingested_at`=서버 수신 시각(서버가 채운다).
+- 🔴 **uuid 칸은 진짜 uuid다** — `correlation_id`·`session_id`·`content_id`·`retry_of_event_id`·`parent_event_id`. c6까지 §4-1 예시가 `content_id`를 `"c-hw-0031"`로 적고 있었는데 **L0 스키마의 그 열은 `uuid`**라, 예시를 그대로 따른 앱은 전건 400을 맞는다(2026-08-06 Edge Function 구현 중 발견 · 예시 정정). 서버는 모양을 **먼저** 본다 — 안 그러면 Postgres가 `22P02`로 죽어 400이어야 할 것이 500이 되고, 5xx는 `retryable`이라 앱이 영구 오류를 무한 재시도한다.
 - ⚠ **기기 시계는 못 믿는다.** `occurred_at`이 미래여도 **거부하지 않는다**(거부하면 학생이 시계를 잘못 맞춘 날의 학습이 통째로 사라진다). 서버는 그대로 저장하고 **로그에만** 남긴다 — 컬럼을 늘리지 않는다.
 
 ## 4. 엔드포인트
@@ -87,7 +89,7 @@
       "occurred_at": "2026-08-05T13:20:11.412Z",
       "correlation_id": "1f0c…",
       "session_id": "9a22…",
-      "content_id": "c-hw-0031",
+      "content_id": "7d1a4e90-2c33-4f8a-9b21-6e0b5c8d1f42",
       "skill_ids": ["skill-ko-grammar-particle-topic"],
       "skill_taxonomy_ver": "kt.2026-08",
       "level_snapshot": "Lv3",
