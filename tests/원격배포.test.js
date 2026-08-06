@@ -26,6 +26,56 @@ async function 임시import(이름, 내용) {
   }
 }
 
+/** 여러 .mjs 를 **같은 방**에 떨군 뒤 하나를 import 한다 — 서로를 import 하는 묶음용. */
+async function 임시import여럿(주인공, 묶음) {
+  const 방 = fs.mkdtempSync(path.join(os.tmpdir(), 'synk-동봉-'));
+  try {
+    for (const [이름, 내용] of Object.entries(묶음)) fs.writeFileSync(path.join(방, 이름), 내용);
+    return await import(require('url').pathToFileURL(path.join(방, 주인공)).href);
+  } finally {
+    fs.rmSync(방, { recursive: true, force: true });
+  }
+}
+
+/* ── lib 끼리의 require (2026-08-06 신설) ───────────────────────────────────
+ * `lib/학생계정.js` 는 `lib/로그인코드.js` 를 require 한다 — 정규화·합성 도메인의 정본이
+ * 거기 하나여야 하기 때문이다(`tests/로그인코드.test.js` 가 기계로 지킨다). Deno 에는
+ * `require` 가 없으므로 껍데기가 풀어 주지 않으면 **배포는 성공하고 첫 호출에서 죽는다.**
+ * 그 실패는 여기서 잡지 않으면 라이브에서만 보인다. */
+test('동봉 — lib 끼리의 require 가 풀려 실제로 import 된다', async () => {
+  const 묶음 = 동봉묶기(path.join(__dirname, '..', 'supabase', 'functions', 'auth'));
+  const m = await 임시import여럿('학생계정.mjs', 묶음);
+  assert.strictEqual(typeof m.default.이메일, 'function', '이메일 함수가 default 로 나와야 한다');
+  // 옆 모듈에서 온 값이 실제로 살아 있는지 — 껍데기만 통과하고 값이 undefined 면 여기서 죽는다.
+  assert.strictEqual(m.default.이메일('SYNK-042'), 'synk042@synk.invalid');
+});
+
+test('동봉 — require 를 이름 있는 import 로 바꾸지 않는다 (껍데기는 default 만 낸다)', () => {
+  /* 🔴 실측 2026-08-06: `import { 정규형 } from './로그인코드.mjs'` 로 바꿨더니 껍데기가
+   *   `export default` 하나만 내보내는 탓에 **import 시점 SyntaxError** 였다.
+   *   배포는 성공하고 첫 호출에서 죽는 모양이라, 파일 텍스트로 못박는다. */
+  const 묶음 = 동봉묶기(path.join(__dirname, '..', 'supabase', 'functions', 'auth'));
+  for (const [이름, src] of Object.entries(묶음)) {
+    assert.ok(!/^\s*import\s*\{/m.test(src),
+      `${이름}: 이름 있는 import 가 생겼다 — 껍데기는 default 만 내보내므로 import 에서 죽는다`);
+    assert.ok(!/\brequire\s*\(/.test(src),
+      `${이름}: require 가 남아 있다 — Deno 에는 require 가 없다`);
+  }
+});
+
+test('동봉 — 표에 없는 파일을 require 하면 배포 전에 멈춘다', () => {
+  /* 탐지력 픽스처: 실저장소가 아니라 **가짜 표**로 잰다(버그가 아직 있을 것을 요구하지 않는다). */
+  const 방 = fs.mkdtempSync(path.join(os.tmpdir(), 'synk-동봉표-'));
+  try {
+    fs.writeFileSync(path.join(방, '동봉.json'),
+      JSON.stringify({ '학생계정.mjs': 'lib/학생계정.js' }));   // 로그인코드를 일부러 뺐다
+    assert.throws(() => 동봉묶기(방), /동봉 표에 없다/,
+      '옆 파일이 표에 없는데 통과했다 — 그러면 함수가 라이브에서 import 에 실패한다');
+  } finally {
+    fs.rmSync(방, { recursive: true, force: true });
+  }
+});
+
 test('동봉 — CJS 검증기가 ESM 으로 감싸여 실제로 import 된다', async () => {
   const 묶음 = 동봉묶기(함수디렉터리);
   const m = await 임시import('이벤트검증.mjs', 묶음['이벤트검증.mjs']);

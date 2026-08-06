@@ -52,13 +52,22 @@ function require풀기(src, 이름, 표내용) {
       .filter(([n]) => n.endsWith('.mjs'))
       .map(([n, p]) => [String(p).replace(/^.*\//, '').replace(/\.js$/, ''), n]),
   );
+  let 번호 = 0;
   return src.replace(REQUIRE문, (전체, 묶음, 파일명) => {
     const 대상 = 있는mjs.get(파일명);
+    /* ⚠ `die`(=process.exit) 가 아니라 **던진다.** exit 하는 가드는 회귀로 탐지력을 잴 수 없고
+     *   (테스트 프로세스가 통째로 죽는다), 못 재는 가드는 다음 개정에서 조용히 죽는다.
+     *   CLI 동작은 같다 — `main().catch(die)` 가 같은 문구로 받는다. */
     if (!대상) {
-      die(`동봉 ${이름}: \`require('./${파일명}.js')\` 를 풀 수 없다 — 그 파일이 동봉 표에 없다.\n`
+      throw new Error(`동봉 ${이름}: \`require('./${파일명}.js')\` 를 풀 수 없다 — 그 파일이 동봉 표에 없다.\n`
         + `       표에 "${파일명}.mjs": "lib/${파일명}.js" 를 더해라. 안 그러면 배포는 성공하고 함수가 import 에서 죽는다.`);
     }
-    return `import ${묶음} from './${대상}';`;
+    /* 🔴 **이름 있는 import 로 바꾸면 안 된다.** 껍데기가 내는 것은 `export default` 하나뿐이라
+     *   `import { a } from './x.mjs'` 는 **import 시점에 SyntaxError** 로 죽는다 —
+     *   배포는 성공하고 첫 호출에서 죽는 그 모양이다(2026-08-06 실측으로 잡았다).
+     *   그래서 default 로 받아서 **원래의 구조분해를 그대로 둔다**. */
+    const 임시 = `__동봉${번호 += 1}`;
+    return `import ${임시} from './${대상}';\nconst ${묶음} = ${임시};`;
   });
 }
 
