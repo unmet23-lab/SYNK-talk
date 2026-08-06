@@ -8,7 +8,7 @@
 
 | 묻는 것 | 정본 | 여기서 하는 일 |
 |---|---|---|
-| 무엇이 **필수 필드**인가 · 값목록 | `계약/수집_교정_계약.json`(**현행 c4**) | **참조만.** 값을 복사하지 않는다 |
+| 무엇이 **필수 필드**인가 · 값목록 | `계약/수집_교정_계약.json`(**현행 c5**) | **참조만.** 값을 복사하지 않는다 |
 | DB에 **어떤 모양**으로 앉나 · 권한 | `docs/L0_데이터계약.md` | 참조만 |
 | 앱이 **무엇을 보내고 받나** | **이 문서** | 정한다 |
 
@@ -48,19 +48,19 @@
 | 헤더 | 예 | 없으면 |
 |---|---|---|
 | `Authorization` | `Bearer <access_token>` | 401 `AUTH_REQUIRED` |
-| `X-Contract-Ver` | `c4` | 400 `CONTRACT_VER_MISSING` |
+| `X-Contract-Ver` | `c5` | 400 `CONTRACT_VER_MISSING` |
 | `X-App-Ver` | `0.3.1 (42)` | 통과(로그용) |
 
 **응답 봉투 — 성공**
 
 ```json
-{ "ok": true, "contract_ver": "c4", "results": [ ... ] }
+{ "ok": true, "contract_ver": "c5", "results": [ ... ] }
 ```
 
 **응답 봉투 — 요청 전체 실패**
 
 ```json
-{ "ok": false, "contract_ver": "c4",
+{ "ok": false, "contract_ver": "c5",
   "error": { "code": "AUTH_EXPIRED", "message": "토큰이 만료됐습니다", "retryable": true } }
 ```
 
@@ -126,14 +126,14 @@
 
 - `payload.ver`(정수) **필수**. 모양이 바뀌면 `2`로 올리고 과거 행은 `1`로 남는다.
   > 🔑 **이벤트 이름에 `.v1`을 붙이지 않는다**(L0 §3-2 표기 정정 요청 · §9). 이름에 붙이면 값목록이 payload 개정마다 배로 늘고, 집계가 `like 'choice.selected%'`가 된다. `payload.ver`는 **컬럼도 값목록도 늘리지 않는다.**
-- payload 필드 이름도 **현행 계약(c4) 필드 목록에서 고른다**(`confidence`·`attempt_no`·`learner_response`·`options_shown`·`position`·`recommended_option`·`selected_option`·`changed_selection`·`latency_ms`·`skipped`). 목록에 없는 이름이 필요하면 **다음 판 개정(c5)**이지 자유 추가가 아니다.
+- payload 필드 이름도 **현행 계약(c5) 필드 목록에서 고른다**(`confidence`·`attempt_no`·`learner_response`·`options_shown`·`position`·`recommended_option`·`selected_option`·`changed_selection`·`latency_ms`·`skipped`). 목록에 없는 이름이 필요하면 **다음 판 개정(c6)**이지 자유 추가가 아니다.
 - 🔴 **`is_correct`(정답여부)를 만들지 않는다.** `submission.body_original`(고른 답) + `task_snapshot.정답`이 있으면 채점은 **언제든 다시 계산되는 파생**이다. 원본을 두고 파생을 저장하면 채점 규칙이 바뀌는 날 과거가 거짓말을 한다.
 - 빈 껍데기 방지: `event_type`이 요구하는 payload가 비면 **저장하지 않는다**(L0 §3-2 두 층 검증). 검증은 이 함수 한 곳에만 있다.
 
 **응답**
 
 ```json
-{ "ok": true, "contract_ver": "c4",
+{ "ok": true, "contract_ver": "c5",
   "results": [
     { "idempotency_key": "b6f1…", "status": "stored",    "event_id": "3c9e…" },
     { "idempotency_key": "77a2…", "status": "duplicate", "event_id": "1b40…" },
@@ -154,7 +154,7 @@
 
 ```json
 요청  { "kind": "audio", "content_type": "audio/wav", "byte_size": 482913 }
-응답  { "ok": true, "contract_ver": "c4",
+응답  { "ok": true, "contract_ver": "c5",
         "upload_url": "https://…", "audio_ref": "voice/2026/08/3c9e….wav",
         "expires_at": "2026-08-05T13:35:00.000Z" }
 ```
@@ -208,7 +208,7 @@
 | 축 | 무엇 | 규칙 |
 |---|---|---|
 | `api_ver` | URL `/v1` | **깨는 변경만** 올린다. 올리면 구 버전을 최소 1개 릴리스 주기 병행 |
-| `contract_ver` | `c4`… | 앱이 헤더로 알리고 서버가 응답에 자기 것을 싣는다. **이 문서의 값은 예시가 아니라 정본과 대조된다**(`tests/C0계약.test.js`) |
+| `contract_ver` | `c5`… | 앱이 헤더로 알리고 서버가 응답에 자기 것을 싣는다. **이 문서의 값은 예시가 아니라 정본과 대조된다**(`tests/C0계약.test.js`) |
 | `payload.ver` | 정수 | 이벤트별 payload 모양 (§4-1) |
 
 - **값목록 추가는 하위호환이다** — 구 앱은 새 값을 안 보낼 뿐 계속 작동한다. **이름 변경·삭제는 금지**(과거 집계가 깨진다 · c3 `값목록_규칙` 승계).

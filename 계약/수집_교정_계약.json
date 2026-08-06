@@ -1,11 +1,12 @@
 {
   "계약": "SYNK 학습 데이터 공용 어휘 — 수집층(Apps Script) ↔ 교정 엔진(SYNK-talk) ↔ L0(Supabase engine.*)",
-  "버전": "c4",
+  "버전": "c5",
   "왜": "두 저장소가 같은 어휘를 각자 들고 있다. 갈라지면 2년치 집계가 제품에서 안 읽히고, 그 사실은 데이터가 이미 쌓인 뒤에 드러난다(소급 불가). 프로즈 경고로 지키던 것을 계약 파일 + 양쪽 회귀로 옮긴 것이다.",
   "고치는_법": "이 파일을 고쳤으면 두 저장소 모두에 같은 바이트로 넣는다. 한쪽만 고치면 그쪽 CI가 빨개진다(그게 이 파일의 목적이다).",
   "c2에서_바뀐_것": "픽스처_항목필드에 「불변」을 추가했다. 채점기(SYNK-talk tools/eval-score.js)가 거짓양성 검사로 갈아타는 유일한 스위치인데 c1 목록에 없었고, 그래서 수집층이 그 필드를 안 만드는 것을 양쪽 회귀가 둘 다 못 봤다. 없으면 정상 표본이 오류 항목으로 채점되는데 오류 채점은 포함·불포함·기대태그가 모두 비면 무조건 통과라, 「멀쩡한 문장을 건드렸는가」가 자동 만점이 된다.",
   "c3에서_바뀐_것": "M0 계약 동결 — learning_events(N1) 절 신설. 지금까지 이 파일이 덮던 것은 교정 어휘(오류태그·골든판정·픽스처)뿐이라 「학습 행동 한 건」의 모양은 어디에도 계약이 없었다. 각 시트가 자기 헤더를 정본으로 삼고 있어서, 시트가 Supabase engine.* 로 이관되는 날 무엇이 필수였는지 말할 원천이 없다. 부록 A-0(제3의 계약 원천 금지)에 따라 별도 계약 파일을 만들지 않고 여기에 넣는다. 계약 이름도 함께 넓혔다(교정 엔진 전용 → 학습 데이터 공용). 같은 날 다른 세션이 SYNK-talk `docs/L0_데이터계약.md`(초안 v1 · d0fc94a)에 물리 스키마를 썼고, 이름이 갈려 있어 **L0 컬럼명으로 통일**했다(이름_규약 참조). 그 대조에서 필드 2건이 잡혔다 — `confidence` 의미 충돌 분리(estimator_confidence), `task_type` 부재.",
   "c4에서_바뀐_것": "S1(첫 앱 화면) 진입 전제 — 「발생 순간에만 얻을 수 있는 원본 증거」의 자리를 계약에 낸다(코어엔진 §9 빈 곳 ①⑤ · 2026-08-06 유호님 분류). 파생 설계는 소급 복원되지만 원본은 안 된다. ①event_type 3종 추가(intervention.delivered=AI가 무엇을 했나 · correction.viewed=학생이 교정을 봤나 · data_use.granted=훈련 승격을 행의 신분이 아니라 사건으로 · 근거 L0 §3-2·§6-1·C0 §9). ②`task_snapshot` 합류 — L0 §3-3의 v1.1 최대 신설(P0-3)이 이 계약에 없었다. c3의 `라이브_대응.task_ref: [숙제문항, 문제]`는 **참조와 스냅샷을 한 칸에 넣은 오류**다(L0 §5가 지적). 문항이 수정되면 그때 학생이 무엇을 보고 답했는지 영원히 사라진다 — 정정해 `task_ref: [숙제ID]` / `task_snapshot: [숙제문항, 문제]`로 가른다. ③`selection_reason`·`rejected_all` — c3 선택로그는 「무엇을 골랐나」까지고 **「왜」와 「전부 거절했다」가 없었다**(§9 ③ 선호 레코드의 실물 대조). `skipped`(무반응)와 전량 거절은 다른 사건이다. ④`cited_refs` — 어느 지식 노트가 그 답에 실렸나(§9 ⑤). 없으면 지식이 틀렸을 때 **이미 나간 답**을 못 찾아 미래분만 고친다. 자리만 내고 채우기는 RAG 도입일부터 강제. ⑤`privacy_class` 보류 해소 — 유호님 기각이 이미 확정이라 「대기」가 아니었다(L0 §6-2 · 열을 만들지 않는다). 목록 이름을 실제 역할대로 `필드로_만들지_않는다`로 고쳤다.",
+  "c5에서_바뀐_것": "수집 파이프라인(제출→AI 1차→검수→학습셋)이 계약 위에 앉을 자리를 낸다. 발단은 GPT 이종 검수 `failed_p0`(2026-08-06) — 파이프라인 발주서가 `student_homeworks`·`ai_processing_logs`·`verified_learning_datasets` 3테이블을 신설했는데 **셋 다 `engine.submissions`·`engine.corrections`의 재발명**이었다(F124). 그래서 c5는 테이블을 늘리지 않고 **없던 축만** 낸다. ①`event_type` +1 `data_use.revoked` — **폐기(discarded)와 철회(revoked)는 다른 사건이다**(F125 계열). 폐기는 교육상 판정이라 파일을 남기고(노이즈도 강건성 재료), 철회는 동의 철회라 `docs/동의_문구_v1.md`가 약속한 대로 **녹음을 실제로 지운다**. 한 축으로 두면 「지웠어야 할 것이 남는다」가 조용히 성립한다. 승격이 사건이면 철회도 사건이어야 대칭이 맞는다. ②`task_format` 값목록 신설(낭독·응답·자유발화·모의면접·높임전환·쓰기첨삭) — 🔴**`task_type`과 다른 축이다.** `task_type`=어느 통로로 들어왔나(숙제제출·발화녹음), `task_format`=그 과제가 무슨 형식이었나. 발주서가 둘을 같은 이름으로 써서 낭독과 자유발화가 한 칸에서 섞일 뻔했다 — 섞이면 섀도잉 데이터와 자유발화 데이터를 영영 못 가른다. ③`오류태그` +1 `화용:공손성` — 문화적 무례·과도한 직설(\"이거 줘요\")은 `높임:상대`(존댓말 등급)와 다른 실패다. 등급은 맞는데 무례한 문장이 존재하고, 축이 없으면 전부 `기타`로 뭉개진다. 🚫**`mishearing`(적다/작다류)은 태그로 만들지 않는다** — 학생 오류가 아니라 ASR 오류일 수 있어 라벨이 거짓이 된다. 그 자리는 `transcript`(기계 전사) ↔ `transcript_verified`(사람 확인) **두 칸의 diff**다. ④필드 자리 3: `task_format`·`retry_of_event_id`(교정 후 재제출 고리 = 학습이 실제로 일어났는지의 유일한 신호)·`transcript`/`transcript_verified`(Whisper가 오발음을 정타로 「고쳐 듣기」 하므로 한 칸이면 파인튜닝 입력쪽이 소실된다).",
   "오류태그": [
     "조사:주격(이/가·은/는)",
     "조사:목적격(을/를)",
@@ -29,6 +30,7 @@
     "어순",
     "누락:필수성분",
     "중복:불필요",
+    "화용:공손성",
     "오류없음"
   ],
   "골든판정": [
@@ -61,8 +63,8 @@
     "왜_봉투가_따로인가": "오프라인 제출·재시도가 있는 앱에서 발생 시점과 수집 시점이 갈리고 같은 사건이 두 번 저장된다. 봉투 6개가 없으면 그때 중복을 셀 수도 지울 수도 없다.",
     "필드": {
       "봉투": ["event_id", "occurred_at", "ingested_at", "correlation_id", "idempotency_key", "schema_ver"],
-      "주체·맥락": ["learner_id", "level_snapshot", "skill_ids", "task_type", "event_type"],
-      "내용": ["task_ref", "task_snapshot", "body_original", "corrected_text"],
+      "주체·맥락": ["learner_id", "level_snapshot", "skill_ids", "task_type", "task_format", "event_type", "retry_of_event_id"],
+      "내용": ["task_ref", "task_snapshot", "body_original", "transcript", "transcript_verified", "corrected_text"],
       "라벨": ["error_tags", "confidence", "attempt_no", "learner_response"],
       "선택로그": ["options_shown", "position", "recommended_option", "selected_option", "changed_selection", "latency_ms", "skipped", "selection_reason", "rejected_all"],
       "출처": ["model", "prompt_ver", "cited_refs", "audio_ref", "intervention_id", "degraded"],
@@ -71,11 +73,13 @@
     },
     "값목록": {
       "task_type": ["숙제제출", "다시쓰기", "퀴즈응답", "대화턴", "발화녹음", "출석발화"],
-      "event_type": ["submission.created", "quiz.answered", "choice.selected", "correction.responded", "correction.viewed", "preference.stated", "session.abandoned", "intervention.delivered", "data_use.granted"],
+      "task_format": ["낭독", "응답", "자유발화", "모의면접", "높임전환", "쓰기첨삭"],
+      "event_type": ["submission.created", "quiz.answered", "choice.selected", "correction.responded", "correction.viewed", "preference.stated", "session.abandoned", "intervention.delivered", "data_use.granted", "data_use.revoked"],
       "source_kind": ["explicit", "teacher", "observed", "inferred"],
       "learner_response": ["채택", "무시", "수정"]
     },
     "값목록_규칙": "오류태그와 같다 — 늘리는 것은 안전하고 이름 변경·삭제는 과거 집계를 깨뜨린다. 늘릴 때 이 파일의 버전을 올리고 두 저장소에 같은 바이트로 넣는다. 자유 문자열로 두면 같은 것이 열 가지 이름으로 쌓여 축이 사라진다(목소리폼 「미션」이 실제로 그렇게 됐다).",
+    "왜_task_format이_따로인가": "c5 신설. `task_type`은 **어느 통로로 들어왔나**(숙제제출·발화녹음), `task_format`은 **그 과제가 무슨 형식이었나**(낭독·자유발화·모의면접)다. 같은 `발화녹음` 통로로 낭독과 자유발화가 함께 들어오는데, 섀도잉(모범 발음 따라읽기)과 자유발화는 **엔진이 배워야 할 것이 정반대**다 — 낭독은 발음, 자유발화는 문장 생성. 한 칸에 담으면 그 둘을 나중에 못 가르고, 낭독 데이터로 회화 모델을 학습시키는 사고가 조용히 성립한다. 🔴이름이 비슷해 실제로 한 번 섞였다(발주 §1이 `task_type`에 낭독·자유를 넣었다 · 2026-08-06 정정).",
     "왜_task_type과_event_type_둘인가": "`event_type`은 **무슨 일이 일어났나**(제출됐다·골랐다·답했다), `task_type`은 **어느 과업이었나**(숙제·다시쓰기·발화)다. 둘을 합치면 숙제 제출과 다시쓰기 제출이 똑같이 `submission.created`가 되어 구분이 사라진다. `skill_ids`·`content_id`로는 대신 못 센다 — 그건 「무엇을 재는가」지 「어느 통로로 들어왔는가」가 아니다. ⚠ L0 초안 v1에는 `task_type`이 없다(합류 항목).",
     "라이브_대응": {
       "occurred_at": ["제출일"],
@@ -94,7 +98,8 @@
     },
     "미구현": [
       "event_id", "correlation_id", "idempotency_key", "schema_ver",
-      "skill_ids", "task_type", "event_type",
+      "skill_ids", "task_type", "task_format", "event_type", "retry_of_event_id",
+      "transcript", "transcript_verified",
       "attempt_no", "learner_response",
       "options_shown", "position", "recommended_option", "selected_option", "changed_selection", "latency_ms", "skipped", "selection_reason", "rejected_all",
       "cited_refs", "intervention_id", "degraded",
@@ -104,6 +109,10 @@
     "미구현_주의": {
       "event_id": "라이브 시트의 `id` 열로 대신하지 않는다 — 시트마다 따로 채번해 한 테이블로 합치면 충돌한다.",
       "task_type": "지금은 「어느 시트에 있느냐」가 과업을 말한다. 한 테이블이 되면 열로 나와야 한다.",
+      "task_format": "c5 신설 — 라이브에 대응 열이 없다(지금은 낭독·자유발화를 나누는 축 자체가 없다). 🔴새 앱은 첫 제출부터 채운다: 나중에 붙이면 그 사이 녹음은 낭독인지 자유발화인지 **영원히 판정 불가**다(음성만 듣고는 못 가른다).",
+      "retry_of_event_id": "c5 신설 — 교정을 받고 다시 낸 고리. 라이브 `hw_feedback`은 재제출을 별개 행으로 쌓기만 하고 잇지 않는다. 🔑지금 설계의 필드가 거의 전부 「입력·성향」인데 **결과 변수는 이것 하나뿐**이다 — 없으면 엔진이 상관만 배우고 처방을 못 배운다.",
+      "transcript": "기계 전사(STT). 라이브 `voice_log`에 「전사」 열이 실재하나 그 시트 헤더는 이 저장소 밖(교재연동 자체 관리)이라 `라이브_대응`에 넣지 않았다 — 넣으려면 헤더 검사부터 그 파일로 넓혀야 한다(tests/계약.test.js 주석).",
+      "transcript_verified": "c5 신설 — 사람이 **들린 대로** 되돌린 전사. 🔴Whisper는 오발음을 정타로 「고쳐 듣기」 한다(학생이 발음한 「작다」를 「적다」로 정규화). 한 칸이면 파인튜닝 **입력쪽이 소실**된다. 🚫두 칸의 차이를 `오류태그`의 mishearing 으로 만들지 않는다 — 학생 오류가 아니라 기계 오류일 수 있어 라벨이 거짓이 된다.",
       "estimator_confidence": "A-10 ③의 추정 신뢰도다. **라벨 축의 `confidence`(학생이 스스로 매긴 확신도 · 라이브 quiz_log에 이미 있다)와 다른 것이라 이름을 갈랐다** — 둘 다 `confidence`로 두면 「AI가 얼마나 확신하나」와 「학생이 얼마나 확신하나」가 한 칸에서 섞인다(2026-08-05 L0 대조에서 잡힘).",
       "consent_ver": "이벤트 행에는 없다. 라이브의 행 단위 스탬프(`음성동의버전`·엔진_폼리포트.js 동의버전스탬프_)는 상담데이터입력의 **학생 행**에 찍히고 **첫 판만** 기록한다(스탬프 불변). 그래서 학생이 나중에 다른 판에 동의해도 그 뒤 이벤트가 어느 판 아래 수집됐는지 조인으로 복원되지 않는다 — 소급 불가.",
       "schema_ver": "이 파일의 `버전`을 행이 스스로 들고 있게 하는 열(부록 A-8 · 유호님 확정 「넣어」). 과거 행은 영원히 빈칸이라 늦을수록 빈칸이 늘어난다.",
