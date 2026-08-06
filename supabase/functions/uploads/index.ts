@@ -1,0 +1,175 @@
+/* POST /v1/uploads/sign — C0 §4-2. 음성·이미지 원본을 **비공개 버킷**에 올릴 서명을 낸다.
+ *
+ * 순서: ①여기서 서명을 받고 → ②앱이 Storage 로 **직접** PUT → ③성공하면 참조를 `/v1/events` 로.
+ *   업로드가 **먼저**인 이유: 반대로 하면 참조가 가리키는 파일이 없는 행이 남고, 그건 나중에
+ *   「전사 실패」와 구분되지 않는다.
+ *
+ * ■ 이 함수가 지는 것 셋 — 전부 「나중에 못 고치는」 것들이다
+ *   ① **경로**(L0 §9-3-1) — `{voice|image}/{learner_id}/{uuid}.{ext}`. 앱이 경로를 정하지 않는다.
+ *      규칙은 `lib/업로드경로.js` 정본을 **동봉**해서 쓴다(베끼면 갈라지고, 갈라지는 방향은 통과다).
+ *      규칙 밖으로 한 번 나간 파일은 규칙을 고쳐도 안 옮겨지고, 그날 동의문의 「모두 삭제」가
+ *      거짓이 된다.
+ *   ② **동의** — 서명을 내주는 것이 곧 수집 허가다. `events` 에만 동의 게이트를 두면 동의 없는
+ *      학생의 음성이 **Storage 에는 이미 올라간 뒤** 행만 거절되고, 파일은 남는다.
+ *      🔑 게이트는 문 뒤가 아니라 **문에** 있어야 한다.
+ *   ③ **학생** — 토큰에서 확정한다. 본문의 learner_id 는 받지 않는다(service_role 은 RLS 를
+ *      우회하므로 본문을 믿는 순간 남의 폴더에 쓰는 서명을 발급한다).
+ *
+ * ■ 규격 밖(m4a·aac)이어도 서명을 내준다
+ *   C0 §4-2 가 못박은 대로다 — 거부하면 학생의 발화가 **영영 사라진다.** 규격은 사람이 지키는
+ *   약속이 아니라 행마다 붙는 관측값이어야 하고, 그 관측은 파일이 올라온 뒤 헤더에서 잰다.
+ *   🔑 그래서 확장자만은 **실제 그것**으로 적는다(m4a 를 .wav 로 적으면 뒤에서 전부 오판한다).
+ */
+import postgres from 'npm:postgres@3.4.4';
+import 경로모듈 from './업로드경로.mjs';
+
+const { 버킷, 경로만들기 } = 경로모듈 as {
+  버킷: string;
+  경로만들기: (a: Record<string, unknown>) => { ref: string | null; 이유: string | null };
+};
+
+/* 상한 25MB(C0 §4-2). 음성은 **보존 무제한**이라 용량 실수의 비용이 영구적이다. */
+const 최대바이트 = 25 * 1024 * 1024;
+
+/* 서명 수명 1시간. 몽골 모바일 회선에서 25MB 를 올리는 데 15분은 빠듯하고, 만료된 서명은
+ * 「업로드 실패」로만 보여서 원인이 안 드러난다. 경로에 매번 새 uuid 가 들어가므로
+ * 재사용 위험은 그 한 파일 자리뿐이다. */
+const 서명수명초 = 3600;
+
+const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
+const 계약판 = /^c(\d+)$/;
+
+type 오류 = { code: string; message: string; retryable: boolean; field?: string };
+
+function 봉투(status: number, body: Record<string, unknown>, ver: string) {
+  return new Response(JSON.stringify({ contract_ver: ver, ...body }), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+const 실패 = (status: number, e: 오류, ver: string) => 봉투(status, { ok: false, error: e }, ver);
+
+/** JWT 의 가운데 마디만 읽는다 — 서명 검증은 플랫폼이 이미 했다(verify_jwt=true). */
+function 토큰주체(req: Request): string | null {
+  const m = req.headers.get('Authorization')?.match(/^Bearer\s+(.+)$/i);
+  if (!m) return null;
+  const 마디 = m[1].split('.');
+  if (마디.length !== 3) return null;
+  try {
+    const p = JSON.parse(atob(마디[1].replace(/-/g, '+').replace(/_/g, '/')));
+    // anon 키도 유효한 JWT 라 verify_jwt 를 통과한다 — 그건 **사람이 아니다**(sub 가 없다).
+    return typeof p.sub === 'string' && p.sub ? p.sub : null;
+  } catch {
+    return null;
+  }
+}
+
+Deno.serve(async (req: Request) => {
+  const 선언 = req.headers.get('X-Contract-Ver') ?? '';
+  if (!선언) return 실패(400, { code: 'CONTRACT_VER_MISSING', message: 'X-Contract-Ver 헤더가 없습니다', retryable: false }, 선언);
+  const 선언판 = 계약판.exec(선언);
+  if (!선언판) {
+    return 실패(426, { code: 'CONTRACT_VER_UNSUPPORTED', message: `계약판 형식이 아닙니다: ${선언}`, retryable: false }, 선언);
+  }
+  if (req.method !== 'POST') return 실패(405, { code: 'CONTRACT_VIOLATION', message: 'POST 만 받는다', retryable: false }, 선언);
+
+  /* 함수 이름은 `uploads` 고 C0 가 적은 경로는 `/v1/uploads/sign` 이다 — 뒷마디까지 본다.
+   * 안 보면 `/uploads/아무거나` 가 전부 서명 발급으로 동작하고, 나중에 `/uploads/…` 형제를
+   * 만드는 날 옛 오타 경로가 **이미 돌고 있던 것**이 된다. */
+  if (!new URL(req.url).pathname.replace(/\/+$/, '').endsWith('/sign')) {
+    return 실패(404, { code: 'CONTRACT_VIOLATION', message: '없는 경로입니다 — POST /v1/uploads/sign', retryable: false }, 선언);
+  }
+
+  const 주체 = 토큰주체(req);
+  if (!주체) return 실패(401, { code: 'AUTH_REQUIRED', message: '로그인이 필요합니다', retryable: false }, 선언);
+
+  let 본문: { kind?: unknown; content_type?: unknown; byte_size?: unknown };
+  try {
+    본문 = JSON.parse((await req.text()) || '{}');
+  } catch {
+    return 실패(400, { code: 'CONTRACT_VIOLATION', message: 'JSON 이 아닙니다', retryable: false }, 선언);
+  }
+
+  // 학생 확정 · DB 계약판을 한 번에 읽는다(왕복 1회). 계약판은 **DB 에게 묻는다** — 함수가
+  // DB 보다 앞설 수 없어야 하고, 손 상수를 두면 마이그레이션마다 사람이 같이 올려야 한다.
+  const [행] = await sql`
+    select (select learner_id from engine.learners where auth_user_id = ${주체}::uuid) as learner_id,
+           (select name from engine.schema_migrations order by version desc limit 1) as 최신조각`;
+
+  const db판 = 계약판.exec(String(행?.최신조각 ?? '').match(/_(c\d+)\.sql$/)?.[1] ?? '');
+  if (!db판) {
+    console.error('[uploads-sign] DB 계약판을 못 읽었다', 행?.최신조각);
+    return 실패(500, { code: 'SERVER_ERROR', message: '서버 설정 오류입니다', retryable: true }, 선언);
+  }
+  const ver = db판[0];
+
+  if (Number(선언판[1]) > Number(db판[1])) {
+    return 실패(426, {
+      code: 'CONTRACT_VER_UNSUPPORTED', retryable: false,
+      message: `서버가 아직 ${선언} 을 모릅니다(현재 ${ver}) — 잠시 뒤 다시 시도해 주세요`,
+    }, ver);
+  }
+
+  if (!행?.learner_id) {
+    return 실패(401, { code: 'AUTH_REQUIRED', message: '학생 계정이 아닙니다', retryable: false }, ver);
+  }
+  const learner_id: string = 행.learner_id;
+
+  /* 🔴 동의 게이트 — **서명을 내주는 것이 곧 수집 허가다.**
+   * `events` 에만 두면 파일은 이미 Storage 에 있고 행만 거절돼, 동의 없이 모은 녹음이 남는다. */
+  const 동의 = await sql`
+    select consent_ver from engine.consents
+     where learner_id = ${learner_id}::uuid
+       and agreed_at <= now()
+       and (revoked_at is null or revoked_at > now())
+     order by agreed_at desc limit 1`;
+  if (!동의.length) {
+    return 실패(403, {
+      code: 'CONSENT_MISSING', field: 'consent_ver', retryable: false,
+      message: '유효한 동의가 없습니다 — 동의 화면을 먼저 띄워야 합니다',
+    }, ver);
+  }
+
+  // 크기는 앱이 말한 값이다(서버는 아직 파일을 못 봤다). 그래도 **먼저** 막는다 —
+  // 25MB 상한을 Storage 에 도착한 뒤에 재면 그때는 이미 올라간 뒤다.
+  const byte_size = Number(본문.byte_size);
+  if (!Number.isFinite(byte_size) || byte_size <= 0) {
+    return 실패(400, { code: 'CONTRACT_VIOLATION', message: 'byte_size(양의 정수)가 필요합니다', field: 'byte_size', retryable: false }, ver);
+  }
+  if (byte_size > 최대바이트) {
+    return 실패(413, {
+      code: 'PAYLOAD_TOO_LARGE', field: 'byte_size', retryable: false,
+      message: `파일이 너무 큽니다(${Math.round(최대바이트 / 1024 / 1024)}MB 까지)`,
+    }, ver);
+  }
+
+  // 경로는 **정본 규칙이 만든다.** 앱이 준 이름은 쓰지 않는다.
+  const { ref, 이유 } = 경로만들기({
+    kind: 본문.kind, content_type: 본문.content_type, learner_id, uuid: crypto.randomUUID(),
+  });
+  if (!ref) {
+    return 실패(400, { code: 'CONTRACT_VIOLATION', message: String(이유), field: 'content_type', retryable: false }, ver);
+  }
+
+  /* 서명 발급 — Storage REST. `engine` 스키마 미노출과 무관하다(Storage 는 PostgREST 를 안 지난다). */
+  const base = Deno.env.get('SUPABASE_URL')!;
+  const 키 = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const r = await fetch(`${base}/storage/v1/object/upload/sign/${버킷}/${ref}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${키}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expiresIn: 서명수명초 }),
+  });
+  if (!r.ok) {
+    console.error('[uploads-sign] 서명 실패', r.status, (await r.text()).slice(0, 300));
+    return 실패(502, { code: 'SERVER_ERROR', message: '업로드 주소를 만들지 못했습니다', retryable: true }, ver);
+  }
+  const { url } = JSON.parse(await r.text()) as { url: string };
+
+  return 봉투(200, {
+    ok: true,
+    upload_url: `${base}/storage/v1${url}`,
+    // 이름을 갈래대로 준다 — 앱이 그대로 submission 의 audio_ref·image_refs 에 싣는다.
+    ...(본문.kind === 'audio' ? { audio_ref: ref } : { image_ref: ref }),
+    expires_at: new Date(Date.now() + 서명수명초 * 1000).toISOString(),
+  }, ver);
+});

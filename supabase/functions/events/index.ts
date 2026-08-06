@@ -28,8 +28,12 @@
 import postgres from 'npm:postgres@3.4.4';
 import 검증모듈 from './이벤트검증.mjs';
 import 계약 from './계약.mjs';
+import 경로모듈 from './업로드경로.mjs';
 
 const { 검증 } = 검증모듈 as { 검증: (e: unknown, c: unknown) => { ok: boolean; 오류들: string[] } };
+const { 경로검사 } = 경로모듈 as {
+  경로검사: (ref: string, learner_id: string) => { ok: boolean; 이유: string | null };
+};
 
 const 최대건수 = 100;
 const 최대바이트 = 1_000_000;
@@ -153,6 +157,26 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
     const v = 사건[칸];
     if (v != null && v !== '' && !UUID.test(String(v))) {
       return 거절({ code: 'CONTRACT_VIOLATION', message: `${칸} 는 uuid 여야 합니다`, field: 칸, retryable: false });
+    }
+  }
+
+  /* 업로드 참조는 **이 학생의** 규칙 안이어야 한다(L0 §9-3-1 · `uploads-sign` 이 만든 그 경로).
+   * 🔴 남의 learner_id 밑을 가리키는 참조를 받으면, 그 학생이 철회했을 때 우리 폴더 삭제가
+   *   **다른 학생의 행이 가리키던 파일**을 지운다 — 두 사람의 보증이 한 번에 깨진다.
+   *   서명을 우리가 냈어도 여기서 다시 본다: 앱이 참조를 **손으로 지어내는 것**은 막을 수 없고,
+   *   막을 수 없는 것은 받는 자리에서 거른다. */
+  const s참조 = 사건.submission as Record<string, unknown> | undefined;
+  if (s참조) {
+    const 이미지 = Array.isArray(s참조.image_refs) ? (s참조.image_refs as unknown[]) : [];
+    for (const [칸, p] of [['audio_ref', s참조.audio_ref], ...이미지.map((v) => ['image_refs', v] as const)]) {
+      if (p == null || p === '') continue;
+      const c = 경로검사(String(p), learner_id);
+      if (!c.ok) {
+        return 거절({
+          code: 'CONTRACT_VIOLATION', field: `submission.${칸}`, retryable: false,
+          message: `업로드 참조가 규칙 밖입니다: ${c.이유}`,
+        });
+      }
     }
   }
 
