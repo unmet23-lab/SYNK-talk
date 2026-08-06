@@ -11,7 +11,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
-const { 만료판정, 새날짜, 만료칸 } = require('../lib/자격증명.js');
+const { 만료판정, 과녁판정, 새날짜, 만료칸, 운영REF, 리허설REF } = require('../lib/자격증명.js');
 
 const TOOLS = path.join(__dirname, '..', 'tools');
 
@@ -75,4 +75,35 @@ test('실저장소 — 액세스 토큰을 쓰는 도구는 전부 공용 통로
   }
   // 🔑 「옛 통로가 없다」만으론 부족하다 — 아예 안 읽는 새 방식이 생기면 게이트를 또 비껴간다.
   assert.deepEqual(안지나는것, [], `공용 통로를 안 지난다: ${안지나는것.join(', ')}`);
+});
+
+/* ── 과녁 게이트 (2026-08-07 신설) ────────────────────────────────────────────
+ * 🔴 실사건: `.env` 의 `SUPABASE_PROJECT_REF` 가 운영을 가리키는 동안 `EXPO_PUBLIC_*` 는
+ *   리허설이었다 — 왕복은 리허설에서 초록인데 `--적용` 은 운영에 떨어졌고, Edge Function
+ *   4개가 그렇게 운영에 섰다. 도구는 대상을 **이미 소리 내어 읽고 있었다**(알림은 안 멈춘다).
+ * 🔑 위 「전부 공용 통로를 지난다」 검사가 이 게이트의 **라우팅**을 이미 지고 있다 —
+ *   새 도구가 게이트를 비껴가려면 그 검사를 먼저 빨갛게 만들어야 한다. */
+
+test('과녁 — 대상이 운영이면 막는다', () => {
+  assert.equal(과녁판정({ SUPABASE_PROJECT_REF: 운영REF }, []).상태, '막음');
+});
+
+test('과녁 — 두 번째 키(--운영)가 있으면 통과한다 (막힌 사람이 따라갈 길이 있다)', () => {
+  assert.equal(과녁판정({ SUPABASE_PROJECT_REF: 운영REF }, ['--적용', '--운영']).상태, '통과');
+});
+
+test('과녁 — 리허설·미설정·모르는 ref 는 마찰 0', () => {
+  for (const ref of [리허설REF, '', undefined, `${리허설REF}X`]) {
+    assert.equal(과녁판정({ SUPABASE_PROJECT_REF: ref }, []).상태, '통과', `ref=${ref}`);
+  }
+  assert.equal(과녁판정({}, []).상태, '통과');
+  assert.equal(과녁판정(null, null).상태, '통과');
+});
+
+test('과녁 — ref 상수가 비거나 리허설과 같아지면 게이트가 조용히 꺼진다', () => {
+  /* 🔑 이게 이 게이트의 유일한 무증상 고장 방식이다 — 상수가 오타나면 모든 ref 가 「통과」로
+   *   보이고, **통과와 게이트-없음이 같은 모양**이 된다. 그래서 상수 자체를 못박는다. */
+  assert.match(운영REF, /^[a-z]{20}$/);
+  assert.match(리허설REF, /^[a-z]{20}$/);
+  assert.notEqual(운영REF, 리허설REF);
 });

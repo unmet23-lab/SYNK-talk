@@ -20,9 +20,10 @@ const path = require('path');
 
 const EAS = path.join(__dirname, '..', 'eas.json');
 
-/** 프로필별로 가리켜야 하는 프로젝트 — 여기가 어긋나면 시험 빌드가 운영 데이터에 쓴다. */
-const 운영REF = 'qiwxeddwwnzkwalpsuty';   // Synk Core
-const 리허설REF = 'baasvefzinrxaryksayl'; // synk-core-rehearsal
+/** 프로필별로 가리켜야 하는 프로젝트 — 여기가 어긋나면 시험 빌드가 운영 데이터에 쓴다.
+ * 🔑 ref 리터럴은 여기 안 적는다 — `lib/자격증명.js` 가 정본이다(같은 판정이 두 곳에 있으면
+ *   갈라지고, 갈라지는 방향은 「통과」다). 그 파일의 과녁 게이트가 같은 값으로 운영을 막는다. */
+const { 운영REF, 리허설REF } = require('../lib/자격증명.js');
 const 배치 = { development: 리허설REF, preview: 리허설REF, production: 운영REF };
 
 /**
