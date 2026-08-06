@@ -53,6 +53,22 @@ test('순수 조회는 읽기로 통과한다', () => {
   assert.strictEqual(읽기전용('with s as (select 1 as a) select * from s;'), true);
 });
 
+test('권한 이름 리터럴은 문장이 아니다 (2026-08-06 실측 거짓양성)', () => {
+  /* 🔴 「anon·authenticated 에 권한이 0인가」를 재려면 권한 이름을 나열해야 하는데,
+   * 그 이름이 하필 INSERT·UPDATE·DELETE·TRUNCATE 다 → **쓰기가 없는지 확인하는 쿼리가
+   * 쓰기로 잡혔다.** 그러면 검증을 돌리는 유일한 길이 `--적용` 이 되고, 승인 플래그가
+   * 습관이 된다(F103 — 따를 수 없는 처방은 우회를 정상 통로로 만든다). */
+  assert.strictEqual(
+    읽기전용("select has_table_privilege('anon','engine.x',p) from (values ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE')) v(p);"),
+    true,
+    '한 낱말짜리 권한 이름은 지우고 센다',
+  );
+  /* ⚠ 반대 방향 — 여러 낱말 리터럴은 동적 SQL 이 숨는 자리라 그대로 둔다. */
+  assert.strictEqual(읽기전용("select dblink_exec('insert into engine.x values (1)');"), false,
+    '문자열 안의 동적 쓰기까지 눈감으면 안 된다');
+  assert.strictEqual(읽기전용("do $$ begin execute 'insert into engine.x values (1)'; end $$;"), false);
+});
+
 test('주석 안의 단어가 판정을 흔들지 않는다', () => {
   // 실제 스키마 파일들이 `-- 학생=자기 행 insert` 같은 설명을 달고 있다.
   // 주석을 안 지우면 모든 조회가 영원히 쓰기로 잡혀 도구가 무용지물이 된다.
@@ -67,6 +83,11 @@ test('주석 안의 단어가 판정을 흔들지 않는다', () => {
 test('유호님이 Run 하던 확인 SQL 은 읽기로 통과한다', () => {
   const sql = fs.readFileSync(path.join(ROOT, 'supabase', '확인_적용전상태.sql'), 'utf8');
   assert.strictEqual(읽기전용(sql), true, '확인 쿼리가 쓰기로 잡히면 원격화의 목적 자체가 죽는다');
+});
+
+test('사후 확인 SQL 도 읽기로 통과한다 — 검증이 승인 플래그를 요구하면 안 된다', () => {
+  const sql = fs.readFileSync(path.join(ROOT, 'supabase', '확인_적용후상태.sql'), 'utf8');
+  assert.strictEqual(읽기전용(sql), true, '적용 결과를 재는 쿼리가 쓰기로 잡히면 --적용 이 습관이 된다');
 });
 
 test('마이그레이션 본체는 쓰기로 잡힌다', () => {

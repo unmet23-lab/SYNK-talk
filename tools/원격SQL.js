@@ -55,9 +55,18 @@ const 주석제거 = (s) => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]
  *   거짓양성(문자열 안의 into 등)은 「막힘」 방향이라 안전하다 — 애매하면 쓰기로 본다. */
 const 쓰기어 = /\b(create|alter|drop|insert|update|delete|truncate|grant|revoke|do|call|vacuum|reindex|refresh|into|copy|comment\s+on|security\s+label)\b/i;
 
+/* 홑따옴표 안의 **한 낱말짜리** 리터럴만 지운다 — `'INSERT'`·`'TRUNCATE'` 는 SQL 문장이 아니라
+ * **권한 이름**이다. 실측 2026-08-06: `확인_적용후상태.sql` 이 「anon·authenticated 에 권한이 0인가」를
+ * 재려고 권한 이름 7개를 나열하는데, 그 때문에 **쓰기가 없는지 확인하는 쿼리가 쓰기로 잡혔다.**
+ * 그러면 검증을 돌리는 유일한 길이 `--적용` 이 되고, 그건 승인 플래그를 습관으로 만든다(F103 계열 —
+ * 따를 수 없는 처방은 우회를 정상 통로로 만든다).
+ * ⚠ **여러 낱말 리터럴은 그대로 둔다** — 동적 SQL(`'insert into ...'`)이 거기 숨는다.
+ *   `''` 이스케이프도 한 낱말 규칙 밖이라 안 지워진다. */
+const 권한이름제거 = (s) => s.replace(/'[A-Za-z_]+'/g, ' ');
+
 /** 읽기 전용인가 — **애매하면 false**(쓰기로 본다). */
 function 읽기전용(sql) {
-  return !쓰기어.test(주석제거(sql));
+  return !쓰기어.test(권한이름제거(주석제거(sql)));
 }
 
 const die = (msg) => { console.error('[원격SQL] ' + msg); process.exit(1); };
