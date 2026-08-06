@@ -129,6 +129,37 @@ test('조회 응답의 필드 이름이 C0와 함수 양쪽에 살아 있다 (�
   }
 });
 
+/* 🔴 2026-08-07 F179 — 검증기가 **필수로 요구하는 필드를 서버가 저장하지 않았다.**
+ *   `correction_id` 가 `functions/events` 의 INSERT 열 목록에서 통째로 빠져 있었고, DB CHECK
+ *   (`learning_events_correction_target_c8`)는 그 두 사건에 not null 을 걸어서
+ *   `correction.viewed`·`correction.responded` 는 **API 로는 100% 거절**됐다.
+ *   검증기·서버·DB 세 층이 서로 다른 계약을 믿었고, 세 층 다 자기 층에서는 초록이었다.
+ * ☠️ 「실왕복 12/12」가 못 잡은 이유: `tools/교정왕복시험.js` 가 **직접 SQL 로 insert** 한다 —
+ *   DB 를 증명한 것이지 앱이 쓰는 통로를 증명한 게 아니었다. 그래서 그 층은 여기서 잡는다.
+ * 🔑 필드 하나가 아니라 **형태 전체**를 건다: 검증기가 요구하는 최상위 필드는 전부 열이어야 한다. */
+test('검증기가 요구하는 최상위 필드는 전부 events INSERT 열 목록에 있다 (한 칸만 빠져도 그 사건은 DB 가 전건 거절한다)', () => {
+  const 검증 = require(path.join(ROOT, 'lib', '이벤트검증.js'));
+  const 소스 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'events', 'index.ts'), 'utf8');
+
+  /* 🔑 파일 전체가 아니라 **열 목록만** 판다. 이 파일 주석에도 `correction_id` 가 여러 번 나오므로
+   *   `소스.includes(이름)` 로 재면 열이 지워져도 초록이다 — 가드가 자기 전처리에 눈이 머는 자리. */
+  const m = 소스.match(/insert into engine\.learning_events\s*\(([^)]*)\)/);
+  assert.ok(m, 'events 의 learning_events INSERT 를 못 찾았다 — 검사가 죽었다(문 모양이 바뀌었으면 이 정규식부터 고쳐라)');
+  const 열 = m[1].split(',').map((s) => s.trim()).filter(Boolean);
+  assert.ok(열.length > 10, `열 목록 추출이 깨졌다(${열.length}칸) — 빈 목록은 아래 검사를 통째로 무력화한다`);
+  assert.ok(열.includes('learner_id'), '열 목록에 learner_id 가 없다 — 엉뚱한 구간을 팠다');
+
+  // 점이 없는 경로 = learning_events 의 칸. `payload.*` 는 jsonb 안, `submission.*` 은 다른 표다.
+  const 필수 = [...검증.공통필수, ...Object.values(검증.이벤트별필수).flat(2)]
+    .filter((p) => typeof p === 'string' && !p.includes('.'));
+
+  for (const 이름 of new Set(필수)) {
+    assert.ok(열.includes(이름),
+      `검증기는 '${이름}' 을 필수로 요구하는데 events INSERT 열 목록에 없다 — 앱이 보낸 값을 서버가 버린다.\n` +
+      '  증상은 조용하지 않다(DB CHECK 가 걸면 그 사건이 전건 거절된다) — 다만 왕복시험이 직접 SQL 이면 안 보인다.');
+  }
+});
+
 test('C0가 값목록을 통째로 복사하지 않았다 (복사본은 계약이 개정되는 날 갈라진다)', () => {
   const md = fs.readFileSync(C0경로, 'utf8');
   const 값목록 = 계약.learning_events.값목록;
