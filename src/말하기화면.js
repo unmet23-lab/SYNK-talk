@@ -23,7 +23,7 @@ import { wav조립 } from '../lib/wav조립.js';
 import { 정본 as 음성정본 } from '../lib/음성헤더.js';
 import { 마이크준비, 마이크끄기 } from '../lib/마이크권한.js';
 import { 흐름id, 항목추가, 다음시도번호, 학습출석, 전송기록, 밀린것, 배달상태 } from '../lib/제출로그.js';
-import { 화면과제 } from '../lib/오늘과제.js';
+import { 화면과제, 몽골날짜 } from '../lib/오늘과제.js';
 import { 로그읽기, 로그쓰기, 음성쓰기, 지속저장 } from './저장.js';
 import { 오늘과제받기 } from './과제API.js';
 import { 발화보내기 } from './제출API.js';
@@ -69,12 +69,6 @@ const 녹음요청 = () => ({
   //    `useAudioStream` 에는 그 손잡이가 없다(Android 는 AudioSource.MIC 로 연다).
   agc_requested: null,
 });
-
-function 오늘() {
-  const d = new Date();
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
 
 function 초표시(ms) {
   const s = Math.floor(ms / 1000);
@@ -143,7 +137,11 @@ export default function 말하기화면({ 급수 = 0, 토큰 = null, 학생번�
       /* 오늘 낼 것을 **서버에서** 받는다(C0 §4-3 ①). 못 받아도 화면은 선다 —
        * 고정 과제로 내려가되 그 사실을 글자로 낸다(`화면과제` 가 사유를 함께 낸다). */
       let 결과;
-      let 그날 = 오늘();
+      /* 🔴 서버를 못 받은 갈래의 날짜도 **몽골 달력**이다(절단문서 ①-14). 기기 시계로 끊으면
+       *   시간대가 어긋난 폰에서 `제출로그.다음시도번호` 가 남의 날 바구니를 세고, 그 값이
+       *   `attempt_no` 로 **서버에 실려 나간다** — 첫 시도가 재시도로 저장되면 사후에 못 고친다.
+       *   `몽골날짜` 는 기기의 *시각*은 그대로 쓰되 *시간대*만 tzdata 로 바로잡는다. */
+      let 그날 = 몽골날짜();
       try {
         if (!토큰) throw new Error('토큰 없음');
         const { 항목, 막힘 } = await 오늘과제받기(토큰);

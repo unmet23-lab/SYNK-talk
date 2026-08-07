@@ -382,3 +382,58 @@ test('제출 사건은 화면이 그린 스냅샷을 그대로 되싣는다', ()
   delete 판없음.task_snapshot;
   assert.equal(제출사건(항목({ task_meta: 판없음 }), 'voice/x/1.m4a'), null);
 });
+
+/* ── 날짜 경계의 정본은 한 곳이다 (절단문서 ①-14) ───────────────────
+ * 「몽골 시간대」가 네 곳에 각자 적혀 있었다: `lib/오늘과제.js` 의 `시간대`,
+ * `deliver`·`tasks` 의 SQL 리터럴, 그리고 `말하기화면` 의 **기기 시계**.
+ * 갈라진 날 증상은 조용하다 — 배치는 오늘에 쓰고 조회는 어제를 세며, 앱은
+ * `다음시도번호` 를 남의 날 바구니에서 세어 첫 시도를 `attempt_no: 2` 로 내보낸다.
+ * 그 값은 서버 행에 박혀 사후에 못 고친다(소급 불가).
+ *
+ * 세 맹점:
+ *   ① 사람이 실제로 쓰는 표기 = IANA 이름 문자열 그대로.
+ *   ② 탐지력은 **픽스처**가 진다 — 실저장소에는 「사본이 0인가」만 건다.
+ *   ③ 자기 처방 — 차단 사유가 시키는 수리(`시간대` 를 가져다 쓴다)는 리터럴을
+ *      안 적으므로 이 검사를 그대로 통과한다.
+ * 🔑 `tools/` 는 일부러 뺀다: `배달왕복시험` 은 **대조자**라 자기 리터럴을 들어야
+ *   `시간대` 가 틀린 날 같이 틀려서 초록이 되는 일이 없다(그 파일 주석에 근거를 적어 뒀다). */
+const 시간대사본 = /Asia\/Ulaanbaatar/;
+const 기기시계 = /getFullYear\(\)|getMonth\(\)|getDate\(\)|toLocaleDateString/;
+const 출하뿌리 = ['src', 'lib', path.join('supabase', 'functions')];
+
+function 소스들(뿌리) {
+  const 나온것 = [];
+  const 훑기 = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) 훑기(p);
+      else if (/\.(js|jsx|ts|tsx|mjs|cjs)$/.test(e.name)) 나온것.push(p);
+    }
+  };
+  훑기(path.join(ROOT, 뿌리));
+  return 나온것;
+}
+
+test('픽스처 — 이 검사가 리터럴 사본과 기기 시계를 실제로 잡는다', () => {
+  assert.ok(시간대사본.test("at time zone 'Asia/Ulaanbaatar'"));
+  assert.ok(기기시계.test('`${d.getFullYear()}-${p(d.getMonth() + 1)}`'));
+  // 처방(= 시간대를 가져다 쓴다)은 통과해야 한다 — 못 따를 처방은 우회를 정상 통로로 만든다.
+  assert.equal(시간대사본.test('const { 몽골날짜, 시간대 } = 과제모듈;'), false);
+  assert.equal(기기시계.test('let 그날 = 몽골날짜();'), false);
+});
+
+test('출하 코드에서 시간대를 손으로 적는 곳은 lib/오늘과제.js 하나다', () => {
+  const 정본 = path.join(ROOT, 'lib', '오늘과제.js');
+  const 사본 = 출하뿌리.flatMap(소스들)
+    .filter((p) => p !== 정본 && 시간대사본.test(fs.readFileSync(p, 'utf8')))
+    .map((p) => path.relative(ROOT, p));
+  assert.deepEqual(사본, [],
+    '시간대를 손으로 적었다 — `lib/오늘과제.js` 의 `시간대` 를 가져다 써라(SQL 에도 ${시간대} 로 넣는다).');
+});
+
+test('앱은 날짜를 기기 시계로 끊지 않는다 — 정본은 몽골 달력이다', () => {
+  const 화면 = fs.readFileSync(path.join(ROOT, 'src', '말하기화면.js'), 'utf8');
+  assert.equal(기기시계.test(화면), false,
+    '기기 시계로 날짜를 조립했다 — `몽골날짜()` 를 써라(attempt_no 가 남의 날 바구니에서 세어진다).');
+  assert.ok(/몽골날짜/.test(화면), '`몽골날짜` 를 안 쓴다 — 서버를 못 받은 갈래의 날짜가 없다.');
+});

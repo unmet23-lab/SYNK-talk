@@ -32,7 +32,10 @@ import 토큰모듈 from './토큰.mjs';
 
 const { 서비스역할 } = 토큰모듈 as { 서비스역할: (req: Request) => boolean };
 const { 사건출처 } = 출처모듈 as { 사건출처: (event_type: string) => string | null };
-const { 몽골날짜, 멱등키, 오늘과제, 따라말하기문장 } = 과제모듈 as {
+/* 🔴 `시간대` 를 **가져다 쓴다** — IANA 이름을 여기에 다시 적으면 그 순간 날짜 경계가 두 곳에
+ *   살고, 갈라진 날 배치는 오늘에 쓰고 조회는 어제를 센다(절단문서 ①-14 · 회귀가 막는다). */
+const { 몽골날짜, 멱등키, 오늘과제, 따라말하기문장, 시간대 } = 과제모듈 as {
+  시간대: string;
   몽골날짜: (때?: Date) => string;
   멱등키: (종류: string, learner_id: string, 날짜: string) => string;
   오늘과제: (재료: Record<string, unknown>) => {
@@ -77,10 +80,10 @@ async function 점검하기(오늘: string) {
     select (select count(*) from engine.learners) as 재적,
            (select count(*) from engine.learning_events
              where event_type = 'task.assigned'
-               and (occurred_at at time zone 'Asia/Ulaanbaatar')::date = ${오늘}::date) as 배정,
+               and (occurred_at at time zone ${시간대})::date = ${오늘}::date) as 배정,
            (select count(*) from engine.learning_events
              where event_type = 'task.assigned' and degraded
-               and (occurred_at at time zone 'Asia/Ulaanbaatar')::date = ${오늘}::date) as 강등`;
+               and (occurred_at at time zone ${시간대})::date = ${오늘}::date) as 강등`;
   const 재적 = Number(r.재적), 배정 = Number(r.배정), 강등 = Number(r.강등);
   const 미달 = 배정 < 재적;
   if (미달) console.error(`[deliver] 🔴 배치 미달 — ${오늘} 배정 ${배정}/${재적}`);

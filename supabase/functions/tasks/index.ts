@@ -37,7 +37,8 @@ const { 지금유효, 거절몸통 } = 동의모듈 as {
 };
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
-const { 몽골날짜 } = 과제모듈 as { 몽골날짜: (때?: Date) => string };
+/* 🔴 `시간대` 도 여기서 가져온다 — 리터럴을 다시 적으면 배치와 조회가 갈린다(절단문서 ①-14). */
+const { 몽골날짜, 시간대 } = 과제모듈 as { 몽골날짜: (때?: Date) => string; 시간대: string };
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
 
@@ -135,7 +136,7 @@ Deno.serve(async (req: Request) => {
            order by i.occurred_at desc limit 1) 개입 on true
        where e.learner_id = ${행.learner_id}::uuid
          and e.event_type = 'task.assigned'
-         and (e.occurred_at at time zone 'Asia/Ulaanbaatar')::date = ${날짜}::date
+         and (e.occurred_at at time zone ${시간대})::date = ${날짜}::date
        order by e.occurred_at desc`;
 
     /* 🔑 `task_ref`·`level_snapshot`·`goal_snapshot` 은 **되돌려 주려고** 싣는다(C0 §4-1).

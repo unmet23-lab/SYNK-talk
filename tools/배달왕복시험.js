@@ -141,6 +141,10 @@ async function main() {
     (내것(r1.몸, 'B') || {}).사유 === 'consent_missing', 내것(r1.몸, 'B'));
   확인('실패 0', (r1.몸.실패 || []).length === 0, r1.몸.실패);
 
+  /* 🔑 아래 두 곳(여기·`/progress` 대조)은 `Asia/Ulaanbaatar` 를 **손으로 적는다** — 여기서만
+   *   그렇다. 시험이 `lib/오늘과제.js` 의 `시간대` 를 가져다 쓰면 그 상수가 틀린 날 시험도 같이
+   *   틀려 초록이 된다. 손으로 적은 쪽은 `오늘`(= `몽골날짜()`)과 어긋나는 순간 빨개진다.
+   *   🔴 그래서 회귀(`tests/오늘과제.test.js`)의 리터럴 금지는 **출하 코드에만** 건다. */
   const 행 = async (k) => (await sql(`
     select e.event_id, e.event_type, e.actor_kind, e.degraded, e.intervention_id, e.idempotency_key,
            e.payload, s.task_snapshot, s.task_format, s.task_ref
