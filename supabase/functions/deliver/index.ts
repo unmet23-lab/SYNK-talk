@@ -27,9 +27,11 @@
  */
 import postgres from 'npm:postgres@3.4.4';
 import 과제모듈 from './오늘과제.mjs';
+import 출처모듈 from './사건출처.mjs';
 import 토큰모듈 from './토큰.mjs';
 
 const { 서비스역할 } = 토큰모듈 as { 서비스역할: (req: Request) => boolean };
+const { 사건출처 } = 출처모듈 as { 사건출처: (event_type: string) => string | null };
 const { 몽골날짜, 멱등키, 오늘과제, 따라말하기문장 } = 과제모듈 as {
   몽골날짜: (때?: Date) => string;
   멱등키: (종류: string, learner_id: string, 날짜: string) => string;
@@ -187,12 +189,17 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
       const 개입 = await tx`
         insert into engine.learning_events (
           learner_id, event_type, actor_kind, occurred_at, idempotency_key,
-          level_snapshot, goal_snapshot, intervention_id, consent_ver, consent_id, degraded, payload, schema_ver
+          level_snapshot, goal_snapshot, intervention_id, consent_ver, consent_id, degraded,
+          source_kind, payload, schema_ver
         ) values (
           ${learner_id}::uuid, 'intervention.delivered', ${공통.actor_kind}, ${지금}::timestamptz,
           ${멱등키('intervention', learner_id, 오늘)},
           ${공통.level_snapshot}, ${공통.goal_snapshot}, ${intervention_id}::uuid,
           ${공통.consent_ver}, ${공통.consent_id}::uuid, ${결정.degraded},
+          /* 이 두 행은 관측이 아니라 **추정**이다 — 오늘 이 문장을 준 것은 「이 학생에게
+           * 이게 맞겠다」는 판단이고, 판단이 틀린 날의 저조를 학생 특성으로 읽지 않으려면
+           * 그 사실이 행에 남아 있어야 한다(절단문서 ①-7 · lib/사건출처.js 가 표를 진다). */
+          ${사건출처('intervention.delivered')}::engine.source_kind,
           ${sql.json({ ver: 1, output_text: 따라말하기문장(결정.task_snapshot) })}, ${ver}
         )
         on conflict (learner_id, idempotency_key) do nothing
@@ -209,12 +216,14 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
       const 배정 = await tx`
         insert into engine.learning_events (
           learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
-          level_snapshot, goal_snapshot, intervention_id, consent_ver, consent_id, degraded, payload, schema_ver
+          level_snapshot, goal_snapshot, intervention_id, consent_ver, consent_id, degraded,
+          source_kind, payload, schema_ver
         ) values (
           ${learner_id}::uuid, 'task.assigned', ${통로}, ${공통.actor_kind}, ${지금}::timestamptz,
           ${멱등키('task', learner_id, 오늘)},
           ${공통.level_snapshot}, ${공통.goal_snapshot}, ${개입id}::uuid,
-          ${공통.consent_ver}, ${공통.consent_id}::uuid, ${결정.degraded}, ${sql.json({ ver: 1 })}, ${ver}
+          ${공통.consent_ver}, ${공통.consent_id}::uuid, ${결정.degraded},
+          ${사건출처('task.assigned')}::engine.source_kind, ${sql.json({ ver: 1 })}, ${ver}
         )
         on conflict (learner_id, idempotency_key) do nothing
         returning event_id`;

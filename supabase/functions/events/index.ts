@@ -27,6 +27,7 @@
  */
 import postgres from 'npm:postgres@3.4.4';
 import 검증모듈 from './이벤트검증.mjs';
+import 출처모듈 from './사건출처.mjs';
 import 계약 from './계약.mjs';
 import 경로모듈 from './업로드경로.mjs';
 import 헤더모듈 from './음성헤더.mjs';
@@ -34,6 +35,7 @@ import 토큰모듈 from './토큰.mjs';
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
 const { 검증 } = 검증모듈 as { 검증: (e: unknown, c: unknown) => { ok: boolean; 오류들: string[] } };
+const { 사건출처 } = 출처모듈 as { 사건출처: (event_type: string) => string | null };
 const { 버킷, 경로검사 } = 경로모듈 as {
   버킷: string;
   경로검사: (ref: string, learner_id: string) => { ok: boolean; 이유: string | null };
@@ -351,7 +353,7 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
           idempotency_key, session_id, content_id, retry_of_event_id, parent_event_id, turn_no,
           correction_id,
           skill_ids, skill_taxonomy_ver, level_snapshot, goal_snapshot,
-          intervention_id, consent_id, consent_ver, payload, schema_ver
+          intervention_id, consent_id, consent_ver, source_kind, payload, schema_ver
         ) values (
           ${learner_id}::uuid, ${String(사건.event_type)}, ${(사건.task_type ?? null) as string | null},
           'learner', ${occurred_at}::timestamptz, ${(사건.correlation_id ?? null) as string | null}::uuid,
@@ -372,7 +374,13 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
           ${(사건.correction_id ?? null) as string | null}::uuid,
           ${skill_ids as string[]}, ${(사건.skill_taxonomy_ver ?? null) as string | null},
           ${(사건.level_snapshot ?? null) as string | null}, ${(사건.goal_snapshot ?? null) as string | null},
-          ${intervention_id}::uuid, ${동의[0].consent_id}::uuid, ${동의[0].consent_ver}, ${제이슨(payload)}, ${ver}
+          ${intervention_id}::uuid, ${동의[0].consent_id}::uuid, ${동의[0].consent_ver},
+          /* 「어떻게 알게 됐나」 — 서버가 정한다(절단문서 ①-7). 앱은 이 칸을 못 보낸다
+           * (검증기 서버칸: 앱이 자기 사건을 「관측입니다」라고 선언하면 자기 증명이다).
+           * 표는 lib/사건출처.js 하나고 배달 통로도 같은 표를 읽는다 — 둘이 각자 적으면
+           * 같은 사건이 한쪽에선 관측, 다른 쪽에선 추정이 된다.
+           * event_type 은 위 검증에서 계약 값목록 안임이 확정됐다(값목록 밖이면 400). */
+          ${사건출처(String(사건.event_type))}::engine.source_kind, ${제이슨(payload)}, ${ver}
         )
         on conflict (learner_id, idempotency_key) do nothing
         returning event_id`;

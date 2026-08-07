@@ -50,7 +50,13 @@ test('② 원문 불변 확대 — 선언된 소급 불가 칸이 전부 자물�
 test('③ 동의 귀속 — consent_id 열이 서고, 세 쓰기 통로가 전부 스탬프한다', () => {
   assert.match(조각, /add column if not exists consent_id uuid references engine\.consents/,
     '조각에서 consent_id 열이 사라졌다');
-  assert.match(EVENTS, /consent_id, consent_ver, payload/, 'events insert 열 목록에 consent_id 가 없다');
+  /* 🔴 이웃이 아니라 **소속**을 잰다. 초판은 `consent_id, consent_ver, payload` 라는 인접 문구였는데,
+   *   그 사이에 상관없는 열 하나(source_kind · 절단문서 ①-7)가 끼자 consent_id 는 멀쩡한데 빨개졌다.
+   *   앵커는 문구가 바뀌면 죽고, 죽은 앵커를 고치는 사람은 「그럼 지우자」로 가기 쉽다. */
+  const 열 = EVENTS.match(/insert into engine\.learning_events \(([^)]+)\)/);
+  assert.ok(열, 'events 의 learning_events INSERT 열 목록을 못 찾았다 — 앵커가 낡았다(그러면 이 검사는 무엇이든 통과시킨다)');
+  assert.ok(열[1].split(',').map((s) => s.trim()).includes('consent_id'),
+    'events insert 열 목록에 consent_id 가 없다');
   assert.match(EVENTS, /동의\[0\]\.consent_id/, 'events 가 consent_id 값을 안 싣는다');
   assert.match(DELIVER, /공통\.consent_id/, 'deliver 가 consent_id 값을 안 싣는다');
   const m = L0.match(/insert into engine\.learning_events\s*\n\s*\(([^)]+)\)/);

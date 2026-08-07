@@ -13,6 +13,9 @@ with 기대열(t, c) as (values
   ('learning_events','consent_id'),
   -- 동의 출처(20260807140000)
   ('consents','recorded_by'),
+  -- 추정메타 물리 칸(20260807170000 · 절단문서 ①-7)
+  ('learning_events','source_kind'), ('learning_events','estimator_confidence'),
+  ('learning_events','estimator_version'), ('learning_events','evidence_refs'),
   ('submissions','capture_meta'), ('skills','superseded_by'), ('daily_activity','expected'),
   ('schema_migrations','version'), ('schema_migrations','name'),
   ('schema_migrations','checksum'), ('schema_migrations','applied_at'),
@@ -121,8 +124,8 @@ select case when 테이블수=11 and RLS켜짐=11 and 정책수=8
              and (select v from 빠진열) is null
              and (select v from 빠진제약) is null
              and (select v from 빠진트리거) is null
-             and (select version from 현재이력)='20260807140000'
-              and (select checksum from 현재이력)='8395b3c08c5df18857da15825676f4077fdfd4ea135334404fb5dd0fa573792c' -- migration-checksum
+             and (select version from 현재이력)='20260807170000'
+              and (select checksum from 현재이력)='d49f922e163dd6e0a51012d2c332e49b12f37479c4405144395e185ee900629c' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·8·0·0·3·1·0·0 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
