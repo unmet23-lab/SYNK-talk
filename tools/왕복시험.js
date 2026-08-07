@@ -4,6 +4,14 @@
  * 왕복시험 — `POST /v1/events` 의 보증을 **실제 DB 왕복으로** 증명한다.
  *
  *   SUPABASE_PROJECT_REF=<리허설ref> node tools/왕복시험.js <student_code> <로그인코드>
+ *   SUPABASE_PROJECT_REF=<리허설ref> node tools/왕복시험.js --새학생
+ *
+ * ■ `--새학생` — 갓 명부에 오른 학생을 **여기서 세워** 전 검사를 그 학생으로 돌린다
+ *   인자로 학생을 받는 판은 **이미 통과한 상태에서 시작**한다. 그러면 그 앞 관문(명부 등록 →
+ *   첫 등록 → 운영자 동의 발급)은 영원히 안 재지고, 관문 **사이의 이음매**는 아무도 안 본다.
+ *   F176 이 그렇게 드러났다 — 리허설 학생 64명 중 동의가 있는 40명 안에서만 돌던 시험을
+ *   갓 등록한 학생으로 태우자 두 칸이 연달아 막혔다. **개원 첫 주는 전원이 이 경로다.**
+ *   그래서 이 모드는 동의도 SQL 로 심지 않고 `tools/동의발급.js`(운영자 통로)를 실제로 부른다.
  *
  * ⚠ **`.env` 의 `SUPABASE_PROJECT_REF` 는 운영(`Synk Core`)을 가리킨다** — 안 덮으면 아래 게이트가
  *   거부한다(옳게 막힌다). 리허설 ref 의 정본은 `tests/앱환경변수.test.js`·`docs/배포_경로.md`.
@@ -93,6 +101,7 @@ async function main() {
     task_type: '숙제제출',
     occurred_at: new Date().toISOString(),
     level_snapshot: 'Lv3',
+    correlation_id: crypto.randomUUID(),   // 한 앉음을 묶는 키(P0 §3-1 ④)
     payload: { ver: 1, attempt_no: 1 },
     submission: {
       task_ref: 'hw-리허설-1', task_format: '자유발화', body_original: '어제 친구를 만나서 밥을 먹었어요',
@@ -154,16 +163,35 @@ async function main() {
     ['본문의 learner_id 는 거부', 기본({ learner_id: crypto.randomUUID() }), 'CONTRACT_VIOLATION'],
     ['서버 사건은 앱이 못 만든다', 기본({ event_type: 'intervention.delivered' }), 'CONTRACT_VIOLATION'],
     ['값목록 밖 task_type', 기본({ task_type: '없는통로' }), 'CONTRACT_VIOLATION'],
-    ['값목록 밖 task_format', 기본({ submission: { task_ref: 'x', task_format: '없는형식', body_original: 'a' } }), 'CONTRACT_VIOLATION'],
+    // 🔴 `submission` 을 통째로 덮으므로 나머지 필수도 함께 실어야 한다 — 안 그러면 이 줄은
+    //   「값목록 밖이라 막혔다」가 아니라 「필수가 빠져 막혔다」를 재고, 둘은 같은 초록으로 보인다.
+    ['값목록 밖 task_format', 기본({ submission: { task_ref: 'x', task_format: '없는형식', body_original: 'a', task_snapshot: { 문항: 'x' } } }), 'CONTRACT_VIOLATION'],
     ['payload 에 ver 없음', 기본({ payload: { attempt_no: 1 } }), 'PAYLOAD_INVALID'],
     ['uuid 아닌 content_id', 기본({ content_id: 'c-hw-0031' }), 'CONTRACT_VIOLATION'],
     ['남의(없는) 사건 재시도', 기본({ retry_of_event_id: crypto.randomUUID() }), 'CONTRACT_VIOLATION'],
     ['필수 누락(level_snapshot)', 기본({ level_snapshot: undefined }), 'CONTRACT_VIOLATION'],
+    /* `skill_ids` — L0 §3-2 가 「배열이라 외래키가 안 걸린다 → 서버 검증으로 막는다」고 적어 둔
+     * 자리가 08-07 까지 비어 있었다(절단문서 ①-13). 오타 하나가 어휘 지도의 축을 영구 오염시킨다. */
+    ['없는 skill_id 는 거부', 기본({ skill_ids: ['skill-없는것'], skill_taxonomy_ver: 'kt.test' }), 'CONTRACT_VIOLATION'],
+    ['skill_ids 만 있고 판본이 없으면 거부', 기본({ skill_ids: ['ci-왕복-skill'] }), 'CONTRACT_VIOLATION'],
+    ['skill_ids 가 배열이 아니면 거부', 기본({ skill_ids: 'ci-왕복-skill', skill_taxonomy_ver: 'kt.test' }), 'CONTRACT_VIOLATION'],
   ];
   for (const [이름, ev, 기대] of 케이스) {
     const rr = await 부르기({ events: [ev] });
     확인(이름, rr.body.results?.[0]?.error?.code === 기대, rr.body.results?.[0]);
   }
+
+  /* 반대 방향 — **실재하는** id 는 통과하고 그대로 저장된다. 거부만 재면 「전부 막는 검사」와
+   * 「옳게 막는 검사」가 같은 모양이 된다(그 상태로 배포하면 G4 게임이 통째로 400 을 맞는다). */
+  await sql(`insert into engine.skills (skill_id, label_ko, domain, schema_ver)
+             values ('ci-왕복-skill', '왕복시험용', 'grammar', 'test')
+             on conflict (skill_id) do nothing`);
+  const 태그된 = 기본({ skill_ids: ['ci-왕복-skill'], skill_taxonomy_ver: 'kt.test' });
+  const r태그 = await 부르기({ events: [태그된] });
+  확인('실재하는 skill_id 는 저장된다', r태그.body.results?.[0]?.status === 'stored', r태그.body.results?.[0]);
+  확인('저장된 skill_ids 가 보낸 그대로다',
+    (await sql(`select array_to_string(skill_ids, ',') s, skill_taxonomy_ver v from engine.learning_events
+                 where event_id = '${r태그.body.results?.[0]?.event_id}'`))[0]?.s === 'ci-왕복-skill');
 
   // ── ⑤ 봉투·판
   console.log('\n⑤ 봉투와 계약판');

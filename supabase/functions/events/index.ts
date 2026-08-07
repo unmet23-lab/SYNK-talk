@@ -311,6 +311,39 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
         intervention_id = 원[0].intervention_id;
       }
 
+      /* ②-b `skill_ids` — L0 §3-2 가 「배열이라 외래키가 안 걸린다 → **서버 검증으로 막고**
+       * 연결 테이블은 만들지 않는다」고 적어 둔 자리다. 그 서버 검증이 없었다(절단문서 ①-13):
+       * `${사건.skill_ids ?? []}` 를 그대로 INSERT 해서 오타·폐기된 id·다른 판본의 id 가
+       * 전부 통과했다. 🔴 어휘 지도의 축이라 한 번 오염되면 그 위의 집계가 전부 흔들리고,
+       * 「이 학생이 무엇을 피하는가」(회피 편향)는 그 축으로만 계산된다 — 소급 복구 불가.
+       * 🔑 빈 배열은 정상이다(축 없는 과업). 검사는 **값이 있을 때만** 돈다. */
+      const skill_ids = 사건.skill_ids ?? [];
+      if (!Array.isArray(skill_ids) || skill_ids.some((v) => typeof v !== 'string' || !v.trim())) {
+        return 거절({
+          code: 'CONTRACT_VIOLATION', field: 'skill_ids', retryable: false,
+          message: 'skill_ids 는 빈 문자열이 없는 문자열 배열이어야 합니다',
+        });
+      }
+      if (skill_ids.length) {
+        // 판본을 모르면 그 id 가 어느 지도의 것인지 나중에 못 되짚는다(이름은 판본 간 재사용된다).
+        if (!사건.skill_taxonomy_ver) {
+          return 거절({
+            code: 'CONTRACT_VIOLATION', field: 'skill_taxonomy_ver', retryable: false,
+            message: 'skill_ids 를 실었으면 skill_taxonomy_ver 도 필요합니다',
+          });
+        }
+        const 실재 = await tx`
+          select skill_id from engine.skills where skill_id = any(${skill_ids as string[]})`;
+        const 있는것 = new Set(실재.map((r: Record<string, unknown>) => String(r.skill_id)));
+        const 없는것 = (skill_ids as string[]).filter((id) => !있는것.has(id));
+        if (없는것.length) {
+          return 거절({
+            code: 'CONTRACT_VIOLATION', field: 'skill_ids', retryable: false,
+            message: `engine.skills 에 없는 skill_id: ${없는것.join(', ')}`,
+          });
+        }
+      }
+
       // ③ 멱등 — 같은 (학생, key) 재전송은 오류가 아니라 원래 event_id 를 돌려준다.
       const 넣기 = await tx`
         insert into engine.learning_events (
@@ -337,7 +370,7 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
            * ☠️ 「12/12 실왕복 초록」이 못 잡은 이유: 왕복시험이 **직접 SQL 로** 넣어
            *   이 통로를 안 탔다. DB 를 증명한 것이지 API 를 증명한 게 아니었다. */
           ${(사건.correction_id ?? null) as string | null}::uuid,
-          ${(사건.skill_ids ?? []) as string[]}, ${(사건.skill_taxonomy_ver ?? null) as string | null},
+          ${skill_ids as string[]}, ${(사건.skill_taxonomy_ver ?? null) as string | null},
           ${(사건.level_snapshot ?? null) as string | null}, ${(사건.goal_snapshot ?? null) as string | null},
           ${intervention_id}::uuid, ${동의[0].consent_id}::uuid, ${동의[0].consent_ver}, ${제이슨(payload)}, ${ver}
         )
