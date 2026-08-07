@@ -38,7 +38,12 @@ const { 지금유효, 거절몸통 } = 동의모듈 as {
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
 /* 🔴 `시간대` 도 여기서 가져온다 — 리터럴을 다시 적으면 배치와 조회가 갈린다(절단문서 ①-14). */
-const { 몽골날짜, 시간대 } = 과제모듈 as { 몽골날짜: (때?: Date) => string; 시간대: string };
+const { 몽골날짜, 시간대, 학생판스냅샷 } = 과제모듈 as {
+  몽골날짜: (때?: Date) => string;
+  시간대: string;
+  /* 🔴 이 응답이 답안지가 되지 않게 거르는 자리(절단문서 ②-20) — 목록도 정본도 저 파일 하나다. */
+  학생판스냅샷: (snap: unknown) => unknown;
+};
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
 
@@ -149,7 +154,10 @@ Deno.serve(async (req: Request) => {
     const data = 행들.map((r: Record<string, unknown>) => ({
       task_id: r.task_id,
       task_ref: r.task_ref,
-      task_snapshot: r.task_snapshot,
+      /* 🔴 **통째로 주지 않는다**(절단문서 ②-20). 계약은 `task_snapshot` 안에 정답을 두고
+       *   (C0 §4-1 예시 · L0 §3-3 필수 4), 채점은 그걸로 나중에 계산하는 파생이다 — 앱은 정답이
+       *   필요 없는데 이 줄은 그걸 실을 자리를 갖고 있었다. 허용 키만 내보낸다(목록 = 저 lib). */
+      task_snapshot: 학생판스냅샷(r.task_snapshot),
       task_format: r.task_format,          // 🔴 배정 행은 비어 있다 — 형식은 호흡마다다(P0 §2-1)
       level_snapshot: r.level_snapshot ?? null,
       goal_snapshot: r.goal_snapshot ?? null,
