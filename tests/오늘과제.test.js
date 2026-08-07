@@ -276,11 +276,34 @@ test('멱등키가 없는 옛 큐 항목은 사건을 만들지 않는다 — �
 
 /* 무발화를 `submission.created` 로 보내면 검증을 못 지나거나(내용물 택1), 지나더라도
  * `submission_count` 가 「말 안 한 날」에 올라 「어제의 나」가 거짓말한다(C0 §4-3 ③). */
-test('무발화는 session.abandoned — 제출 수에 섞이지 않는다', () => {
+/* 🔴 2026-08-07 뒤집힘(절단문서 ①-6). 예전 이 검사는 「제출물 행을 만들지 않는다」로 위 뜻을
+ *   지켰는데, 그 대가로 **어디서 막혔는지가 통째로 사라졌다** — 낭독 시작 전 이탈과 자유발화 중
+ *   포기가 같은 행이 되고, 끈기·난이도 모델의 원신호는 그 둘의 차이다. 제출 수를 지키는 진짜
+ *   지렛대는 행의 부재가 아니라 `event_type` 필터다: 하류 5곳(progress·tasks·deliver 둘·
+ *   corrections)이 전부 그렇게 세고, `tools/배달왕복시험.js` ⑥ 이 그 자리를 지킨다. */
+test('무발화는 session.abandoned — 어디서 막혔는지를 들고 가되 제출로 세어지지 않는다', () => {
   const e = 제출사건(항목({ status: 'abandoned', audio: null }));
   assert.equal(e.event_type, 'session.abandoned');
-  assert.equal(e.submission, undefined, '제출물 행을 만들지 않는다');
+  assert.equal(e.submission.task_format, '자유발화', '어느 호흡에서 막혔는지가 없다');
+  assert.equal(e.submission.task_ref, `task-${날짜}`, '어느 날 배정인지가 없으면 분모가 없다');
+  assert.equal(e.submission.body_original, undefined, '내용물은 여전히 없다');
+  assert.equal(e.submission.audio_ref, undefined, '내용물은 여전히 없다');
   assert.ok(검증(e, 계약).ok, 검증(e, 계약).오류들.join(' · '));
+});
+
+test('무발화 두 호흡이 서로 다른 행이 된다 — 낭독 이탈 ≠ 자유발화 포기 (①-6)', () => {
+  const 낭독 = 제출사건(항목({ step: '따라', status: 'abandoned', audio: null }));
+  const 자유 = 제출사건(항목({ step: '답하기', status: 'abandoned', audio: null }));
+  assert.equal(낭독.submission.task_format, '낭독');
+  assert.equal(자유.submission.task_format, '자유발화');
+  assert.notEqual(낭독.submission.task_format, 자유.submission.task_format);
+  for (const e of [낭독, 자유]) assert.ok(검증(e, 계약).ok, 검증(e, 계약).오류들.join(' · '));
+});
+
+test('형식을 모르면 무발화도 안 보낸다 — 지어내면 그 자리가 영원히 거짓이다', () => {
+  const 형식없음 = 재료();
+  형식없음.형식 = { 따라: null, 답하기: null };
+  assert.equal(제출사건(항목({ status: 'abandoned', audio: null, task_meta: 형식없음 })), null);
 });
 
 test('재시도(retried)도 제출 사건이다 — 자기수정이 서버에 남는다', () => {

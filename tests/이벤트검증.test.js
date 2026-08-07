@@ -14,7 +14,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const 계약 = JSON.parse(fs.readFileSync(path.join(ROOT, '계약', '수집_교정_계약.json'), 'utf8'));
-const { 검증, 공통필수, 널허용, 이벤트별필수, 선택필드, 서버칸, 서버사건 } = require('../lib/이벤트검증.js');
+const { 검증, 공통필수, 널허용, 이벤트별필수, 문턱없음, 선택필드, 서버칸, 서버사건 } = require('../lib/이벤트검증.js');
 
 /* C0 §4-1 예시 그대로 — 서버가 채우는 칸은 뺐다(앱이 보내는 모양). */
 const 정상제출 = () => ({
@@ -345,6 +345,52 @@ test('반대방향 — 계약 필드는 요구·서버칸·선택장부 셋 중 
   // ③ 실저장소 — 거짓양성만. 여기가 빨개지면 계약에 「누가 채우나」가 안 정해진 이름이 있다.
   assert.deepEqual(미분류(계약, 정본), [],
     '계약에 이름은 있는데 아무도 안 요구하고 사유도 없는 필드가 있다');
+});
+
+/* 절단문서 ①-6 — 「추가 필수 0」의 두 뜻을 가른다. `session.abandoned` 는 **정해서 안 건 것**
+ * 이었고 `preference.stated` 는 **아직 안 정한 것**이었는데, 둘 다 `[]` 라 코드 주석이 「같은
+ * 이유」로 묶어 놨었다. 빈 목록에 사유를 강제하면 다음 빈 껍데기도 조용히 못 지나간다. */
+test('추가 필수가 0인 사건은 그 이유가 적혀 있다 — 결론과 미정은 같은 모양이면 안 된다', () => {
+  const 빈것 = Object.keys(이벤트별필수).filter((k) => !이벤트별필수[k].length);
+  assert.ok(빈것.length > 0, '빈 목록이 하나도 없다 — 이 검사가 아무것도 안 재고 있다');
+
+  const 사유없음 = 빈것.filter((k) => !String(문턱없음[k] || '').trim());
+  assert.deepEqual(사유없음, [], `추가 필수가 비었는데 이유가 없다: ${사유없음.join(', ')}`);
+
+  // 반대 방향 — 목록이 채워졌는데 사유만 남으면 낡은 줄이다(두 판정이 갈라진다).
+  const 낡음 = Object.keys(문턱없음).filter((k) => (이벤트별필수[k] || []).length);
+  assert.deepEqual(낡음, [], `필수가 생겼는데 문턱없음에 남아 있다: ${낡음.join(', ')}`);
+
+  // 「나중에」는 사유가 아니다 — 지금 안 거는 이유를 적게 한다(선택필드 장부와 같은 규칙).
+  for (const [k, 사유] of Object.entries(문턱없음)) {
+    assert.ok(사유.length >= 30, `${k} 의 사유가 너무 짧다 — 지금 안 거는 이유를 적는다`);
+  }
+});
+
+test('session.abandoned 는 어디서 막혔는지를 요구한다 (①-6 · 양방향)', () => {
+  const 무발화 = () => ({
+    idempotency_key: 'b6f1c0a2-0000-4000-8000-000000000003',
+    event_type: 'session.abandoned',
+    occurred_at: '2026-08-05T13:22:00.000Z',
+    level_snapshot: 'Lv1',
+    correlation_id: 'b6f1c0a2-0000-4000-8000-0000000000c3',
+    task_type: '발화녹음',
+    submission: { task_ref: 'task-2026-08-05', task_format: '낭독' },
+  });
+  assert.equal(검증(무발화(), 계약).ok, true, 검증(무발화(), 계약).오류들.join(' / '));
+
+  const 형식없음 = 무발화();
+  delete 형식없음.submission.task_format;
+  assert.equal(검증(형식없음, 계약).ok, false, '어디서 막혔는지 없이 통과했다');
+
+  const 통로없음 = 무발화();
+  delete 통로없음.task_type;
+  assert.equal(검증(통로없음, 계약).ok, false, 'task_type 없이 통과했다');
+
+  // 값목록 밖 형식은 여전히 막힌다 — 「무엇이든 넣으면 통과」가 되면 칸만 늘고 뜻은 안 는다.
+  const 지어냄 = 무발화();
+  지어냄.submission.task_format = '무발화';
+  assert.equal(검증(지어냄, 계약).ok, false, '값목록 밖 task_format 이 통과했다');
 });
 
 test('선택장부는 계약과 붙어 있다 — 낡은 줄·두 곳 등재 금지', () => {
