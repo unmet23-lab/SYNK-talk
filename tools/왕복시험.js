@@ -233,6 +233,12 @@ async function main() {
     ['uuid 아닌 content_id', 기본({ content_id: 'c-hw-0031' }), 'CONTRACT_VIOLATION'],
     ['남의(없는) 사건 재시도', 기본({ retry_of_event_id: crypto.randomUUID() }), 'CONTRACT_VIOLATION'],
     ['필수 누락(level_snapshot)', 기본({ level_snapshot: undefined }), 'CONTRACT_VIOLATION'],
+    /* c9 로 올린 두 칸 — 「사실상 필수」·「이름만 있음」이던 자리다(절단문서 ①-10·①-3).
+     * 🔴 API 로 재는 이유: 검증기는 Edge Function 이 **배포 시점에 묶은 사본**을 들고 돈다.
+     *   저장소가 초록이어도 그 사본이 낡았으면 서버는 계속 옛 판정을 낸다(F179 가 그 형태였다). */
+    ['한 앉음 키가 없으면 거부', 기본({ correlation_id: undefined }), 'CONTRACT_VIOLATION'],
+    ['그때 본 판(task_snapshot)이 없으면 거부',
+      기본({ submission: { task_ref: 'hw-리허설-1', task_format: '자유발화', body_original: 'a' } }), 'CONTRACT_VIOLATION'],
     /* `skill_ids` — L0 §3-2 가 「배열이라 외래키가 안 걸린다 → 서버 검증으로 막는다」고 적어 둔
      * 자리가 08-07 까지 비어 있었다(절단문서 ①-13). 오타 하나가 어휘 지도의 축을 영구 오염시킨다. */
     ['없는 skill_id 는 거부', 기본({ skill_ids: ['skill-없는것'], skill_taxonomy_ver: 'kt.test' }), 'CONTRACT_VIOLATION'],
@@ -279,8 +285,9 @@ async function main() {
   console.log('\n⑦ 한 앉음(correlation_id)');
   const 흐름 = crypto.randomUUID();
   const 쌍 = await 부르기({ events: [
-    기본({ correlation_id: 흐름, submission: { task_ref: 'hw-리허설-1', task_format: '낭독', body_original: '어제 친구를 만났어요' } }),
-    기본({ correlation_id: 흐름, submission: { task_ref: 'hw-리허설-1', task_format: '자유발화', body_original: '저는 밥을 먹었어요' } }),
+    // `submission` 을 통째로 덮으므로 `task_snapshot`(c9 필수)도 함께 싣는다 — 그날 본 판이다.
+    기본({ correlation_id: 흐름, submission: { task_ref: 'hw-리허설-1', task_format: '낭독', body_original: '어제 친구를 만났어요', task_snapshot: { ver: 1, 문장: '어제 친구를 만났어요' } } }),
+    기본({ correlation_id: 흐름, submission: { task_ref: 'hw-리허설-1', task_format: '자유발화', body_original: '저는 밥을 먹었어요', task_snapshot: { ver: 1, 프롬프트: '어제 뭐 했어요?' } } }),
   ] });
   확인('둘 다 저장됐다', 쌍.body.results?.every((x) => x.status === 'stored'), 쌍.body.results);
   const 묶임 = await sql(`select e.correlation_id::text c, s.task_format
@@ -374,6 +381,7 @@ async function main() {
   const 열람 = {
     idempotency_key: crypto.randomUUID(), event_type: 'correction.viewed', task_type: '숙제제출',
     occurred_at: new Date().toISOString(), level_snapshot: 'Lv3',
+    correlation_id: crypto.randomUUID(),   // c9 공통 필수 — 교정 열람도 한 앉음 안에서 일어난다
     correction_id, payload: { ver: 1 },
   };
   r = await 부르기({ events: [열람] });
