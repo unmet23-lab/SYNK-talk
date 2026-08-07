@@ -54,6 +54,13 @@ const 측정제한밀리 = 5000;
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
 
+/* 「누구인가」 다음은 「아직 살아 있는가」 — 정본은 `lib/토큰.js` 하나다(절단문서 ②-15).
+ * `sql` 뒤에서 꺼낸다: 조각의 타입이 이 클라이언트에 매여 있다. */
+const { 발급시각, 살아있는학생 } = 토큰모듈 as {
+  발급시각: (req: Request) => number | null;
+  살아있는학생: (질의: typeof sql, 주체: string, iat: number | null) => ReturnType<typeof sql>;
+};
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const 계약판 = /^c(\d+)$/;
 
@@ -172,7 +179,7 @@ Deno.serve(async (req: Request) => {
   // 학생 확정과 DB 계약판을 **한 번에** 읽는다(왕복 1회).
   // 유효한 JWT 여도 학생 행이 없으면 학생이 아니다(직원·서비스 토큰).
   const [행] = await sql`
-    select (select learner_id from engine.learners where auth_user_id = ${주체}::uuid) as learner_id,
+    select (select learner_id from engine.learners where ${살아있는학생(sql, 주체, 발급시각(req))}) as learner_id,
            (select name from engine.schema_migrations order by version desc limit 1) as 최신조각`;
 
   const db판 = 계약판.exec(String(행?.최신조각 ?? '').match(/_(c\d+)\.sql$/)?.[1] ?? '');
