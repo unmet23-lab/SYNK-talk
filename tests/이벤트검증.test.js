@@ -14,7 +14,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const 계약 = JSON.parse(fs.readFileSync(path.join(ROOT, '계약', '수집_교정_계약.json'), 'utf8'));
-const { 검증, 공통필수, 널허용, 이벤트별필수, 문턱없음, 선택필드, 서버칸, 서버사건 } = require('../lib/이벤트검증.js');
+const { 검증, 공통필수, 널허용, 이벤트별필수, 문턱없음, 선택필드, 생산자, 서버칸, 서버사건 } = require('../lib/이벤트검증.js');
 
 /* C0 §4-1 예시 그대로 — 서버가 채우는 칸은 뺐다(앱이 보내는 모양). */
 const 정상제출 = () => ({
@@ -365,6 +365,58 @@ test('추가 필수가 0인 사건은 그 이유가 적혀 있다 — 결론과 
   for (const [k, 사유] of Object.entries(문턱없음)) {
     assert.ok(사유.length >= 30, `${k} 의 사유가 너무 짧다 — 지금 안 거는 이유를 적는다`);
   }
+});
+
+/* ── 생산자 장부 — 「누가 이 사건을 내는가」 (전층 감사 2026-08-07 · 발견 A) ──────────
+ * 요구·물리·서버가 다 서 있어도 내는 코드가 없으면 그 사건은 영원히 0행이고, 그 0은 어떤
+ * 검사에서도 안 빨갛다 — 왕복시험 초록까지 전부 **합성 사건**으로 만든 초록이다. 실측:
+ * correction.viewed·responded 가 c8(이름)·DDL(열+FK+CHECK+트리거)·검증기·서버 INSERT 까지
+ * 서고도 생산자 0줄인 채 아무 데도 안 빨갰다. 이 장부가 그 부재를 **글**로 만들고,
+ * 아래 검사가 장부의 거짓(유령 사건·낡은 파일 지목·빈 사유)을 막는다.
+ * 탐지력은 픽스처가 지고 실저장소에는 거짓양성만 건다(반대방향 장부와 같은 규칙). */
+
+/** 파일 지목형 중 「그 파일에 그 사건 문자열이 없는」 항목들 — 낡은 지목의 탐지기.
+ * ⚠ 천장: **문자열 실재까지만** 잰다 — 그 파일의 어느 줄이 실제로 내는지는 안 잰다.
+ *   그래서 유기적 부패(생산자 삭제·이동 → 문자열 소실)는 잡지만, 우연히 같은 문자열을 가진
+ *   엉뚱한 파일을 **고의로** 지목하면 통과한다(변이 실측 — task.assigned→오늘과제.js).
+ *   그건 기계가 아니라 리뷰 몫이다 — 발화 좌표 파싱까지 가면 TS·JS·SQL 리터럴 세 문법을
+ *   다 알아야 해서 가드가 로직보다 등록층에서 샌다. */
+const 낡은지목 = (장부) => Object.entries(장부)
+  .filter(([, v]) => v && v.파일)
+  .filter(([et, v]) => {
+    try { return !fs.readFileSync(path.join(ROOT, v.파일), 'utf8').includes(et); }
+    catch (_) { return true; } // 파일이 없다 = 지목이 더 크게 낡았다
+  })
+  .map(([et]) => et);
+
+test('생산자 장부 — 모든 event_type 은 파일 xor 사유를 가진다', () => {
+  const 값 = 계약.learning_events.값목록.event_type;
+  const 빠짐 = 값.filter((et) => !(et in 생산자));
+  assert.deepEqual(빠짐, [], `값목록에 있는데 생산자 장부에 없다 — 누가 내는지 아무도 안 정했다: ${빠짐.join(', ')}`);
+
+  const 유령 = Object.keys(생산자).filter((et) => !값.includes(et));
+  assert.deepEqual(유령, [], `장부에 있는데 계약 값목록에 없다 — 낡은 줄이다: ${유령.join(', ')}`);
+
+  for (const [et, v] of Object.entries(생산자)) {
+    const 파일 = typeof v.파일 === 'string' && v.파일.trim();
+    const 사유 = typeof v.사유 === 'string' && v.사유.trim();
+    assert.ok(Boolean(파일) !== Boolean(사유),
+      `${et}: 파일 xor 사유여야 한다 — 둘 다면 어느 쪽이 정본인지, 둘 다 아니면 아무것도 안 정한 것`);
+    // 「나중에」는 사유가 아니다 — 무엇이 서면 생기는지를 적게 한다(문턱없음과 같은 규칙).
+    if (사유) assert.ok(v.사유.length >= 30, `${et} 의 사유가 너무 짧다`);
+  }
+});
+
+test('생산자 장부 — 파일 지목형은 그 파일에 그 사건 문자열이 실재한다', () => {
+  // ① 탐지력(픽스처) — 그 문자열이 없는 실재 파일을 지목하면 그 사건을 지목한다.
+  assert.deepEqual(낡은지목({ 'correction.viewed': { 파일: 'lib/오늘과제.js' } }), ['correction.viewed'],
+    '문자열 없는 파일을 지목했는데 조용하다 — 이 검사가 아무것도 안 재고 있다');
+  // ② 파일이 아예 없어도 잡는다(지워진 생산자를 장부가 계속 가리키는 형태).
+  assert.deepEqual(낡은지목({ 'quiz.answered': { 파일: 'src/없는파일.js' } }), ['quiz.answered'],
+    '없는 파일 지목이 통과했다');
+  // ③ 실저장소 — 거짓양성만. 여기가 빨개지면 생산자가 옮겨졌는데 장부가 낡은 것이다.
+  assert.deepEqual(낡은지목(생산자), [],
+    '장부가 지목한 파일에서 그 사건 문자열이 사라졌다 — 생산자를 옮겼으면 장부도 같이 옮긴다');
 });
 
 test('session.abandoned 는 어디서 막혔는지를 요구한다 (①-6 · 양방향)', () => {
