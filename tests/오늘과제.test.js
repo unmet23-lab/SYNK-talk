@@ -288,8 +288,25 @@ test('무발화는 session.abandoned — 어디서 막혔는지를 들고 가되
   assert.equal(e.submission.task_format, '자유발화', '어느 호흡에서 막혔는지가 없다');
   assert.equal(e.submission.task_ref, `task-${날짜}`, '어느 날 배정인지가 없으면 분모가 없다');
   assert.equal(e.submission.body_original, undefined, '내용물은 여전히 없다');
-  assert.equal(e.submission.audio_ref, undefined, '내용물은 여전히 없다');
+  // ⓐ 입을 안 뗀 무발화 — 올릴 파일이 없으니 참조도 없다. ⓑ(문턱 미달)는 아래 별도 회귀.
+  assert.equal(e.submission.audio_ref, undefined, '올린 파일이 없는데 참조가 생겼다');
   assert.ok(검증(e, 계약).ok, 검증(e, 계약).오류들.join(' · '));
+});
+
+/* 🔴 무발화 두 갈래가 접히던 자리 — ①-6 의 한 층 아래.
+ *   ⓐ 입을 안 뗐다(조각 0 · WAV 없음) / ⓑ 소리는 났는데 문턱 미달(WAV 있음 · **이미 업로드된다**).
+ *   `제출사건` 이 `audio_ref` 를 버리면 두 행이 바이트 단위로 같아지고 올라간 파일은 고아가 된다.
+ *   겁먹은 학생과 포기한 학생이 같은 행이 되는 것이라 이탈 예측(P0 S1-6)의 원신호가 죽는다.
+ *   ⚠ 이 회귀는 **직전 테스트와 짝**이다 — 한쪽만 있으면 「늘 싣는다」·「늘 버린다」 둘 다 통과한다. */
+test('문턱 미달 무발화는 자기 WAV 를 들고 간다 — ⓐ입 안 뗌과 ⓑ작게 말함이 갈린다 (①-2)', () => {
+  const 작게말함 = 제출사건(항목({ status: 'abandoned' }), 'voice/x/작게말함.wav');
+  assert.equal(작게말함.event_type, 'session.abandoned', '제출로 승격되면 안 된다');
+  assert.equal(작게말함.submission.audio_ref, 'voice/x/작게말함.wav', '올린 파일을 가리키지 않으면 고아다');
+  assert.equal(작게말함.submission.body_original, undefined, '낸 답은 여전히 없다');
+  assert.ok(검증(작게말함, 계약).ok, 검증(작게말함, 계약).오류들.join(' · '));
+
+  const 입안뗌 = 제출사건(항목({ status: 'abandoned', audio: null }));
+  assert.notDeepEqual(입안뗌.submission, 작게말함.submission, '두 무발화가 같은 행이면 사후에 못 가른다');
 });
 
 test('무발화 두 호흡이 서로 다른 행이 된다 — 낭독 이탈 ≠ 자유발화 포기 (①-6)', () => {
