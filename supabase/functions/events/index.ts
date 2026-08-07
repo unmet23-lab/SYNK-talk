@@ -318,6 +318,22 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
           });
         }
         intervention_id = 원[0].intervention_id;
+      } else if (s참조?.task_ref) {
+        /* 🔴 **최초 제출도 개입을 가리켜야 한다**(절단문서 ①-11). 여기까지는 `retry_of_event_id`
+         *   가 있을 때만 이었고, 그래서 **즉시 성과 — 개입이 먹힌 바로 그 경우 — 만 고리가 없었다.**
+         *   재시도한 학생은 남고 한 번에 해낸 학생은 안 남는 편향이라, 그 위의 「어느 개입이
+         *   먹혔나」는 영영 재시도 쪽으로 기운다. 소급 불가: 지금 안 이으면 그 기간은 null 이다.
+         *   🔑 새 필드를 안 만든다 — `task_ref` 는 배치가 지은 이름이고 제출이 이미 들고 온다.
+         *   못 찾으면 **거절하지 않고 null 로 둔다**: 고정 도입 과제처럼 배정 행 없이 낸 갈래가
+         *   실제로 있고, 거기서 400 을 내면 그 학생의 발화가 큐에서 영영 재시도한다. */
+        const 배정 = await tx`
+          select e.intervention_id from engine.learning_events e
+            join engine.submissions s on s.event_id = e.event_id
+           where e.learner_id = ${learner_id}::uuid
+             and e.event_type = 'task.assigned'
+             and s.task_ref = ${String(s참조.task_ref)}
+           order by e.occurred_at desc limit 1`;
+        intervention_id = 배정.length ? 배정[0].intervention_id : null;
       }
 
       /* ②-b `skill_ids` — L0 §3-2 가 「배열이라 외래키가 안 걸린다 → **서버 검증으로 막고**

@@ -395,6 +395,44 @@ async function main() {
   확인('지목 없는 correction.viewed 는 correction_id 때문에 거절된다',
     /correction_id/.test(r.body.results?.[0]?.error?.message ?? ''), r.body.results?.[0]);
 
+  /* ── ⑭ 최초 제출도 개입을 가리킨다 — 절단문서 ①-11
+   *   여기까지 `intervention_id` 는 `retry_of_event_id` 가 있을 때만 이어졌다. 그래서 **개입이
+   *   먹혀 한 번에 해낸 학생만** 고리가 없었다 — 「어느 개입이 먹혔나」가 영영 재시도 쪽으로 기운다.
+   *   🔴 검사를 두 갈래로 나눈다: 배정이 **있을 때 잇는가**(양성) + **없을 때 거절하지 않는가**(음성).
+   *   음성이 없으면 「전부 거절하는 서버」와 「옳게 잇는 서버」가 같은 초록이 된다. */
+  console.log('\n⑭ 최초 제출 ↔ 개입 (①-11)');
+  const 배정표 = `task-①11-${Date.now().toString(36)}`;
+  const 개입값 = crypto.randomUUID();
+  const [{ event_id: 배정사건 }] = await sql(`
+    insert into engine.learning_events
+      (learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
+       intervention_id, consent_ver, schema_ver)
+    values ('${learner_id}', 'task.assigned', '숙제제출', 'ai', now() - interval '1 hour',
+            '${배정표}', '${개입값}', 'v18.9', '${await 현재판()}')
+    returning event_id`);
+  await sql(`insert into engine.submissions (event_id, task_type, task_ref, occurred_at, schema_ver)
+             values ('${배정사건}', '숙제제출', '${배정표}', now() - interval '1 hour', '${await 현재판()}')`);
+
+  const 최초 = 기본({ submission: { task_ref: 배정표, task_format: '자유발화', body_original: '한 번에 해냈어요',
+    task_snapshot: { ver: 1, 프롬프트: '어제 뭐 했어요?' } } });
+  r = await 부르기({ events: [최초] });
+  확인('재시도가 아닌 첫 제출도 저장된다', r.body.results?.[0]?.status === 'stored', r.body.results?.[0]);
+  확인('그 행이 그날 배정의 intervention_id 를 물려받았다',
+    (await sql(`select intervention_id::text i from engine.learning_events
+                 where event_id = '${r.body.results?.[0]?.event_id}'`))[0]?.i === 개입값,
+    (await sql(`select intervention_id::text i from engine.learning_events
+                 where event_id = '${r.body.results?.[0]?.event_id}'`))[0]);
+
+  // 음성 — 배정 없는 task_ref(고정 도입 과제 갈래)는 **거절이 아니라 null** 이다.
+  const 배정없음 = 기본({ submission: { task_ref: `task-없는것-${Date.now().toString(36)}`, task_format: '자유발화',
+    body_original: '배정 없이 냈어요', task_snapshot: { ver: 1, 프롬프트: 'x' } } });
+  r = await 부르기({ events: [배정없음] });
+  확인('배정을 못 찾아도 거절하지 않는다 — 그 발화가 큐에서 영영 재시도하면 안 된다',
+    r.body.results?.[0]?.status === 'stored', r.body.results?.[0]);
+  확인('못 찾은 경우는 null 로 남는다(지어내지 않는다)',
+    (await sql(`select intervention_id from engine.learning_events
+                 where event_id = '${r.body.results?.[0]?.event_id}'`))[0]?.intervention_id === null);
+
   console.log(`\n── 통과 ${통과} · 실패 ${실패} ──`);
   process.exit(실패 ? 1 : 0);
 }
