@@ -9,9 +9,12 @@
  *   `tests/훅통로.test.js` 의 이식 · 규칙은 파일 단위 — 자리 단위로 좁히면 경로를 인자로 받는
  *   도우미가 사각이 된다).
  *
- * 대상 밖(일부러): `spawnSync('sh'|'git'…)` 직접 호출과 execFileSync — sh 자리는 `.error` 프로브
- *   +skip 이 관행이고(커밋트레일러:43), execFileSync 는 스폰 실패·비정상 종료에 스스로 던진다.
- *   둘 다 미실행이 이미 시끄럽다. 조용한 건 spawnSync(node …) 의 코드 판정뿐이다.
+ * 대상 = node 자식 판정: `spawnSync(process.execPath|'node' …)` + `execFileSync('node' …)`.
+ *   execFileSync 는 스스로 던지지만 **catch 에서 e.status 를 코드로 번역하는 관행**이 크래시
+ *   (uncaught throw 도 exit 1)를 「차단」 모양으로 만든다 — 실측: precommit.integration 의
+ *   자격증명 검사가 앵커 없이 그 코드만 봐서 **가드가 통째로 죽어도 초록**이었다(08-07).
+ * 대상 밖(일부러): `spawnSync('sh'…)`=`.error` 프로브+skip 관행(커밋트레일러:43) ·
+ *   `execFileSync('git'…)`=판정이 아니라 픽스처 조립이라 미실행이 이미 시끄럽다.
  *
  * 검사 구조 — 탐지력은 픽스처로 못박고, 실저장소에는 거짓양성만 묻는다(형제 CLAUDE.md 맹점②).
  */
@@ -50,7 +53,7 @@ function 코드만(src) {
 /** 한 파일의 위반 행 번호들 — node 자식을 직접 띄워 판정하는 자리. */
 function 위반들(원문) {
   const src = 코드만(원문);
-  return [...src.matchAll(/spawnSync\s*\(\s*process\.execPath/g)]
+  return [...src.matchAll(/(?:spawnSync|execFileSync)\s*\(\s*(?:process\.execPath|['"]node['"])/g)]
     .map((m) => src.slice(0, m.index).split('\n').length);
 }
 
@@ -73,6 +76,14 @@ test('🔴 옛 통로를 잡는다 — node 자식을 직접 spawn 해 코드로
     "const 도구 = path.join(ROOT, 'tools', 'x.js');\n"
     + 'const r = spawnSync(process.execPath, [도구], { encoding: "utf8" });\n');
   assert.deepStrictEqual(스캔(d), ['나쁜.test.js:2'], '옛 형태를 못 잡았다 — 이 회귀가 무력하다');
+});
+
+test('🔴 execFileSync(node …) 의 catch 번역형도 잡는다 — 크래시가 「차단」 모양이 되는 자리', () => {
+  const d = 임시();
+  fs.writeFileSync(path.join(d, '나쁜2.test.js'),
+    'try { out = execFileSync("node", [도구], { encoding: "utf8" }); } catch (e) { r = { code: e.status }; }\n');
+  assert.deepStrictEqual(스캔(d), ['나쁜2.test.js:1'],
+    '정확히 이번에 고친 형태(precommit.integration 옛 판)를 못 잡는다 — 재발해도 안 문다');
 });
 
 test('🔑 주석·문자열 속 옛 형태는 위반이 아니다 — 검사가 자기 픽스처를 신고하면 안 된다', () => {
