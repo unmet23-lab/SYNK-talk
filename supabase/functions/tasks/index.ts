@@ -130,11 +130,11 @@ Deno.serve(async (req: Request) => {
       select e.event_id as task_id, e.degraded, e.intervention_id,
              s.task_snapshot, s.task_format, s.task_ref,
              e.level_snapshot, e.goal_snapshot,
-             개입.payload->>'output_text' as output_text
+             개입.payload->>'output_text' as output_text, 개입.event_id as intervention_event_id
         from engine.learning_events e
         join engine.submissions s on s.event_id = e.event_id
         left join lateral (
-          select i.payload from engine.learning_events i
+          select i.payload, i.event_id from engine.learning_events i
            where i.learner_id = e.learner_id
              and i.event_type = 'intervention.delivered'
              and i.intervention_id = e.intervention_id
@@ -162,8 +162,19 @@ Deno.serve(async (req: Request) => {
       level_snapshot: r.level_snapshot ?? null,
       goal_snapshot: r.goal_snapshot ?? null,
       degraded: r.degraded,
+      /* 🔴 `event_id` 는 `intervention_id` 의 사본이 아니다 — **`content.viewed` 가 `parent_event_id`
+       *   로 가리킬 유일한 값**이다(c9 · 절단문서 ①-2·①-12). `intervention_id` 는 업무 키라
+       *   배달·성과가 **여러 행에 걸쳐 같은 값**을 들고, 그 값으로는 「어느 배달을 열었나」가 안
+       *   갈린다(같은 개입을 두 번 내보낸 날 두 열람이 한 행으로 접힌다 — `lib/이벤트검증.js` 가
+       *   `task_ref` 대안을 기각한 것과 같은 이유). 이게 없어서 생산자가 0이었다.
+       * 🔑 `null` 일 수 있다 — 배정에 `intervention_id` 는 있는데 배달 사건 행을 못 찾은 경우다.
+       *   그때 앱은 열람을 **안 보낸다**(가리킬 대상이 없는 관측은 학생 단위 집계로만 남는다). */
       intervention: r.intervention_id
-        ? { intervention_id: r.intervention_id, output_text: r.output_text ?? null }
+        ? {
+            intervention_id: r.intervention_id,
+            event_id: r.intervention_event_id ?? null,
+            output_text: r.output_text ?? null,
+          }
         : null,
     }));
 

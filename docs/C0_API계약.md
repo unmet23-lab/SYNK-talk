@@ -234,7 +234,7 @@
 | 항목 | 값 |
 |---|---|
 | 쿼리 | `date`(생략 시 오늘 · **`Asia/Ulaanbaatar` 기준 날짜**) |
-| `data[]` | `task_id`(= 그 `task.assigned` 이벤트 id) · `task_snapshot`(그날 학생이 본 것 그대로) · `task_format` · **`task_ref`·`level_snapshot`·`goal_snapshot`**(제출에 **되돌려 실을** 값 — 아래 🔑) · `intervention`(①듣기용 · `output_text`·`intervention_id`) · `degraded`(강등으로 나온 과제인가) |
+| `data[]` | `task_id`(= 그 `task.assigned` 이벤트 id) · `task_snapshot`(그날 학생이 본 것 그대로) · `task_format` · **`task_ref`·`level_snapshot`·`goal_snapshot`**(제출에 **되돌려 실을** 값 — 아래 🔑) · `intervention`(①듣기용 · `output_text`·`intervention_id`·**`event_id`**) · `degraded`(강등으로 나온 과제인가) |
 | 빈 상태 | `data: []` = **오늘 배정이 없다.** 앱은 고정 도입 과제로 내려간다(`P0 §6-4`) — 오류로 취급하지 않는다 |
 | S1 사용 | 1건만 읽는다(하루 1건이므로 `next_cursor`는 항상 `null`) |
 
@@ -248,7 +248,7 @@
   "data": [ { "task_id": "…", "task_snapshot": { "ver": 1, "호흡": [ … ] },
               "task_format": null, "task_ref": "task-2026-08-07",
               "level_snapshot": "Lv2", "goal_snapshot": "study", "degraded": false,
-              "intervention": { "intervention_id": "…", "output_text": "…" } } ] }
+              "intervention": { "intervention_id": "…", "event_id": "…", "output_text": "…" } } ] }
 ```
 
 | 상황 | 응답 |
@@ -261,6 +261,7 @@
 
 - 🔑 **`task_format`은 항상 `null`로 온다** — 배정 1건에 ②낭독 + ③자유발화 두 형식이 들어서 행에 담지 않는다(`P0 §2-1`). 형식은 `task_snapshot.호흡[]` 안에 있다.
 - 🔑 **`intervention`은 `intervention_id`로 잇는다**(시각·순서가 아니다). 하루 2건이 서는 날 시각으로 이으면 조용히 어긋난다.
+- 🔑 **`intervention.event_id` = 그 `intervention.delivered` 사건의 id — 앱이 `content.viewed`의 `parent_event_id`로 쓸 유일한 값**(c9 · 절단문서 ①-2·①-12 · 2026-08-07). 🔴 **`intervention_id`로 대신하지 못한다**: 그건 배달과 성과가 함께 드는 **업무 키**라 여러 행에 같은 값이 실리고, 그 값으로 가리키면 같은 개입을 두 번 내보낸 날 두 열람이 한 행으로 접힌다(`lib/이벤트검증.js`가 `task_ref` 대안을 기각한 것과 같은 축). 이 칸이 없어서 `content.viewed`는 이름·물리·검증기가 다 선 뒤에도 **생산자가 0**이었다 — 앱이 가리킬 대상을 손에 못 들었기 때문이다. ⚠ `null`일 수 있다(배정엔 `intervention_id`가 있는데 배달 사건 행을 못 찾은 경우) → 그때 앱은 열람을 **보내지 않는다**.
 - 🔑 **`task_ref`·`level_snapshot`·`goal_snapshot`은 「되돌려 주려고」 싣는다**(2026-08-07 · S1-b 쓰기 절반). 셋 다 제출 사건에서 **앱이 채우는 칸**인데(§4-1 — 3일 전 오프라인 제출을 오늘 올리면 서버의 현재 급수는 그때 급수가 아니다) 앱은 알 길이 없었다: 급수는 로그인 응답에도 없고, `task_ref`는 배치의 작명 규칙(`task-{날짜}`)이라 앱이 지어내면 **규칙의 사본**이 된다. 사본은 배치가 규칙을 바꾸는 날 갈라지고 증상은 「제출이 큐와 안 이어지는 것」뿐이라 어디에도 오류로 안 남는다. 🔴 **`task_ref`가 없으면 앱은 그날 발화를 보내지 않는다**(지어내는 것보다 안 보내는 편이 옳다 · `lib/오늘과제.js` 화면과제).
 - ⚠ **급수 없는 학생은 배정은 받는데 제출을 못 한다**(2026-08-07 실왕복이 적발 · ✅처방 확정 = 바로 아래 ⓑ). 배치는 `learners.level_current ?? null`을 배정 행에 넣는데 §4-1은 `level_snapshot`을 **공통 필수**로 요구한다 → 그 학생 화면엔 오늘 과제가 뜨고, 말하면 `400 CONTRACT_VIOLATION`으로 막힌다. **개원 첫 주(반 배정 전)가 정확히 이 상태**라 §4-5 「첫 발화 기준선」(소급 불가)을 통째로 잃는다. 처방 후보: ⓐ등록 시 급수 필수(계약·앱 변경 0 · 기계 강제 없음) ⓑ`level_snapshot`을 선택으로 완화(=「모른다」를 null로 · 「수집이 채점보다 우선」에 맞지만 **계약 개정**) ⓒ배치가 급수 없는 학생을 건너뜀(발화는 여전히 못 올라간다).
   - ✅ **유호님 확정 2026-08-07 = ⓑ.** 🚫ⓐ·ⓒ 재제안 금지 — 둘 다 개원 첫 주 첫 발화를 못 살린다. 근거는 이 계약 자신의 원칙이다: §4-1이 `level_snapshot`을 요구한 이유가 「그때 화면이 알던 값을 그때 적는 것이 유일하게 정확하다」인데, 화면이 아무것도 몰랐으면 **`null`이 유일하게 정확한 값**이다(ⓐ는 추측을 append-only 기록에 넣고, ⓒ는 기준선이 존재하는 바로 그 주를 버린다). 즉 ⓑ는 완화가 아니라 **원칙의 일관 적용**이다.

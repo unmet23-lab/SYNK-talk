@@ -285,6 +285,16 @@ async function main() {
   확인('①듣기 — intervention 이 같은 intervention_id 로 붙어 output_text 를 실어 온다',
     !!읽은.intervention && 읽은.intervention.intervention_id === A배정.intervention_id
       && 읽은.intervention.output_text === 따라말하기문장(snap), 읽은.intervention);
+  /* 🔴 c9 생산자의 **유일한 재료**(절단문서 ①-2·①-12 · C0 §4-3 ①). 이 칸이 없어서
+   *   `content.viewed` 는 이름·물리·검증기가 다 선 채로 생산자가 0이었다. 로컬 회귀는 함수를
+   *   재고 여기서 재는 것은 **배포된 판이 실제로 그 값을 싣는가**다 — 안 실리면 증상은
+   *   「열람이 한 건도 안 쌓인다」뿐이고 그건 소급이 안 된다.
+   * 🔑 `intervention_id` 와 **다른 값**인지도 같이 본다. 같으면 업무 키를 사건 id 자리에 넣은
+   *   것이라, 같은 개입을 두 번 내보낸 날 두 열람이 한 행으로 접힌다(그 오류는 조용하다). */
+  확인('🔴 intervention.event_id = 그 배달 사건의 event_id — 앱이 parent_event_id 로 쓸 값',
+    !!읽은.intervention && A개입 && 읽은.intervention.event_id === A개입.event_id
+      && 읽은.intervention.event_id !== 읽은.intervention.intervention_id,
+    [읽은.intervention && 읽은.intervention.event_id, A개입 && A개입.event_id]);
   확인('행의 task_format 은 비어서 온다 — 형식은 호흡 안에 있다',
     읽은.task_format === null && (읽은.task_snapshot.호흡 || []).length === 2, 읽은.task_format);
   확인('강등 여부가 그대로 전달된다', 읽은.degraded === false, 읽은.degraded);

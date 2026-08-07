@@ -14,7 +14,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const 계약 = JSON.parse(fs.readFileSync(path.join(ROOT, '계약', '수집_교정_계약.json'), 'utf8'));
-const { 몽골날짜, 멱등키, 오늘과제, 따라말하기문장, 화면과제, 제출사건, 도입,
+const { 몽골날짜, 멱등키, 오늘과제, 따라말하기문장, 화면과제, 제출사건, 열람사건, 도입,
   학생판스냅샷, 학생공개키 } = require('../lib/오늘과제.js');
 const { 검증 } = require('../lib/이벤트검증.js');
 
@@ -127,7 +127,14 @@ const 서버항목 = (덧 = {}) => {
     task_snapshot: r.task_snapshot,
     task_format: null,
     degraded: r.degraded,
-    intervention: { intervention_id: '22222222-2222-4222-8222-222222222222', output_text: '오늘 온 말' },
+    /* 🔑 `event_id` ≠ `intervention_id`. 둘을 같은 값으로 적으면 아래 검사가 **둘을 바꿔 써도**
+     *   초록이 되고, 그 오류의 증상은 「같은 개입을 두 번 낸 날 두 열람이 한 행으로 접히는 것」
+     *   뿐이라 조용하다(C0 §4-3 ①). */
+    intervention: {
+      intervention_id: '22222222-2222-4222-8222-222222222222',
+      event_id: '33333333-3333-4333-8333-333333333333',
+      output_text: '오늘 온 말',
+    },
     ...덧,
   };
 };
@@ -153,6 +160,61 @@ test('①듣기가 비면 ②문장이 그날 나간 말이다 — 강등 경로
   const v = 화면과제(서버항목({ intervention: null }), 폴백);
   assert.equal(v.편지.본문, 도입.따라말하기);
   assert.equal(v.intervention_id, null);
+});
+
+/* ── c9 `content.viewed` — 「귀에 실제로 닿았다」 ──────────────────────
+ * 🔴 이 사건은 이름·물리·검증기가 다 선 채로 **생산자가 0**이었다. 막고 있던 것은 화면이 아니라
+ *   `parent_event_id` 로 가리킬 값이었고(C0 §4-3 ① `intervention.event_id`), 그게 없는 동안
+ *   `intervention.delivered` 는 배치의 **추정**인 채로 남았다 — 관측 짝이 없으면 네트워크 실패가
+ *   「전달 완료」로 학습된다(절단문서 ①-12 · ①-2). 소급 불가라 개원 전에 서야 한다. */
+test('🔑 배달 사건의 event_id 가 화면까지 온다 — 열람이 가리킬 유일한 값', () => {
+  const v = 화면과제(서버항목(), 폴백);
+  assert.equal(v.intervention_event_id, '33333333-3333-4333-8333-333333333333');
+  assert.notEqual(v.intervention_event_id, v.intervention_id,
+    '업무 키를 사건 id 자리에 넣으면 같은 개입을 두 번 낸 날 두 열람이 한 행으로 접힌다');
+});
+
+test('가리킬 배달이 없으면 화면도 빈손이다 — 폴백 날·개입 없는 배정', () => {
+  assert.equal(화면과제(null, 폴백).intervention_event_id, null, '폴백 날엔 배달 사건이 없다');
+  assert.equal(화면과제(서버항목({ intervention: null }), 폴백).intervention_event_id, null);
+  // 개입은 붙었는데 배달 사건 행을 못 찾은 경우 — 서버가 `event_id: null` 로 보낸다.
+  const 반쪽 = 서버항목({ intervention: { intervention_id: 'x', event_id: null, output_text: '말' } });
+  assert.equal(화면과제(반쪽, 폴백).intervention_event_id, null);
+});
+
+test('🔑 열람사건이 계약을 지나는 `content.viewed` 를 만든다', () => {
+  const e = 열람사건({
+    parent_event_id: '33333333-3333-4333-8333-333333333333',
+    idempotency_key: '44444444-4444-4444-8444-444444444444',
+    correlation_id: '55555555-5555-4555-8555-555555555555',
+    level_snapshot: 'Lv2',
+    occurred_at: '2026-08-07T02:00:00.000Z',
+  });
+  assert.equal(e.event_type, 'content.viewed');
+  assert.equal(e.parent_event_id, '33333333-3333-4333-8333-333333333333');
+  const v = 검증(e, 계약);
+  assert.ok(v.ok, v.오류들.join(' · '));
+});
+
+/* 🔴 급수 없는 학생(개원 첫 주 = 반 배정 전)도 열람은 보낼 수 있어야 한다 — 막으면 그 주의
+ *   관측이 통째로 빈다. 「모른다(null)」와 「앱이 빠뜨렸다(키 없음)」는 갈라진 채다(§4-3 ① ⓑ). */
+test('급수를 모르면 null 로 간다 — 키는 남는다', () => {
+  const e = 열람사건({
+    parent_event_id: 'p', idempotency_key: 'k', correlation_id: 'c',   // 형식 검사는 서버가 진다
+  });
+  assert.equal(e.level_snapshot, null);
+  assert.ok('level_snapshot' in e, '키까지 빠지면 앱 결손이 「모른다」로 위장돼 들어온다');
+});
+
+/* 🔑 지어내지 않는다 — 없는 재료를 채우면 ①-10(가짜 앉음)·①-5(좌표 멱등키)로 되돌아간다.
+ *   ⚠ 셋을 **따로** 잰다: 하나로 뭉뚱그리면 한 갈래만 살아 있어도 초록이 된다. */
+test('재료가 없으면 사건을 안 만든다 — 셋 각각', () => {
+  const 온전 = { parent_event_id: 'p', idempotency_key: 'k', correlation_id: 'c' };
+  assert.ok(열람사건(온전), '온전한 재료가 null 이 되면 아래 검사가 전부 무의미하다');
+  for (const 뺀것 of Object.keys(온전)) {
+    assert.equal(열람사건({ ...온전, [뺀것]: null }), null, `${뺀것} 없이 사건이 만들어졌다`);
+  }
+  assert.equal(열람사건(), null, '인자 자체가 없어도 던지지 않고 null 이다');
 });
 
 /* 🔴 빈 상태·깨진 스냅샷은 **내려가되 말한다.** 조용히 폴백을 쓰면 배치가 며칠 안 돌아도
@@ -458,6 +520,47 @@ test('앱은 날짜를 기기 시계로 끊지 않는다 — 정본은 몽골 �
   assert.ok(/몽골날짜\(/.test(화면), '`몽골날짜()` 를 안 부른다 — 서버를 못 받은 갈래의 날짜가 없다.');
 });
 
+/* ── c9 생산자 배선 — 「사건을 만드는 함수」와 「그것을 부르는 자리」는 다르다 ──────
+ * 🔴 `열람사건()` 이 아무리 초록이어도 **아무도 안 부르면 수집은 0**이고, 그 상태의 증상은
+ *   「열람이 한 건도 안 쌓인다」뿐이라 아무 데서도 안 빨개진다 — 새는 방향은 언제나 통과다.
+ *   이 사건이 태어난 이유가 정확히 그 모양이었다(생산자 0 · `lib/이벤트검증.js` 생산자 장부).
+ * ⚠ 천장을 알고 쓴다: RN 렌더러 없이는 **호출 여부 자체**를 못 재므로 소스 층에서 「어느
+ *   콜백에 붙었나」까지만 본다(`tests/마이크권한.test.js` 통로 검사와 같은 자리).
+ * 🔑 재는 것이 두 개다 — ⓐ카드에 넘겼는가 ⓑ **`onDone` 에만** 붙었는가. ⓑ 가 핵심이다:
+ *   `onError` 에도 붙으면 「들었다」가 「띄웠다」로 조용히 뜻을 갈아탄다(재생이 안 된 기기도
+ *   흐름은 진행되므로 그 갈래는 늘 돈다). */
+const 열람배선 = (소스) => {
+  const 시작 = /\bonDone:\s*\(\)\s*=>\s*\{/.exec(소스);
+  const 끝 = /\bonError:\s*\(\)\s*=>\s*\{/.exec(소스);
+  if (!시작 || !끝 || 끝.index < 시작.index) return { 넘김: false, 완료: false, 오류: true };
+  return {
+    넘김: /들었음알리기=\{열람알리기\}/.test(소스),
+    완료: 소스.slice(시작.index, 끝.index).includes('들었음알리기'),
+    // 🔴 `onError` 갈래는 **끝을 모른다** — 뒤 전부를 본다(닫는 괄호를 세는 순간 파서가 된다).
+    오류: 소스.slice(끝.index).includes('들었음알리기'),
+  };
+};
+
+test('탐지력 픽스처 — 배선이 빠지거나 엉뚱한 콜백에 붙으면 실제로 잡는다', () => {
+  const 판 = (본문) => `<듣기카드 ${본문.넘김 ? '들었음알리기={열람알리기}' : ''} />
+    onDone: () => { set들었다(true); ${본문.완료 ? '들었음알리기();' : ''} },
+    onError: () => { set들었다(true); ${본문.오류 ? '들었음알리기();' : ''} },`;
+  assert.deepEqual(열람배선(판({ 넘김: true, 완료: true, 오류: false })),
+    { 넘김: true, 완료: true, 오류: false }, '온전한 배선을 통과로 못 읽으면 아래가 무의미하다');
+  assert.equal(열람배선(판({ 넘김: false, 완료: true })).넘김, false, '프롭이 빠진 것을 못 잡는다');
+  assert.equal(열람배선(판({ 넘김: true, 완료: false })).완료, false, '호출이 빠진 것을 못 잡는다');
+  assert.equal(열람배선(판({ 넘김: true, 완료: true, 오류: true })).오류, true, 'onError 갈래를 못 잡는다');
+  assert.deepEqual(열람배선('콜백이 아예 없다'), { 넘김: false, 완료: false, 오류: true },
+    '모양을 못 읽었으면 통과가 아니라 미측정이다 — 그때는 빨개져야 한다');
+});
+
+test('🔴 실 화면 — 열람은 재생이 끝난 자리에만 붙어 있다 (c9 생산자)', () => {
+  const r = 열람배선(fs.readFileSync(path.join(ROOT, 'src', '말하기화면.js'), 'utf8'));
+  assert.equal(r.넘김, true, '듣기카드에 `들었음알리기` 를 안 넘긴다 — 카드가 알릴 길이 없다');
+  assert.equal(r.완료, true, '재생 완료(onDone)에서 안 알린다 — 열람이 한 건도 안 쌓인다');
+  assert.equal(r.오류, false, '재생 **실패**에서도 알린다 — 귀에 닿은 것이 없는데 열람으로 적힌다');
+});
+
 /* ── ②-20 `/tasks` 응답이 답안지가 되지 않는다 ────────────────────────
  * 계약이 `task_snapshot` 안에 정답을 두었는데(C0 §4-1 예시 · L0 §3-3 필수 4) 서버는 그 객체를
  * 통째로 학생에게 준다. 오늘 새는 양은 0 이다 — 생산자가 따라말하기뿐이라서지 통로가 막혀서가
@@ -533,4 +636,19 @@ test('②-20 `/tasks` 가 실제로 그 필터를 거쳐 응답한다', () => {
     '`/tasks` 가 필터를 안 거친다 — `task_snapshot: 학생판스냅샷(r.task_snapshot)` 로 내보내라.');
   assert.equal(/task_snapshot:\s*r\.task_snapshot\b/.test(통로), false,
     '스냅샷을 통째로 돌려주는 줄이 남아 있다(②-20).');
+});
+
+/* 🔴 **c9 재료가 응답에서 빠지는 것을 파일 층에서 잡는 유일한 자리**(2026-08-07 변이 ⑥ 이
+ *   실측한 구멍). 위 `열람배선` 은 앱만 보고, `열람사건` 회귀는 인자를 받아 도므로 **서버가
+ *   그 칸을 안 실어도 둘 다 초록**이다 — 증상은 「열람이 한 건도 안 쌓인다」뿐이고 그건
+ *   소급이 안 된다(개원 첫 주가 손실 창).
+ * ⚠ 천장: 값이 **맞는지**는 못 잰다(배포된 판이 진짜 그 사건 id 를 싣는가는 `tools/배달왕복
+ *   시험.js` ⑧ 이 진다). 여기가 잡는 것은 「칸이 통째로 사라진 것」 하나다.
+ * 🔑 SQL 별칭만 봐서는 안 된다 — 변이 ⑥ 은 응답 줄만 지웠고 별칭은 남겼다. 둘을 **잇는 줄**을 본다. */
+test('🔴 `/tasks` 가 배달 사건의 event_id 를 실제로 실어 보낸다 (c9 생산자의 유일한 재료)', () => {
+  const 통로 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'tasks', 'index.ts'), 'utf8');
+  assert.ok(/event_id:\s*r\.intervention_event_id\b/.test(통로),
+    '`intervention.event_id` 가 응답에서 빠졌다 — 앱이 `parent_event_id` 로 쓸 값이 사라져 `content.viewed` 생산자가 다시 0이 된다(C0 §4-3 ①).');
+  assert.ok(/개입\.event_id\s+as\s+intervention_event_id/.test(통로),
+    '별칭이 사라졌다 — 위 줄이 남아 있어도 값이 늘 `undefined` 라, 증상은 「가리킬 대상이 없다」로 위장된다.');
 });
