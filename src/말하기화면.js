@@ -12,19 +12,19 @@ import {
 } from 'react-native';
 import {
   AudioModule,
-  RecordingPresets,
   createAudioPlayer,
   setAudioModeAsync,
-  useAudioRecorder,
-  useAudioRecorderState,
+  useAudioStream,
 } from 'expo-audio';
 import * as Speech from 'expo-speech';
 import { 색, 폰트, 모노트래킹 } from './테마';
-import { 머뭇거림추적, 발화문턱_DB, 다음호흡 } from '../lib/세호흡.js';
+import { 머뭇거림추적, 발화문턱_DB, 데시벨, 다음호흡 } from '../lib/세호흡.js';
+import { wav조립 } from '../lib/wav조립.js';
+import { 정본 as 음성정본 } from '../lib/음성헤더.js';
 import { 마이크준비, 마이크끄기 } from '../lib/마이크권한.js';
 import { 흐름id, 항목추가, 다음시도번호, 학습출석, 전송기록, 밀린것, 배달상태 } from '../lib/제출로그.js';
 import { 화면과제 } from '../lib/오늘과제.js';
-import { 로그읽기, 로그쓰기, 음성보관, 지속저장 } from './저장.js';
+import { 로그읽기, 로그쓰기, 음성쓰기, 지속저장 } from './저장.js';
 import { 오늘과제받기 } from './과제API.js';
 import { 발화보내기 } from './제출API.js';
 import { 급수편지 } from '../contents/첫편지.js';
@@ -41,24 +41,31 @@ const 호흡라벨 = { 듣기: '듣기', 따라: '따라 말하기', 답하기: 
 const 호흡번호 = { 듣기: '01', 따라: '02', 답하기: '03' };
 
 /* 앱이 **요청하는** 녹음 설정. 상수로 뺀 이유는 두 곳이 같은 것을 봐야 하기 때문이다 —
- * 녹음기와 `capture_meta.app`(그때 무엇을 요청했나 · C0 §4-2). 인라인으로 두면 한쪽만 바뀐다.
+ * 마이크 스트림과 `capture_meta.app`(그때 무엇을 요청했나 · C0 §4-2). 인라인으로 두면 한쪽만 바뀐다.
  *
- * ⚠ **정본 규격은 PCM WAV 16kHz/mono 인데 이건 그게 아니다**(HIGH_QUALITY = m4a/AAC).
- *   C0 §4-2 가 「설정을 안 바꾸면 조용히 압축본이 쌓인다」고 미리 적어 둔 그 상태다.
- *   숨기지 않는다: 서버가 파일 헤더를 재서 `spec_violations` 로 **행마다** 남기고, 요청한 설정은
- *   아래 `녹음요청()` 이 함께 실어 보낸다. 프리셋 교체는 실기기 2대 검사가 붙는 별도 칸이다.
+ * 🔑 값을 여기서 정하지 않고 `음성헤더.정본` 에서 **파생**한다 — 규격은 서버가 검사하는 그 표
+ *   하나뿐이어야 한다. 두 곳에 적으면 요청과 검사가 갈라지고, 갈라진 순간 규격 위반이 안 보인다.
+ *
+ * 🔴 옛 통로는 `RecordingPresets.HIGH_QUALITY`(m4a/AAC) 였다 — 손실 압축이 지운 발음 신호는
+ *   원본이 없어 복원 경로가 0 이라(소급 불가 배선 ①), 컨테이너 인코더를 버리고 PCM 스트림을 받는다.
  */
-const 녹음설정 = { ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true };
+const 녹음설정 = {
+  sampleRate: 음성정본.sample_rate,
+  channels: 음성정본.channels,
+  encoding: 음성정본.bit_depth === 16 ? 'int16' : 'float32',
+};
 
 /** 요청한 설정을 **있는 그대로** 적는다 — 잰 값이 아니다(C0 §4-2 `capture_meta.app`). */
 const 녹음요청 = () => ({
   platform: Platform.OS,
   os_version: String(Platform.Version ?? ''),
-  extension: 녹음설정.extension ?? null,
-  sample_rate: 녹음설정.sampleRate ?? null,
-  channels: 녹음설정.numberOfChannels ?? null,
-  bit_rate: 녹음설정.bitRate ?? null,
+  extension: 'wav',
+  sample_rate: 녹음설정.sampleRate,
+  channels: 녹음설정.channels,
+  bit_depth: 음성정본.bit_depth,
+  bit_rate: null, // 무압축이라 비트레이트라는 개념이 없다 — 0 이 아니라 없음이다
   // 🔴 AGC 를 끄라고 **요청한 적이 없다.** `false` 로 적으면 그 행이 「off 였다」는 거짓 증거가 된다.
+  //    `useAudioStream` 에는 그 손잡이가 없다(Android 는 AudioSource.MIC 로 연다).
   agc_requested: null,
 });
 
@@ -331,22 +338,34 @@ function 듣기카드({ 편지, 라벨 = '편지가 왔어요', 다음 }) {
 
 /* ── ②③ 녹음 — 코랄이 사는 유일한 곳 ── */
 function 녹음카드({ step, 제시문, 안내, 선택지, 텍스트병기, date, 로그, 기록추가, 완료, prompt_id }) {
-  const recorder = useAudioRecorder(녹음설정);
-  const rState = useAudioRecorderState(recorder, 100);
   const [단계, set단계] = useState('대기'); // 대기 | 녹음중 | 확인 | 무발화
-  const [녹음, set녹음] = useState(null); // { uri, duration_ms, hesitation_ms, spoke }
+  const [녹음, set녹음] = useState(null); // { uri, 바이트, duration_ms, hesitation_ms, spoke }
+  const [경과, set경과] = useState(0); // 녹음중 타이머 — 스트림이 알려 준 시각
   const [병기글, set병기글] = useState('');
   const [듣는중, set듣는중] = useState(false);
   const [막힘, set막힘] = useState(null); // 녹음이 시작되지 못한 이유 — 버튼 옆에 글자로 선다
   const 추적 = useRef(null);
   const 플레이어 = useRef(null);
+  const 조각들 = useRef([]); // 마이크가 준 PCM 조각. 원본이 여기 말고 어디에도 없다.
+  const 실규격 = useRef(null); // 🔴 스트림이 **보고한** 값 — 요청값과 다를 수 있다(폴백)
 
-  // 미터링 표본 → 머뭇거림 (설계 §5: 확신도의 대체물)
-  useEffect(() => {
-    if (단계 === '녹음중' && 추적.current && rState.isRecording) {
-      추적.current.표본(rState.durationMillis || 0, rState.metering);
-    }
-  }, [단계, rState.durationMillis, rState.metering, rState.isRecording]);
+  /* 마이크 → PCM 조각 + 머뭇거림 표본(설계 §5: 확신도의 대체물).
+   * 🔑 조각과 세기를 같은 자리에서 받는다 — 옛 통로는 녹음기의 `metering` 을 따로 폴링했는데,
+   *   PCM 스트림에는 그 칸이 없어 우리가 같은 눈금(dBFS)으로 잰다(`세호흡.데시벨`). */
+  const { stream } = useAudioStream({
+    sampleRate: 녹음설정.sampleRate,
+    channels: 녹음설정.channels,
+    encoding: 녹음설정.encoding,
+    onBuffer: (buf) => {
+      if (!buf || !buf.data) return;
+      const 조각 = new Uint8Array(buf.data);
+      조각들.current.push(조각);
+      실규격.current = { sample_rate: buf.sampleRate, channels: buf.channels };
+      const t_ms = Math.round((buf.timestamp || 0) * 1000);
+      set경과(t_ms);
+      if (추적.current) 추적.current.표본(t_ms, 데시벨(조각));
+    },
+  });
 
   useEffect(
     () => () => {
@@ -371,8 +390,10 @@ function 녹음카드({ step, 제시문, 안내, 선택지, 텍스트병기, dat
     }
     try {
       추적.current = 머뭇거림추적();
-      await recorder.prepareToRecordAsync();
-      recorder.record();
+      조각들.current = [];
+      실규격.current = null;
+      set경과(0);
+      await stream.start();
       set단계('녹음중');
     } catch (e) {
       set단계('대기');
@@ -382,20 +403,55 @@ function 녹음카드({ step, 제시문, 안내, 선택지, 텍스트병기, dat
   };
 
   const 끝 = async () => {
-    await recorder.stop();
+    stream.stop();
     await 마이크끄기({ 오디오모드: setAudioModeAsync }); // 바로 뒤 「내 목소리 듣기」가 작게 들리지 않도록
-    const duration_ms = rState.durationMillis || 0;
+
+    /* 조각이 하나도 안 왔다 = 시작하자마자 멈춘 것. 무발화도 데이터라(설계 §3-4) 오류로 접지 않는다. */
+    if (조각들.current.length === 0 || !실규격.current) {
+      set녹음({ uri: null, 바이트: null, duration_ms: 0, hesitation_ms: 0, spoke: false });
+      set단계('무발화');
+      return;
+    }
+
+    /* 🔴 헤더는 **스트림이 보고한 값**으로 쓴다. 기기가 16kHz 를 못 주면 네이티브가 조용히
+     *   폴백하는데, 요청값을 적으면 그 파일이 자기가 무엇인지 거짓말하게 된다(`lib/wav조립.js`). */
+    let 조립 = null;
+    try {
+      조립 = wav조립({
+        조각들: 조각들.current,
+        sample_rate: 실규격.current.sample_rate,
+        channels: 실규격.current.channels,
+        bit_depth: 음성정본.bit_depth,
+      });
+    } catch (e) {
+      set단계('대기');
+      set녹음(null);
+      set막힘('녹음을 담지 못했어요: ' + String(e.message || e));
+      return;
+    }
+
+    const duration_ms = 조립.duration_ms;
     const r = 추적.current ? 추적.current.결과(duration_ms) : { 발화있음: true, 머뭇거림_ms: 0 };
-    set녹음({ uri: recorder.uri, duration_ms, hesitation_ms: r.머뭇거림_ms, spoke: r.발화있음 });
+
+    /* 「내 목소리 듣기」는 uri 로만 연다. 최종 이름은 시도 번호가 붙어야 정해지므로(`남기기`)
+     * 여기서는 호흡별 임시 이름에 쓴다. 실패해도 **바이트는 메모리에 그대로** 있어 제출은 산다. */
+    let uri = null;
+    try {
+      uri = await 음성쓰기(조립.바이트, `임시-${step}.wav`);
+    } catch (_) {
+      uri = null;
+    }
+
+    set녹음({ uri, 바이트: 조립.바이트, duration_ms, hesitation_ms: r.머뭇거림_ms, spoke: r.발화있음 });
     set단계(r.발화있음 ? '확인' : '무발화');
   };
 
   const 남기기 = async (status) => {
     const attempt = 다음시도번호(로그, date, step);
     let audio = null;
-    if (녹음 && 녹음.uri) {
+    if (녹음 && 녹음.바이트) {
       try {
-        audio = await 음성보관(녹음.uri, `${date}-${step}-${attempt}.m4a`);
+        audio = await 음성쓰기(녹음.바이트, `${date}-${step}-${attempt}.wav`);
       } catch (_) {
         audio = null; // 파일 보관 실패 — 로그에는 null 로 정직하게 남는다
       }
@@ -469,7 +525,7 @@ function 녹음카드({ step, 제시문, 안내, 선택지, 텍스트병기, dat
       {단계 === '녹음중' && (
         <중앙>
           <녹음버튼 녹음중 onPress={끝} />
-          <Text style={s.타이머}>{초표시(rState.durationMillis || 0)}</Text>
+          <Text style={s.타이머}>{초표시(경과)}</Text>
           <Text style={s.녹음안내}>다 말했으면 탭해서 마쳐요</Text>
         </중앙>
       )}

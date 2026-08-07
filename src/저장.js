@@ -48,19 +48,22 @@ export async function 로그쓰기(로그) {
 }
 
 /**
- * 녹음 임시 파일을 영구 위치로 옮긴다.
- * @param {string} uri 레코더가 준 임시 uri
- * @param {string} 이름 예: 2026-08-03-따라-1.m4a
- * @returns {Promise<string|null>} 영구 경로(웹은 null — 파일 지속 불가)
+ * 조립된 WAV 바이트를 기기에 쓴다(배선① — 앱이 컨테이너를 직접 만든다 · `lib/wav조립.js`).
+ *
+ * 🔑 옛 통로(`음성보관`)는 레코더의 임시 파일을 복사했다. PCM 스트림에는 임시 파일이 없다 —
+ *   바이트가 곧 원본이라 여기가 그 원본이 **처음 디스크에 닿는 자리**다.
+ *
+ * @param {Uint8Array} 바이트
+ * @param {string} 이름 예: 2026-08-03-따라-1.wav
+ * @returns {Promise<string|null>} 파일 uri(웹은 null — 파일 지속 불가)
  */
-export async function 음성보관(uri, 이름) {
+export async function 음성쓰기(바이트, 이름) {
   if (웹) return null;
   const dir = new FS.Directory(FS.Paths.document, 'recordings');
   if (!dir.exists) dir.create();
-  const src = new FS.File(uri);
-  const dst = new FS.File(dir, 이름);
-  src.copy(dst); // move 가 아니라 copy — 레코더의 임시 파일 수명은 레코더에게 맡긴다
-  return dst.uri;
+  const f = new FS.File(dir, 이름);
+  f.write(바이트);
+  return f.uri;
 }
 
 /**

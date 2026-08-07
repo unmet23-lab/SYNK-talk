@@ -5,7 +5,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { 발화문턱_DB, 머뭇거림추적, 호흡순서, 다음호흡 } = require('../lib/세호흡.js');
+const { 발화문턱_DB, 무음_DB, 데시벨, 머뭇거림추적, 호흡순서, 다음호흡 } = require('../lib/세호흡.js');
 const { 흐름id, 다음시도번호, 항목추가, 직렬화, 역직렬화, 학습출석, 전송기록, 밀린것, 배달상태 } = require('../lib/제출로그.js');
 
 // ── 머뭇거림 (설계 §5 — 퀴즈 확신도의 대체물) ──────────────────
@@ -38,6 +38,50 @@ test('머뭇거림: null·undefined 미터링 표본은 무시한다(웹은 미�
   t.표본(200, undefined);
   t.표본(300, -10);
   assert.equal(t.결과(1000).머뭇거림_ms, 300);
+});
+
+// ── 마이크 세기 (배선① · PCM 스트림에는 metering 칸이 없어 우리가 잰다) ──
+
+/** int16 리틀엔디언으로 표본을 싼다 — `useAudioStream` 이 주는 것과 같은 모양. */
+const pcm = (값들) => {
+  const b = new Uint8Array(값들.length * 2);
+  const dv = new DataView(b.buffer);
+  값들.forEach((v, i) => dv.setInt16(i * 2, v, true));
+  return b;
+};
+
+test('세기: 최대진폭은 0dBFS 근처, 무음은 바닥값', () => {
+  assert.ok(Math.abs(데시벨(pcm([32767, -32767, 32767, -32767]))) < 0.1);
+  assert.equal(데시벨(pcm([0, 0, 0, 0])), 무음_DB);
+});
+
+/* 🔴 바이트 순서를 거꾸로 읽으면 큰 소리가 작게 잰다 — 말한 학생이 「무발화」로 남는다.
+ * 0x4000(=진폭 0.5 · 약 -6dB)은 거꾸로 읽으면 0x0040(≈ -54dB)이라 문턱의 반대편이다. */
+test('세기: 표본을 리틀엔디언으로 읽는다', () => {
+  const dB = 데시벨(Uint8Array.from([0x00, 0x40, 0x00, 0x40]));
+  assert.ok(dB > -7 && dB < -5, `기대 ≈-6dB, 실제 ${dB}`);
+  assert.ok(dB > 발화문턱_DB);
+});
+
+test('세기: 문턱 양쪽을 실제로 가른다', () => {
+  assert.ok(데시벨(pcm([3277, -3277, 3277, -3277])) > 발화문턱_DB); // 진폭 0.1 ≈ -20dB
+  assert.ok(데시벨(pcm([328, -328, 328, -328])) < 발화문턱_DB); // 진폭 0.01 ≈ -40dB
+});
+
+/* 표본이 없을 때 0 을 돌려주면 그건 dBFS 에서 **최대 음량**이라 무발화가 발화로 뒤집힌다. */
+test('세기: 표본이 없으면 null 이고, 머뭇거림추적이 그것을 무시한다', () => {
+  assert.equal(데시벨(new Uint8Array(0)), null);
+  assert.equal(데시벨(Uint8Array.from([0x7f])), null); // 반쪽 표본 하나뿐
+
+  const t = 머뭇거림추적();
+  t.표본(100, 데시벨(new Uint8Array(0)));
+  assert.equal(t.결과(1000).발화있음, false);
+});
+
+test('세기: 프레임을 못 채운 꼬리 바이트는 세지 않는다', () => {
+  const 온전 = 데시벨(pcm([20000, -20000]));
+  const 꼬리 = 데시벨(Uint8Array.from([...pcm([20000, -20000]), 0x7f]));
+  assert.equal(꼬리, 온전);
 });
 
 // ── 호흡 순서 (설계 §6) ────────────────────────────────────────
