@@ -108,3 +108,25 @@ test('픽스처 — 들여쓰기·줄바꿈만 다른 소스는 통과 (거짓�
   const 다른모양 = `where learner_id = l.learner_id\n\t and    agreed_at <= now()\n and (revoked_at is null or revoked_at > now())`;
   assert.deepEqual(검사({ 대상: 다른모양 }, 지금유효술어), []);
 });
+
+/* ── 막힘 화면이 **받기만 하고 받아주지는 않는가** (P0 §239 · S1) ──────────────
+ * S1 에서 앱은 동의를 **확인만** 한다 — 동의는 상담 자리에서 대면으로 받고 운영자가
+ * `tools/동의발급.js` 로 옮겨 적는다. 여기에 「동의하기」 버튼이 서면 **근거 없는 동의**가
+ * 쌓이고, 동의는 소급해서 무를 수 없다. 그 버튼이 서는 것은 파일럿(2027-02 · P0 §240)이고
+ * 선행 조건이 셋이다: 몽골어 검수 · Inter Tight cyrillic-ext 탑재 · 동의문 6항목 사본(A-10).
+ *
+ * 🔑 프로즈로만 적어 두면 다음 사람이 「학생이 답답해 하니 버튼 하나쯤」으로 연다 —
+ *   그래서 소스에서 기계로 본다. 레이아웃은 검사하지 않는다(그건 기기에서 볼 층이다). */
+test('🚫 막힘 카드에 「동의하기」 버튼이 없다 — S1 은 앱이 확인만 한다', () => {
+  const 소스 = fs.readFileSync(path.join(__dirname, '..', 'src', '막힘카드.js'), 'utf8');
+  const 코드 = 소스.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, ''); // 주석은 이 규칙을 **설명**한다
+  const 누른다 = 코드.match(/Pressable|TouchableOpacity|Button|onPress/);
+  assert.equal(누른다, null,
+    `🔴 막힘 카드에 누를 것이 생겼다(${누른다 && 누른다[0]}) — 동의를 앱에서 받으면 근거 없는 동의가 쌓인다.\n` +
+    '   S1 은 확인만(P0 §239). 파일럿에 열 때는 몽골어 검수·Inter Tight cyrillic-ext·동의문 사본이 먼저다.');
+});
+
+test('픽스처 — 버튼이 되살아나면 잡는다 (통과와 미실행이 같은 모양이 되지 않게)', () => {
+  const 가짜 = '<Pressable onPress={동의하기}><Text>동의합니다</Text></Pressable>';
+  assert.ok(/Pressable|TouchableOpacity|Button|onPress/.test(가짜), '탐지 규칙 자체가 죽었다');
+});
