@@ -144,10 +144,43 @@ async function 미디어받기(참조들, 출력, e) {
   return 지도;
 }
 
-function HTML만들기({ 갈래, ref, 미디어지도, 참조통계 }) {
-  const 자료 = JSON.stringify({ 갈래, ref, 미디어지도, 참조통계, 만든때: new Date().toISOString() })
-    .replace(/</g, '\\u003c');   // </script> 조기 종료 차단
-  return `<meta charset="utf-8"><title>SYNK 엔진 뷰어 · ${ref}</title>
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* 🔴 **JS 로 그리지 않는다.** 2026-08-07 유호님 「안 보여」 — 화면엔 제목만 뜨고 아래가 통째로 비었다.
+ *   원인은 데이터도 문법도 아니었다(node 에서 같은 스크립트가 정상 실행됨): **스크립트를 안 돌리는
+ *   뷰어**가 있다는 것이다(Claude 앱 미리보기는 프로젝트 밖 파일을 정적 스냅샷으로 연다 · 메일·PDF 도 같다).
+ *   데이터는 이미 여기 node 안에 있으니 **바로 찍으면 된다** — 넘겨서 브라우저가 다시 그리게 할 이유가 없었다.
+ *   접기는 `<details>`, 재생은 `<audio>` 로 **네이티브**라 스크립트 0 줄로 선다. */
+function 행그리기(행들, 라벨, 미디어지도) {
+  if (!행들 || !행들.length) return `<div class="row">${esc(라벨)} 없음</div>`;
+  return 행들.map((r, i) => {
+    const refs = [...new Set(참조수집(r))]
+      .filter((p) => ['wav', 'm4a', 'mp3', 'png', 'jpg', 'jpeg', 'webp'].includes(확장자(p)));
+    const 재생 = refs.filter((p) => 미디어지도[p])
+      .map((p) => `<audio controls preload="none" src="${esc(미디어지도[p])}"></audio>`).join('');
+    const 태그 = [r.event_type, r.task_type, r.task_format, r.source_kind].filter(Boolean)
+      .map((t) => `<span class="tag">${esc(t)}</span>`).join('');
+    return `<details class="row"><summary><b>${i + 1}</b>${태그}`
+      + (refs.length ? `<span class="tag">${refs.length} 파일</span>` : '')
+      + `</summary>${재생}<pre>${esc(JSON.stringify(r, null, 2))}</pre></details>`;
+  }).join('');
+}
+
+function HTML만들기({ 갈래, ref, 미디어지도 }) {
+  const T = 갈래.totals || {};
+  const 칩 = (갈래.events_by_type || [])
+    .map((x) => `<span class="chip">${esc(x.k)} <b>${x.n}</b></span>`).join('');
+  const 카드 = [['음성 .wav', T.wav, 1], ['텍스트 본문', T.text, 0], ['이미지', T.image, 0],
+    ['전사문', T.transcript, 0], ['제출 전체', T.submissions, 0], ['사건 전체', T.events, 0]]
+    .map(([이름, n, 소리]) => `<div class="card"><div class="t"><span class="dot${소리 ? ' audio' : ''}"></span>`
+      + `${esc(이름)}</div><div class="n">${n == null ? '—' : n}</div></div>`).join('');
+  const 제출 = 갈래.submissions_sample || [];
+  const 사건 = 갈래.events_sample || [];
+  /* DOCTYPE 을 뺐더니 미리보기가 이 파일을 HTML 로 안 읽었다(같은 날 같은 자리). */
+  return `<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SYNK 엔진 뷰어 · ${ref}</title>
 <style>
 :root{--bg:#FBF7EE;--ink:#151A2E;--muted:#2A3358;--line:rgba(42,51,88,.18);--coral:#FF6B5C;--lime:#B8E836}
 *{box-sizing:border-box}
@@ -172,50 +205,18 @@ pre{margin:8px 0 0;padding:10px;background:#F7F4EC;border-radius:6px;overflow:au
 audio{width:100%;margin-top:8px}
 .warn{border-left:3px solid var(--coral);padding:8px 12px;background:#fff;border-radius:0;font-size:12px;color:var(--muted);margin-bottom:20px}
 </style>
+</head><body>
 <h1>엔진 뷰어</h1>
-<div class="sub" id="sub"></div>
+<div class="sub">${esc(ref)} · 지금 수집돼 있는 것 전부입니다</div>
 <div class="warn">이 페이지는 네트워크를 타지 않습니다 — 데이터는 파일 안에 박혀 있고 키는 들어 있지 않습니다.</div>
-<div class="kinds" id="kinds"></div>
+<div class="kinds">${칩}</div>
 <h2>확장자별</h2>
-<div class="ext" id="ext"></div>
-<h2>제출 <span id="sn" class="tag"></span></h2>
-<div id="subs"></div>
-<h2>사건 <span id="en" class="tag"></span></h2>
-<div id="evts"></div>
-<script>
-const D = ${자료};
-const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-$('sub').textContent = D.ref + ' · ' + new Date(D.만든때).toLocaleString('ko-KR') + ' 기준';
-
-$('kinds').innerHTML = (D.갈래.events_by_type || [])
-  .map(x => '<span class="chip">' + esc(x.k) + ' <b>' + x.n + '</b></span>').join('');
-
-const T = D.갈래.totals || {};
-$('ext').innerHTML = [
-  ['음성 .wav', T.wav, 1], ['텍스트 본문', T.text, 0], ['이미지', T.image, 0],
-  ['전사문', T.transcript, 0], ['제출 전체', T.submissions, 0], ['사건 전체', T.events, 0],
-].map(([이름, n, 소리]) => '<div class="card"><div class="t"><span class="dot' +
-    (소리 ? ' audio' : '') + '"></span>' + esc(이름) + '</div><div class="n">' +
-    (n == null ? '—' : n) + '</div></div>').join('');
-
-function 그리기(칸, 행들, 라벨) {
-  const rows = 행들 || [];
-  $(칸 === 'subs' ? 'sn' : 'en').textContent = rows.length + '건';
-  $(칸).innerHTML = rows.map((r, i) => {
-    const refs = JSON.stringify(r).match(/[\\w./-]+\\.(wav|m4a|mp3|png|jpg|jpeg|webp)/gi) || [];
-    const 재생 = refs.filter(p => D.미디어지도[p]).map(p =>
-      '<audio controls preload="none" src="' + D.미디어지도[p] + '"></audio>').join('');
-    const 태그 = [r.event_type, r.task_type, r.task_format, r.source_kind]
-      .filter(Boolean).map(t => '<span class="tag">' + esc(t) + '</span>').join('');
-    return '<details class="row"><summary><b>' + (i+1) + '</b>' + 태그 +
-      (refs.length ? '<span class="tag">' + refs.length + ' 파일</span>' : '') +
-      '</summary>' + 재생 + '<pre>' + esc(JSON.stringify(r, null, 2)) + '</pre></details>';
-  }).join('') || '<div class="row">' + 라벨 + ' 없음</div>';
-}
-그리기('subs', D.갈래.submissions_sample);
-그리기('evts', D.갈래.events_sample);
-</script>`;
+<div class="ext">${카드}</div>
+<h2>제출 <span class="tag">표본 ${제출.length}건</span></h2>
+${행그리기(제출, '제출', 미디어지도)}
+<h2>사건 <span class="tag">표본 ${사건.length}건</span></h2>
+${행그리기(사건, '사건', 미디어지도)}
+</body></html>`;
 }
 
 async function main() {
@@ -227,8 +228,6 @@ async function main() {
   const { 갈래, ref, e } = await 질의실행(건수);
 
   const 모든참조 = [...new Set(참조수집(갈래))];
-  const 참조통계 = {};
-  for (const p of 모든참조) { const x = 확장자(p); 참조통계[x] = (참조통계[x] || 0) + 1; }
 
   fs.mkdirSync(출력, { recursive: true });
   const 미디어지도 = args.includes('--미디어')
@@ -236,7 +235,7 @@ async function main() {
     : {};
 
   const 파일 = path.join(출력, '뷰어.html');
-  fs.writeFileSync(파일, HTML만들기({ 갈래, ref, 미디어지도, 참조통계 }), 'utf8');
+  fs.writeFileSync(파일, HTML만들기({ 갈래, ref, 미디어지도 }), 'utf8');
   console.log(`[엔진뷰어] ✅ ${파일}`);
   if (!args.includes('--미디어')) console.log('[엔진뷰어] 메타데이터만 — 사본 0. 음성까지 보려면 --미디어 (사본이 늘어난다)');
 }
@@ -253,7 +252,23 @@ function 자가검사() {
     [__filename, '--출력', path.join(ROOT, 'tmp')], { encoding: 'utf8' });
   assert.strictEqual(r.status, 1, '저장소 안 출력이 거부되지 않았다');
   assert.match(r.stderr, /저장소 안이다/);
-  console.log('[엔진뷰어] 자가검사 통과 — 질의 읽기전용 · 참조수집 · 확장자 정규화 · 저장소 출력 거부');
+
+  /* 🔴 이 검사가 유호님 「안 보여」의 회귀다 — 스크립트를 안 돌리는 뷰어에서도 내용이 보여야 한다.
+   *    「<script> 가 없다」만 보면 부족하다(빈 페이지도 통과한다) — **숫자가 실제로 박혔는지**까지 본다. */
+  const h = HTML만들기({
+    갈래: {
+      totals: { wav: 44, text: 187, image: 0, transcript: 0, submissions: 360, events: 509 },
+      events_by_type: [{ k: 'submission.created', n: 291 }],
+      submissions_sample: [{ task_type: 'speaking', audio_ref: 'voice/a/b.wav' }],
+      events_sample: [],
+    }, ref: 'testref', 미디어지도: {},
+  });
+  assert.ok(!/<script/i.test(h), 'HTML 에 <script> 가 있다 — 스크립트 없는 뷰어에서 빈 화면이 된다');
+  ['44', '187', '360', '509', 'submission.created', 'speaking', '사건 없음']
+    .forEach((s) => assert.ok(h.includes(s), `렌더 결과에 «${s}» 가 없다`));
+  assert.ok(h.startsWith('<!DOCTYPE html>'), 'DOCTYPE 이 없다 — 미리보기가 HTML 로 안 읽는다');
+
+  console.log('[엔진뷰어] 자가검사 통과 — 질의 읽기전용 · 참조수집 · 확장자 정규화 · 저장소 출력 거부 · **스크립트 없이 렌더**');
 }
 
 if (process.argv.includes('--자가검사')) 자가검사();
