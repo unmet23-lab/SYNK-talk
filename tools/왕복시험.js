@@ -255,11 +255,46 @@ async function main() {
   let 되돌림막힘 = false;
   try { await sql(`update engine.consents set revoked_at = null where learner_id='${learner_id}'`); } catch { 되돌림막힘 = true; }
   확인('철회 되돌리기 거부(재동의는 새 행)', 되돌림막힘);
-  // 재동의 = 새 행 — 회로가 다시 산다(다음 실행도 이 상태에서 시작한다)
+  /* 재동의 = 새 행 — 회로가 다시 산다(다음 실행도 이 상태에서 시작한다).
+   * 🔴 `now()` 가 아니라 2초 앞선 시각을 쓴다. 게이트는 `agreed_at <= occurred_at` 인데
+   *   agreed_at 은 **DB 시계**, occurred_at 은 **기기 시계**라 둘을 직접 비교한다. now() 로
+   *   심으면 여백이 왕복 지연분(실측 ~12ms)뿐이라 지터에 뒤집힌다 — 2026-08-07 에 같은
+   *   조건에서 적색 2회·초록 2회로 실제로 흔들렸다. 여기서 재려는 것은 「재동의하면 다시
+   *   저장된다」지 두 시계의 오차가 아니다. ⚠ 이 여백은 **시험의 편의**이고, 두 시계를
+   *   직접 비교하는 설계 자체는 남아 있다(기기 시계가 뒤처진 학생은 방금 동의하고도
+   *   거절될 수 있다 — sol 심문 C0 P0 「신뢰하지 않는 occurred_at 이 동의 효력을 결정한다」). */
   await sql(`insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver)
-             values ('${learner_id}', 'v18.9', now(), 'test')`);
+             values ('${learner_id}', 'v18.9', now() - interval '2 seconds', 'test')`);
   r = await 부르기({ events: [기본()] });
   확인('재동의(새 행) 뒤에는 다시 저장된다', r.body.results?.[0]?.status === 'stored', r.body.results?.[0]);
+
+  // ── ⑬ 교정 고리가 **API 로** 선다 — c8 correction_id (F179 가 지목한 사각지대)
+  /* 🔴 왜 여기냐: `교정왕복시험.js` 는 이 보증을 SQL 로만 잰다. 그래서 실제 통로인
+   *   Edge Function 의 INSERT 열 목록에서 correction_id 가 통째로 빠져 있는데도
+   *   12/12 가 초록이었다(F179). DB 를 증명한 것이지 **API 를 증명한 게 아니었다.**
+   *   그 층은 여기밖에 없다 — 이 파일만 학생 로그인 토큰으로 함수를 부른다. */
+  console.log('\n⑬ 교정 고리(API)');
+  const [{ submission_id: 교정대상 }] = await sql(
+    `select submission_id from engine.submissions where event_id = '${첫?.event_id}'`);
+  const [{ correction_id }] = await sql(
+    `insert into engine.corrections (submission_id, actor_kind, corrected_text, schema_ver)
+     values ('${교정대상}'::uuid, 'teacher', '어제 친구를 만나서 밥을 먹었어요', '${await 현재판()}')
+     returning correction_id`);
+  const 열람 = {
+    idempotency_key: crypto.randomUUID(), event_type: 'correction.viewed', task_type: '숙제제출',
+    occurred_at: new Date().toISOString(), level_snapshot: 'Lv3',
+    correction_id, payload: { ver: 1 },
+  };
+  r = await 부르기({ events: [열람] });
+  확인('API 가 correction.viewed 를 받는다', r.body.results?.[0]?.status === 'stored', r.body.results?.[0]);
+  확인('저장된 행에 correction_id 가 살아 있다 — 서버가 값을 버리지 않는다',
+    (await sql(`select correction_id from engine.learning_events
+                 where idempotency_key='${열람.idempotency_key}'`))[0]?.correction_id === correction_id);
+  /* 사유까지 본다 — 「거절됐다」만 보면 봉투·급수 같은 **다른 이유**의 거절이 초록이 된다
+   * (이 검사를 지을 때 실제로 두 번 그렇게 거짓 초록이 났다). */
+  r = await 부르기({ events: [{ ...열람, idempotency_key: crypto.randomUUID(), correction_id: undefined }] });
+  확인('지목 없는 correction.viewed 는 correction_id 때문에 거절된다',
+    /correction_id/.test(r.body.results?.[0]?.error?.message ?? ''), r.body.results?.[0]);
 
   console.log(`\n── 통과 ${통과} · 실패 ${실패} ──`);
   process.exit(실패 ? 1 : 0);
