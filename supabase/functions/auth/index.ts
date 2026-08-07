@@ -56,6 +56,7 @@ const { 학생번호맞나, 이메일, 뒷자리맞나, 시도상한 } = 학생�
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
 const AUTH = `${Deno.env.get('SUPABASE_URL')!}/auth/v1`;
+const 함수기지 = `${Deno.env.get('SUPABASE_URL')!}/functions/v1`;
 const 서비스키 = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 /** §4-2 표: 6자 이상만 요구하고 복잡도 규칙은 두지 않는다(몽골 10대가 매일 치는 값이다). */
@@ -444,9 +445,47 @@ Deno.serve(async (req: Request) => {
       ok: true,
       student_code: 이음[0].student_code,
       display_name: 이음[0].display_name,
+      // 조용히 실패하지 않게 결과를 싣는다 — 앱은 안 쓰지만 이 값이 없으면 첫날 소실이 로그에만 남는다.
+      첫배정: await 첫배정세우기(String(이음[0].learner_id)),
     }, ver);
   } catch (e) {
     console.error('[auth] 예외', e instanceof Error ? e.message : String(e));
     return 실패(500, { code: 'SERVER_ERROR', message: '잠시 뒤 다시 시도해 주세요', retryable: true }, ver);
   }
 });
+
+/* 첫 배정을 **지금** 세운다 — 오디오 타임캡슐 N23 (유호님 확정 2026-08-08 · ㉱ⓐ).
+ *
+ * ■ 왜 등록 시점인가
+ *   배치(`deliver`)는 하루 1회다. 등록 당일 낮에 앱을 켠 학생에게는 오늘 배정이 아직 없고,
+ *   그때 앱은 `contents/첫편지.js` 폴백 화면으로 내려가 **발화를 서버로 보내지 않는다**
+ *   (`lib/오늘과제.js` 화면과제 — `제출재료: null`. 지어내지 않는 그 판단 자체는 옳다).
+ *   그런데 그 하루가 정확히 **「입학 첫날 목소리」**이고, 그것은 소급이 안 된다.
+ *
+ * ■ 🔑 배정을 만드는 코드는 `deliver` 하나뿐이다
+ *   여기서 직접 INSERT 하면 배정 생성이 두 곳이 되고, 갈라진 쪽이 낸 행은 계약 밖 모양이 된다
+ *   (같은 이유로 `deliver` 도 단건 모드를 **새 경로가 아니라 대상만 좁힌 같은 `한명()`** 으로 냈다).
+ *
+ * ■ ⚠ 실패해도 등록은 되돌리지 않는다
+ *   계정은 이미 섰고, 못 세운 배정은 다음 배치가 집는다. 다만 **그날 안에 앱을 켜면 폴백이라
+ *   첫 목소리는 잃는다** — 그래서 조용히 넘기지 않고 로그 + 응답(`첫배정`)에 남긴다.
+ *   ⚠ 동의가 없는 학생은 `deliver` 가 `skipped`(consent_missing)로 건너뛴다. 그때도 응답은
+ *     `true`(호출 성공)라 이 값만으로 「배정이 섰다」를 단정하지 않는다 — 분모는 `deliver` 의
+ *     §6-5 점검 모드가 진다. */
+async function 첫배정세우기(learner_id: string): Promise<boolean> {
+  try {
+    const r = await fetch(`${함수기지}/deliver?learner_id=${encodeURIComponent(learner_id)}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${서비스키}`, 'Content-Type': 'application/json' },
+    });
+    if (!r.ok) {
+      console.error('[auth] 🔴 첫 배정 실패 — 오늘 앱을 켜면 폴백이라 첫 목소리를 잃는다',
+        learner_id, r.status, (await r.text()).slice(0, 200));
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('[auth] 🔴 첫 배정 호출 예외', learner_id, e instanceof Error ? e.message : String(e));
+    return false;
+  }
+}

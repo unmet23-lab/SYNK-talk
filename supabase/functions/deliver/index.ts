@@ -60,10 +60,22 @@ Deno.serve(async (req: Request) => {
     return 봉투(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: '배치 호출 권한이 없습니다' } });
   }
   const 오늘 = 몽골날짜();
-  const 점검 = new URL(req.url).searchParams.has('점검');
+  const 인자 = new URL(req.url).searchParams;
+  const 점검 = 인자.has('점검');
+
+  /* 단건 모드 — 첫 등록 직후 `auth` 가 그 학생 하나만 세우려고 부른다(N23 · 유호님 확정 08-08).
+   * 배치는 하루 1회라 등록 당일 낮에 앱을 켠 학생에게는 배정이 없고, 그때 앱은 폴백 화면으로
+   * 내려가 **발화를 서버로 보내지 않는다**(lib/오늘과제.js 화면과제). 그 하루가 곧 「입학 첫날
+   * 목소리」이고 소급이 안 된다.
+   * 🔑 새 경로가 아니라 **같은 `한명()` 을 대상만 좁혀 부르는 것**이다 — 배정을 만드는 코드가
+   *   둘이 되면 그 둘은 갈라지고, 갈라진 쪽이 낸 행은 계약 밖 모양이 된다. */
+  const 한사람 = 인자.get('learner_id');
+  if (한사람 !== null && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(한사람)) {
+    return 봉투(400, { ok: false, error: { code: 'BAD_REQUEST', message: 'learner_id 가 uuid 가 아닙니다' } });
+  }
 
   try {
-    return 점검 ? await 점검하기(오늘) : await 배달하기(오늘);
+    return 점검 ? await 점검하기(오늘) : await 배달하기(오늘, 한사람);
   } catch (e) {
     const 글 = String((e as Error)?.message ?? e);
     console.error('[deliver] 실패', 글);
@@ -90,7 +102,10 @@ async function 점검하기(오늘: string) {
   return 봉투(200, { ok: true, mode: '점검', date: 오늘, 재적, 배정, 강등, 미달 });
 }
 
-async function 배달하기(오늘: string) {
+async function 배달하기(오늘: string, 한사람: string | null = null) {
+  /* 단건이면 대상만 좁힌다 — 재료를 만드는 lateral 셋은 **그대로 탄다**(첫날 판정·교정문·동의).
+   * 좁히는 자리를 여기 하나로 두면 「전원」과 「한 명」이 같은 재료로 같은 결정을 낸다. */
+  const 좁히기 = 한사람 ? sql`where l.learner_id = ${한사람}::uuid` : sql``;
   /* 학생과 재료를 **한 번에** 읽는다(학생 수만큼 왕복하지 않는다).
    * · 마지막 배정 = 「첫날인가」와 「전날 문장」의 근거
    * · 교정문 = **지난 배정 뒤에 새로 확정된 것**만. 「최신 1건」으로 잡으면 같은 교정문이
@@ -130,7 +145,15 @@ async function 배달하기(오늘: string) {
          where learner_id = l.learner_id
            and agreed_at <= now()
            and (revoked_at is null or revoked_at > now())
-         order by agreed_at desc limit 1) 동의 on true`;
+         order by agreed_at desc limit 1) 동의 on true
+      ${좁히기}`;
+
+  /* 🔴 단건인데 0건 = 없는 learner_id 로 불렸다는 뜻이다. 200 으로 넘기면 「배정 0/재적 0」이라
+   *   미달 경고에도 안 걸려 **조용히 아무 일도 안 한 것**이 된다. 부른 쪽이 알아야 한다. */
+  if (한사람 && !대상.length) {
+    console.error('[deliver] 🔴 단건 대상 없음', 한사람);
+    return 봉투(404, { ok: false, date: 오늘, mode: '단건', error: { code: 'NOT_FOUND', message: '그 학생이 없습니다' } });
+  }
 
   const [{ 최신조각 }] = await sql`
     select name as 최신조각 from engine.schema_migrations order by version desc limit 1`;
@@ -148,7 +171,7 @@ async function 배달하기(오늘: string) {
 
   const 센다 = (s: string) => results.filter((r) => r.status === s).length;
   const 몸 = {
-    ok: true, date: 오늘, contract_ver: ver, 재적: 대상.length,
+    ok: true, date: 오늘, contract_ver: ver, mode: 한사람 ? '단건' : '전원', 재적: 대상.length,
     배정: 센다('assigned') + 센다('duplicate'),
     신규: 센다('assigned'), 재실행: 센다('duplicate'),
     강등: results.filter((r) => r.degraded).length,
