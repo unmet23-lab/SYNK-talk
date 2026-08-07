@@ -34,6 +34,15 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { 정규형, 이메일, 비밀번호 } = require('../lib/로그인코드.js');
+// --새학생 이 쓰는 통로. 로그인 코드 계정과 **다른 이메일 규칙**이라 정본에서 따로 가져온다.
+const { 이메일: 학생이메일 } = require('../lib/학생계정.js');
+const { execFileSync } = require('child_process');
+
+/* --새학생 픽스처. 인증왕복시험과 같은 모양을 쓰되 번호만 매 회차 새로 딴다 —
+ * 이 시험은 `learning_events` 에 지울 수 없는 행을 남겨 학생을 재사용하면 「갓 등록」이 아니다. */
+const 새연락처 = '+976 9911-2233';
+const 새뒷자리 = '2233';
+const 새비번 = 'Synk-Rehearsal-1';
 
 const ROOT = path.resolve(__dirname, '..');
 const API = 'https://api.supabase.com/v1/projects';
@@ -50,7 +59,10 @@ function 확인(이름, 조건, 실제) {
 async function main() {
   const args = process.argv.slice(2);
   const [code용학생, 평문코드] = args.filter((a) => !a.startsWith('--'));
-  if (!code용학생 || !평문코드) die('사용: node tools/왕복시험.js <student_code> <로그인코드>');
+  const 새학생 = args.includes('--새학생');
+  if (!새학생 && (!code용학생 || !평문코드)) {
+    die('사용: node tools/왕복시험.js <student_code> <로그인코드>   또는   --새학생');
+  }
 
   const e = 자격증명.읽기('왕복시험');
   const 토큰 = e.SUPABASE_ACCESS_TOKEN, ref = e.SUPABASE_PROJECT_REF;
@@ -64,6 +76,11 @@ async function main() {
     die(`「${이름}」 은 리허설이 아니다. 이 시험은 **지울 수 없는 행**을 남긴다 —\n` +
         '     유호님 승인 뒤에만: --운영승인');
   }
+  /* --새학생 은 `--운영승인` 으로도 안 뚫린다 — 운영 명부에 시험 학생을 만드는 것은
+   * 사건 몇 행과 달리 **사람 한 명이 생기는 것**이고, FK restrict 라 지울 수도 없다. */
+  if (새학생 && !/rehearsal/i.test(이름)) {
+    die('--새학생 은 리허설 전용이다 — 운영 명부에 시험 학생을 만들지 않는다(지워지지도 않는다)');
+  }
 
   /** Management API 로 SQL — 준비·검증용(함수를 안 거치고 DB 를 직접 본다). */
   const sql = async (q) => {
@@ -76,11 +93,43 @@ async function main() {
   const kr = await fetch(`${API}/${ref}/api-keys`, { headers: M });
   const anon = JSON.parse(await kr.text()).find((k) => k.name === 'anon').api_key;
 
+  let 학생번호 = code용학생;
+  let 자격 = 새학생 ? null : { email: 이메일(평문코드), password: 비밀번호(정규형(평문코드)) };
+
+  if (새학생) {
+    /* ⓪ 개원 첫 관문 — 명부 등록 → 학생이 앱에서 첫 등록.
+     *   번호는 매 회차 새로 딴다: 이 시험이 남기는 `learning_events` 가 append-only 라
+     *   같은 학생을 다시 쓰면 두 번째부터는 「갓 등록」이 아니다(그게 F176 이 밟은 함정이다).
+     *   ponytail: SYNK-9NN 대역 100개를 쓰고 고갈되면 die 한다 — 대역을 넓히는 건 그때 몫이다. */
+    console.log('⓪ 갓 명부에 오른 학생을 여기서 세운다');
+    const [{ 다음 }] = await sql(
+      `select coalesce(max(right(student_code, 3)::int), 901) + 1 as 다음
+         from engine.learners where student_code ~ '^SYNK-9[0-9][0-9]$'`);
+    if (Number(다음) > 999) die('SYNK-9NN 대역이 찼다 — 시험 학생 대역을 넓히거나 리허설 DB 를 새로 깔아라');
+    학생번호 = `SYNK-${다음}`;
+    await sql(`insert into engine.learners(student_code, contact, display_name, schema_ver)
+               values ('${학생번호}', '${새연락처}', '왕복시험 새학생', 'probe')`);
+    확인(`명부에 ${학생번호} 가 올랐다`,
+      (await sql(`select count(*)::int n from engine.learners where student_code='${학생번호}'`))[0].n === 1);
+
+    // 학생이 앱에서 하는 첫 등록(C0 §2) — 여기가 실제 개원 첫날의 첫 화면이다.
+    const fr = await fetch(`https://${ref}.supabase.co/functions/v1/auth/first-login`, {
+      method: 'POST',
+      headers: { apikey: anon, Authorization: `Bearer ${anon}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_code: 학생번호, phone_last4: 새뒷자리, password: 새비번 }),
+    });
+    const f본문 = JSON.parse((await fr.text()) || '{}');
+    확인('갓 명부에 오른 학생이 첫 등록으로 계정을 만든다', fr.status === 200 && f본문.ok === true,
+      { status: fr.status, body: f본문 });
+    if (fr.status !== 200) die('첫 등록이 막혀 뒤 관문을 잴 수 없다 — 여기서 멈추는 게 개원 첫날의 모습이다');
+    자격 = { email: 학생이메일(학생번호), password: 새비번 };
+  }
+
   // 학생 로그인 — 앱이 하는 것과 **같은 경로**(C0 §2). 여기서 갈리면 앱에서도 갈린다.
   const lr = await fetch(`https://${ref}.supabase.co/auth/v1/token?grant_type=password`, {
     method: 'POST',
     headers: { apikey: anon, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 이메일(평문코드), password: 비밀번호(정규형(평문코드)) }),
+    body: JSON.stringify(자격),
   });
   if (!lr.ok) die(`로그인 실패 ${lr.status} — ${(await lr.text()).slice(0, 300)}`);
   const 학생토큰 = JSON.parse(await lr.text()).access_token;
@@ -110,8 +159,8 @@ async function main() {
     ...덮기,
   });
 
-  const [{ learner_id }] = await sql(`select learner_id from engine.learners where student_code = '${code용학생}'`);
-  console.log(`학생 ${code용학생} = ${learner_id}\n`);
+  const [{ learner_id }] = await sql(`select learner_id from engine.learners where student_code = '${학생번호}'`);
+  console.log(`학생 ${학생번호} = ${learner_id}\n`);
 
   // ── ① 동의 게이트 — 동의를 넣기 **전**이라 저장되면 안 된다
   console.log('① 동의 게이트');
@@ -126,9 +175,23 @@ async function main() {
   확인('그 행은 저장되지 않았다',
     (await sql(`select count(*)::int n from engine.learning_events where idempotency_key='${무동의.idempotency_key}'`))[0].n === 0);
 
-  // 동의를 **과거로** 넣는다 — occurred_at 보다 앞서야 유효하다
-  await sql(`insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver)
-             values ('${learner_id}', 'v18.9', now() - interval '1 day', 'test')`);
+  if (새학생) {
+    /* 운영자 통로를 **실제로 태운다**. 시험이 SQL 로 심으면 그 도구는 영원히 안 재지고,
+     * 개원 첫 주에 운영자가 밟는 자리가 바로 여기다(P0 §403 운영 도구 트리오).
+     * ⚠ 이 도구는 `agreed_at` 을 **서버 now()** 로 넣는다 — 아래 ②의 `occurred_at` 은 이 기기
+     *   시계라, 두 시계가 어긋나면 방금 동의한 학생이 거절된다. 그 이음매를 여기서 잰다. */
+    console.log('  ▸ 운영자 동의 발급(tools/동의발급.js)');
+    execFileSync(process.execPath,
+      [path.join(ROOT, 'tools', '동의발급.js'), 학생번호, '--판', 'v18.9', '--확정자', '왕복시험', '--적용'],
+      { stdio: 'inherit' });
+    확인('운영자 도구가 동의 행을 넣었다',
+      (await sql(`select count(*)::int n from engine.consents
+                   where learner_id='${learner_id}' and revoked_at is null`))[0].n === 1);
+  } else {
+    // 동의를 **과거로** 넣는다 — occurred_at 보다 앞서야 유효하다
+    await sql(`insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver)
+               values ('${learner_id}', 'v18.9', now() - interval '1 day', 'test')`);
+  }
 
   // ── ② 정상 저장 + 제출물 연결
   console.log('\n② 정상 저장');
