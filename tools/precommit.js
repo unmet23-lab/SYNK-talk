@@ -77,6 +77,34 @@ function main() {
 
   const problems = [];
 
+  /* 계약이 두 저장소에서 갈라진 채 커밋되는 것을 막는다 (유호님 확정 ㉮ · 2026-08-07).
+   * 여기 copy 는 **사본**이고 정본은 형제(SYNK-appsscript)에 있다. 갈라짐을 잡던 유일한 장치인
+   * `tests/계약.test.js` 는 형제가 없으면 skip 이고 Actions 는 자기 저장소만 checkout 하므로,
+   * 갈라져도 양쪽 CI 가 다 초록이었다(설계 심문 지목 · 워크플로 실측).
+   * 🔑 판정은 여기서 안 한다 — 형제의 `계약동기화.js` 하나가 진다(같은 판정을 두 곳에 적으면
+   *   갈라지고, 갈라지는 방향은 언제나 「통과」다). 이 자리는 발동 조건만 맡는다.
+   * ⚠ 형제가 없는 기계(폰·클라우드)에서는 **막지 않고 말한다** — 확인 불가를 차단으로 바꾸면
+   *   그 세션은 아무것도 커밋 못 한다. 대신 통과와 미실행이 같은 모양이 되지 않게 찍는다. */
+  if (paths.includes('계약/수집_교정_계약.json')) {
+    // 경로를 주입 가능하게 두는 이유는 **회귀가 이 자리를 실제로 밟게** 하려는 것뿐이다.
+    // 실데이터(계약 파일)를 흔들어 재면 그게 더 위험하다. 운영에서는 기본값으로만 쓴다.
+    const 도구 = process.env.SYNK_계약도구
+      || require('node:path').join(__dirname, '..', '..', 'SYNK-appsscript', 'tools', '계약동기화.js');
+    if (!require('node:fs').existsSync(도구)) {
+      console.error('[guard] 형제 저장소가 없어 계약 대조를 **못 했다** — 정본과 갈라졌는지 알 수 없다.');
+    } else {
+      try {
+        execFileSync(process.execPath, [도구, '--check'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      } catch (e) {
+        problems.push({
+          path: '계약/수집_교정_계약.json',
+          rule: '정본과 갈라진 계약',
+          why: `형제 저장소의 정본과 다르다 — ${String(e.stderr || '').trim().split('\n')[0] || '대조 실패'}`,
+        });
+      }
+    }
+  }
+
   for (const p of ignoredButStaged(paths)) {
     problems.push({
       path: p,
