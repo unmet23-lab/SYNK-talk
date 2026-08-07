@@ -58,6 +58,8 @@ async function main() {
   if (!/rehearsal/i.test(이름)) {
     die(`리허설이 아니다(${이름}) — 이 시험은 파일을 남기고 비밀번호를 갈아끼운다. 운영에는 안 돌린다.`);
   }
+  // 발화점 — 배포판 ≠ 소스(HEAD)면 이 왕복의 초록은 옛 판을 잰 것이다(다르면 여기서 죽는다).
+  await require('./배포대조.js').왕복전게이트('업로드왕복', e);
 
   const kr = await fetch(`${API}/${ref}/api-keys`, { headers: 헤더 });
   if (!kr.ok) die(`api-keys HTTP ${kr.status}`);

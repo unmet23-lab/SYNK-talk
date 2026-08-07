@@ -15,7 +15,10 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { 정규, 펴기, 평평하게 } = require('../tools/배포대조.js');
+const fs = require('node:fs');
+const path = require('node:path');
+const { 정규, 펴기, 평평하게, 대조, 게이트판정, 왕복전게이트 } = require('../tools/배포대조.js');
+const { 동봉묶기 } = require('../tools/원격배포.js');
 
 /* 배포본을 흉내낸다 — eszip 은 바이너리 껍데기 안에 소스를 **UTF-8 평문**으로 담는다.
  * 앞뒤 쓰레기 바이트는 실제 포맷이 그렇기 때문에 넣는다(0x00 이 소스 조각을 감싼다). */
@@ -85,4 +88,99 @@ test('④ 동봉된 파일이 여럿이어도 각각 따로 잡힌다 (lib 하�
   const 섞인배포 = 배포본흉내('export default 1; // index.ts 새 판', 원본);
   assert.equal(섞인배포.includes(정규(lib새판)), false, 'lib 이 옛 판인데 못 잡았다');
   assert.ok(섞인배포.includes(정규(원본)), '옛 판 자체는 배포본에 있으므로 찾아져야 한다');
+});
+
+/* ── 발화점(왕복전게이트) — 도구가 스스로 우는 자리의 회귀 ─────────────────────────
+ * 대조·게이트판정은 주입형으로 **실제로 돌려서** 잰다 — 소스 문구 검사는 도달 불가여도
+ * 통과한다(F196 계열 실측). 원격은 안 친다: 배포본은 `동봉묶기`(HEAD)로 그 자리에서 만든다. */
+
+const FN뿌리 = path.join(__dirname, '..', 'supabase', 'functions');
+const 실제slug = fs.readdirSync(FN뿌리).find((n) => fs.existsSync(path.join(FN뿌리, n, 'index.ts')));
+
+/** 진짜 함수 묶음으로 「배포본」을 흉내낸다 — 묶음에서 뺀 파일이 곧 「옛 판」이다. */
+const 배포응답 = (묶음) => {
+  const buf = Buffer.concat([
+    Buffer.from('ESZIP2.3'), Buffer.from([0, 0, 0, 4]),
+    ...Object.values(묶음).map((s) => Buffer.concat([Buffer.from([0, 0]), Buffer.from(s, 'utf8'), Buffer.from([0])])),
+  ]);
+  return { ok: true, arrayBuffer: async () => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) };
+};
+
+test('⑤ 대조 — 같다/다르다/미측정(HTTP·네트워크) 세 답이 실제 함수 묶음으로 갈린다', async () => {
+  assert.ok(실제slug, 'supabase/functions 에 함수가 하나도 없다 — 픽스처가 설 자리가 없다(0건=미실행)');
+  const 묶음 = 동봉묶기(path.join(FN뿌리, 실제slug));
+
+  const 같다 = await 대조('ref0', 't', [실제slug], async () => 배포응답(묶음));
+  assert.deepEqual(같다.map((r) => r.상태), ['같다'], JSON.stringify(같다));
+
+  const { [Object.keys(묶음)[0]]: 뺀것, ...옛묶음 } = 묶음;
+  const 다르다 = await 대조('ref0', 't', [실제slug], async () => 배포응답(옛묶음));
+  assert.deepEqual(다르다.map((r) => r.상태), ['다르다'], '파일 하나가 옛 판인데 같다고 했다');
+  assert.ok(다르다[0].상세.includes(Object.keys(묶음)[0]), '어느 파일이 빠졌는지 짚지 않았다');
+
+  const 오류 = await 대조('ref0', 't', [실제slug], async () => ({ ok: false, status: 503 }));
+  assert.deepEqual(오류.map((r) => r.상태), ['미측정'], 'HTTP 실패를 판정으로 번역했다');
+  const 끊김 = await 대조('ref0', 't', [실제slug], async () => { throw new Error('ENOTFOUND'); });
+  assert.deepEqual(끊김.map((r) => r.상태), ['미측정'], '네트워크 예외가 미측정이 아니라 죽음이 됐다');
+});
+
+test('⑥ 게이트판정 — 다르다=차단+따라갈 수 있는 처방 · 미측정만=경고 · 전부 같다=통과', () => {
+  const 차단 = 게이트판정([
+    { slug: 'events', 상태: '다르다', 상세: 'x' },
+    { slug: 'tasks', 상태: '미측정', 상세: 'y' },
+  ]);
+  assert.equal(차단.행동, '차단');
+  // F103 자기처방 — 처방은 원격배포.js 의 실제 사용법 그대로여야 한다(따를 수 없는 처방은 우회를 낳는다).
+  assert.ok(차단.처방[0].includes('원격배포.js') && 차단.처방[0].includes('supabase/functions/events')
+    && 차단.처방[0].includes('--적용'), 차단.처방[0]);
+  assert.equal(게이트판정([{ slug: 'a', 상태: '미측정', 상세: '' }]).행동, '경고');
+  assert.equal(게이트판정([{ slug: 'a', 상태: '같다', 상세: '' }]).행동, '통과');
+});
+
+test('⑦ 왕복전게이트 — 다르다에서 실제로 죽고(1) 처방을 소리 낸다 · 미측정은 소리 내고 진행한다', async () => {
+  const 잡음 = [];
+  const 원래오류 = console.error, 원래출력 = console.log;
+  console.error = (...a) => 잡음.push(a.join(' '));
+  console.log = (...a) => 잡음.push(a.join(' '));
+  try {
+    let 코드 = null;
+    await 왕복전게이트('시험', { SUPABASE_PROJECT_REF: 'ref0', SUPABASE_ACCESS_TOKEN: 't' }, {
+      목록: [실제slug],
+      가져오기: async () => 배포응답({}),          // 빈 배포본 → 전 파일이 빠짐 → 다르다
+      나가기: (c) => { 코드 = c; },
+    });
+    assert.equal(코드, 1, '다르다인데 안 죽었다 — 게이트가 알림으로 격하되면 F179(세 층이 다른 계약)가 돌아온다');
+    assert.ok(잡음.some((줄) => 줄.includes('원격배포.js')), '차단이 처방 없이 죽었다');
+
+    잡음.length = 0; 코드 = null;
+    await 왕복전게이트('시험', { SUPABASE_PROJECT_REF: 'ref0', SUPABASE_ACCESS_TOKEN: 't' }, {
+      목록: [실제slug],
+      가져오기: async () => ({ ok: false, status: 503 }),
+      나가기: (c) => { 코드 = c; },
+    });
+    assert.equal(코드, null, '미측정으로 죽였다 — 관리 API 플레이크가 왕복을 막으면 우회가 정상 통로가 된다');
+    // 요약의 「(미측정 n)」만으로는 부족하다 — **어느 함수**를 왜 못 쟀는지가 줄로 남아야 한다(변이 실측: 요약 줄이 이 검사를 통과시켰다).
+    assert.ok(잡음.some((줄) => 줄.includes('미측정') && 줄.includes(실제slug)),
+      '미측정이 조용하다 — 통과와 미실행이 같은 모양이 된다');
+
+    잡음.length = 0; 코드 = null;
+    const 묶음 = 동봉묶기(path.join(FN뿌리, 실제slug));
+    await 왕복전게이트('시험', { SUPABASE_PROJECT_REF: 'ref0', SUPABASE_ACCESS_TOKEN: 't' }, {
+      목록: [실제slug], 가져오기: async () => 배포응답(묶음), 나가기: (c) => { 코드 = c; },
+    });
+    assert.equal(코드, null, '같은데 죽였다');
+    assert.ok(잡음.some((줄) => 줄.includes('배포판=소스 ✅')), '통과가 조용하다 — 보고가 인용할 한 줄이 없다');
+  } finally { console.error = 원래오류; console.log = 원래출력; }
+});
+
+test('⑧ 등록층 — 왕복시험 계열 전부가 왕복전게이트를 부른다(가드는 로직보다 등록층에서 샌다)', () => {
+  const 도구뿌리 = path.join(__dirname, '..', 'tools');
+  const 도구들 = fs.readdirSync(도구뿌리).filter((n) => /왕복시험\.js$/.test(n));
+  // 0건=미실행 — 이름이 바뀌어 glob 이 비면 「전부 통과」가 아니라 여기서 빨개져야 한다.
+  assert.ok(도구들.length >= 5, `왕복시험 도구가 ${도구들.length}개뿐이다 — 이름 규칙이 바뀌었으면 이 회귀부터 고친다`);
+  for (const n of 도구들) {
+    const 소스 = fs.readFileSync(path.join(도구뿌리, n), 'utf8');
+    const 산줄 = 소스.split('\n').some((줄) => /왕복전게이트\(/.test(줄) && !/^\s*(\/\/|\*|\/\*)/.test(줄));
+    assert.ok(산줄, `${n} 이 배포판 대조 없이 돈다 — 그 초록은 무엇을 쟀는지 말할 수 없다`);
+  }
 });

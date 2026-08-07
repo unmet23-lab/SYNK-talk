@@ -52,6 +52,8 @@ async function main() {
   if (!/rehearsal/i.test(이름)) {
     die(`「${이름}」 은 리허설이 아니다 — 이 시험은 지울 수 없는 행을 남긴다.`);
   }
+  // 발화점 — 배포판 ≠ 소스(HEAD)면 이 왕복의 초록은 옛 판을 잰 것이다(다르면 여기서 죽는다).
+  await require('./배포대조.js').왕복전게이트('배달왕복시험', e);
 
   const sql = async (q) => {
     const r = await fetch(`${API}/${ref}/database/query`, { method: 'POST', headers: M, body: JSON.stringify({ query: q }) });
