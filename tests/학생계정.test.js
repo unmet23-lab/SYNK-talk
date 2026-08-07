@@ -10,7 +10,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { 학생번호맞나, 이메일, 뒤4자리, 뒷자리맞나, 시도상한 } = require('../lib/학생계정.js');
+const { 학생번호맞나, 이메일, 학생번호표기, 뒤4자리, 뒷자리맞나, 시도상한 } = require('../lib/학생계정.js');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -114,4 +114,13 @@ test('🔴 첫 등록: 남이 선점한 계정을 이을 때 비밀번호를 덮
 
 test('시도상한이 계약값과 같다 — 없으면 1만 번 대입으로 뚫린다', () => {
   assert.equal(시도상한, 5);
+});
+
+/* 🔴 화면에 내는 값은 **선생님이 명단에서 찾을 값**이다(F176 ① 막힘 안내 `보여줄값`).
+ *   학생이 친 그대로 보여주면 `synk 42` 가 그대로 서고 명단 검색이 빗나간다. */
+test('학생번호표기: 어떻게 쳤든 발급기 표기형으로 접힌다', () => {
+  for (const v of ['SYNK-042', 'SYNK042', 'synk-042', ' synk 042 ']) {
+    assert.equal(학생번호표기(v), 'SYNK-042', `${JSON.stringify(v)} 가 표기형으로 안 접혔다`);
+  }
+  assert.equal(학생번호표기('SYNK-1000'), 'SYNK-1000', '네 자리(1000번대)에서 자리를 밀지 않는다');
 });

@@ -14,7 +14,7 @@
  * ⚠ `EXPO_PUBLIC_*` 는 **번들에 인라인**된다. 그래서 여기 있어도 되는 것은 **anon 키뿐**이고,
  *   `service_role` 은 어떤 경우에도 앱에 두지 않는다(`tools/guard.js` 가 기계로 막는다).
  */
-import { 이메일 } from '../lib/학생계정.js';
+import { 이메일, 학생번호표기 } from '../lib/학생계정.js';
 
 const URL_ = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -75,7 +75,16 @@ export async function 로그인(학생번호, 비밀번호) {
     //   가르는 문구라 학생번호의 존재가 샌다. 서버 게이트와 **같은 한 문장**으로 접는다.
     throw new 인증오류('LOGIN_FAILED', '학생번호 또는 비밀번호가 맞지 않습니다', false);
   }
-  return { access_token: 몸.access_token, refresh_token: 몸.refresh_token, user: 몸.user };
+  /* 🔑 학생번호를 세션에 실어 보낸다 — 막힘 안내가 「선생님께 이 번호를 보여 주세요」로 끝나는데
+   *   토큰에 실려 오는 것은 **합성 이메일**뿐이라, 안 실으면 화면이 그 번호를 모른다.
+   *   여기서 **표기형으로 접는다**: 세 통로(로그인·첫등록·임시번호)가 전부 이 한 줄을 지나므로
+   *   화면마다 다시 다듬을 일이 없다. */
+  return {
+    access_token: 몸.access_token,
+    refresh_token: 몸.refresh_token,
+    user: 몸.user,
+    학생번호: 학생번호표기(학생번호),
+  };
 }
 
 /** 첫 등록 — 계정이 서는 유일한 통로. 성공해도 세션은 안 생기므로 곧바로 로그인한다. */

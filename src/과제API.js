@@ -10,6 +10,9 @@
  * ■ 🔴 빈 상태는 오류가 아니다 (C0 §4-3 공통)
  *   `data: []` + 200 은 **첫날·배치 실패·동의 없음**이 전부 정상 경로라는 뜻이다. 여기서
  *   던지면 학생 화면이 「고장」이 된다. 그래서 빈 배열은 그대로 내고, 내려갈지는 화면이 정한다.
+ *   🔑 대신 **왜 비었는지**(`blocked`)를 함께 낸다 — 원인이 셋인데 응답이 하나면 화면은
+ *   전부에 대해 「오늘 받은 과제가 아직 없어요」만 말하게 되고, 동의가 없어 막힌 학생은
+ *   자기가 무엇을 하면 되는지 영영 못 듣는다(F176 이 정확히 그 모양이었다).
  *
  * ⚠ `EXPO_PUBLIC_*` 는 번들에 인라인된다 — 여기 있어도 되는 것은 **anon 키뿐**이다.
  */
@@ -33,7 +36,7 @@ export const 계약판 = 'c8';
  *
  * @param {string} 토큰  학생 세션 토큰(access_token)
  * @param {string} [날짜] `YYYY-MM-DD`(몽골 기준). 생략하면 **서버가 정한다** — 기기 시계를 안 믿는다(C0 §3).
- * @returns {Promise<{항목: object|null, contract_ver: string}>}
+ * @returns {Promise<{항목: object|null, 막힘: {code: string}|null, contract_ver: string}>}
  */
 export async function 오늘과제받기(토큰, 날짜) {
   if (!URL_ || !ANON) throw new 인증오류('CONFIG', '서버 설정이 없어요', false);
@@ -60,5 +63,11 @@ export async function 오늘과제받기(토큰, 날짜) {
     throw new 인증오류(e.code, e.message, e.retryable);
   }
   const data = Array.isArray(몸.data) ? 몸.data : [];
-  return { 항목: data.length ? data[0] : null, contract_ver: 몸.contract_ver || null };
+  /* 🔑 `data` 가 있어도 그대로 싣는다 — 배정 뒤에 철회한 학생은 **과제를 보면서 업로드만 막힌다.**
+   *   「비었을 때만」 읽으면 `막힘: null` 이 측정이 아니라 추측이 된다(동의게이트 정본과 같은 규칙). */
+  return {
+    항목: data.length ? data[0] : null,
+    막힘: 몸.blocked || null,
+    contract_ver: 몸.contract_ver || null,
+  };
 }

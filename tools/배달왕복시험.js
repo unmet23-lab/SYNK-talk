@@ -283,6 +283,10 @@ async function main() {
     읽은.task_format === null && (읽은.task_snapshot.호흡 || []).length === 2, 읽은.task_format);
   확인('강등 여부가 그대로 전달된다', 읽은.degraded === false, 읽은.degraded);
   확인('하루 1건이라 next_cursor 는 null 이다', t.몸.next_cursor === null, t.몸.next_cursor);
+  /* 🔑 **`data` 가 있어도 잰다.** 배정 뒤에 철회한 학생은 과제를 보면서 업로드만 막히므로,
+   *   「비었을 때만」 재면 `blocked: null` 이 측정이 아니라 **추측**이 된다. */
+  확인('동의가 있는 A 는 blocked 가 null 이다 — 막히지 않았음을 값으로 말한다',
+    t.몸.blocked === null, t.몸.blocked);
 
   /* 🔴 빈 상태는 오류가 아니다 — A 는 어제 배정이 없다. 404 를 주면 앱이 오류 화면을 띄우고,
    *   그건 첫날 학생 전원에게 「고장」으로 보인다. */
@@ -303,6 +307,23 @@ async function main() {
   확인('🔴 date 가 날짜꼴이 아니면 400 이다 — 500 이면 앱이 영구 오류를 무한 재시도한다',
     (await 조회('?date=어제')).status === 400, (await 조회('?date=어제')).몸);
   확인('POST 는 405 다 — 조회가 쓰기를 겸하지 않는다', (await 조회('', { 방법: 'POST' })).status === 405);
+
+  /* 🔴 **동의 없는 학생의 빈 화면에 이유가 붙는가** (F176 ①).
+   *   `data: []` 의 원인은 셋(첫날·배치 실패·동의 없음)인데 응답이 하나면 앱은 전부에 대해
+   *   「오늘 받은 과제가 아직 없어요」만 말하고, 막힌 학생은 며칠이든 기다린다.
+   *   같은 토큰을 B 에게 옮겨 붙여 잰다 — 학생은 토큰에서 확정되므로 이게 곧 「B 로 로그인」이다. */
+  await sql(`update engine.learners set auth_user_id = null where auth_user_id = '${uid}'`);
+  await sql(`update engine.learners set auth_user_id = '${uid}' where learner_id = '${id.B}'::uuid`);
+  const 막힌 = await 조회();
+  확인('🔴 동의 없는 B 는 빈 배열 + 이유(blocked)가 함께 온다 — 「배치가 안 돈 날」과 구별된다',
+    막힌.status === 200 && (막힌.몸.data || []).length === 0
+      && 막힌.몸.blocked && 막힌.몸.blocked.code === 'CONSENT_MISSING', 막힌.몸);
+  확인('🔴 막혀도 200 이다 — 4xx 를 주면 앱이 「고장」 화면을 띄우고 학생은 이유를 못 듣는다',
+    막힌.status === 200, 막힌.status);
+  /* A 로 되돌린다 — 아래 ⑨ 가 같은 토큰으로 A 의 교정을 읽는다. 안 되돌리면 그쪽이 빈 채로 돈다. */
+  await sql(`update engine.learners set auth_user_id = null where auth_user_id = '${uid}'`);
+  await sql(`update engine.learners set auth_user_id = '${uid}' where learner_id = '${id.A}'::uuid`);
+  확인('되돌림 확인 — 토큰이 다시 A 를 가리킨다', ((await 조회()).몸.data || []).length === 1);
 
   /* ── ⑨ 교정 조회 (C0 §4-3 ②) ─────────────────────────────────────
    * c8 이 `correction_id` 를 깔았지만 **교정을 꺼내 보여주는 통로**가 없어 앱은 자기가 받은

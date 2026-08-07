@@ -27,6 +27,7 @@ import { 화면과제 } from '../lib/오늘과제.js';
 import { 로그읽기, 로그쓰기, 음성쓰기, 지속저장 } from './저장.js';
 import { 오늘과제받기 } from './과제API.js';
 import { 발화보내기 } from './제출API.js';
+import 막힘카드 from './막힘카드.js';
 import { 급수편지 } from '../contents/첫편지.js';
 
 /**
@@ -80,10 +81,13 @@ function 초표시(ms) {
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
-export default function 말하기화면({ 급수 = 0, 토큰 = null }) {
+export default function 말하기화면({ 급수 = 0, 토큰 = null, 학생번호 = null }) {
   const 폴백 = useMemo(() => 급수편지(급수), [급수]);
 
   const [과제, set과제] = useState(null); // null = **아직 모른다**(빈 화면과 다른 상태다)
+  /* 서버가 준 `blocked` — **왜** 비었나(F176 ①). 아래 `녹음카드` 의 `막힘`(녹음이 시작되지
+   * 못한 이유)과 이름이 겹치지 않게 `서버` 를 붙인다 — 같은 파일 안이라 헷갈리면 그대로 버그다. */
+  const [서버막힘, set서버막힘] = useState(null);
   const [date, setDate] = useState(오늘); // 서버가 답하면 **서버 날짜**로 바꾼다(아래)
   const [호흡, set호흡] = useState('듣기');
   const [로그, set로그] = useState([]);
@@ -142,7 +146,8 @@ export default function 말하기화면({ 급수 = 0, 토큰 = null }) {
       let 그날 = 오늘();
       try {
         if (!토큰) throw new Error('토큰 없음');
-        const { 항목 } = await 오늘과제받기(토큰);
+        const { 항목, 막힘 } = await 오늘과제받기(토큰);
+        if (살아있음) set서버막힘(막힘);
         결과 = 화면과제(항목, 폴백);
         // 🔴 날짜의 정본은 **서버**다 — 기기 시계로 끊으면 몽골 아침에 어제 것이 오늘이 된다.
         //   로그 키까지 여기서 맞춰 둬야 「학습 출석」과 서버 배정이 같은 날을 가리킨다.
@@ -205,6 +210,21 @@ export default function 말하기화면({ 급수 = 0, 토큰 = null }) {
     보내기(항목);
     return 새로그;
   };
+
+  /* 🔴 **막힌 학생에게는 흐름을 아예 열지 않는다.** 열어 두면 90초를 말하고 나서 업로드가
+   *   403 으로 죽고, 그 발화는 어디에도 안 남는다 — 학생 눈엔 「했는데 사라졌다」다.
+   *   배정이 있어도 같다(배정 뒤 철회한 학생은 과제를 보면서 업로드만 막힌다).
+   * 🔑 분기를 카드마다 다는 대신 여기서 한 번에 끊는다 — 호흡은 앞으로도 늘어나고,
+   *   늘어난 쪽에 조건을 빠뜨리면 그 구멍은 「통과」로 보인다. */
+  if (서버막힘) {
+    return (
+      <ScrollView style={s.wrap} contentContainerStyle={s.inner}>
+        <머리 호흡={호흡} />
+        {오류 && <Text style={s.오류}>{오류}</Text>}
+        <막힘카드 막힘={서버막힘} 학생번호={학생번호} />
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView style={s.wrap} contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
