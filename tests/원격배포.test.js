@@ -113,8 +113,15 @@ test('동봉 — 감싼 둘을 붙이면 계약 검증이 실제로 돈다(통�
     event_type: 'submission.created',
     occurred_at: '2026-08-05T13:20:11.412Z',
     level_snapshot: 'Lv3',
+    // ⚠ **손으로 적은 「온전한 사건」이라 계약이 필수를 늘리면 여기가 빨개진다** — 그게 맞다:
+    //   이 검사가 재는 것은 「감싼 검증기가 실제로 돈다」이고, 그러려면 통과하는 사건이 진짜
+    //   통과해야 한다. 필수 목록의 정본은 `lib/이벤트검증.js` 다(여기 베낀 것이 아니다).
+    correlation_id: 'b6f1c0a2-0000-4000-8000-0000000000c1',
     task_type: '숙제제출',
-    submission: { task_ref: 'hw-1', task_format: '자유발화', body_original: '어제 밥을 먹었어요' },
+    submission: {
+      task_ref: 'hw-1', task_format: '자유발화', body_original: '어제 밥을 먹었어요',
+      task_snapshot: { ver: 1, 문항: '어제 뭐 했어요?' },
+    },
   };
   assert.deepStrictEqual(검증모듈.검증(온전, 계약), { ok: true, 오류들: [] });
 
