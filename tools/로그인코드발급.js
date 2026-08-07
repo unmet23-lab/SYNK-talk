@@ -25,7 +25,23 @@ const crypto = require('crypto');
 const { 집합, 길이, 정규형, 표기형, 형식맞나, 이메일, 비밀번호 } = require('../lib/로그인코드.js');
 
 const ROOT = path.resolve(__dirname, '..');
-const die = (msg) => { console.error('[발급] ' + msg); process.exit(1); };
+/* 🔴 `process.exit()` 를 부르지 않는다 — fetch 소켓이 닫히는 중에 부르면 Node 가 abort 하고
+ *   종료코드가 **127**(셸에서 「그런 명령이 없다」)로 나가, 정상적인 거절이 **설치 사고**로
+ *   읽힌다. `교정확정.js` 에서 2026-08-07 실측된 그 자리고 이 도구도 같은 모양이었다. */
+class 중단 extends Error {}
+const die = (msg) => { console.error('[발급] ' + msg); process.exitCode = 1; throw new 중단(msg); };
+
+/**
+ * 발급 직후 화면이 들고 있는 **다음 한 걸음**. 순수 함수라 검사할 수 있다.
+ * 유호님 확정(2026-08-07): 동의는 **등록 직후** 옮겨 적는다.
+ */
+function 다음걸음(student, 동의수) {
+  return 동의수 > 0
+    ? `\n   동의 이력 ${동의수}건 — 지금 유효한지: node tools/동의발급.js --현황 --학생 ${student}`
+    : `\n   🔴 이 학생은 **아직 아무것도 못 한다** — 동의 행이 0건이라 업로드는 403 이고`
+      + `\n      오늘의 과제 배정에서도 빠진다. 상담에서 받은 동의를 지금 옮겨 적는다:`
+      + `\n      node tools/동의발급.js ${student} --판 v18.9 --확정자 "이름" --적용`;
+}
 
 const 자격증명 = require('../lib/자격증명.js');   // .env 읽기 + 토큰 만료 게이트(공용 통로)
 
@@ -141,6 +157,26 @@ async function main() {
     + `\n      학생에게 전달한 뒤 이 창을 닫는다. 분실하면 재발급뿐이다.`
     + `\n   📌 감사 기록(누가·언제): ${new Date().toISOString()} · learner=${student} · 첫 발급`
     + `\n      ⚠ 넣을 표가 아직 없어 화면에만 남는다 — 필요하면 지금 옮겨 적는다.`);
+
+  /* 🔴 다음 한 걸음 = 동의 (유호님 확정 2026-08-07: **등록 직후**).
+   * 계정만으로는 학생이 아무것도 못 한다 — `uploads` 는 403 CONSENT_MISSING 이고
+   * `deliver` 는 「동의 없는 학생은 배정하지 않는다」(P0 §345)라 과제도 안 간다. 두 증상 다
+   * 「앱이 비어 있다」로만 보여서, 발급하고 잊으면 그 학생은 **조용히** 멈춘 채로 남는다.
+   * ⛔ 여기서 대신 넣지 않는다 — 동의는 별개의 법적 행위다. 받은 사실이 없는데 도구가
+   *    만들면 그건 편의가 아니라 위조다. 이 자리가 하는 일은 **안 잊게 하는 것**까지다.
+   * 유효성 판정은 여기서 안 한다(그 정본은 동의 게이트 하나여야 한다) — 있나 없나만 센다. */
+  const [{ n: 동의수 }] = await sql(e,
+    `select count(*)::int n from engine.consents where learner_id = (
+       select learner_id from engine.learners where student_code = ${따옴표(student)})`);
+  console.log(다음걸음(student, 동의수));
 }
 
-main().catch((err) => die(err.message));
+if (require.main === module) {
+  main().catch((err) => {
+    if (err instanceof 중단) return;                       // die() 가 이미 찍고 코드를 세웠다
+    console.error('[발급] ' + err.message);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { 다음걸음, 따옴표, 코드생성 };
