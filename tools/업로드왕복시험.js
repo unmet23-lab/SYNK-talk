@@ -16,7 +16,7 @@ const fs = require('fs');
 const path = require('path');
 const { 경로검사 } = require('../lib/업로드경로.js');
 const { 화면과제, 제출사건 } = require('../lib/오늘과제.js');
-const { 항목추가 } = require('../lib/제출로그.js');
+const { 항목추가, 흐름id } = require('../lib/제출로그.js');
 const 계약정본 = require('../계약/수집_교정_계약.json');
 
 const API = 'https://api.supabase.com/v1/projects';
@@ -245,6 +245,12 @@ async function main() {
         text: null, audio: 'file:///rec.m4a', prompt_id: 본.task_id, created_at: 지금,
         task_meta: 본.제출재료,
         capture_app: { platform: 'node-rehearsal', extension: '.wav', agc_requested: null },
+        /* 🔴 **앱이 넘기는 값이라 여기서도 넘겨야 한다**(`src/말하기화면.js:205` `흐름잡기`).
+         *   `항목추가` 는 이 칸을 **짓지 않고 받기만** 한다(제출로그.js:93) — 한 앉음을 화면이
+         *   정하기 때문이다. 안 넘기면 `제출사건` 이 `null` 을 내고(①-10 이 공통 필수로 올린 뒤로),
+         *   이 시험은 그걸 그대로 보내 **평문 500** 을 받았다. 즉 봉투 조립 실패가 「서버 장애」로
+         *   보였다(2026-08-07 실측 · 그동안 이 갈래는 아무것도 증명하지 못하고 있었다). */
+        correlation_id: 흐름id(),
       });
 
       // 앱이 하는 그대로: 먼저 올리고(서명→PUT), 그 참조로 사건을 보낸다(C0 §4-2 순서).
@@ -252,12 +258,23 @@ async function main() {
       await fetch(s앱.upload_url, { method: 'PUT', headers: { 'Content-Type': 'audio/wav' }, body: wav() });
 
       const 사건 = 제출사건(항목, s앱.audio_ref);
+      /* 🔑 **앱이 두는 가드를 시험도 둔다**(`src/제출API.js:114` `if (!사건) return`). 없으면
+       *   `{events:[null]}` 이 나가고, 서버는 JSON 거절이 아니라 **평문 500** 으로 죽는다 —
+       *   이 갈래가 재는 것은 「앱이 조립한 봉투」인데 앱이라면 애초에 보내지 않을 것을 보내고
+       *   있었다. 조립이 깨진 것을 서버 탓으로 읽지 않으려면 여기서 멈춰야 한다. */
+      if (!사건) die('제출사건이 null 이다 — 앱이라면 여기서 멈춘다(src/제출API.js:114). '
+        + '항목이 correlation_id·idempotency_key 를 들고 있는지 봐라.');
       const er = await fetch(`${base}/functions/v1/events`, {
         method: 'POST',
         headers: { apikey: anon, Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json', 'X-Contract-Ver': 판 },
         body: JSON.stringify({ events: [사건] }),
       });
-      const eb = await er.json().catch(() => ({}));
+      /* 🔴 본문을 **먼저 글자로** 받는다. `.json().catch(()=>({}))` 는 비JSON 응답을 `{}` 로
+       *   접어서, 게이트웨이 500·부팅 실패처럼 **원문에만 이유가 있는 실패**가 정확히
+       *   진단이 필요한 순간에 `{}` 로 찍혔다(2026-08-07 실측). 파싱 실패는 그 자체가 사실이다. */
+      const e원문 = await er.text();
+      let eb = {};
+      try { eb = JSON.parse(e원문); } catch { /* 비JSON — 아래 곁말에 원문이 그대로 나간다 */ }
       const 한건 = eb.results && eb.results[0];
       /* 🔑 `duplicate` 도 통과로 둔다. 지금은 `항목추가` 가 실행마다 새 멱등키를 내므로 매번
        *   `stored` 여야 맞지만(절단문서 ①-5 로 결정론 조립을 걷어냈다), 이 자리는 **어느 쪽인지가
@@ -268,7 +285,7 @@ async function main() {
        *   400·426 은 두 경우 모두 여기서 그대로 걸린다. */
       잰다('앱이 조립한 봉투가 서버를 실제로 통과한다',
         er.status === 200 && (한건?.status === 'stored' || 한건?.status === 'duplicate'),
-        `HTTP ${er.status} · ${JSON.stringify(한건 ?? eb).slice(0, 200)}`);
+        `HTTP ${er.status} · ${한건 ? JSON.stringify(한건).slice(0, 200) : e원문.slice(0, 400)}`);
 
       if (한건?.event_id) {
         const [행] = await 질의(
