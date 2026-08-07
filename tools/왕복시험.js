@@ -433,6 +433,49 @@ async function main() {
     (await sql(`select intervention_id from engine.learning_events
                  where event_id = '${r.body.results?.[0]?.event_id}'`))[0]?.intervention_id === null);
 
+  /* ── ⑮ 인과 고리를 **앞 항목의 멱등키**로 가리킨다 — 절단문서 ①-4
+   *   여기까지 `retry_of_event_id`·`parent_event_id` 는 서버 발급 `event_id` 만 받았다. 그런데 앱의
+   *   제출 로그는 오프라인 큐라, 한 배치 안의 앞 항목은 **아직 event_id 가 없다** — 그 고리는 틀리게
+   *   저장되는 게 아니라 **보낼 수단이 없어 사라진다.**
+   *   🔴 반드시 **한 번의 호출로 두 건**을 보낸다. 앞 것을 미리 넣어 두고 재면 그건 이미 event_id 가
+   *     있는 경우라, 정작 이 항목이 지목한 상황(아직 없는 앞)을 **안 재고 초록이 된다.**
+   *   🔑 저장된 값이 「가리킨 키」가 아니라 **진짜 event_id** 인지까지 본다 — 열에 멱등키가 남으면
+   *     FK 도 하류 조회(`/progress` correction_retry)도 조용히 무너진다. */
+  console.log('\n⑮ 아직 안 올라간 앞을 가리킨다 (①-4)');
+  const 앞 = 기본();
+  const 뒤 = 기본({ retry_of_event_id: 앞.idempotency_key, payload: { ver: 1, attempt_no: 2 } });
+  r = await 부르기({ events: [앞, 뒤] });
+  const [앞결, 뒤결] = r.body.results ?? [];
+  확인('한 배치 안에서 앞 항목의 멱등키로 가리켜도 저장된다 (그 앞은 보낼 때 event_id 가 없었다)',
+    앞결?.status === 'stored' && 뒤결?.status === 'stored', r.body.results);
+  확인('🔑 열에 남는 것은 가리킨 키가 아니라 앞 항목의 진짜 event_id 다',
+    (await sql(`select retry_of_event_id::text v from engine.learning_events
+                 where event_id = '${뒤결?.event_id}'`))[0]?.v === 앞결?.event_id,
+    { 기대: 앞결?.event_id, 가리킨키: 앞.idempotency_key });
+
+  // 호환 — 서버 event_id 로 가리키던 옛 방식이 그대로여야 한다(넓힌 것이지 바꾼 게 아니다).
+  const 옛방식 = 기본({ retry_of_event_id: 앞결?.event_id, payload: { ver: 1, attempt_no: 3 } });
+  r = await 부르기({ events: [옛방식] });
+  확인('서버 event_id 로 가리키는 옛 방식도 그대로 된다', r.body.results?.[0]?.status === 'stored', r.body.results?.[0]);
+
+  // 선행 턴도 같은 통로다 — 한쪽만 고쳐지면 증상은 「그 칸만 조용히 안 풀린다」뿐이다.
+  const 턴1 = 기본();
+  const 턴2 = 기본({ parent_event_id: 턴1.idempotency_key, turn_no: 2 });
+  r = await 부르기({ events: [턴1, 턴2] });
+  const [턴1결, 턴2결] = r.body.results ?? [];
+  확인('선행 턴도 앞 항목의 멱등키로 가리킬 수 있다', 턴2결?.status === 'stored', r.body.results);
+  확인('그 열에도 진짜 event_id 가 들어간다',
+    (await sql(`select parent_event_id::text v from engine.learning_events
+                 where event_id = '${턴2결?.event_id}'`))[0]?.v === 턴1결?.event_id, 턴2결);
+
+  /* 음성 — 아무 데도 없는 uuid 는 **400** 이어야 한다. 여기까지 `parent_event_id` 는 검사가 없어
+   * FK 가 대신 터졌고, 그건 5xx=`retryable` 이라 그 발화가 큐에서 영원히 재시도했다.
+   * 🔴 「거절됐다」만 재면 안 된다 — 500 도 거절처럼 보인다. 상태 코드와 retryable 을 같이 본다. */
+  r = await 부르기({ events: [기본({ parent_event_id: crypto.randomUUID() })] });
+  확인('없는 선행 턴은 400 CONTRACT_VIOLATION 이다 (500 이면 큐가 영원히 재시도한다)',
+    r.status === 200 && r.body.results?.[0]?.error?.code === 'CONTRACT_VIOLATION'
+      && r.body.results?.[0]?.error?.retryable === false, { status: r.status, r: r.body.results?.[0] });
+
   console.log(`\n── 통과 ${통과} · 실패 ${실패} ──`);
   process.exit(실패 ? 1 : 0);
 }

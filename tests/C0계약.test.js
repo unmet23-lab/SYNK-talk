@@ -160,6 +160,78 @@ test('검증기가 요구하는 최상위 필드는 전부 events INSERT 열 목
   }
 });
 
+/* 🔴 2026-08-07 절단문서 ①-4 — 인과 참조(`retry_of_event_id`·`parent_event_id`)가 **서버 발급
+ *   event_id 만** 받아, 오프라인 큐에서 아직 안 올라간 앞을 가리킬 수단이 **아예 없었다.**
+ *   고리가 틀리게 저장되는 게 아니라 **보낼 수 없어 사라진다** — 그래서 소급이 안 된다.
+ *   곁들여 `parent_event_id` 는 존재 검사가 없어 FK 가 대신 터졌다: 400 이어야 할 것이 500 이고,
+ *   5xx 는 `retryable` 이라 그 발화가 큐에서 영원히 재시도한다.
+ * 🔑 여기서 재는 것은 **배선**뿐이다 — 「푼 값이 열로 가는가」·「둘이 같은 통로인가」.
+ *   실제로 풀리는지는 `tools/왕복시험.js` ⑮ 가 잰다(자격증명이 필요해 CI 밖). 두 층은 서로를
+ *   대신하지 못한다: 배선이 맞아도 쿼리가 틀릴 수 있고, 왕복은 이 저장소가 아니라 배포판을 잰다. */
+const 인과배선 = (소스) => {
+  const 흠 = [];
+  const m = 소스.match(/insert into engine\.learning_events\s*\([^)]*\)\s*values\s*\(([\s\S]*?)\n\s*\)\n\s*on conflict/);
+  if (!m) return ['INSERT values 구간을 못 찾았다 — 검사가 죽었다(문 모양이 바뀌었으면 이 정규식부터 고쳐라)'];
+  for (const 칸 of ['retry_of_event_id', 'parent_event_id']) {
+    // 열로 가는 값이 앱이 보낸 **원값**이면 그 칸은 event_id 만 받는 것이다(=①-4 그대로).
+    if (new RegExp(`\\$\\{[^}]*사건\\.${칸}`).test(m[1])) 흠.push(`${칸}: 앱이 보낸 원값이 그대로 열로 간다`);
+  }
+  /* 통로가 하나인지는 **이름을 안 박고** 잰다 — 개명이 이 검사를 깨우면 안 된다.
+   * 둘이 다른 함수를 타면 한쪽만 고쳐지고 증상은 「한 칸만 조용히 안 풀린다」다. */
+  const 호출 = [...소스.matchAll(/await\s+([^\s(]+)\(사건\.(retry_of_event_id|parent_event_id)\)/g)];
+  const 푼칸 = new Set(호출.map((h) => h[2]));
+  for (const 칸 of ['retry_of_event_id', 'parent_event_id']) {
+    if (!푼칸.has(칸)) 흠.push(`${칸}: 푸는 통로를 안 지난다`);
+  }
+  if (new Set(호출.map((h) => h[1])).size > 1) 흠.push('두 칸이 서로 다른 통로를 탄다 — 한쪽만 고쳐진다');
+  // 푸는 자리가 두 이름을 다 보는가. 하나만 보면 오프라인 큐의 그 고리는 그대로 사라진다.
+  const 풀이 = 소스.match(/select event_id, intervention_id from engine\.learning_events([\s\S]*?)`/);
+  if (!풀이) 흠.push('푸는 조회를 못 찾았다 — 검사가 죽었다');
+  else for (const 이름 of ['event_id = ', 'idempotency_key = ']) {
+    if (!풀이[1].includes(이름)) 흠.push(`푸는 조회가 ${이름.trim()} 로 안 찾는다`);
+  }
+  // 못 풀었을 때 400 으로 접는가(그냥 넣으면 FK 가 500 을 낸다 = 영원한 재시도).
+  if (!/field: 'parent_event_id'/.test(소스)) 흠.push('parent_event_id 를 못 풀었을 때 거절하는 자리가 없다');
+  return 흠;
+};
+
+test('탐지력 픽스처 — ①-4 이전 모양을 실제로 잡는다 (초록이 「깨끗함」이지 「안 봄」이 아니어야 한다)', () => {
+  const 옛판 = [
+    "      if (사건.retry_of_event_id) {",
+    '        const 원 = await tx`',
+    // 조회 자체는 살려 두고 **한 조건만** 뺀다 — 그래야 「없다」가 아니라 「event_id 만 본다」를 잰다.
+    '          select event_id, intervention_id from engine.learning_events',
+    '           where learner_id = ${learner_id}::uuid and event_id = ${String(사건.retry_of_event_id)}::uuid`;',
+    '      }',
+    '      const 넣기 = await tx`',
+    '        insert into engine.learning_events (',
+    '          learner_id, retry_of_event_id, parent_event_id, turn_no',
+    '        ) values (',
+    '          ${learner_id}::uuid,',
+    '          ${(사건.retry_of_event_id ?? null) as string | null}::uuid,',
+    '          ${(사건.parent_event_id ?? null) as string | null}::uuid,',
+    '          ${(사건.turn_no ?? null) as number | null}',
+    '        )',
+    '        on conflict (learner_id, idempotency_key) do nothing`;',
+  ].join('\n');
+  const 흠 = 인과배선(옛판);
+  for (const 칸 of ['retry_of_event_id', 'parent_event_id']) {
+    assert.ok(흠.some((s) => s.startsWith(`${칸}: 앱이 보낸 원값`)), `옛판의 ${칸} 원값 직결을 못 잡았다`);
+    assert.ok(흠.some((s) => s === `${칸}: 푸는 통로를 안 지난다`), `옛판의 ${칸} 통로 부재를 못 잡았다`);
+  }
+  assert.ok(흠.some((s) => s.includes('idempotency_key')), '옛판 조회가 event_id 만 보는 것을 못 잡았다');
+  assert.ok(흠.some((s) => s.includes('거절하는 자리가 없다')), '옛판의 parent_event_id 무검사를 못 잡았다');
+  // 검사가 죽는 쪽도 초록이면 안 된다 — 못 찾았다는 통과가 아니다.
+  assert.ok(인과배선('').length, '아무것도 없는 소스를 통과시켰다 — 그러면 파일이 바뀌는 날 조용히 초록이 된다');
+});
+
+test('인과 참조는 앱이 든 idempotency_key 로도 가리킬 수 있다 (오프라인 큐의 앞 항목은 event_id 가 없다 · ①-4)', () => {
+  const 소스 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'events', 'index.ts'), 'utf8');
+  assert.deepEqual(인과배선(소스), [],
+    '인과 고리 배선이 ①-4 이전으로 돌아갔다 — 증상은 오류가 아니라 「그 고리가 없다」다.\n' +
+    '  오프라인 큐(lib/제출로그.js)는 3일 뒤에 올라가는 항목이 있고, 그 앞 항목은 event_id 가 아직 없다.');
+});
+
 test('C0가 값목록을 통째로 복사하지 않았다 (복사본은 계약이 개정되는 날 갈라진다)', () => {
   const md = fs.readFileSync(C0경로, 'utf8');
   const 값목록 = 계약.learning_events.값목록;

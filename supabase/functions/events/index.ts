@@ -305,19 +305,45 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
         });
       }
 
+      /* ②-a **인과 고리를 푸는 자리 하나**(절단문서 ①-4) — `retry_of_event_id`·`parent_event_id`.
+       *   여기까지 이 둘은 **서버가 발급한 event_id** 만 받았다. 그런데 이 앱의 제출 로그는
+       *   오프라인 큐다(`lib/제출로그.js` — 3일 뒤에 올라가는 항목이 실제로 있다): 한 배치 안에서
+       *   둘째 항목이 첫째를 가리키려 해도 첫째는 **아직 event_id 가 없다.** 즉 그 고리는 틀리게
+       *   저장되는 게 아니라 **보낼 수단 자체가 없어** 사라진다 — 재제출 인과와 대화 순서가 통째로.
+       *   🔑 **새 이름을 안 만든다(c9 불요).** 앱은 항목마다 v4 uuid 를 한 번 짓고 다시는 안 바꾸고
+       *     (`idempotency_key` · 절단문서 ①-5), 서버엔 그 값으로 찾을 유일 색인이 **이미 있다**
+       *     (`unique (learner_id, idempotency_key)`). 가리킬 이름은 있었고 받는 쪽이 안 읽었을 뿐이다.
+       *     저장되는 값은 그대로 **진짜 event_id** 라 하류 조회는 아무것도 안 바뀐다.
+       *   🔴 `parent_event_id` 는 **존재 검사가 아예 없었다** — FK(`learning_events_parent_same_learner`)
+       *     가 대신 터져 400 이어야 할 것이 500 이 되고, 5xx 는 `retryable` 이라 그 발화가 큐에서
+       *     영원히 재시도한다(§78 이 uuid **모양**에 대해 못박은 그 사고의 다른 얼굴이다).
+       *     한 통로로 들어오니 한 자리에서 함께 막는다. */
+      const 고리풀기 = async (v: unknown) => {
+        const s = String(v);
+        /* event_id 를 **먼저** 본다. 두 이름이 한 값에 겹칠 확률은 사실상 0 이지만, 순서를 안
+         * 정해 두면 그 드문 날의 판정이 계획에 없던 대로 갈린다(둘 다 uuid 라 눈으로는 못 가린다). */
+        const 원 = await tx`
+          select event_id, intervention_id from engine.learning_events
+           where learner_id = ${learner_id}::uuid
+             and (event_id = ${s}::uuid or idempotency_key = ${s})
+           order by (event_id = ${s}::uuid) desc limit 1`;
+        return 원.length ? 원[0] : null;
+      };
+
       // ② 개입 계승(c6) — 앱은 「무엇에 대한 재시도인가」만 말하고, 그 사건의 intervention_id 는 서버가 잇는다.
       let intervention_id: string | null = null;
+      let retry_of: string | null = null;
+      let parent_of: string | null = null;
       if (사건.retry_of_event_id) {
-        const 원 = await tx`
-          select intervention_id from engine.learning_events
-           where learner_id = ${learner_id}::uuid and event_id = ${String(사건.retry_of_event_id)}::uuid`;
-        if (!원.length) {
+        const 원 = await 고리풀기(사건.retry_of_event_id);
+        if (!원) {
           return 거절({
             code: 'CONTRACT_VIOLATION', field: 'retry_of_event_id', retryable: false,
             message: 'retry_of_event_id 가 이 학생의 사건이 아닙니다',
           });
         }
-        intervention_id = 원[0].intervention_id;
+        retry_of = 원.event_id;
+        intervention_id = 원.intervention_id;
       } else if (s참조?.task_ref) {
         /* 🔴 **최초 제출도 개입을 가리켜야 한다**(절단문서 ①-11). 여기까지는 `retry_of_event_id`
          *   가 있을 때만 이었고, 그래서 **즉시 성과 — 개입이 먹힌 바로 그 경우 — 만 고리가 없었다.**
@@ -334,6 +360,20 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
              and s.task_ref = ${String(s참조.task_ref)}
            order by e.occurred_at desc limit 1`;
         intervention_id = 배정.length ? 배정[0].intervention_id : null;
+      }
+
+      /* 선행 턴. 🔴 여기서 거절하는 것이 **완화가 아니라 강화**다 — 지금까지 이 칸은 검사 없이
+       * FK 로 갔고, 그 결과가 500 + 무한 재시도였다(위 ②-a). 거절 사유를 400 으로 돌려주면
+       * 앱은 그 항목을 `send_final` 로 접는다(`lib/제출로그.js` — 계약 위반은 100번 보내도 위반이다). */
+      if (사건.parent_event_id) {
+        const 원 = await 고리풀기(사건.parent_event_id);
+        if (!원) {
+          return 거절({
+            code: 'CONTRACT_VIOLATION', field: 'parent_event_id', retryable: false,
+            message: 'parent_event_id 가 이 학생의 사건이 아닙니다',
+          });
+        }
+        parent_of = 원.event_id;
       }
 
       /* ②-b `skill_ids` — L0 §3-2 가 「배열이라 외래키가 안 걸린다 → **서버 검증으로 막고**
@@ -382,8 +422,11 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
           'learner', ${occurred_at}::timestamptz, ${(사건.correlation_id ?? null) as string | null}::uuid,
           ${String(key)}, ${(사건.session_id ?? null) as string | null}::uuid,
           ${(사건.content_id ?? null) as string | null}::uuid,
-          ${(사건.retry_of_event_id ?? null) as string | null}::uuid,
-          ${(사건.parent_event_id ?? null) as string | null}::uuid,
+          /* 🔑 푼 값을 넣는다(②-a). 앱이 자기 idempotency_key 로 가리켰어도 열에 남는 것은 늘
+           * 진짜 event_id 라 FK 도 하류 조회(progress 의 correction_retry 등)도 그대로다.
+           * ⚠ 이 주석도 SQL 템플릿 리터럴 안이다 — 백틱 금지(바로 아래 F180 경고와 같은 자리). */
+          ${retry_of}::uuid,
+          ${parent_of}::uuid,
           ${(사건.turn_no ?? null) as number | null},
           /* c8 교정 고리. 🔴 2026-08-07 F179: 이 한 칸이 빠져 있었고, 그 결과
            * 「correction.viewed」·「correction.responded」 는 **API 로는 100% 거절**됐다 —
