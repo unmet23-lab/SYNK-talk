@@ -18,7 +18,8 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { execFileSync, spawnSync } = require('node:child_process');
+const { execFileSync } = require('node:child_process');
+const { 띄우기 } = require('./lib/띄우기');
 
 const 훅 = path.join(__dirname, '..', 'tools', 'precommit.js');
 const 계약경로 = '계약/수집_교정_계약.json';
@@ -41,12 +42,14 @@ function 가짜도구(dir, 종료코드) {
   return p;
 }
 
-/* spawnSync 인 이유: 훅의 말은 **stderr** 로 나가는데 execFileSync 는 성공했을 때 stdout 만
- * 돌려준다. 그러면 「막지 않았다」와 「막지 않고 아무 말도 안 했다」가 같은 모양이 된다 —
- * 이 파일이 ④에서 재려는 게 정확히 그 차이다(첫 판이 그래서 빨갛게 났다). */
+/* execFileSync 가 아닌 이유: 훅의 말은 **stderr** 로 나가는데 execFileSync 는 성공했을 때
+ * stdout 만 돌려준다. 그러면 「막지 않았다」와 「막지 않고 아무 말도 안 했다」가 같은 모양이
+ * 된다 — 이 파일이 ④에서 재려는 게 정확히 그 차이다(첫 판이 그래서 빨갛게 났다).
+ * 통로가 `띄우기` 인 이유: 옛 판정 `r.status !== 0` 은 스폰 실패(status=null)까지 「막혔다」로
+ * 번역했다 — 미실행은 판정이 아니라 예외여야 한다(tests/lib/띄우기.js · 통과코드 0|1 만 결과다). */
 function 검사(dir, 도구) {
   const env = { ...process.env, SYNK_계약도구: 도구 };
-  const r = spawnSync(process.execPath, [훅], { cwd: dir, encoding: 'utf8', env });
+  const r = 띄우기(훅, { cwd: dir, env, 통과코드: [0, 1] });
   return { 막혔나: r.status !== 0, 출력: String(r.stdout || '') + String(r.stderr || '') };
 }
 

@@ -14,7 +14,7 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
+const { 띄우기 } = require('./lib/띄우기');
 
 const ROOT = path.join(__dirname, '..');
 const 도구 = path.join(ROOT, 'tools', '원격SQL.js');
@@ -98,7 +98,8 @@ test('마이그레이션 본체는 쓰기로 잡힌다', () => {
 /* ── 거부는 실제로 발동하고, 그 처방은 실제로 통하는 통로여야 한다 (F103) ── */
 
 test('쓰기 SQL 을 --적용 없이 주면 자격증명을 보기도 전에 거부한다', () => {
-  const r = spawnSync(process.execPath, [도구, 'supabase/L0_스키마.sql'], { encoding: 'utf8' });
+  // 거부 코드 1 만 결과다 — 스폰 실패·다른 코드는 `띄우기` 가 던진다(미실행 ≠ 거부).
+  const r = 띄우기([도구, 'supabase/L0_스키마.sql'], { encoding: 'utf8', 통과코드: [1] });
   assert.strictEqual(r.status, 1);
   assert.match(r.stderr, /상태를 바꾼다/);
   assert.match(r.stderr, /--적용/);
