@@ -106,7 +106,9 @@ async function main() {
 
   // ── ① 동의 게이트 — 동의를 넣기 **전**이라 저장되면 안 된다
   console.log('① 동의 게이트');
-  await sql(`delete from engine.consents where learner_id = '${learner_id}'`);
+  // 동의 행은 지우지 않는다 — 법적 증거라 delete 를 consents_protect 가 막는다(20260807120000).
+  // 「무동의 상태」는 삭제가 아니라 **전부 철회**로 만든다(실제 세계에서도 무동의는 그 모양이다).
+  await sql(`update engine.consents set revoked_at = now() where learner_id = '${learner_id}' and revoked_at is null`);
   const 무동의 = 기본();
   let r = await 부르기({ events: [무동의] });
   확인('동의 없으면 CONSENT_MISSING', r.body.results?.[0]?.error?.code === 'CONSENT_MISSING', r.body.results?.[0]);
@@ -210,6 +212,54 @@ async function main() {
     try { await sql(q); } catch { 막힘 = true; }
     확인(이름, 막힘);
   }
+
+  // ── ⑨ 수집→처리 배선 — 제출이 서면 처리 대기표(pipeline_jobs)에 줄이 **같은 트랜잭션**으로 선다
+  console.log('\n⑨ 수집→처리 배선');
+  const 잡 = await sql(`select j.status from engine.pipeline_jobs j
+                          join engine.submissions s on s.submission_id = j.submission_id
+                         where s.event_id = '${첫?.event_id}'`);
+  확인('제출에 처리 job 이 함께 섰다(pending)', 잡.length === 1 && 잡[0].status === 'pending', 잡);
+  확인('동의 귀속(consent_id)이 행에 박혔다',
+    (await sql(`select consent_id from engine.learning_events where event_id = '${첫?.event_id}'`))[0]?.consent_id != null);
+
+  // ── ⑩ 원문 불변 확대 — 「최대 소급 불가」 선언과 자물쇠의 범위가 같다
+  console.log('\n⑩ 원문 불변 확대');
+  for (const [이름, q] of [
+    ['task_snapshot 덮어쓰기 거부', `update engine.submissions set task_snapshot='{}'::jsonb where event_id='${첫?.event_id}'`],
+    ['occurred_at 바꾸기 거부', `update engine.submissions set occurred_at=now() where event_id='${첫?.event_id}'`],
+  ]) {
+    let 막힘 = false;
+    try { await sql(q); } catch { 막힘 = true; }
+    확인(이름, 막힘);
+  }
+
+  // ── ⑪ 동의 증거 보호 — 개서·삭제가 물리로 막힌다(철회 세우기·새 행만 통과)
+  console.log('\n⑪ 동의 증거 보호');
+  for (const [이름, q] of [
+    ['동의 행 삭제 거부', `delete from engine.consents where learner_id='${learner_id}'`],
+    ['agreed_at 개서 거부', `update engine.consents set agreed_at = now() where learner_id='${learner_id}' and revoked_at is null`],
+  ]) {
+    let 막힘 = false;
+    try { await sql(q); } catch { 막힘 = true; }
+    확인(이름, 막힘);
+  }
+
+  // ── ⑫ 철회 후 수집 0건 — 과거 시각을 주장해도 새 수집이 없다(동의문 「철회 시 중단」)
+  console.log('\n⑫ 철회 후 수집 0건');
+  await sql(`update engine.consents set revoked_at = now() where learner_id='${learner_id}' and revoked_at is null`);
+  const 철회후 = 기본({ occurred_at: new Date(Date.now() - 3600_000).toISOString() });
+  r = await 부르기({ events: [철회후] });
+  확인('철회 뒤엔 철회 전 시각을 적어도 CONSENT_MISSING', r.body.results?.[0]?.error?.code === 'CONSENT_MISSING', r.body.results?.[0]);
+  확인('그 행은 저장되지 않았다',
+    (await sql(`select count(*)::int n from engine.learning_events where idempotency_key='${철회후.idempotency_key}'`))[0].n === 0);
+  let 되돌림막힘 = false;
+  try { await sql(`update engine.consents set revoked_at = null where learner_id='${learner_id}'`); } catch { 되돌림막힘 = true; }
+  확인('철회 되돌리기 거부(재동의는 새 행)', 되돌림막힘);
+  // 재동의 = 새 행 — 회로가 다시 산다(다음 실행도 이 상태에서 시작한다)
+  await sql(`insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver)
+             values ('${learner_id}', 'v18.9', now(), 'test')`);
+  r = await 부르기({ events: [기본()] });
+  확인('재동의(새 행) 뒤에는 다시 저장된다', r.body.results?.[0]?.status === 'stored', r.body.results?.[0]);
 
   console.log(`\n── 통과 ${통과} · 실패 ${실패} ──`);
   process.exit(실패 ? 1 : 0);

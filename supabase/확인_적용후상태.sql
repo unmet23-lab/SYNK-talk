@@ -10,6 +10,7 @@ with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'), ('learning_events','skill_taxonomy_ver'),
   ('learning_events','parent_event_id'), ('learning_events','turn_no'),
   ('learning_events','correction_id'),
+  ('learning_events','consent_id'),
   ('submissions','capture_meta'), ('skills','superseded_by'), ('daily_activity','expected'),
   ('schema_migrations','version'), ('schema_migrations','name'),
   ('schema_migrations','checksum'), ('schema_migrations','applied_at'),
@@ -33,10 +34,14 @@ with 기대열(t, c) as (values
   ('corrections_reviewed_same_submission'), ('schema_migrations_pkey'),
   ('learners_signup_attempts_nonneg_c8'), ('staff_role_c8'),
   ('learners_temp_password_paired_c8'),
-  ('learning_events_correction_target_c8'), ('learning_events_correction_id_fkey')
+  ('learning_events_correction_target_c8'), ('learning_events_correction_id_fkey'),
+  -- 동의 귀속(20260807120000)
+  ('learning_events_consent_id_fkey')
 ), 기대트리거(n) as (values
   ('learning_events_immutable'), ('corrections_immutable'), ('submissions_original_immutable'),
-  ('staff_access_log_immutable'), ('learning_events_correction_same_learner')
+  ('staff_access_log_immutable'), ('learning_events_correction_same_learner'),
+  -- 수집→처리 배선 + 동의 증거 보호(20260807120000)
+  ('submissions_enqueue_job'), ('consents_protect')
 ), 대상역할(r) as (values ('anon'), ('authenticated'))
 , 대상권한(p) as (values
   ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE'), ('REFERENCES'), ('TRIGGER')
@@ -101,18 +106,23 @@ with 기대열(t, c) as (values
     where t.typnamespace=to_regnamespace('engine')
       and t.typname='job_status' and e.enumlabel='failed') as 실패상태,
   (select count(*) from pg_policies
-    where schemaname='engine' and tablename='schema_migrations') as 이력정책
+    where schemaname='engine' and tablename='schema_migrations') as 이력정책,
+  -- 수집→처리 배선(20260807120000): 제출이 있는데 job 이 없으면 고아다 — 0이어야 한다.
+  (select count(*) from engine.submissions s
+    where not exists (select 1 from engine.pipeline_jobs j
+                       where j.submission_id = s.submission_id)) as 잡없는제출
 )
 select case when 테이블수=11 and RLS켜짐=11 and 정책수=8
              and 새는테이블권한=0 and 새는스키마권한=0
              and 삭제차단=3 and 실패상태=1 and 이력정책=0
+             and 잡없는제출=0
              and (select v from 빠진열) is null
              and (select v from 빠진제약) is null
              and (select v from 빠진트리거) is null
-             and (select version from 현재이력)='20260807060000'
-              and (select checksum from 현재이력)='a198ff4c8f3e0bb48640366988782806fe16f7423ca5163fcb86c582b29d2dcb' -- migration-checksum
+             and (select version from 현재이력)='20260807120000'
+              and (select checksum from 현재이력)='7745dfed827ed302b2bd0ec2448f33252207d59183fedb33b8ae998cfbdea780' -- migration-checksum
             then '✅ 전부 통과'
-            else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·8·0·0·3·1·0 · 빠진 칸은 전부 비어 있어야 합니다)'
+            else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·8·0·0·3·1·0·0 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
        (select version from 현재이력) as 현재버전,
        (select checksum from 현재이력) as checksum,

@@ -95,7 +95,7 @@ async function 배달하기(오늘: string) {
   const 대상 = await sql`
     select l.learner_id, l.level_current, l.goal_track,
            배정.occurred_at as 마지막배정, 배정.task_snapshot as 마지막스냅샷,
-           교정.corrected_text as 교정문, 동의.consent_ver
+           교정.corrected_text as 교정문, 동의.consent_ver, 동의.consent_id
       from engine.learners l
       left join lateral (
         select e.occurred_at, s.task_snapshot
@@ -113,7 +113,7 @@ async function 배달하기(오늘: string) {
            and c.created_at > coalesce(배정.occurred_at, '-infinity'::timestamptz)
          order by c.created_at desc limit 1) 교정 on true
       left join lateral (
-        select consent_ver from engine.consents
+        select consent_id, consent_ver from engine.consents
          where learner_id = l.learner_id and revoked_at is null
          order by agreed_at desc limit 1) 동의 on true`;
 
@@ -167,6 +167,8 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
     level_snapshot: (학생.level_current ?? null) as string | null,
     goal_snapshot: (학생.goal_track ?? null) as string | null,
     consent_ver: String(학생.consent_ver),
+    // 동의 귀속(20260807120000) — 위 consent_ver 게이트가 무동의를 걸렀으니 여기선 항상 있다.
+    consent_id: String(학생.consent_id),
   };
 
   try {
@@ -175,12 +177,12 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
       const 개입 = await tx`
         insert into engine.learning_events (
           learner_id, event_type, actor_kind, occurred_at, idempotency_key,
-          level_snapshot, goal_snapshot, intervention_id, consent_ver, degraded, payload, schema_ver
+          level_snapshot, goal_snapshot, intervention_id, consent_ver, consent_id, degraded, payload, schema_ver
         ) values (
           ${learner_id}::uuid, 'intervention.delivered', ${공통.actor_kind}, ${지금}::timestamptz,
           ${멱등키('intervention', learner_id, 오늘)},
           ${공통.level_snapshot}, ${공통.goal_snapshot}, ${intervention_id}::uuid,
-          ${공통.consent_ver}, ${결정.degraded},
+          ${공통.consent_ver}, ${공통.consent_id}::uuid, ${결정.degraded},
           ${sql.json({ ver: 1, output_text: 따라말하기문장(결정.task_snapshot) })}, ${ver}
         )
         on conflict (learner_id, idempotency_key) do nothing
@@ -197,12 +199,12 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
       const 배정 = await tx`
         insert into engine.learning_events (
           learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
-          level_snapshot, goal_snapshot, intervention_id, consent_ver, degraded, payload, schema_ver
+          level_snapshot, goal_snapshot, intervention_id, consent_ver, consent_id, degraded, payload, schema_ver
         ) values (
           ${learner_id}::uuid, 'task.assigned', ${통로}, ${공통.actor_kind}, ${지금}::timestamptz,
           ${멱등키('task', learner_id, 오늘)},
           ${공통.level_snapshot}, ${공통.goal_snapshot}, ${개입id}::uuid,
-          ${공통.consent_ver}, ${결정.degraded}, ${sql.json({ ver: 1 })}, ${ver}
+          ${공통.consent_ver}, ${공통.consent_id}::uuid, ${결정.degraded}, ${sql.json({ ver: 1 })}, ${ver}
         )
         on conflict (learner_id, idempotency_key) do nothing
         returning event_id`;

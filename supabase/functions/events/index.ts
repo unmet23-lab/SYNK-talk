@@ -279,11 +279,15 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
   try {
     return await sql.begin(async (tx) => {
       // ① 동의 — `occurred_at` 시점에 살아 있던 것만. 사후 동의는 과거를 유효하게 만들지 못한다(C0 §5).
+      //    그리고 **철회한 뒤에는 과거 시각을 주장해도 새 수집이 없다** — 저장은 지금 벌어지는
+      //    일이라 지금(now()) 기준으로도 살아 있어야 한다(동의문 「철회 시 중단」 · 왕복 ⑫).
+      //    `consent_id` 까지 읽는 이유: 행이 「어느 동의 문서 판」이 아니라 **정확히 어느 동의 행**에
+      //    근거했는지를 남긴다(20260807120000 · 서버 파생이라 앱 payload 는 그대로다).
       const 동의 = await tx`
-        select consent_ver from engine.consents
+        select consent_id, consent_ver from engine.consents
          where learner_id = ${learner_id}::uuid
            and agreed_at <= ${occurred_at}::timestamptz
-           and (revoked_at is null or revoked_at > ${occurred_at}::timestamptz)
+           and (revoked_at is null or (revoked_at > ${occurred_at}::timestamptz and revoked_at > now()))
          order by agreed_at desc limit 1`;
       if (!동의.length) {
         return 거절({
@@ -314,7 +318,7 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
           idempotency_key, session_id, content_id, retry_of_event_id, parent_event_id, turn_no,
           correction_id,
           skill_ids, skill_taxonomy_ver, level_snapshot, goal_snapshot,
-          intervention_id, consent_ver, payload, schema_ver
+          intervention_id, consent_id, consent_ver, payload, schema_ver
         ) values (
           ${learner_id}::uuid, ${String(사건.event_type)}, ${(사건.task_type ?? null) as string | null},
           'learner', ${occurred_at}::timestamptz, ${(사건.correlation_id ?? null) as string | null}::uuid,
@@ -333,7 +337,7 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
           ${(사건.correction_id ?? null) as string | null}::uuid,
           ${(사건.skill_ids ?? []) as string[]}, ${(사건.skill_taxonomy_ver ?? null) as string | null},
           ${(사건.level_snapshot ?? null) as string | null}, ${(사건.goal_snapshot ?? null) as string | null},
-          ${intervention_id}::uuid, ${동의[0].consent_ver}, ${제이슨(payload)}, ${ver}
+          ${intervention_id}::uuid, ${동의[0].consent_id}::uuid, ${동의[0].consent_ver}, ${제이슨(payload)}, ${ver}
         )
         on conflict (learner_id, idempotency_key) do nothing
         returning event_id`;
