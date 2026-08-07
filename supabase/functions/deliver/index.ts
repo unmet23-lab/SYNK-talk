@@ -112,9 +112,19 @@ async function 배달하기(오늘: string) {
            and c.corrected_text is not null
            and c.created_at > coalesce(배정.occurred_at, '-infinity'::timestamptz)
          order by c.created_at desc limit 1) 교정 on true
+      /* 🔴 동의 술어는 lib/동의게이트.js 의 「지금유효술어」와 **같아야 한다** — 2026-08-07 실측:
+       *   여기만 agreed_at 조건이 없고 revoked_at is null 이라 **양쪽으로 어긋나 있었다.**
+       *   · 미래 날짜 동의 → 배정은 되는데 uploads 는 403 (과제를 보고도 못 올린다)
+       *   · 철회를 미래로 예약한 학생 → 배정이 안 되는데 업로드는 통과 (화면이 비는데 이유가 없다)
+       *   태그 질의를 못 쓰는 자리(lateral join)라 술어를 글자로 적되 tests/동의게이트.test.js 가
+       *   정본 텍스트와 대조한다 — 갈라지면 빨개진다.
+       *   ⚠ 이 주석은 SQL 템플릿 리터럴 **안**이다 — 백틱을 쓰면 문자열이 여기서 끝나고 함수가
+       *   번들조차 안 된다(F180 · 방금 그렇게 한 번 빨개졌다). 강조는 「」로 한다. */
       left join lateral (
         select consent_id, consent_ver from engine.consents
-         where learner_id = l.learner_id and revoked_at is null
+         where learner_id = l.learner_id
+           and agreed_at <= now()
+           and (revoked_at is null or revoked_at > now())
          order by agreed_at desc limit 1) 동의 on true`;
 
   const [{ 최신조각 }] = await sql`

@@ -28,6 +28,13 @@
 import postgres from 'npm:postgres@3.4.4';
 import 토큰모듈 from './토큰.mjs';
 import 과제모듈 from './오늘과제.mjs';
+import 동의모듈 from './동의게이트.mjs';
+
+/* 진단 한 칸(`blocked`)을 위해서만 쓴다 — 이 함수는 막는 게이트가 아니다(아래 주석). */
+const { 지금유효, 거절몸통 } = 동의모듈 as {
+  지금유효: (sql: unknown, learner_id: string) => Promise<Array<{ consent_ver: string }>>;
+  거절몸통: { code: string; field: string; retryable: boolean };
+};
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
 const { 몽골날짜 } = 과제모듈 as { 몽골날짜: (때?: Date) => string };
@@ -144,8 +151,25 @@ Deno.serve(async (req: Request) => {
         : null,
     }));
 
+    /* 🔴 **빈 배열의 이유를 앱이 알 수 없었다**(F176 ① · 2026-08-07 실측).
+     *   `deliver` 는 동의 없는 학생을 배정하지 않으므로(P0 §345) 그 학생의 `data` 는 빈다.
+     *   그런데 배치가 안 돈 날도 똑같이 빈다 — **원인이 둘인데 응답이 하나**라 앱은 못 가르고,
+     *   화면에는 「오늘 받은 과제가 아직 없어요」만 뜬다. 갓 등록한 학생은 그 화면을 보며
+     *   무엇을 해야 하는지 알 길이 없고, 운영자도 그 학생이 왜 조용한지 모른다.
+     *
+     *   그래서 **왜 비었나**를 한 칸 싣는다. C0 §4-3 「빈 상태는 오류가 아니다」의 연장이다 —
+     *   200 을 유지하면서 이유만 말한다(4xx 로 바꾸면 앱의 정상 경로가 오류 경로가 된다).
+     *
+     * 🔑 이 함수는 **막지 않는다.** 게이트는 `uploads`(서명)·`events`(적재)·`deliver`(배정)이고
+     *   여기는 그 게이트를 **미리 읽어 알려주는** 자리다. 술어가 갈라지면 「화면은 초록인데
+     *   업로드는 403」이 되므로 정본(`lib/동의게이트.js`)을 그대로 부른다.
+     * 🔑 `data` 가 있어도 잰다 — 배정 뒤 철회한 학생은 과제를 보면서 업로드만 막힌다.
+     *   「비었을 때만」 재면 `blocked: null` 이 **측정이 아니라 추측**이 된다. */
+    const 동의 = await 지금유효(sql, 행.learner_id as string);
+    const blocked = 동의.length ? null : { code: 거절몸통.code };
+
     // 하루 1건이 멱등으로 보장되므로 `next_cursor` 는 항상 null 이다(C0 §4-3 ①).
-    return 봉투(200, { ok: true, date: 날짜, data, next_cursor: null }, ver);
+    return 봉투(200, { ok: true, date: 날짜, data, blocked, next_cursor: null }, ver);
   } catch (e) {
     console.error('[tasks] 조회 실패', String((e as Error)?.message ?? e));
     return 실패(500, { code: 'SERVER_ERROR', message: '잠시 뒤 다시 시도해 주세요', retryable: true }, ver);

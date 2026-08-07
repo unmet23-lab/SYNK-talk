@@ -105,7 +105,12 @@ Deno.serve(async (req: Request) => {
   const learner_id: string = 행.learner_id;
 
   /* 🔴 동의 게이트 — **서명을 내주는 것이 곧 수집 허가다.**
-   * `events` 에만 두면 파일은 이미 Storage 에 있고 행만 거절돼, 동의 없이 모은 녹음이 남는다. */
+   * `events` 에만 두면 파일은 이미 Storage 에 있고 행만 거절돼, 동의 없이 모은 녹음이 남는다.
+   * 🔑 술어의 **정본은 `lib/동의게이트.js 지금유효술어`** 다(2026-08-07: 같은 술어가 네 곳에
+   *   네 가지로 적혀 있었고 `deliver` 는 양쪽으로 어긋나 있었다). 이 파일이 그 텍스트와 갈라지면
+   *   `tests/동의게이트.test.js` 가 빨개진다.
+   *   ⚠ 정본 함수를 **직접 부르는 형태**로 바꾸는 것은 이 함수를 든 트랙 몫이다 — 지금 옆 세션이
+   *   `functions/events` 와 그 회귀를 들고 있어 여기서 모양을 바꾸면 남의 검사가 빨개진다(F073). */
   const 동의 = await sql`
     select consent_ver from engine.consents
      where learner_id = ${learner_id}::uuid
