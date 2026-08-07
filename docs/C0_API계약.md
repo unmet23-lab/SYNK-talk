@@ -58,19 +58,19 @@
 | 헤더 | 예 | 없으면 |
 |---|---|---|
 | `Authorization` | `Bearer <access_token>` | 401 `AUTH_REQUIRED` |
-| `X-Contract-Ver` | `c8` | 400 `CONTRACT_VER_MISSING` |
+| `X-Contract-Ver` | `c9` | 400 `CONTRACT_VER_MISSING` |
 | `X-App-Ver` | `0.3.1 (42)` | 통과(로그용) |
 
 **응답 봉투 — 성공**
 
 ```json
-{ "ok": true, "contract_ver": "c8", "results": [ ... ] }
+{ "ok": true, "contract_ver": "c9", "results": [ ... ] }
 ```
 
 **응답 봉투 — 요청 전체 실패**
 
 ```json
-{ "ok": false, "contract_ver": "c8",
+{ "ok": false, "contract_ver": "c9",
   "error": { "code": "AUTH_EXPIRED", "message": "토큰이 만료됐습니다", "retryable": true } }
 ```
 
@@ -151,7 +151,7 @@
 
 - `payload.ver`(정수) **필수**. 모양이 바뀌면 `2`로 올리고 과거 행은 `1`로 남는다.
   > 🔑 **이벤트 이름에 `.v1`을 붙이지 않는다**(L0 §3-2 표기 정정 요청 · §9). 이름에 붙이면 값목록이 payload 개정마다 배로 늘고, 집계가 `like 'choice.selected%'`가 된다. `payload.ver`는 **컬럼도 값목록도 늘리지 않는다.**
-- payload 필드 이름도 **현행 계약(c8) 필드 목록에서 고른다**(`confidence`·`attempt_no`·`learner_response`·`options_shown`·`position`·`recommended_option`·`selected_option`·`changed_selection`·`latency_ms`·`skipped`·**`selection_reason`**·**`rejected_all`**·**`cited_refs`**·**`output_text`**). 목록에 없는 이름이 필요하면 **다음 판 개정(c9)**이지 자유 추가가 아니다.
+- payload 필드 이름도 **현행 계약(c9) 필드 목록에서 고른다**(`confidence`·`attempt_no`·`learner_response`·`options_shown`·`position`·`recommended_option`·`selected_option`·`changed_selection`·`latency_ms`·`skipped`·**`selection_reason`**·**`rejected_all`**·**`cited_refs`**·**`output_text`**). 목록에 없는 이름이 필요하면 **다음 판 개정(c9)**이지 자유 추가가 아니다.
   > 🔴 **굵은 4개는 c4·c5가 계약에 넣었는데 이 목록이 따라오지 않았다**(2026-08-06 외부 검토가 잡았다). 계약은 「필수」라 하고 이 문서는 「목록에 없는 이름은 자유 추가가 아니다」라 해서, **앱이 그 필드를 보내는 순간 계약 위반으로 거절되는** 상태였다. 두 문서가 각자 맞는 말을 하는데 합치면 구현이 불가능한 형태 — 계약을 늘릴 때 이 목록을 함께 늘리지 않으면 반드시 재발한다.
 - **선택지는 `{option_id, label}`로 싣는다**(c6). `option_id`는 안 바뀌는 조인 키고 `label`은 그때 표시된 문구의 스냅샷이다. 문구만 문자열로 남기면 문구를 개정하는 날 **판을 가로지르는 집계가 끊긴다** — 스킬에 「이름 말고 불변 ID로 묶는다」를 적용한 것과 같은 이유이고, c5까지 선택지에만 그 규칙이 빠져 있었다.
 - 🔴 **`is_correct`(정답여부)를 만들지 않는다.** `submission.body_original`(고른 답) + `task_snapshot.정답`이 있으면 채점은 **언제든 다시 계산되는 파생**이다. 원본을 두고 파생을 저장하면 채점 규칙이 바뀌는 날 과거가 거짓말을 한다.
@@ -160,7 +160,7 @@
 **응답**
 
 ```json
-{ "ok": true, "contract_ver": "c8",
+{ "ok": true, "contract_ver": "c9",
   "results": [
     { "idempotency_key": "b6f1…", "status": "stored",    "event_id": "3c9e…" },
     { "idempotency_key": "77a2…", "status": "duplicate", "event_id": "1b40…" },
@@ -181,7 +181,7 @@
 
 ```json
 요청  { "kind": "audio", "content_type": "audio/wav", "byte_size": 482913 }
-응답  { "ok": true, "contract_ver": "c8",
+응답  { "ok": true, "contract_ver": "c9",
         "upload_url": "https://…", "audio_ref": "voice/9f2c…(learner_id)/3c9e….wav",
         "expires_at": "2026-08-05T13:35:00.000Z" }
 ```
@@ -244,7 +244,7 @@
 **응답 예 · 실패 표** (`supabase/functions/tasks`):
 
 ```json
-{ "ok": true, "contract_ver": "c8", "date": "2026-08-07", "next_cursor": null,
+{ "ok": true, "contract_ver": "c9", "date": "2026-08-07", "next_cursor": null,
   "data": [ { "task_id": "…", "task_snapshot": { "ver": 1, "호흡": [ … ] },
               "task_format": null, "task_ref": "task-2026-08-07",
               "level_snapshot": "Lv2", "goal_snapshot": "study", "degraded": false,
@@ -301,7 +301,7 @@
 | 🔴 경계 | 이 엔드포인트는 **집계값만** 낸다. 점수·등수·타 학생 값은 담지 않는다(`P0 §2-1` 랭킹 금지) |
 
 ```json
-{ "ok": true, "contract_ver": "c8", "date": "2026-08-07", "next_cursor": null,
+{ "ok": true, "contract_ver": "c9", "date": "2026-08-07", "next_cursor": null,
   "data": [ { "today":     { "submission_count": 2, "retry_count": 1, "correction_retry": true },
               "yesterday": { "submission_count": 1, "retry_count": 0, "correction_retry": false } } ] }
 ```

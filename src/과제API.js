@@ -29,7 +29,7 @@ const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
  *   대신 손 상수를 두고 **`tests/계약.test.js` 가 정본과 같은지 기계로 묶는다** — 갈라지면
  *   CI 가 빨개진다. 갈라진 채 나가면 증상은 426 이고 학생 눈에는 「업데이트하래요」로 보인다.
  */
-export const 계약판 = 'c8';
+export const 계약판 = 'c9';
 
 /**
  * 오늘(또는 지정한 날)의 과제를 읽는다.

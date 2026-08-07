@@ -33,13 +33,13 @@ with 기대열(t, c) as (values
   -- 임시번호를 해시로 든다(L0 §4-2-2 · 20260807024500_temp_password_c7)
   ('learners','temp_password_hash')
 ), 기대제약(n) as (values
-  ('learning_events_event_type_c8'), ('learning_events_task_type_c8'),
-  ('submissions_task_format_c8'), ('submissions_translation_source_c8'), ('corrections_verdict_c8'),
+  ('learning_events_event_type_c9'), ('learning_events_task_type_c9'),
+  ('submissions_task_format_c9'), ('submissions_translation_source_c9'), ('corrections_verdict_c9'),
   ('learning_events_retry_same_learner'), ('learning_events_parent_same_learner'),
   ('corrections_reviewed_same_submission'), ('schema_migrations_pkey'),
-  ('learners_signup_attempts_nonneg_c8'), ('staff_role_c8'),
-  ('learners_temp_password_paired_c8'),
-  ('learning_events_correction_target_c8'), ('learning_events_correction_id_fkey'),
+  ('learners_signup_attempts_nonneg_c9'), ('staff_role_c9'),
+  ('learners_temp_password_paired_c9'),
+  ('learning_events_correction_target_c9'), ('learning_events_correction_id_fkey'),
   -- 동의 귀속(20260807120000)
   ('learning_events_consent_id_fkey')
 ), 기대트리거(n) as (values
@@ -134,8 +134,8 @@ select case when 테이블수=11 and RLS켜짐=11 and 정책수=7
              and (select v from 빠진열) is null
              and (select v from 빠진제약) is null
              and (select v from 빠진트리거) is null
-             and (select version from 현재이력)='20260807190000'
-              and (select checksum from 현재이력)='949655b398b49f55b0629fdb718c5c18e5c10833af3c4905fcebd0d9165860b9' -- migration-checksum
+             and (select version from 현재이력)='20260807210000'
+              and (select checksum from 현재이력)='6539abce7a626aa59a03c213e331de94cc335fae9db7f4fc70e06b873831e85d' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·7·0·0·3·1·0·0·1 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
