@@ -6,7 +6,7 @@
 --
 -- 🔴 **이 SQL 은 통째로 rollback 한다.** 안에서 하는 일(가짜 계정·grant·해임)이 전부
 --   되돌려지므로 실행 뒤 상태는 실행 전과 같다. 되돌리는 절차를 먼저 정하고 바꿔본다.
---   확인: 실행 직후 `확인_적용후상태.sql` 이 여전히 11·11·8·**0**·0·3·1·0 이어야 한다
+--   확인: 실행 직후 `확인_적용후상태.sql` 이 여전히 11·11·7·**0**·0·3·1·0·0·1 이어야 한다
 --   (특히 「새는테이블권한=0」 — 아래에서 잠깐 grant 했다가 되돌린 자리다).
 --
 -- ⚠ **오늘 정책은 도달 자체가 불가능하다.** `engine` 은 API 에 노출돼 있지 않고
@@ -32,6 +32,7 @@ declare
   큐제출 int; 큐교정 int; 학생행 int; 쓰기거부 boolean := false;
   해임후 int; 폐기후 int; 감사쓰기거부 boolean := false;
   기대큐교정 int; 기대큐제출 int; 전체제출 int; 큐제출id uuid;
+  뷰제출 int; 샌열 text;  -- 검수 판(20260807190000 · 절단문서 ②-17)
   학생 uuid; 학생주장 text; 학생전 int; 학생후 int; 학생축 text;
 begin
   -- ── 판 깔기 (전부 rollback 된다) ──────────────────────────────────────────
@@ -77,6 +78,9 @@ begin
   grant select, insert on engine.learners, engine.learning_events, engine.submissions,
                           engine.corrections, engine.staff, engine.staff_access_log
                        to authenticated;
+  -- 🔴 검수 판은 **운영에서 아무에게도 grant 하지 않는다**(조회 감사가 「읽는 지점 하나」를
+  --   전제로 선다 · §4-5 ④). 여기서만 열어 **판이 실제로 좁은지**를 잰다 — rollback 이 지운다.
+  grant select on engine.review_queue to authenticated;
 
   perform set_config('request.jwt.claims', 주장, true);
   set local role authenticated;
@@ -86,7 +90,18 @@ begin
 
   -- ── 큐는 보인다 (막기만 하고 열지 않으면 그것도 결함이다) ──────────────────
   select count(*) into 큐교정 from engine.corrections;
+  -- 🔴 제출물 **원표**는 이제 0행이어야 한다(20260807190000 이 넓은 정책을 지웠다).
+  --   RLS 는 행 단위라 열을 못 좁혀, 큐에 든 행을 열면 `body_original`·`task_snapshot`·
+  --   `redaction_result` 가 함께 나갔다(절단문서 ②-17).
   select count(*) into 큐제출 from engine.submissions;
+  -- 대신 **판**이 보인다. 여기서 재는 것은 권한이 아니라 **넓이**다 — 역할 판정은
+  --   Edge Function 몫이라(§4-5 ②) 이 뷰에는 일부러 안 들어 있다.
+  select count(*) into 뷰제출 from engine.review_queue;
+  select string_agg(column_name, ', ' order by column_name) into 샌열
+    from information_schema.columns
+   where table_schema = 'engine' and table_name = 'review_queue'
+     and column_name in ('body_original', 'task_snapshot', 'redaction_result',
+                         'redaction_ver', 'capture_meta', 'event_id', 'image_refs');
 
   -- ── ② 직접 쓰기는 거부된다 (쓰기는 Edge Function 만) ──────────────────────
   -- ⚠ 대상은 **위에서 확정한 id** 다. `select ... from` 로 원본을 고르면 그 select 가 0행일 때
@@ -153,9 +168,20 @@ begin
   if 학생행 <> 0 then
     raise exception '① 실패: 검수자에게 learners 가 %행 보인다 — 학생 신원은 열지 않는다', 학생행;
   end if;
-  if 큐교정 <> 기대큐교정 or 큐제출 <> 기대큐제출 then
-    raise exception '큐 실패: 교정 %/% · 제출 %/% — 막기만 하고 열지 않으면 검수가 안 돈다',
-      큐교정, 기대큐교정, 큐제출, 기대큐제출;
+  if 큐교정 <> 기대큐교정 then
+    raise exception '큐 실패: 교정 %/% — 막기만 하고 열지 않으면 검수가 안 돈다',
+      큐교정, 기대큐교정;
+  end if;
+  if 큐제출 <> 0 then
+    raise exception '②-17 실패: 검수자에게 submissions 원표가 %행 보인다 — 넓은 옛 정책이 살아 있다',
+      큐제출;
+  end if;
+  if 뷰제출 <> 기대큐제출 then
+    raise exception '②-17 실패: 검수 판이 %행 (기대 %행) — 좁히다가 화면을 통째로 비웠다',
+      뷰제출, 기대큐제출;
+  end if;
+  if 샌열 is not null then
+    raise exception '②-17 실패: 검수 판에 %가 실려 있다 — 이름만 가리고 원문을 연 그 상태다', 샌열;
   end if;
   if not 쓰기거부 then raise exception '② 실패: 검수자 토큰이 corrections 에 직접 썼다'; end if;
   if not 감사쓰기거부 then raise exception '② 실패: 검수자 토큰이 감사표에 직접 썼다'; end if;
@@ -163,7 +189,7 @@ begin
   if 폐기후 <> 0 then raise exception '④ 실패: revoked_before 뒤에도 옛 토큰이 %행 본다', 폐기후; end if;
 
   insert into 판정결과 values (
-    '✅ ①~④ 전부 통과 — 학생 신원 0행 · 큐만 보임 · 직접 쓰기 거부 · 해임/재발급 즉시 차단',
+    '✅ ①~④ 전부 통과 — 학생 신원 0행 · 원표 0행/판만 보임 · 직접 쓰기 거부 · 해임/재발급 즉시 차단',
     전체제출, 기대큐제출, 기대큐교정, 학생축);
 end
 $probe$;
