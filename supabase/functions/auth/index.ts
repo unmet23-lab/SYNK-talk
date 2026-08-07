@@ -366,6 +366,23 @@ Deno.serve(async (req: Request) => {
         console.error('[auth] 계정 생성 실패 · 기존 계정도 못 찾았다', 생성.status, 생성.본문.slice(0, 300));
         return 실패(500, { code: 'SERVER_ERROR', message: '잠시 뒤 다시 시도해 주세요', retryable: true }, ver);
       }
+      /* ☠️ **계정 선점 차단** (2026-08-07 설계 심문 · 유호님 확정 ㉯).
+       *   위 주석은 「여기까지 왔으면 그 학생 본인이다」라고 했는데, 그건 *우리가 만들다 실패한*
+       *   계정일 때만 참이다. 공개 가입이 열려 있으면(`disable_signup=false` — L0 §8-2 실측)
+       *   **남이 먼저** `synk042@synk.invalid` 로 가입할 수 있다. 학생번호는 순번이라 주소가 예측된다.
+       *   그러면 이 분기가 **공격자 계정을 그 학생의 learners 행에 이어 주고**, 비밀번호는 공격자
+       *   것이라 그 사람이 그 학생이 된다 — 진짜 학생은 자기 계정에 영영 못 들어간다.
+       *   L0 §8-2 는 두 사실(공개 가입 열림 · 이미 있으면 잇는다)을 각각 맞게 적고 **곱을 안 봤다**.
+       * 🔑 그래서 잇기 전에 비밀번호를 **방금 이 학생이 정한 값으로 덮는다.** 원래 이 분기가 다루려던
+       *   「우리가 만든 계정」에서는 같은 값이라 무해하고, 남의 계정이면 그 순간 통제권이 넘어온다.
+       *   실패하면 잇지 않는다 — 비밀번호를 모르는 계정을 이으면 학생이 못 들어오는 건 마찬가지다.
+       * ⚠ 천장: `.invalid` 는 예약 TLD라 어떤 OAuth 제공자도 소유를 확인해 주지 않는다. 그래서
+       *   비밀번호 통로만 닫으면 된다. 다른 도메인을 쓰게 되면 연결된 identity 도 봐야 한다. */
+      const 덮기 = await 비밀번호갈기(uid, 비밀번호);
+      if (!덮기.ok) {
+        console.error('[auth] 선점 방지 비밀번호 덮기 실패', 덮기.status, 덮기.본문.slice(0, 300));
+        return 실패(500, { code: 'SERVER_ERROR', message: '잠시 뒤 다시 시도해 주세요', retryable: true }, ver);
+      }
     } else {
       console.error('[auth] 계정 생성 실패', 생성.status, 생성.본문.slice(0, 300));
       return 실패(500, { code: 'SERVER_ERROR', message: '잠시 뒤 다시 시도해 주세요', retryable: true }, ver);
