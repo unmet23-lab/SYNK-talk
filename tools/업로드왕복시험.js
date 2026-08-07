@@ -157,8 +157,13 @@ async function main() {
           event_type: 'submission.created',
           occurred_at: new Date().toISOString(),
           level_snapshot: 'Lv1',
+          correlation_id: crypto.randomUUID(),   // c9 공통 필수 — 한 앉음을 묶는 키(절단문서 ①-10)
           task_type: '발화녹음',
-          submission: { task_ref: 'rehearsal-capture', task_format: '낭독', audio_ref },
+          // 그때 학생이 본 판. c9 부터 `submission.created` 의 필수다(절단문서 ①-3).
+          submission: {
+            task_ref: 'rehearsal-capture', task_format: '낭독', audio_ref,
+            task_snapshot: { ver: 1, 문장: '리허설 캡처 문장' },
+          },
         }],
       }),
     });

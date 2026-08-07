@@ -14,7 +14,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const 계약 = JSON.parse(fs.readFileSync(path.join(ROOT, '계약', '수집_교정_계약.json'), 'utf8'));
-const { 검증, 공통필수, 널허용, 이벤트별필수, 서버칸, 서버사건 } = require('../lib/이벤트검증.js');
+const { 검증, 공통필수, 널허용, 이벤트별필수, 선택필드, 서버칸, 서버사건 } = require('../lib/이벤트검증.js');
 
 /* C0 §4-1 예시 그대로 — 서버가 채우는 칸은 뺐다(앱이 보내는 모양). */
 const 정상제출 = () => ({
@@ -23,9 +23,11 @@ const 정상제출 = () => ({
   task_type: '숙제제출',
   occurred_at: '2026-08-05T13:20:11.412Z',
   level_snapshot: 'Lv3',
+  correlation_id: 'b6f1c0a2-0000-4000-8000-0000000000c1',
   submission: {
     task_ref: 'hw-2026-08-05-3',
     task_format: '자유발화',
+    task_snapshot: { ko: '어제 뭐 했어요?', 날짜: '2026-08-05' },
     body_original: '어제 친구를 만나서 밥을 먹었어요',
   },
 });
@@ -175,6 +177,7 @@ test('선택 로그는 표시 순서·추천 여부까지 요구한다 — 없�
     event_type: 'choice.selected',
     occurred_at: '2026-08-05T13:21:00.000Z',
     level_snapshot: 'Lv1',
+    correlation_id: 'b6f1c0a2-0000-4000-8000-0000000000c2',
     payload: { options_shown: ['가', '나'], position: 1, recommended_option: '가', selected_option: '가' },
   };
   assert.equal(검증(고름, 계약).ok, true, 검증(고름, 계약).오류들.join(' / '));
@@ -215,6 +218,23 @@ test('필수로 건 이름은 전부 계약에 실재한다 — 지어내기 금
   assert.deepEqual(없는것, [], `계약에 없는 이름을 필수로 걸었다: ${없는것.join(', ')}`);
 });
 
+/* 이벤트별 필수는 **목록에서 파생해** 전건을 잰다 — 필드를 늘리고 검사를 안 늘리면
+ * 새 칸만 조용히 안 재진다(`task_snapshot` 이 c8 까지 그 상태였다). 「택1」 묶음은 위
+ * 내용물 검사가 따로 지므로 여기선 단일 경로만 본다. */
+test('submission.created 의 단일 필수는 하나씩 빠뜨리면 전부 잡힌다', () => {
+  const 단일 = 이벤트별필수['submission.created'].filter((r) => !Array.isArray(r));
+  assert.ok(단일.length >= 4, `필수 목록이 줄었다(${단일.length}) — 검사가 대상을 잃었다`);
+  for (const 경로 of 단일) {
+    const e = 정상제출();
+    const 칸 = 경로.split('.');
+    const 마지막 = 칸.pop();
+    delete 칸.reduce((o, k) => o[k], e)[마지막];
+    const r = 검증(e, 계약);
+    assert.equal(r.ok, false, `${경로} 가 빠졌는데 통과했다`);
+    assert.ok(r.오류들.some((m) => m.includes(마지막)), `${경로} 를 지목하지 않았다: ${r.오류들}`);
+  }
+});
+
 test('서버 칸 목록도 계약에 실재하는 이름이다', () => {
   const 실재 = new Set();
   for (const v of Object.values(계약.learning_events.필드 || {})) {
@@ -222,6 +242,71 @@ test('서버 칸 목록도 계약에 실재하는 이름이다', () => {
   }
   const 없는것 = 서버칸.filter((n) => !실재.has(n));
   assert.deepEqual(없는것, [], `서버 칸에 계약에 없는 이름: ${없는것.join(', ')}`);
+});
+
+/* ── 반대방향: 「이름은 있는데 아무도 안 요구한다」 ──────────────────────────
+ * 위 두 검사는 **정방향**이다(필수로 건 이름이 계약에 있는가). 그 짝이 비어 있어서
+ * `task_snapshot`·`correlation_id`·`skill_ids` 가 셋 다 「계약에 이름은 있는데 아무 사건도
+ * 요구하지 않는」 상태로 나란히 서 있었고, 아무 검사도 안 빨개졌다
+ * (`docs/_ops/심문_P0_소급불가_절단.md` ① 3·10·13 · 새 앱이라 그 칸들은 **영원히 빈다**).
+ *
+ * 탐지력은 **픽스처**가 진다(실저장소를 픽스처로 쓰지 않는다 — 지금 초록인 것은 오늘 고쳤기
+ * 때문이고, 그 상태를 검사의 근거로 삼으면 다음 번 구멍을 못 잡는다). 실저장소에는
+ * 거짓양성만 건다. */
+const 미분류 = (계약, { 공통필수, 이벤트별필수, 선택필드, 서버칸 }) => {
+  const 이름 = (경로) => 경로.split('.').pop();
+  const 요구됨 = new Set(공통필수.map(이름));
+  for (const 요구들 of Object.values(이벤트별필수)) {
+    for (const 요구 of 요구들) (Array.isArray(요구) ? 요구 : [요구]).forEach((p) => 요구됨.add(이름(p)));
+  }
+  const 서버 = new Set(서버칸);
+  const 실재 = [];
+  for (const v of Object.values(계약.learning_events.필드 || {})) {
+    if (Array.isArray(v)) 실재.push(...v);
+  }
+  return 실재.filter((n) => !요구됨.has(n) && !서버.has(n) && !(n in 선택필드));
+};
+
+test('반대방향 — 계약 필드는 요구·서버칸·선택장부 셋 중 하나에 반드시 속한다', () => {
+  const 정본 = { 공통필수, 이벤트별필수, 선택필드, 서버칸 };
+
+  // ① 탐지력 — 계약에 새 이름이 하나 늘고 아무 데도 안 적히면 그 이름을 지목한다.
+  const 픽스처 = JSON.parse(JSON.stringify(계약));
+  픽스처.learning_events.필드.내용 = [...픽스처.learning_events.필드.내용, '몰래_늘린_칸'];
+  assert.deepEqual(미분류(픽스처, 정본), ['몰래_늘린_칸'],
+    '계약에 필드를 늘렸는데 아무 검사도 안 빨개졌다 — 이 장부의 존재 이유가 그것이다');
+
+  // ② 같은 픽스처라도 선택장부에 사유를 적으면 통과한다(자기 처방이 실제로 먹히는가 · F103).
+  assert.deepEqual(
+    미분류(픽스처, { ...정본, 선택필드: { ...선택필드, 몰래_늘린_칸: '사유' } }), [],
+    '차단 사유가 시키는 대로 했는데도 막힌다 — 따를 수 없는 처방은 우회를 정상 통로로 만든다');
+
+  // ③ 실저장소 — 거짓양성만. 여기가 빨개지면 계약에 「누가 채우나」가 안 정해진 이름이 있다.
+  assert.deepEqual(미분류(계약, 정본), [],
+    '계약에 이름은 있는데 아무도 안 요구하고 사유도 없는 필드가 있다');
+});
+
+test('선택장부는 계약과 붙어 있다 — 낡은 줄·두 곳 등재 금지', () => {
+  const 실재 = new Set();
+  for (const v of Object.values(계약.learning_events.필드 || {})) {
+    if (Array.isArray(v)) v.forEach((n) => 실재.add(n));
+  }
+  assert.ok(실재.size > 10, '계약 필드 목록을 못 읽었다(통과와 미실행이 같은 모양이 된다)');
+
+  const 유령 = Object.keys(선택필드).filter((n) => !실재.has(n));
+  assert.deepEqual(유령, [], `계약에서 사라진 이름이 선택장부에 남았다: ${유령.join(', ')}`);
+
+  // 필수로 올린 이름이 사유와 함께 남아 있으면 두 판정이 갈라진다(신뢰성 ④).
+  const 이름 = (경로) => 경로.split('.').pop();
+  const 요구됨 = new Set(공통필수.map(이름));
+  for (const 요구들 of Object.values(이벤트별필수)) {
+    for (const 요구 of 요구들) (Array.isArray(요구) ? 요구 : [요구]).forEach((p) => 요구됨.add(이름(p)));
+  }
+  const 겹침 = Object.keys(선택필드).filter((n) => 요구됨.has(n) || 서버칸.includes(n));
+  assert.deepEqual(겹침, [], `요구·서버칸인데 선택장부에도 있다: ${겹침.join(', ')}`);
+
+  const 빈사유 = Object.entries(선택필드).filter(([, v]) => typeof v !== 'string' || v.trim().length < 10);
+  assert.deepEqual(빈사유.map(([k]) => k), [], '사유가 비었다 — 빈 문자열로 장부를 통과시키지 않는다');
 });
 
 /* c8 — 교정 사건은 「어느 교정인가」 없이는 통과하지 못한다 (P0 §10-A-11 해소).
@@ -234,6 +319,7 @@ const 교정사건 = (type) => ({
   event_type: type,
   occurred_at: '2026-08-07T04:00:00.000Z',
   level_snapshot: 'Lv3',
+  correlation_id: 'b6f1c0a2-0000-4000-8000-0000000000c3',
   correction_id: '9a7d3f10-0000-4000-8000-0000000000c1',
   ...(type === 'correction.responded' ? { payload: { learner_response: '채택' } } : {}),
 });

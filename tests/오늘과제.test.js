@@ -192,6 +192,10 @@ const 배정 = (덧 = {}) =>
 
 const 재료 = (덧) => 화면과제(배정(덧), 폴백).제출재료;
 
+/* 한 앉음을 묶는 고리(P0 §3-1 ④) — c9 부터 **공통 필수**라 기본 항목이 들고 있어야
+ * 「평범한 제출」이 된다(`lib/이벤트검증.js` 공통필수 · 절단문서 ①-10). */
+const 흐름값 = '1f0c9c1e-6a2d-4c3b-8f11-2b7a5d9e0c44';
+
 const 항목 = (덧 = {}) => ({
   id: `${날짜}-답하기-1`,
   date: 날짜,
@@ -201,6 +205,7 @@ const 항목 = (덧 = {}) => ({
   text: null,
   audio: 'file:///rec.m4a',
   created_at: '2026-08-07T02:00:00.000Z',
+  correlation_id: 흐름값,
   task_meta: 재료(),
   capture_app: { platform: 'android', extension: '.m4a', agc_requested: null },
   ...덧,
@@ -292,8 +297,8 @@ test('내용물이 하나도 없으면 검증이 막는다 — 빈 제출 행을
 /* ── 한 앉음을 묶는 고리 (P0 §3-1 ④) ────────────────────────────────
  * 「②와 ③이 같은 세션에서 쌍으로 저장된다」는 **그 순간에만** 알 수 있다. 안 실어 보내면
  * 나중에 남는 근거가 `task_ref`(그날 배정)뿐인데, 그건 아침에 ②·저녁에 ③ 을 낸 날과
- * 한 흐름으로 낸 날을 같은 모양으로 만든다 — 소급 복구가 안 된다. */
-const 흐름값 = '1f0c9c1e-6a2d-4c3b-8f11-2b7a5d9e0c44';
+ * 한 흐름으로 낸 날을 같은 모양으로 만든다 — 소급 복구가 안 된다.
+ * (`흐름값` 은 위 `항목` 기본값과 같은 상수다 — c9 부터 공통 필수라 기본이 들고 있다.) */
 
 test('②③이 한 흐름이면 correlation_id 가 같고 task_format 은 다르다', () => {
   const 쌍 = ['따라', '답하기'].map((step) =>
@@ -312,6 +317,22 @@ test('무발화(session.abandoned)도 같은 흐름을 든다', () => {
   assert.ok(검증(e, 계약).ok);
 });
 
-test('흐름이 없으면 null 로 나간다 — 없던 앉음을 지어내지 않는다', () => {
-  assert.equal(제출사건(항목(), 'voice/x/1.m4a').correlation_id, null);
+/* c9 판정 뒤집힘 — 예전엔 「없으면 `null` 로 나간다」였다(계약이 선택이었으므로).
+ * 이제 공통 필수라 `null` 은 서버가 400 으로 돌려주고, 그 항목은 큐에서 영영 재시도한다.
+ * 그래서 **아예 안 만든다** — 지어낸 키로 채우지도 않는다(흩어진 것을 한 앉음이라 거짓말한다). */
+test('흐름이 없으면 사건을 안 만든다 — 400 루프도, 지어낸 앉음도 만들지 않는다', () => {
+  assert.equal(제출사건(항목({ correlation_id: null }), 'voice/x/1.m4a'), null);
+  assert.equal(제출사건(항목({ correlation_id: undefined, status: 'abandoned', audio: null })), null);
+});
+
+/* 그때 학생이 본 판을 되싣는다 (절단문서 ①-3) — `task_ref` 는 가리키기만 하고 문항은 개정된다. */
+test('제출 사건은 화면이 그린 스냅샷을 그대로 되싣는다', () => {
+  const e = 제출사건(항목(), 'voice/x/1.m4a');
+  assert.deepEqual(e.submission.task_snapshot, 재료().task_snapshot);
+  assert.equal(따라말하기문장(e.submission.task_snapshot), 도입.따라말하기);
+
+  // 판을 못 들고 온 옛 큐 항목은 안 나간다 — 서버가 400 을 낼 사건을 만들지 않는다.
+  const 판없음 = { ...재료() };
+  delete 판없음.task_snapshot;
+  assert.equal(제출사건(항목({ task_meta: 판없음 }), 'voice/x/1.m4a'), null);
 });
