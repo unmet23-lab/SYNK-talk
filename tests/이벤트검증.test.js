@@ -171,15 +171,24 @@ test('제출에 내용물이 하나도 없으면 거부, 소리만 있어도 통
   assert.equal(검증(소리만, 계약).ok, true, '소리만 있는 제출이 막혔다');
 });
 
+/* C0 §156(c6) — 선택지는 `{option_id, label}`. `option_id` 가 안 바뀌는 조인 키고
+ * `label` 은 그때 표시된 문구의 스냅샷이다. */
+const 정상선택 = () => ({
+  idempotency_key: 'b6f1c0a2-0000-4000-8000-000000000002',
+  event_type: 'choice.selected',
+  occurred_at: '2026-08-05T13:21:00.000Z',
+  level_snapshot: 'Lv1',
+  correlation_id: 'b6f1c0a2-0000-4000-8000-0000000000c2',
+  payload: {
+    options_shown: [{ option_id: 'o1', label: '즉시 자세히 설명' }, { option_id: 'o2', label: '힌트만 제공' }],
+    position: 1,
+    recommended_option: 'o1',
+    selected_option: 'o2',
+  },
+});
+
 test('선택 로그는 표시 순서·추천 여부까지 요구한다 — 없으면 선호와 「밀어준 것」이 안 갈린다', () => {
-  const 고름 = {
-    idempotency_key: 'b6f1c0a2-0000-4000-8000-000000000002',
-    event_type: 'choice.selected',
-    occurred_at: '2026-08-05T13:21:00.000Z',
-    level_snapshot: 'Lv1',
-    correlation_id: 'b6f1c0a2-0000-4000-8000-0000000000c2',
-    payload: { options_shown: ['가', '나'], position: 1, recommended_option: '가', selected_option: '가' },
-  };
+  const 고름 = 정상선택();
   assert.equal(검증(고름, 계약).ok, true, 검증(고름, 계약).오류들.join(' / '));
 
   for (const k of ['options_shown', 'position', 'recommended_option']) {
@@ -195,6 +204,58 @@ test('선택 로그는 표시 순서·추천 여부까지 요구한다 — 없�
     e.payload[대체] = true;
     assert.equal(검증(e, 계약).ok, true, `${대체} 가 막혔다`);
   }
+});
+
+/* 절단문서 ①-8 — 소급 불가. 문구를 값으로 저장하면 문구를 개정하는 날 판을 가로지르는
+ * 집계가 끊기고, 그 전에 쌓인 행은 어느 선택지였는지 되짚을 길이 없다.
+ * 🔴 이 회귀가 없던 동안 위 픽스처가 **문구 문자열 배열**이었다 — 「검사가 있다」와
+ *   「옳게 검사한다」가 같은 초록이었다(①-5 와 같은 형태: 회귀가 계약 반대쪽을 잠갔다). */
+test('선택지는 문구가 아니라 불변 id 로 잇는다 (①-8)', () => {
+  const 문구형 = 정상선택();
+  문구형.payload.options_shown = ['즉시 자세히 설명', '힌트만 제공'];
+  문구형.payload.recommended_option = '즉시 자세히 설명';
+  문구형.payload.selected_option = '힌트만 제공';
+  assert.equal(검증(문구형, 계약).ok, false, '문구 문자열 배열이 통과했다');
+
+  // 배열 모양은 맞는데 **가리키는 이름이 문구**인 경우 — 조인은 여기서 끊긴다
+  const 라벨선택 = 정상선택();
+  라벨선택.payload.selected_option = '힌트만 제공';
+  assert.equal(검증(라벨선택, 계약).ok, false, 'label 을 selected_option 에 넣었는데 통과했다');
+
+  /* 조인 키가 겹치면 「무엇을 골랐나」가 두 곳을 가리킨다.
+   * 🔑 가리키는 값은 **소속이 맞게** 둔다 — 안 그러면 소속 검사가 대신 빨개져서 중복 규칙을
+   *   지워도 이 케이스가 초록으로 남는다(변이 ②가 실제로 그렇게 살아남았다). */
+  const 중복 = 정상선택();
+  중복.payload.options_shown = [{ option_id: 'o1', label: '가' }, { option_id: 'o1', label: '나' }];
+  중복.payload.recommended_option = 'o1';
+  중복.payload.selected_option = 'o1';
+  assert.equal(검증(중복, 계약).ok, false, 'option_id 중복이 통과했다');
+
+  // id 만 있고 label 이 없으면 그때 화면에 무엇이 떴는지가 사라진다(스냅샷이 아니다)
+  const 라벨없음 = 정상선택();
+  라벨없음.payload.options_shown = [{ option_id: 'o1' }, { option_id: 'o2' }];
+  assert.equal(검증(라벨없음, 계약).ok, false, 'label 없이 통과했다');
+
+  /* 고른 것을 가리키면서 보여준 것을 안 실으면 분모가 없다 — id 를 무엇에도 못 맞춘다.
+   * 🔑 `choice.selected` 로 재면 안 된다 — 거기선 `이벤트별필수` 가 먼저 막아 ⑦ 을 안 거치고,
+   *   그러면 ⑦ 의 트리거를 지워도 초록이 남는다(변이 ⑤가 그렇게 살아남았다). */
+  const 분모없음 = 정상제출();
+  분모없음.payload = { position: 2, selected_option: 'w2' };
+  assert.equal(검증(분모없음, 계약).ok, false, 'options_shown 없이 selected_option 만으로 통과했다');
+
+  /* 🔴 G2 통로 — 같은 선택로그 필드를 `choice.selected` 가 아니라 **`submission.created`
+   *   payload** 로 보낸다(`발주_게임모듈.md` §362 · `recommended_option` 은 안 싣는다).
+   *   검사를 이벤트별로 걸었으면 이 통로가 통째로 샜다. */
+  const G2 = 정상제출();
+  G2.payload = { options_shown: ['보고서를', '교수님한테'], position: 2, selected_option: '교수님한테' };
+  assert.equal(검증(G2, 계약).ok, false, 'submission payload 의 문구형 선택지가 통과했다');
+
+  G2.payload = {
+    options_shown: [{ option_id: 'w1', label: '보고서를' }, { option_id: 'w2', label: '교수님한테' }],
+    position: 2,
+    selected_option: 'w2',
+  };
+  assert.equal(검증(G2, 계약).ok, true, 검증(G2, 계약).오류들.join(' / '));
 });
 
 /* ── 실저장소 검사: 지어낸 이름을 못 쓰게 한다 ───────────────────────────
