@@ -145,6 +145,27 @@ test('흐름은 항목이 들고 간다 — 같은 앉음의 ②③이 한 값�
   assert.equal(항목추가([], 기본).항목.correlation_id, null);
 });
 
+/* 🔴 절단문서 ①-5. 멱등키를 보낼 때 `submission:{날짜}:{호흡}:{시도}` 로 조립하면, `attempt` 가
+ *   로컬 로그에서 세는 값이라 재설치·로그 초기화·다른 기기에서 1 로 되돌아간다 — 그날 새로 녹음한
+ *   발화가 이미 서버에 있는 옛 행과 같은 키가 되고, 서버는 `duplicate` + 원래 event_id 를
+ *   **성공으로** 돌려준다. 손실이 성공과 같은 모양이라 아무도 못 알아챈다.
+ *   👉 그래서 키는 **항목을 만들 때 한 번** 지어 항목이 들고 간다(C0 §4-1). */
+test('멱등키는 항목을 만들 때 한 번 난다 — 좌표가 같아도 다른 항목이면 다른 키', () => {
+  const { 항목: 첫판 } = 항목추가([], 기본);
+  assert.ok(서버모양.test(첫판.idempotency_key), `uuid 가 아니다: ${첫판.idempotency_key}`);
+  assert.equal(서버모양.test(`submission:${기본.date}:${기본.step}:1`), false, '옛 조립 형태는 uuid 가 아니다');
+
+  // 로그를 지우고 같은 날 같은 호흡을 다시 녹음한다 = attempt 가 1 로 되돌아간 그 순간.
+  const { 항목: 재설치후 } = 항목추가([], 기본);
+  assert.equal(첫판.attempt, 재설치후.attempt, '좌표는 같다(= 사고 조건)');
+  assert.equal(첫판.id, 재설치후.id, 'id 마저 같다 — 좌표에서 나는 이름은 다 겹친다');
+  assert.notEqual(첫판.idempotency_key, 재설치후.idempotency_key, '🔴 겹치면 뒤엣것이 조용히 사라진다');
+
+  // 왕복(직렬화→역직렬화)에서 살아남아야 오프라인 큐에서 의미가 있다 — 밀린 항목이 재시도할 때
+  // 이 값을 못 들고 오면 그 자리에서 다시 지어야 하고, 그게 곧 「보낼 때마다 새 행」이다.
+  assert.equal(역직렬화(직렬화([첫판])).로그[0].idempotency_key, 첫판.idempotency_key);
+});
+
 test('재시도는 attempt 를 올린 새 항목 — 이전 항목이 그대로 남는다', () => {
   let r = 항목추가([], 기본);
   r = 항목추가(r.로그, { ...기본, duration_ms: 3100 });

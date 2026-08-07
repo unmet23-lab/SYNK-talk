@@ -259,12 +259,13 @@ async function main() {
       });
       const eb = await er.json().catch(() => ({}));
       const 한건 = eb.results && eb.results[0];
-      /* 🔑 `duplicate` 도 통과다 — 멱등키가 `submission:<날짜>:<차례>:<시도>` 로 **결정론**이라
-       *   같은 날 두 번째 실행은 반드시 `duplicate` 가 된다. `stored` 만 통과로 보면 이 도구가
-       *   **하루에 한 번만 쓸 수 있는 계기**가 되고, 그 빨간 줄은 결함이 아니라 재실행 흔적이다
-       *   (2026-08-07 실측: ⓑ 반영 확인 재실행에서 그렇게 빨개졌다).
-       *   잃는 것은 「오늘 첫 실행인가」뿐이고 그건 아래 「재전송이 같은 행으로 접힌다」가
-       *   event_id 대조로 이미 진다. 400·426 은 여기서 그대로 걸린다. */
+      /* 🔑 `duplicate` 도 통과로 둔다. 지금은 `항목추가` 가 실행마다 새 멱등키를 내므로 매번
+       *   `stored` 여야 맞지만(절단문서 ①-5 로 결정론 조립을 걷어냈다), 이 자리는 **어느 쪽인지가
+       *   판정이 아니다** — 여기서 재는 것은 「앱이 조립한 봉투가 서버를 통과하는가」이고, 접힘
+       *   자체는 아래 「재전송이 같은 행으로 접힌다」가 event_id 대조로 따로 진다.
+       *   ⚠ 옛 이유는 반대였다: 키가 결정론이라 같은 날 두 번째 실행이 반드시 `duplicate` 였고
+       *   `stored` 만 통과로 보면 이 도구가 하루 한 번짜리 계기가 됐다(2026-08-07 실측).
+       *   400·426 은 두 경우 모두 여기서 그대로 걸린다. */
       잰다('앱이 조립한 봉투가 서버를 실제로 통과한다',
         er.status === 200 && (한건?.status === 'stored' || 한건?.status === 'duplicate'),
         `HTTP ${er.status} · ${JSON.stringify(한건 ?? eb).slice(0, 200)}`);
@@ -290,7 +291,9 @@ async function main() {
           행?.capture_meta?.app?.platform === 'node-rehearsal' && !!행?.capture_meta?.server,
           JSON.stringify(행?.capture_meta ?? null).slice(0, 200));
 
-        // 같은 항목을 다시 보낸다 — 멱등키가 결정론이라 **새 행이 생기면 안 된다**.
+        // 같은 **항목**을 다시 보낸다 — 항목이 멱등키를 들고 있어 **새 행이 생기면 안 된다**.
+        // 🔑 항목을 새로 만들지 않는 것이 이 검사의 전부다: 키가 항목에 있으므로 재조립은
+        //    같은 값을 싣고, 항목이 새로 나면 새 키라 이 검사는 의미가 없어진다(그건 새 발화다).
         const er2 = await fetch(`${base}/functions/v1/events`, {
           method: 'POST',
           headers: { apikey: anon, Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json', 'X-Contract-Ver': 판 },

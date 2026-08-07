@@ -124,7 +124,9 @@ export async function 발화보내기(토큰, 항목) {
   }
 
   const 한건 = 본문.results && 본문.results[0];
-  // `duplicate` 는 실패가 아니라 **재전송이 접힌 것**이다 — 멱등키가 결정론적이라서 안전하다.
+  // `duplicate` 는 실패가 아니라 **재전송이 접힌 것**이다 — 항목이 멱등키를 들고 있어서 안전하다
+  // (같은 항목은 몇 번 보내도 같은 키다 · C0 §4-1). 🔴 여기서 항목을 새로 만들면 새 키가 나고,
+  // 그때부터 회선이 끊길 때마다 같은 발화가 여러 벌 쌓인다.
   if (한건 && (한건.status === 'stored' || 한건.status === 'duplicate')) {
     return { event_id: 한건.event_id };
   }

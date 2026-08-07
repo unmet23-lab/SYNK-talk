@@ -196,6 +196,11 @@ const 재료 = (덧) => 화면과제(배정(덧), 폴백).제출재료;
  * 「평범한 제출」이 된다(`lib/이벤트검증.js` 공통필수 · 절단문서 ①-10). */
 const 흐름값 = '1f0c9c1e-6a2d-4c3b-8f11-2b7a5d9e0c44';
 
+/* 멱등키도 **항목이 들고 온다**(C0 §4-1 · 절단문서 ①-5) — `lib/제출로그.js` 가 항목을 만들 때
+ * 한 번 짓는다. 이 픽스처는 그 값을 손으로 박지만, 「진짜 통로가 실제로 박는가」는 손 픽스처로는
+ * 못 재므로 아래 `항목추가` 를 태우는 검사를 따로 둔다. */
+const 멱등값 = 'b6f1c0a2-0000-4000-8000-0000000000a5';
+
 const 항목 = (덧 = {}) => ({
   id: `${날짜}-답하기-1`,
   date: 날짜,
@@ -206,6 +211,7 @@ const 항목 = (덧 = {}) => ({
   audio: 'file:///rec.m4a',
   created_at: '2026-08-07T02:00:00.000Z',
   correlation_id: 흐름값,
+  idempotency_key: 멱등값,
   task_meta: 재료(),
   capture_app: { platform: 'android', extension: '.m4a', agc_requested: null },
   ...덧,
@@ -240,15 +246,32 @@ test('앱이 조립한 제출 사건이 계약 검증을 통과한다 — ②낭
   }
 });
 
-/* 멱등키가 uuid 면 「보냈는데 응답을 못 받은」 재시도가 매번 새 행이 된다 — 몽골 회선에서
- * 그건 예외가 아니라 상시다. 서버는 (learner_id, key) 로 접으므로 키가 결정론이어야 한다. */
-test('멱등키는 결정론적이다 — 같은 항목을 두 번 조립하면 같은 키', () => {
-  const a = 제출사건(항목(), 'voice/x/1.m4a');
-  const b = 제출사건(항목(), 'voice/x/2.m4a');
-  assert.equal(a.idempotency_key, b.idempotency_key);
-  assert.equal(a.idempotency_key, `submission:${날짜}:답하기:1`);
-  // 같은 날 같은 호흡의 다음 시도는 달라야 한다 — 안 그러면 재시도가 첫 시도를 덮는다.
-  assert.notEqual(제출사건(항목({ attempt: 2 })).idempotency_key, a.idempotency_key);
+/* 재시도가 새 행을 만들지 않는 근거는 「키가 좌표에서 나온다」가 아니라 **「항목이 키를 들고
+ * 있다」**이다 — 같은 항목을 몇 번 조립해도 같은 값이 실린다. 좌표 조립으로 되돌아가면
+ * `attempt` 가 로컬 로그에서 세는 값이라 재설치·다른 기기에서 1 로 되돌아가고, 그때 새 녹음이
+ * 옛 행에 `duplicate` 로 접힌다(절단문서 ①-5). */
+test('멱등키는 항목이 들고 온다 — 같은 항목을 두 번 조립하면 같은 키', () => {
+  const 그항목 = 항목();
+  const a = 제출사건(그항목, 'voice/x/1.m4a');
+  const b = 제출사건(그항목, 'voice/x/2.m4a');
+  assert.equal(a.idempotency_key, b.idempotency_key, '재전송이 접히는 것이 이 한 줄에 달렸다');
+  assert.equal(a.idempotency_key, 멱등값, '여기서 짓지 않는다 — 항목의 값을 그대로 싣는다');
+});
+
+/* 🔴 이 검사가 ①-5 를 막는 자물쇠다. **좌표가 같고 발화가 다른** 두 항목 — 로그를 지우고
+ * 다시 녹음한 그날이 정확히 이 모양이다. 좌표에서 키를 조립하면 둘이 같은 키가 되고,
+ * 서버는 뒤엣것을 `duplicate` + 원래 event_id 로 **성공처럼** 돌려준다. */
+test('🔴 좌표(날짜·호흡·시도)가 같아도 다른 항목이면 다른 키 — 로그 초기화가 발화를 안 지운다', () => {
+  const 첫판 = 제출사건(항목({ idempotency_key: '00000000-0000-4000-8000-000000000001' }), 'voice/x/1.m4a');
+  const 재설치후 = 제출사건(항목({ idempotency_key: '00000000-0000-4000-8000-000000000002' }), 'voice/x/2.m4a');
+  assert.equal(첫판.payload.attempt_no, 재설치후.payload.attempt_no, '좌표는 같다(= 사고 조건)');
+  assert.notEqual(첫판.idempotency_key, 재설치후.idempotency_key);
+});
+
+/* 없는 값을 지어내면 갈래가 하나 더 생기고, 그 갈래가 곧 옛 버그다(`correlation_id` 와 같은 규칙). */
+test('멱등키가 없는 옛 큐 항목은 사건을 만들지 않는다 — 여기서 짓지 않는다', () => {
+  assert.equal(제출사건(항목({ idempotency_key: null }), 'voice/x/1.m4a'), null);
+  assert.equal(제출사건(항목({ idempotency_key: undefined, status: 'abandoned', audio: null })), null);
 });
 
 /* 무발화를 `submission.created` 로 보내면 검증을 못 지나거나(내용물 택1), 지나더라도
