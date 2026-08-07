@@ -130,8 +130,17 @@ export async function 비밀번호변경({ 학생번호, 현재비밀번호, 새
   return true;
 }
 
-/** 원장 「비밀번호 초기화」 — director 토큰으로만 돈다. 임시번호는 **이 응답에서 한 번만** 나온다. */
+/** 원장 「비밀번호 초기화」 — director 토큰으로만 돈다. 임시번호는 **이 응답에서 한 번만** 나온다.
+ *
+ * 🔑 결과가 **두 갈래**다. 아직 앱 계정이 없는 학생이면 줄 임시번호가 없고(비밀번호가 없다),
+ *   대신 **첫 등록 잠금이 풀려** 돌아온다(`잠금해제`). 한 갈래로 읽으면 번호 자리가 빈 채로 떠서
+ *   원장이 「없는 번호」를 학생에게 불러 준다 — 화면이 두 결과를 갈라 읽어야 하는 이유다. */
 export async function 초기화요청({ 학생번호, 토큰 }) {
   const 몸 = await 함수부르기('reset', { student_code: 학생번호 }, 토큰);
-  return { 임시번호: 몸.temp_password, 유효분: 몸.expires_in_minutes, 학생번호: 몸.student_code };
+  return {
+    임시번호: 몸.temp_password ?? null,
+    유효분: 몸.expires_in_minutes ?? null,
+    학생번호: 몸.student_code,
+    잠금해제: 몸.unlocked === true,
+  };
 }

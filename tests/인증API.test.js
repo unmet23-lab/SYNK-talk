@@ -167,7 +167,26 @@ test('🔴 원장 초기화 — **원장 토큰**을 싣는다 (anon 으로 부�
   const r = await API.초기화요청({ 학생번호: 'SYNK-042', 토큰: 'DIRECTOR' });
   assert.equal(부른것[0].headers.Authorization, 'Bearer DIRECTOR');
   assert.equal(부른것[0].headers.apikey, ANON, 'apikey 는 anon 이어야 게이트웨이를 지난다');
-  assert.deepEqual(r, { 임시번호: '482913', 유효분: 30, 학생번호: 'SYNK-042' });
+  assert.deepEqual(r, { 임시번호: '482913', 유효분: 30, 학생번호: 'SYNK-042', 잠금해제: false });
+});
+
+test('🔴 초기화 — 아직 계정이 없는 학생은 **잠금 해제**로 돌아온다 (임시번호 자리가 비어야 한다 · ②-19)', async () => {
+  const { API } = 세우기({
+    응답들: [{ 몸: { ok: true, student_code: 'SYNK-042', unlocked: true } }],
+  });
+  const r = await API.초기화요청({ 학생번호: 'SYNK-042', 토큰: 'DIRECTOR' });
+  assert.equal(r.잠금해제, true);
+  /* 🔴 `undefined` 가 아니라 `null` 이다 — 화면이 `결과.임시번호` 를 그대로 그리면
+   *   `undefined` 는 빈칸으로 보이고 원장이 **없는 번호를 학생에게 불러 준다**.
+   * 🔴 `strictEqual` 이어야 한다: `assert.equal` 은 `==` 라 `undefined == null` 이 참이고,
+   *   그래서 「`?? null` 을 지운다」는 변이를 **초록으로 통과시켰다**(변이 시험이 잡았다). */
+  assert.strictEqual(r.임시번호, null, '🔴 없는 임시번호를 값처럼 넘겼다');
+  assert.strictEqual(r.유효분, null);
+});
+
+test('🔴 초기화 화면 — 두 결과를 **갈라 그린다** (한 갈래로 그리면 잠금 해제에 빈 번호가 뜬다)', () => {
+  const 화면 = require('fs').readFileSync(path.join(__dirname, '..', 'src', '원장초기화.js'), 'utf8');
+  assert.ok(/결과\.잠금해제\s*\?/.test(화면), '🔴 화면이 잠금 해제 갈래를 안 본다');
 });
 
 // ── 네트워크 ────────────────────────────────────────────────
@@ -181,6 +200,35 @@ test('네트워크가 끊긴 것은 서버 오류와 **다른 사건**이다 (�
     assert.equal(e.code, 'NETWORK');
     assert.equal(e.retryable, true, '🔴 다시 시도할 수 있는 실패를 영구 실패로 말했다');
   }
+});
+
+// ── 서버 쪽 초기화(`functions/auth`) — 여기 보증은 **순서**와 **범위**라 Deno 를 안 띄우고
+//    소스에서 잰다. 진짜 판정은 `tools/인증왕복시험.js`(라이브)가 하고, 이 둘은 CI 가 볼 수 있는
+//    최소한의 눈이다 — 리허설 자격증명이 없는 CI 에서 그 왕복시험은 아예 안 돈다.
+const 초기화본문 = () => {
+  const 전체 = require('fs').readFileSync(
+    path.join(__dirname, '..', 'supabase', 'functions', 'auth', 'index.ts'), 'utf8');
+  const 시작 = 전체.indexOf('async function 초기화(');
+  const 끝 = 전체.indexOf('async function 임시로그인(');
+  assert.ok(시작 > 0 && 끝 > 시작, '초기화 함수를 못 찾았다 — 이 검사가 빈 문자열을 통과시키면 안 된다');
+  /* 🔴 주석을 **먼저 지운다.** 안 지우면 「이 조건을 쓰지 않는다」고 적은 주석이 그 조건으로 읽혀
+   *   검사가 자기 설명에 걸린다(첫 판이 실제로 그렇게 빨개졌다). 길이는 안 맞춰도 된다 —
+   *   아래 둘은 순서와 존재만 본다. */
+  return 전체.slice(시작, 끝).replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, ' ');
+};
+
+test('🔴 초기화 — GoTrue 를 **먼저** 갈고 DB 를 나중에 쓴다 (②-18 · 순서가 곧 반쯤 실패한 상태다)', () => {
+  const 본문 = 초기화본문();
+  const 갈기 = 본문.indexOf('비밀번호갈기(대상.auth_user_id');
+  const 디비 = 본문.indexOf('temp_password_hash = extensions.crypt');
+  assert.ok(갈기 > 0 && 디비 > 0, '두 지점을 못 찾았다');
+  assert.ok(갈기 < 디비,
+    '🔴 DB 를 먼저 쓰면 GoTrue 가 실패한 날 **감사표엔 「초기화했다」가 남고 옛 비밀번호는 산다**');
+});
+
+test('🔴 초기화 — 잠긴 학생(`auth_user_id is null`)을 조회에서 거르지 않는다 (②-19 · 출구)', () => {
+  assert.ok(!/auth_user_id is not null/.test(초기화본문()),
+    '🔴 이 조건이 돌아오면 첫 등록에 잠긴 학생만 정확히 빠져나가 해제 통로가 다시 없어진다');
 });
 
 test('🔴 앱은 `signUp` 을 부르지 않는다 (계정이 서는 통로는 first-login 하나뿐 · C0 §2-3)', () => {

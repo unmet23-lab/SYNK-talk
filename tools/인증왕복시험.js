@@ -128,23 +128,8 @@ async function main() {
     });
     확인(!lr2.ok, '🔴 두 번째 요청이 비밀번호를 덮어쓰지 못했다(덮였다면 계정 탈취다)');
 
-    console.log('\n⑥ 잠금 — 5회에 이르면 그 학생의 첫 등록이 닫힌다');
-    await sql(`update engine.learners set auth_user_id = null, signup_attempts = 0
-                where student_code='${학생번호}'`);
-    await sql(`delete from auth.users where email='${이메일(학생번호)}'`);
-    for (let i = 0; i < 5; i += 1) await 부르기({ student_code: 학생번호, phone_last4: '0000', password: 새비번 });
-    확인(await 시도수() === 5, '5회까지 센다');
-    const 잠긴뒤 = await 부르기({ student_code: 학생번호, phone_last4: 뒷자리, password: 새비번 });
-    확인(잠긴뒤.status === 401, '🔴 뒷자리가 **맞아도** 잠긴 뒤에는 안 열린다');
-    확인(!(await sql(`select auth_user_id from engine.learners where student_code='${학생번호}'`))[0].auth_user_id,
-      '잠긴 채로는 계정이 안 생긴다');
-    console.log('\n⑦ 원장 초기화 — 임시번호는 GoTrue 가 아니라 해시로 산다 (L0 §4-2-2)');
-    // 판 다시 깔기: 등록된 학생 + 원장 직원 하나.
-    await sql(`update engine.learners set signup_attempts = 0 where student_code='${학생번호}'`);
-    const 재등록 = await 부르기({ student_code: 학생번호, phone_last4: 뒷자리, password: 새비번 });
-    확인(재등록.status === 200, '시험용 학생을 다시 등록했다');
-
-    /* 🔑 **원장은 만들고 지우지 않는다 — 재사용한다.**
+    /* ── 판 깔기: 원장 하나. ⑥·⑦ 이 둘 다 원장 토큰을 쓴다(⑥ 은 잠금 해제, ⑦ 은 초기화).
+     * 🔑 **원장은 만들고 지우지 않는다 — 재사용한다.**
      *   `staff_access_log` 가 append-only(트리거)이고 `staff_id` FK 가 `on delete restrict` 라
      *   **감사 행이 있는 직원은 지울 수 없다.** 그건 결함이 아니라 감사 무결성이 설계대로 도는
      *   것이다(누가 무엇을 했는지가 사람 행보다 오래 살아야 한다). 지우려 들면 시험이
@@ -187,6 +172,36 @@ async function main() {
       return { status: r.status, body: JSON.parse((await r.text()) || '{}') };
     };
 
+    console.log('\n⑥ 잠금 — 5회면 닫히고, **푸는 통로는 원장의 초기화 하나뿐이다**');
+    await sql(`update engine.learners set auth_user_id = null, signup_attempts = 0
+                where student_code='${학생번호}'`);
+    await sql(`delete from auth.users where email='${이메일(학생번호)}'`);
+    for (let i = 0; i < 5; i += 1) await 부르기({ student_code: 학생번호, phone_last4: '0000', password: 새비번 });
+    확인(await 시도수() === 5, '5회까지 센다');
+    const 잠긴뒤 = await 부르기({ student_code: 학생번호, phone_last4: 뒷자리, password: 새비번 });
+    확인(잠긴뒤.status === 401, '🔴 뒷자리가 **맞아도** 잠긴 뒤에는 안 열린다');
+    확인(!(await sql(`select auth_user_id from engine.learners where student_code='${학생번호}'`))[0].auth_user_id,
+      '잠긴 채로는 계정이 안 생긴다');
+
+    /* 🔴 여기가 절단문서 ②-19 다. **잠긴 학생은 `auth_user_id` 가 null** 인데 초기화가 그 조건으로
+     *   걸러 내던 동안, 문서가 「해제는 원장뿐」이라고 적어 둔 그 버튼이 **잠긴 학생만 정확히
+     *   못 집었다**. 학생번호는 순번이라 아무나 5번 틀려서 학생 수만큼 그 상태를 만들 수 있었고,
+     *   되돌리는 길은 DB 직접 수정뿐이었다(이 시험도 그래서 위에서 `update` 로 풀고 있었다 —
+     *   회귀가 제품에 없는 통로를 쓰면 그 통로가 없다는 사실이 안 보인다). */
+    const 해제전 = (await sql(`select count(*)::int c from engine.staff_access_log
+                                 where action='learner.signup_unlock'`))[0].c;
+    const 해제 = await 초기화하기(원장토큰, { student_code: 학생번호 });
+    확인(해제.status === 200 && 해제.body.unlocked === true, '🔴 원장이 첫 등록 잠금을 푼다');
+    확인(해제.body.temp_password === undefined,
+      '🔴 계정 없는 학생에게 임시번호를 내지 않는다 — 내면 원장이 없는 번호를 학생에게 불러 준다');
+    확인((await sql(`select count(*)::int c from engine.staff_access_log
+                      where action='learner.signup_unlock'`))[0].c === 해제전 + 1,
+      '해제가 감사에 정확히 1행 남는다(누가 풀었는지가 남아야 한다)');
+    확인(await 시도수() === 0, '시도 횟수가 0으로 돌아왔다');
+    const 해제뒤등록 = await 부르기({ student_code: 학생번호, phone_last4: 뒷자리, password: 새비번 });
+    확인(해제뒤등록.status === 200, '🔴 푼 뒤에는 학생이 **앱에서** 다시 등록한다 — DB 손질 없이');
+
+    console.log('\n⑦ 원장 초기화 — 임시번호는 GoTrue 가 아니라 해시로 산다 (L0 §4-2-2)');
     확인((await 초기화하기(anon, { student_code: 학생번호 })).status === 401,
       'anon 키로는 초기화가 안 된다(사람이 아니다)');
     const 학생토큰 = JSON.parse(await (await fetch(`https://${ref}.supabase.co/auth/v1/token?grant_type=password`, {

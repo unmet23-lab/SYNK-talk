@@ -2,6 +2,7 @@
  *
  *   /first-login  학생의 첫 등록 (anon)
  *   /reset        원장의 「비밀번호 초기화」 — 6자리 임시번호를 **1회** 낸다 (director 토큰)
+ *                 계정이 아직 없는 학생에게는 임시번호 대신 **첫 등록 잠금을 푼다**(`unlocked:true`)
  *   /temp-login   학생이 그 번호로 들어와 새 비밀번호를 정한다 (anon)
  *
  * ■ 임시번호는 **GoTrue에 넣지 않는다**(유호님 확정 2026-08-07 「해시로 들고 있는 방식」)
@@ -26,7 +27,9 @@
  *   (C0 §2 🔴 의 첫 등록판: 여기선 토큰이 없으므로 **게이트가 그 자리를 대신한다**).
  *
  * ■ 게이트 셋 (§4-1-1) — 뒤 4자리는 1만 가지뿐이라 자릿수가 지키는 게 아니다
- *   ① `signup_attempts` 가 5 에 이르면 잠긴다(해제는 원장만)
+ *   ① `signup_attempts` 가 5 에 이르면 잠긴다 — 해제는 원장의 `/reset` **하나뿐이고, 그게 실제로
+ *      그 학생을 집는다**(2026-08-07 · 절단문서 ②-19. 그전엔 `auth_user_id is not null` 로 걸러
+ *      **잠긴 학생만 정확히 빠져나가** 출구가 문서에만 있었다)
  *   ② `auth_user_id is null` 일 때만 열린다 — 성공하는 순간 이 경로는 영원히 닫힌다
  *   ③ **실패 메시지는 하나뿐이다.** 「없는 학생번호」와 「뒷자리 불일치」와 「이미 등록됨」을
  *      가르면 학생번호의 **존재 여부가 새어** 명단을 훑을 수 있다. 잠김도 가르지 않는다 —
@@ -163,10 +166,12 @@ async function 초기화(req: Request, 본문: Record<string, unknown>) {
     }, ver);
   }
 
-  const 코드 = 임시번호();
+  type 대상 = { learner_id: string; auth_user_id: string | null; student_code: string; staff_id: string };
 
-  type 대상 = { learner_id: string; auth_user_id: string; student_code: string };
-  const 결과 = (await sql.begin(async (tx) => {
+  /* ①원장인가 ②그런 학생이 있나 — 여기서는 **읽기만 한다.** 쓰기는 GoTrue 를 갈아끼운 뒤다
+   * (아래 🔴 순서). 권한 판정이 트랜잭션 안에 있어야 하는 이유는 그대로다 — `set_config` 의
+   * `true` 는 트랜잭션 지역이라, 밖에서 부르면 커넥션 재사용 때 남의 주장이 살아 있게 된다. */
+  const 대상 = (await sql.begin(async (tx) => {
     // 트랜잭션 안에서만 사는 주장(`true`) — 커넥션이 재사용돼도 남지 않는다.
     await tx`select set_config('request.jwt.claims', ${JSON.stringify({ sub: 주장.sub, role: 'authenticated', iat: 주장.iat })}, true)`;
     // ⚠ `current_staff()` 는 못 찾으면 **전 칸이 null 인 행 하나**를 낸다 — 「행이 없다」가 아니다.
@@ -174,41 +179,71 @@ async function 초기화(req: Request, 본문: Record<string, unknown>) {
     const [직원] = await tx`select staff_id, role from engine.current_staff()`;
     if (!직원 || 직원.role !== 'director') return null;
 
+    /* 🔴 `auth_user_id is not null` 로 **거르지 않는다**(절단문서 ②-19).
+     *   거르면 아직 계정이 없는 학생 — 즉 첫 등록 게이트에 **잠긴 바로 그 학생** — 이 이 통로에서
+     *   빠진다. `signup_attempts` 를 0 으로 되돌리는 곳은 ⓐ첫 등록 성공 ⓑ임시로그인 성공 ⓒ여기
+     *   셋뿐이고 앞의 둘은 잠긴 학생이 못 지나므로, 거른 상태에서 5회를 채운 학생은 **앱으로는
+     *   영원히 등록하지 못한다**(되돌리는 길이 DB 직접 수정뿐이었다). 학생번호는 순번이라
+     *   아무나 그 상태를 학생 수만큼 만들 수 있다 — 잠금은 남기고 **출구를 연다**. */
     const [학생] = await tx`
-      update engine.learners
-         set temp_password_hash = extensions.crypt(${코드}, extensions.gen_salt('bf')),
-             temp_password_expires_at = now() + ${`${만료분} minutes`}::interval,
-             signup_attempts = 0,
-             revoked_before = now()
-       where upper(replace(student_code, '-', '')) = ${정규화(학생번호)}
-         and auth_user_id is not null
-      returning learner_id, auth_user_id, student_code`;
+      select learner_id, auth_user_id, student_code
+        from engine.learners
+       where upper(replace(student_code, '-', '')) = ${정규화(학생번호)}`;
     if (!학생) return null;
 
-    // 🔴 평문 임시번호는 **적지 않는다** — 감사표 하나가 다수 계정이 되면 안 된다.
-    await tx`
-      insert into engine.staff_access_log(staff_id, action, target_ids)
-      values (${직원.staff_id}, 'learner.password_reset', ${[학생.learner_id]}::uuid[])`;
-
-    return 학생;
+    return { ...학생, staff_id: 직원.staff_id };
   })) as 대상 | null;
 
   // 🔑 「원장이 아니다」와 「그런 학생이 없다」를 **가르지 않는다** — 가르면 원장 아닌 토큰으로
   //    학생번호의 실재 여부를 훑을 수 있다. 둘 다 403 이다.
-  if (!결과) return 거부();
+  if (!대상) return 거부();
 
-  /* 🔴 **옛 비밀번호도 죽인다.** 초기화가 필요한 현실적 사고 중 하나는 「누가 내 비번을 안다」인데,
-   *   옛 값을 살려 두면 그 경우 초기화가 아무것도 안 한 것이 된다. 아무도 모르는 값으로 갈아끼운다 —
-   *   이제 이 계정을 여는 길은 임시번호(우리 검증)뿐이다. */
-  const 갈기 = await 비밀번호갈기(결과.auth_user_id, 아무도모르는값());
+  /* ── 아직 계정이 없는 학생 = 첫 등록 잠금 해제. **임시번호를 내지 않는다** —
+   *   줄 계정이 없어서다(비밀번호도 세션도 없으니 GoTrue 도 `revoked_before` 도 할 일이 없다).
+   *   학생이 할 일은 첫 로그인을 다시 하는 것이고, 그 게이트(전화 뒤 4자리)는 그대로 서 있다. */
+  if (!대상.auth_user_id) {
+    await sql.begin(async (tx) => {
+      await tx`update engine.learners set signup_attempts = 0 where learner_id = ${대상.learner_id}`;
+      await tx`
+        insert into engine.staff_access_log(staff_id, action, target_ids)
+        values (${대상.staff_id}, 'learner.signup_unlock', ${[대상.learner_id]}::uuid[])`;
+    });
+    return 봉투(200, { ok: true, student_code: 대상.student_code, unlocked: true }, ver);
+  }
+
+  const 코드 = 임시번호();
+
+  /* 🔴 **GoTrue 를 먼저 갈고 DB 를 나중에 쓴다**(절단문서 ②-18). 둘은 한 트랜잭션에 못 묶이므로
+   *   순서가 곧 「반쯤 실패했을 때 남는 상태」다. 반대로 하면(DB 먼저) GoTrue 가 실패한 날
+   *   **감사표엔 「초기화했다」가 남고 옛 비밀번호는 살아 있다** — 초기화가 막으려던 바로 그 사고
+   *   (「누가 내 비번을 안다」)에서 초기화가 아무것도 안 한 것이 되고, 원장 화면엔 500 만 떠서
+   *   아무도 그 사실을 모른다. 이 순서면 실패는 「비번은 죽었고 임시번호는 안 나왔다」로 남는다 —
+   *   학생이 잠깐 못 들어오지만 원장이 **한 번 더 누르면 복구된다**(조용한 영구 대신 시끄러운 가역).
+   * ⚠ 대가: 여기 다음 줄에서 죽으면 감사표에 행이 없다. 「빠진 기록」이 「거짓 기록」보다 낫다는 판단이다.
+   * 🔴 옛 비밀번호를 죽이는 이유는 그대로다 — 살려 두면 위 사고에서 초기화가 무의미해진다. */
+  const 갈기 = await 비밀번호갈기(대상.auth_user_id, 아무도모르는값());
   if (!갈기.ok) {
     console.error('[auth] 초기화 — 옛 비밀번호 무효화 실패', 갈기.status, 갈기.본문.slice(0, 200));
     return 실패(500, { code: 'SERVER_ERROR', message: '잠시 뒤 다시 시도해 주세요', retryable: true }, ver);
   }
 
+  await sql.begin(async (tx) => {
+    await tx`
+      update engine.learners
+         set temp_password_hash = extensions.crypt(${코드}, extensions.gen_salt('bf')),
+             temp_password_expires_at = now() + ${`${만료분} minutes`}::interval,
+             signup_attempts = 0,
+             revoked_before = now()
+       where learner_id = ${대상.learner_id}`;
+    // 🔴 평문 임시번호는 **적지 않는다** — 감사표 하나가 다수 계정이 되면 안 된다.
+    await tx`
+      insert into engine.staff_access_log(staff_id, action, target_ids)
+      values (${대상.staff_id}, 'learner.password_reset', ${[대상.learner_id]}::uuid[])`;
+  });
+
   return 봉투(200, {
     ok: true,
-    student_code: 결과.student_code,
+    student_code: 대상.student_code,
     temp_password: 코드,            // 🔴 화면이 1회 보여주고 끝. 저장·전달 금지(L0 §4-2-2 ⚠).
     expires_in_minutes: 만료분,
   }, ver);
