@@ -287,6 +287,42 @@ async function main() {
     읽은.task_format === null && (읽은.task_snapshot.호흡 || []).length === 2, 읽은.task_format);
   확인('강등 여부가 그대로 전달된다', 읽은.degraded === false, 읽은.degraded);
   확인('하루 1건이라 next_cursor 는 null 이다', t.몸.next_cursor === null, t.몸.next_cursor);
+
+  /* ── ②-20 정답은 학생 응답에 안 실린다 ────────────────────────────
+   * 로컬 회귀는 **함수**를 재고, 이 칸이 재는 것은 **배포된 판이 그 함수를 실제로 거치는가**다.
+   * 목록만 서고 호출부가 안 갈리면 회귀는 초록인데 라이브만 샌다(F179 가 겪은 거짓 초록).
+   * 오늘 S1 스냅샷엔 정답 키가 없으니 **심어 주지 않으면 이 자리는 영원히 「통과」**다.
+   * 🔴 기존 배정을 고쳐서는 못 잰다 — `engine.reject_original_overwrite()` 가 스냅샷 수정을
+   *   막는다("그날 학생이 본 것이 증거다" · L0 §3-3). 그래서 **정답을 든 배정을 새로 넣는다**
+   *   (그 트리거가 살아 있다는 것도 이 자리에서 함께 확인된 셈이다). */
+  const 답날 = '2999-01-02';
+  const 답스냅 = { ...오늘과제({ 날짜: 답날, 첫날: true }).task_snapshot, 정답: '먹고' };
+  답스냅.호흡 = 답스냅.호흡.map((h, i) => (i === 0 ? { ...h, 정답: '가' } : h));
+  await sql(`
+    with ev as (
+      insert into engine.learning_events
+        (learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
+         level_snapshot, consent_ver, degraded, payload, schema_ver)
+      values ('${id.A}'::uuid,'task.assigned','발화녹음','ai',
+              '${답날}T04:00:00Z'::timestamptz, 'task:${id.A}:${답날}',
+              'Lv2','v18.9', false, '{"ver":1}'::jsonb, '${판}')
+      returning event_id)
+    insert into engine.submissions (event_id, task_type, task_ref, task_snapshot, occurred_at, schema_ver)
+    select event_id, '발화녹음', 'task-${답날}',
+           '${JSON.stringify(답스냅).replace(/'/g, "''")}'::jsonb,
+           '${답날}T04:00:00Z'::timestamptz, '${판}' from ev`);
+  /* 0개 방어 — 심은 것이 실제로 DB 에 정답을 들고 앉았는지 먼저 본다. 안 그러면 아래 두 칸이
+   *   「정답 없는 행을 읽고 정답이 없다」로 **공허하게 통과**한다(재는 척하는 검사가 가장 나쁘다). */
+  const 심은행 = await sql(`select task_snapshot->>'정답' as 정답 from engine.submissions s
+                              join engine.learning_events e on e.event_id = s.event_id
+                             where e.learner_id = '${id.A}'::uuid and s.task_ref = 'task-${답날}'`);
+  확인('②-20 픽스처가 DB 에 정답을 들고 앉았다 — 이게 없으면 아래 두 칸은 공허하다',
+    (심은행[0] || {}).정답 === '먹고', 심은행);
+  const 답판 = (((await 조회(`?date=${답날}`)).몸.data || [])[0] || {}).task_snapshot || {};
+  확인('🔴 ②-20 배정에 정답이 있어도 학생 응답엔 안 실린다 — 응답이 답안지가 되지 않는다',
+    Object.keys(답판).length > 0 && !JSON.stringify(답판).includes('정답'), 답판);
+  확인('②-20 정답만 빠지고 나머지는 그대로다 — 과잉 차단이면 학생 화면이 빈다',
+    따라말하기문장(답판) === 따라말하기문장(답스냅) && (답판.호흡 || []).length === 2, 답판);
   /* 🔑 **`data` 가 있어도 잰다.** 배정 뒤에 철회한 학생은 과제를 보면서 업로드만 막히므로,
    *   「비었을 때만」 재면 `blocked: null` 이 측정이 아니라 **추측**이 된다. */
   확인('동의가 있는 A 는 blocked 가 null 이다 — 막히지 않았음을 값으로 말한다',
