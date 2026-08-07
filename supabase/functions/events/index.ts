@@ -328,9 +328,11 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
           ${(사건.parent_event_id ?? null) as string | null}::uuid,
           ${(사건.turn_no ?? null) as number | null},
           /* c8 교정 고리. 🔴 2026-08-07 F179: 이 한 칸이 빠져 있었고, 그 결과
-           * `correction.viewed`·`correction.responded` 는 **API 로는 100% 거절**됐다 —
-           * 검증기(`이벤트검증`)는 이 필드를 필수로 요구하고, DB CHECK
-           * (`learning_events_correction_target_c8`)는 그 두 사건에 not null 을 거는데,
+           * 「correction.viewed」·「correction.responded」 는 **API 로는 100% 거절**됐다 —
+           * ⚠ 이 주석은 SQL 템플릿 리터럴 **안**이다 — 백틱을 쓰면 문자열이 여기서 끊겨
+           *   함수가 번들조차 안 된다(2026-08-07 실사고 · 회귀 tests/화면구문.test.js).
+           * 검증기(이벤트검증)는 이 필드를 필수로 요구하고, DB CHECK
+           * (learning_events_correction_target_c8)는 그 두 사건에 not null 을 거는데,
            * 서버만 값을 조용히 버려 null 로 넣었기 때문이다. 세 층이 서로 다른 계약을 믿었다.
            * ☠️ 「12/12 실왕복 초록」이 못 잡은 이유: 왕복시험이 **직접 SQL 로** 넣어
            *   이 통로를 안 탔다. DB 를 증명한 것이지 API 를 증명한 게 아니었다. */
