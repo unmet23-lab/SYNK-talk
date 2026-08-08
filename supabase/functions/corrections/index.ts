@@ -132,7 +132,7 @@ Deno.serve(async (req: Request) => {
      *   그 사이 새 교정이 서서 총계와 목록이 어긋난다. */
     const 행들 = await sql`
       select c.correction_id, c.submission_id, c.corrected_text, c.error_tags,
-             c.actor_kind, c.created_at as confirmed_at
+             c.explanation, c.actor_kind, c.created_at as confirmed_at
         from engine.corrections c
         join engine.submissions s on s.submission_id = c.submission_id
         join engine.learning_events e on e.event_id = s.event_id
@@ -150,6 +150,13 @@ Deno.serve(async (req: Request) => {
       submission_id: r.submission_id,
       corrected_text: r.corrected_text ?? null,
       error_tags: r.error_tags ?? [],
+      /* 🔑 **몽골어 해설**(발주_수집파이프라인 §87 — 「교정문은 한국어 1문장, 해설은 몽골어」).
+       *   발주_게임모듈 §780 이 「화면에 그대로 나간다」고 적어 둔 칸인데 응답에 없어서 앱에
+       *   닿는 길이 0이었다 — 물리에 값이 쌓여도 학생은 영영 못 본다(유호님 승인 2026-08-09).
+       * 🔴 위 `where` 의 「보여줄 것이 있나」 판정에는 **일부러 넣지 않았다**: 해설은 교정에
+       *   딸리는 한 줄이라 `corrected_text`·`error_tags` 없이 홀로 서는 행은 설계에 없다.
+       *   넣으면 강사가 판정만 남긴 골든셋 행이 해설 한 줄만 든 카드로 학생 화면에 뜬다. */
+      explanation: r.explanation ?? null,
       actor_kind: r.actor_kind,
       confirmed_at: r.confirmed_at,
     }));

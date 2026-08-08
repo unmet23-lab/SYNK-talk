@@ -103,7 +103,7 @@ test('오디오 업로드 포맷이 C0와 발주서에서 갈라지지 않았다
  * 살아 있는지만 본다(값목록처럼 계약 파일에서 파생되는 종류가 아니라, 이 API 만의 이름이다). */
 const 조회필드 = {
   progress: ['submission_count', 'retry_count', 'correction_retry'],
-  corrections: ['correction_id', 'submission_id', 'corrected_text', 'error_tags', 'confirmed_at'],
+  corrections: ['correction_id', 'submission_id', 'corrected_text', 'error_tags', 'explanation', 'confirmed_at'],
   tasks: ['task_id', 'task_snapshot', 'task_format', 'degraded'],
 };
 const 빠진이름 = (소스, 문서, 키들) => 키들.filter((k) => !소스.includes(k) || !문서.includes(k));
@@ -127,6 +127,39 @@ test('조회 응답의 필드 이름이 C0와 함수 양쪽에 살아 있다 (�
     assert.deepEqual(빠진이름(소스, md, 키들), [],
       `functions/${이름} 과 C0 §4-3 중 한쪽에만 있는 이름이 있다 — 앱은 문서를 읽고 서버는 코드대로 낸다`);
   }
+});
+
+test('몽골어 해설이 DB에서 학생 눈까지 네 마디로 이어져 있다 (한 마디만 끊겨도 증상은 침묵이다)', () => {
+  /* 왜 이 한 칸만 이렇게 파나 — `explanation` 은 **물리에 값이 있고 아무도 안 그리는** 형태로
+   * c6 부터 살아 있었다(발주 §780 이 「화면에 그대로 나간다」고 적었는데 응답 목록에만 없었다).
+   * 서버만 고치고 화면을 잊거나 그 반대여도 오류가 안 난다 — 학생 화면이 조용히 비고, 값은
+   * 쌓이므로 나중에 「왜 아무도 해설을 안 봤나」로만 보인다.
+   * ⚠ 위 `조회필드` 검사로는 이걸 못 잡는다: 그건 **이름이 파일에 있나**만 보므로, 산문이나
+   *   select 한쪽에 이름이 남아 있으면 통과한다(그 검사가 스스로 적어 둔 한계). 그래서 여기서는
+   *   **자리를 지목해서** 잰다. */
+  const fn = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'corrections', 'index.ts'), 'utf8');
+  const md = fs.readFileSync(C0경로, 'utf8');
+  const 화면 = fs.readFileSync(path.join(ROOT, 'src', '답장화면.js'), 'utf8');
+
+  // ① DB에서 꺼낸다
+  assert.ok(/c\.explanation/.test(fn),
+    'corrections 함수의 select 에 c.explanation 이 없다 — 꺼내지 않으면 뒤 세 마디가 다 헛돈다');
+  // ② 응답에 싣는다 (select 에만 있으면 조용히 사라진다)
+  assert.ok(/explanation: r\.explanation/.test(fn),
+    'corrections 함수가 explanation 을 응답 data[] 에 안 싣는다 — 꺼내고 버리는 상태다');
+  // ③ 계약 문서의 `data[]` **그 행**에 적혀 있다 (앱 구현자가 읽는 쪽)
+  const data행 = md.split('\n').find((l) => l.includes('| `data[]` |') && l.includes('correction_id'));
+  assert.ok(data행 && data행.includes('explanation'),
+    'C0 §4-3 ② 의 data[] 행에 explanation 이 없다 — 산문에만 있으면 구현자는 못 본다');
+  // ④ 화면이 그린다
+  assert.ok(/교정\.explanation/.test(화면),
+    'src/답장화면.js 가 explanation 을 읽지 않는다 — 서버가 내도 학생 화면에 안 나온다');
+
+  /* 🔴 자형이 없는 폰트를 지정하면 두부(□□□)가 뜨고, 그 화면은 「글자가 안 왔다」와 구별이
+   *   안 된다. 해설 줄이 `테마.몽골어`(fontFamily 없음)를 쓰는지 못박는다 — 킷 폰트 4종에
+   *   키릴 자형이 없다(P0 §188 · Inter Tight cyrillic-ext 미탑재). */
+  assert.ok(/해설: \{ \.\.\.몽골어/.test(화면),
+    '해설 줄이 몽골어 스타일(시스템 폰트)을 안 쓴다 — 키릴이 두부로 뜬다');
 });
 
 /* 🔴 2026-08-07 F179 — 검증기가 **필수로 요구하는 필드를 서버가 저장하지 않았다.**
