@@ -11,7 +11,11 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
-const { 정본, 헤더읽기, 파일없음 } = require('../lib/음성헤더.js');
+const fs = require('node:fs');
+const path = require('node:path');
+const { 정본, 헤더읽기, 길이초, 파일없음 } = require('../lib/음성헤더.js');
+
+const EVENTS = fs.readFileSync(path.resolve(__dirname, '..', 'supabase', 'functions', 'events', 'index.ts'), 'utf8');
 
 /* 2026-08-07 리허설에서 **실제로 받은** 본문 그대로. 지어낸 문자열로 재면 다음에 형식이 바뀌어도
  * 회귀는 계속 초록이다 — 픽스처는 실측을 박제하는 자리다. */
@@ -173,4 +177,67 @@ test('🔴 AGC 는 여기서 적지 않는다 — 헤더에 흔적이 없다(모
   const { 앞머리, 전체 } = wav();
   assert.ok(!('agc_verified' in 헤더읽기(앞머리, 전체)),
     'agc 를 헤더에서 「쟀다」고 적으면 그 행이 거짓 증거가 된다 — 봉투(functions/events) 몫이다');
+});
+
+/* ── 길이초 — 잰 값이 봉투 밖(읽는 열)으로 나가는가 ──────────────────────────
+ * 이 회귀가 지는 것: **`submissions.audio_duration_sec` 가 다시 빈 칸으로 돌아가지 않는 것.**
+ * 그 열이 비면 검수 큐도 게임의 「발화 길이」도 전량 0 을 읽고, 0 은 「말을 안 했다」와
+ * 같은 모양이라 아무도 못 알아챈다(2026-08-09 실측: 실기기 관통 2건 다 빈 칸이었다). */
+
+test('🔴 잰 길이가 초로 나온다 — 파서가 낸 값과 같은 값이어야 한다(사슬이 끊기면 여기서 빨개진다)', () => {
+  const { 앞머리, 전체 } = wav({ 실제데이터: 32000 });          // 16k·mono·16bit → 1.00초
+  const 잰것 = 헤더읽기(앞머리, 전체);
+  assert.strictEqual(잰것.duration_ms, 1000);
+  assert.strictEqual(길이초({ state: 'measured', ...잰것 }), 1,
+    '봉투 안 duration_ms 와 열 값이 갈리면 두 숫자가 서로를 반박한다');
+});
+
+test('🔴 못 잰 것은 null 이다 — 0 으로 적으면 측정 실패가 0.0초 발화라는 거짓 관측이 된다', () => {
+  for (const v of [
+    { state: 'unmeasured', reason: 'storage_key' },            // 키가 틀렸다
+    { state: 'missing' },                                      // 파일이 없다
+    { state: 'measured', duration_ms: null },                  // 잘린 헤더 · byteRate 0
+    null, undefined, 'measured', 42,
+  ]) {
+    assert.strictEqual(길이초(v), null, `모르는 것을 숫자로 적었다: ${JSON.stringify(v)}`);
+  }
+  assert.strictEqual(길이초({ duration_ms: -1 }), null, '음수는 관측이 아니다');
+});
+
+test('numeric(6,2) — 소수 둘째 자리까지, 넘는 값은 비운다(insert 가 던지면 그 발화가 영구 소멸한다)', () => {
+  assert.strictEqual(길이초({ duration_ms: 5346 }), 5.35, '반올림이 없으면 DB 가 자른다');
+  assert.strictEqual(길이초({ duration_ms: 0 }), 0, '0ms 는 「못 쟀다」가 아니라 「길이가 0 이라고 쟀다」다');
+  assert.strictEqual(길이초({ duration_ms: 9_999_990 }), 9999.99, '상한 안은 그대로 통과한다');
+  assert.strictEqual(길이초({ duration_ms: 10_000_000 }), null,
+    '열 하나 때문에 발화를 잃지 않는다 — 원본 밀리초는 capture_meta 에 남아 있다');
+});
+
+/* 이 파일 머리말의 「**파생해 저장한다**」 중 저장 절반. 파생만 검사하면 순수 함수는 영원히
+ * 초록인데 열은 계속 빈 칸이다 — F179 가 그 모양이었다(검증기·DB·서버가 서로 다른 계약을 믿고,
+ * 서버만 값을 조용히 버렸다). insert 문 **한 문장만** 떼어 본다: 파일 전체에서 이름을 찾으면
+ * 위 주석에 적힌 글자가 배선으로 읽힌다(F207 계열). 앵커 방식 = tests/마감시각.test.js 와 같다. */
+const 제출insert = (소스) => {
+  const 시작 = 소스.indexOf('insert into engine.submissions');
+  assert.notEqual(시작, -1, 'events 에서 submissions insert 를 못 찾았다 — 앵커가 낡았다');
+  const 끝 = 소스.indexOf('`', 시작);
+  return 소스.slice(시작, 끝 === -1 ? undefined : 끝);
+};
+
+const 길이배선검사 = (소스) => {
+  const 문장 = 제출insert(소스);
+  assert.ok(문장.includes('audio_duration_sec'),
+    '열이 비면 검수 큐도 게임의 「발화 길이」도 전량 0 을 읽는다 — 0 은 「말을 안 했다」와 같은 모양이다');
+  assert.ok(/길이초\(/.test(문장),
+    '값을 봉투 밖에서 따로 계산하면 판정이 두 곳으로 갈린다 — 판정은 lib/음성헤더.js 한 곳이다');
+};
+
+test('🔴 제출 insert 가 audio_duration_sec 를 싣는다 (열만 서고 아무도 안 채우는 상태를 막는다)', () => {
+  길이배선검사(EVENTS);
+});
+
+test('탐지력 — 열이 빠져도·값이 딴 데서 와도 위 검사가 잡는다(같은 함수를 그대로 돌린다)', () => {
+  assert.throws(() => 길이배선검사(EVENTS.replace(/audio_duration_sec/g, '')),
+    '이름을 지웠는데 초록이면 이 검사는 아무것도 안 지키고 있다');
+  assert.throws(() => 길이배선검사(EVENTS.replace(/길이초\(/g, '따로계산(')),
+    '판정을 딴 함수로 바꿔도 초록이면 두 곳으로 갈린 뒤에야 알게 된다');
 });

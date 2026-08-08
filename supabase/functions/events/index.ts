@@ -40,8 +40,9 @@ const { 버킷, 경로검사 } = 경로모듈 as {
   버킷: string;
   경로검사: (ref: string, learner_id: string) => { ok: boolean; 이유: string | null };
 };
-const { 헤더읽기, 파일없음 } = 헤더모듈 as {
+const { 헤더읽기, 길이초, 파일없음 } = 헤더모듈 as {
   헤더읽기: (앞머리: Uint8Array, 전체바이트: number | null) => Record<string, unknown>;
+  길이초: (server: unknown) => number | null;
   파일없음: (status: number, 본문: string) => boolean;
 };
 
@@ -465,7 +466,7 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
         await tx`
           insert into engine.submissions (
             event_id, task_type, task_format, task_ref, task_snapshot, task_schema_ver,
-            body_original, image_refs, audio_ref, capture_meta, occurred_at, schema_ver
+            body_original, image_refs, audio_ref, capture_meta, audio_duration_sec, occurred_at, schema_ver
           ) values (
             ${event_id}::uuid, ${String(사건.task_type)}, ${(s.task_format ?? null) as string | null},
             ${(s.task_ref ?? null) as string | null},
@@ -475,6 +476,11 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
             ${(s.image_refs ?? null) as string[] | null},
             ${(s.audio_ref ?? null) as string | null},
             ${제이슨(capture_meta)},
+            /* 잰 길이를 **읽는 자리**까지 내보낸다 — capture_meta.server.duration_ms 는 봉투
+             * 안이라 검수 큐도 게임 지표도 못 읽는다. 판정은 lib/음성헤더.js 의 길이초 가 진다
+             * (여기 적으면 리허설을 쏴야만 검증되고, 그건 회귀가 못 지키는 자리다).
+             * ⚠ 이 주석은 SQL 템플릿 리터럴 **안**이다 — 백틱 금지(위 c8 칸의 실사고). */
+            ${길이초((capture_meta as Record<string, unknown> | null)?.server) as number | null},
             ${occurred_at}::timestamptz, ${ver}
           )`;
       }

@@ -182,8 +182,13 @@ async function main() {
     if (!한건 || 한건.status !== 'stored') {
       return { 저장: false, 곁: `HTTP ${r.status} · ${JSON.stringify(한건 ?? b).slice(0, 200)}` };
     }
-    const [행] = await 질의(`select capture_meta from engine.submissions where event_id = '${한건.event_id}'::uuid`);
-    return { 저장: true, server: (행 && 행.capture_meta && 행.capture_meta.server) || null };
+    const [행] = await 질의(`select capture_meta, audio_duration_sec from engine.submissions where event_id = '${한건.event_id}'::uuid`);
+    return {
+      저장: true,
+      server: (행 && 행.capture_meta && 행.capture_meta.server) || null,
+      // 봉투 밖 열까지 왔는가 — 여기가 검수 큐·게임 지표가 실제로 읽는 자리다.
+      길이: 행 ? 행.audio_duration_sec : undefined,
+    };
   };
 
   const 정본잰것 = await 제출(b1.audio_ref);
@@ -195,6 +200,12 @@ async function main() {
     `${정본잰것.server?.sample_rate}Hz · ${JSON.stringify(정본잰것.server?.spec_violations)}`);
   잰다('AGC 는 모른다고 적는다 — 헤더에 흔적이 없다', 정본잰것.server?.agc_verified === 'unknown',
     String(정본잰것.server?.agc_verified));
+  /* 🔴 잰 길이가 **봉투 밖 열**까지 오는가. 위 셋이 다 초록이어도 이게 비면 「몇 초 말했나」는
+   *   전량 0 이고, 0 은 「말을 안 했다」와 같은 모양이라 아무도 못 알아챈다(2026-08-09 실측:
+   *   실기기 관통 2건 다 빈 칸이었다). 회귀는 파생만 지고 **행에 앉는 것**은 여기서만 보인다. */
+  잰다('잰 길이가 audio_duration_sec 로 행에 앉는다',
+    정본잰것.길이 != null && Math.abs(Number(정본잰것.길이) - 정본잰것.server?.duration_ms / 1000) < 0.01,
+    `열=${정본잰것.길이} · 봉투=${정본잰것.server?.duration_ms}ms`);
 
   // ⑧ 규격 밖 — 「앱 프리셋이 조용히 바뀌었다」가 행에서 보여야 한다. 이게 이 열의 존재 이유다.
   const s2 = await (await 부르기({ kind: 'audio', content_type: 'audio/wav', byte_size: 6444 })).json();
