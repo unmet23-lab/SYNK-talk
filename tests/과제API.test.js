@@ -20,8 +20,8 @@ const babel = require('@babel/core');
 
 const SRC = path.join(__dirname, '..', 'src', '과제API.js');
 
-/** 응답 하나를 주는 가짜 fetch 와 함께 모듈을 세운다. */
-function 세우기(몸, status = 200) {
+/** 응답 하나를 주는 가짜 fetch 와 함께 모듈을 세운다. `던짐` 이면 fetch 자체가 실패한다(회선 없음). */
+function 세우기(몸, status = 200, 던짐 = false) {
   const { code } = babel.transformFileSync(SRC, {
     babelrc: false,
     configFile: false,
@@ -33,7 +33,10 @@ function 세우기(몸, status = 200) {
     exports: module_.exports,
     require: (p) => require(path.resolve(path.dirname(SRC), p)),
     process: { env: { EXPO_PUBLIC_SUPABASE_URL: 'https://x.supabase.co', EXPO_PUBLIC_SUPABASE_ANON_KEY: 'anon' } },
-    fetch: async () => ({ ok: status < 400, status, json: async () => 몸 }),
+    fetch: async () => {
+      if (던짐) throw new TypeError('Network request failed');
+      return { ok: status < 400, status, json: async () => 몸 };
+    },
     console,
   });
   return module_.exports;
@@ -57,4 +60,37 @@ test('🔴 과제가 있어도 막힘을 잰다 — 배정 뒤 철회한 학생�
 test('막히지 않은 날은 null 이다 — 없는 것을 있는 척하지 않는다', async () => {
   const API = 세우기({ ok: true, data: [{ task_id: 't1' }], blocked: null });
   assert.equal((await API.오늘과제받기('토큰')).막힘, null);
+});
+
+/* ── 배치 미달 (P0 §6-5 · 원장 화면의 「보는 눈」) ────────────────────────────
+ * 급소는 값이 오는 갈래가 아니라 **안 오는 갈래**다: 이 조회는 학생 전원이 지나가고 그들은
+ * 전부 401 을 받는다(권한은 서버가 정한다). 여기서 던지면 호출부가 학생의 401 을 오류로
+ * 다루고, 최악은 그걸 세션 만료로 읽어 **멀쩡한 학생을 로그아웃**시키는 것이다. */
+
+test('🔴 미달이면 서버가 센 수가 그대로 온다 — 원장이 「몇 명이 못 받았나」를 본다', async () => {
+  const API = 세우기({ ok: true, mode: '점검', date: '2026-08-09', 재적: 12, 배정: 3, 강등: 3, 미달: true });
+  assert.deepEqual(await API.배치미달받기('토큰'), { 날짜: '2026-08-09', 재적: 12, 배정: 3, 강등: 3 });
+});
+
+test('🔴 미달이 아니면 null — 판정은 서버 값 하나다(부등호를 여기서 다시 세지 않는다)', async () => {
+  // 서버가 `미달:false` 라고 답한 응답에 배정<재적 을 일부러 실었다. 앱이 스스로 세면
+  // 이 줄에서 값이 나오고, 그 순간 판정이 두 곳에 살아 갈라지는 날 화면이 조용히 눕는다.
+  const API = 세우기({ ok: true, mode: '점검', date: '2026-08-09', 재적: 12, 배정: 3, 강등: 0, 미달: false });
+  assert.equal(await API.배치미달받기('토큰'), null);
+});
+
+test('🔴 원장이 아니면(401) 던지지 않고 null — 학생 전원이 매일 지나가는 갈래다', async () => {
+  const API = 세우기({ ok: false, error: { code: 'AUTH_REQUIRED' } }, 401);
+  assert.equal(await API.배치미달받기('토큰'), null,
+    '던지면 호출부가 이 401 을 세션 만료로 읽어 멀쩡한 학생을 로그아웃시킬 수 있다');
+});
+
+test('🔴 회선이 없어도 던지지 않는다 — 안 보이는 것과 「정상」을 화면이 구별할 재료가 없다', async () => {
+  const API = 세우기(null, 200, true);
+  assert.equal(await API.배치미달받기('토큰'), null);
+});
+
+test('토큰이 없으면 부르지도 않는다', async () => {
+  const API = 세우기({ 미달: true, 재적: 1, 배정: 0 });
+  assert.equal(await API.배치미달받기(''), null);
 });

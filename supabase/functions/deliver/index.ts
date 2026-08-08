@@ -30,7 +30,11 @@ import 과제모듈 from './오늘과제.mjs';
 import 출처모듈 from './사건출처.mjs';
 import 토큰모듈 from './토큰.mjs';
 
-const { 서비스역할 } = 토큰모듈 as { 서비스역할: (req: Request) => boolean };
+const { 서비스역할, 토큰주체, 발급시각 } = 토큰모듈 as {
+  서비스역할: (req: Request) => boolean;
+  토큰주체: (req: Request) => string | null;
+  발급시각: (req: Request) => number | null;
+};
 const { 사건출처 } = 출처모듈 as { 사건출처: (event_type: string) => string | null };
 /* 🔴 `시간대` 를 **가져다 쓴다** — IANA 이름을 여기에 다시 적으면 그 순간 날짜 경계가 두 곳에
  *   살고, 갈라진 날 배치는 오늘에 쓰고 조회는 어제를 센다(절단문서 ①-14 · 회귀가 막는다). */
@@ -56,12 +60,20 @@ const 봉투 = (status: number, body: Record<string, unknown>) =>
 Deno.serve(async (req: Request) => {
   /* 호출자는 **JWT 의 `role` 로** 가른다 — 키 문자열 비교가 아니다(정본 `lib/토큰.js`).
    * 서명 검증은 플랫폼이 이미 했지만(`verify_jwt=true`) 그건 **anon 키도 통과시킨다**. */
-  if (!서비스역할(req)) {
-    return 봉투(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: '배치 호출 권한이 없습니다' } });
-  }
   const 오늘 = 몽골날짜();
   const 인자 = new URL(req.url).searchParams;
   const 점검 = 인자.has('점검');
+
+  /* 쓰기(배달)는 `service_role` 하나다. **읽기(점검)만 원장에게 연다** — §6-5 가 정한 「보는 눈」이
+   * 원장 화면인데 앱 토큰은 절대 `service_role` 이 아니라, 안 열면 미달은 영원히 함수 로그에만 뜬다
+   * (그리고 그 로그를 보는 사람이 0이면 배치가 죽은 날과 안 죽은 날이 같은 모양이다).
+   * 🔴 갈리는 자리를 **여기 하나**로 둔다 — 두 함수가 각자 재면 그 중 한 곳이 빠지는 날 배달까지
+   *   원장에게 열리고, 새는 방향은 언제나 「통과」다.
+   * 🔑 원장인지는 이 파일이 안 정한다 — `engine.current_staff()` 가 정본이고 폐기(`revoked_before`)
+   *   까지 그 안에서 본다. 여기서 `engine.staff` 를 직접 읽으면 그 판정이 둘로 갈린다. */
+  if (!서비스역할(req) && !(점검 && await 원장인가(req))) {
+    return 봉투(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: '배치 호출 권한이 없습니다' } });
+  }
 
   /* 단건 모드 — 첫 등록 직후 `auth` 가 그 학생 하나만 세우려고 부른다(N23 · 유호님 확정 08-08).
    * 배치는 하루 1회라 등록 당일 낮에 앱을 켠 학생에게는 배정이 없고, 그때 앱은 폴백 화면으로
@@ -82,6 +94,30 @@ Deno.serve(async (req: Request) => {
     return 봉투(500, { ok: false, date: 오늘, error: { code: 'SERVER_ERROR', message: 글.slice(0, 300) } });
   }
 });
+
+/* 이 토큰이 **원장인가** — `auth` 의 `/reset` 과 같은 절차다(L0 §4-5 · 판정 정본은 DB).
+ *
+ * 🔴 `set_config` 의 셋째 인자 `true` 는 **트랜잭션 지역**이다. 밖에서 부르면 커넥션이
+ *   재사용될 때 남의 주장이 살아 있고, 그 다음 요청은 앞사람 권한으로 통과한다.
+ * 🔑 `current_staff()` 는 못 찾아도 **전 칸이 null 인 행 하나**를 낸다 — 「행이 없다」가 아니다.
+ *   그래서 존재가 아니라 `role` 값을 본다(행 유무로 재면 아무나 통과한다).
+ * 🔑 실패는 전부 `false` 다 — 못 읽은 토큰·없는 직원·DB 오류가 「원장」이 되는 갈래를 안 만든다. */
+async function 원장인가(req: Request): Promise<boolean> {
+  const 주체 = 토큰주체(req);
+  if (!주체) return false;
+  const iat = 발급시각(req);
+  try {
+    return await sql.begin(async (tx) => {
+      await tx`select set_config('request.jwt.claims', ${
+        JSON.stringify({ sub: 주체, role: 'authenticated', iat })}, true)`;
+      const [직원] = await tx`select role from engine.current_staff()`;
+      return !!직원 && 직원.role === 'director';
+    });
+  } catch (e) {
+    console.error('[deliver] 원장 판정 실패', String((e as Error)?.message ?? e));
+    return false;
+  }
+}
 
 /* 🔴 §6-5 — 배치가 **안 돈 것**은 강등으로 잡히지 않는다.
  *   전원이 며칠 고정 과제로 돌아도 증상은 조용하고, 그걸 보는 눈은 원장 주 1회 화면뿐이다.

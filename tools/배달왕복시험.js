@@ -591,6 +591,65 @@ async function main() {
   확인('없는 뒷마디는 404 다 — 오타 경로가 「이미 돌던 것」이 되지 않는다',
     (await 조회('/아무거나', { 함수: 'progress' })).status === 404);
 
+  /* ── ⑪ 배치 미달을 **누가 보나** (P0 §6-5) ──────────────────────────────
+   * ⑦ 이 「미달을 센다」를 쟀다면 여기는 **그 값이 사람에게 닿는가**다. 계약이 정한 수신자는
+   * 유호님 한 명이고 통로는 원장 화면 하나인데, 앱 토큰은 절대 `service_role` 이 아니라
+   * 열지 않으면 미달은 영원히 함수 로그에만 뜬다(= 보는 눈 0).
+   * 🔴 여는 것과 **같은 실행에서 배달(쓰기)이 안 열렸는지**를 잰다. 둘을 가르는 것은 조건
+   *   한 칸이고 새는 방향은 언제나 「통과」다 — 코드 독해로는 그 칸이 **있는지**만 보이고,
+   *   배포된 판이 실제로 그렇게 답하는지는 이 자리에서만 나온다. */
+  console.log('\n■ ⑪ 미달을 누가 보나 — POST /deliver?점검 (P0 §6-5)');
+  const 점검질의 = `?${encodeURIComponent('점검')}`;
+  const 학생점검 = await 조회(점검질의, { 함수: 'deliver', 방법: 'POST', 판: null });
+  확인('🔴 학생 토큰은 점검을 못 본다 — 재적·배정 수는 학생에게 줄 값이 아니다',
+    학생점검.status === 401, 학생점검);
+  확인('🔴 배달(쓰기)은 앱 토큰에 안 열린다 — 「점검일 때만」 이라는 조건이 실제로 걸려 있다',
+    (await 조회('', { 함수: 'deliver', 방법: 'POST', 판: null })).status === 401);
+
+  /* 원장 계정 — 이 통로의 전부는 `engine.staff` 의 `role='director'` 한 칸이다(판정 정본 =
+   * `engine.current_staff()` · 폐기까지 그 함수가 본다). 계정은 **재사용**한다 — 회차마다
+   * 새로 만들면 `auth.users` 가 회차 수만큼 쌓인다(학생 계정과 같은 규칙). */
+  const 원장이메일 = `probe-director${도메인}`;
+  const 원장비번 = 'Director-Rehearsal-1';
+  let duid = (await sql(`select id from auth.users where email='${원장이메일}'`))[0]?.id;
+  if (!duid) {
+    const cr = await 유저('admin/users', 'POST', { email: 원장이메일, password: 원장비번, email_confirm: true });
+    duid = cr.ok ? JSON.parse(await cr.text()).id : (await sql(`select id from auth.users where email='${원장이메일}'`))[0]?.id;
+  } else {
+    await 유저(`admin/users/${duid}`, 'PUT', { password: 원장비번 });
+  }
+  if (!duid) die('시험용 원장 계정을 못 만들었다');
+  await sql(`
+    insert into engine.staff (auth_user_id, role, display_name)
+    values ('${duid}'::uuid, 'director', '리허설 원장')
+    on conflict (auth_user_id) do update
+      set role = 'director', active = true, revoked_before = null`);
+
+  const 원장로그인 = await fetch(`https://${ref}.supabase.co/auth/v1/token?grant_type=password`, {
+    method: 'POST', headers: { apikey: anon, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 원장이메일, password: 원장비번 }),
+  });
+  const 원장토큰 = JSON.parse(await 원장로그인.text()).access_token;
+  if (!원장토큰) die('원장 토큰을 못 받았다');
+
+  const 원장점검 = await 조회(점검질의, { 함수: 'deliver', 방법: 'POST', 판: null, 토큰: 원장토큰 });
+  확인('🔴 원장은 미달을 본다 — 이 칸이 없으면 배치가 죽은 날과 안 죽은 날이 같은 모양이다',
+    원장점검.status === 200 && 원장점검.몸.mode === '점검' && Number(원장점검.몸.재적) > 0, 원장점검.몸);
+  확인('그 답이 앱이 그릴 세 값을 다 싣는다 — 날짜·배정·재적',
+    !!원장점검.몸.date && Number.isFinite(Number(원장점검.몸.배정))
+      && Number.isFinite(Number(원장점검.몸.재적)), 원장점검.몸);
+  확인('🔴 B·D 가 못 받았으므로 미달이 참이고, 그 값이 그대로 원장 화면에 선다',
+    원장점검.몸.미달 === true && Number(원장점검.몸.배정) < Number(원장점검.몸.재적), 원장점검.몸);
+  확인('🔴 원장도 배달은 못 돌린다 — 열린 것은 읽기 한 칸뿐이다',
+    (await 조회('', { 함수: 'deliver', 방법: 'POST', 판: null, 토큰: 원장토큰 })).status === 401);
+
+  /* 🔑 해임·폐기가 이 통로에도 걸리는가 — `current_staff()` 안에 있으니 걸려야 한다.
+   *   안 걸리면 나간 직원의 폰이 학원 재적 수를 계속 읽는다(그 상태는 아무 증상이 없다). */
+  await sql(`update engine.staff set active = false where auth_user_id = '${duid}'::uuid`);
+  확인('🔴 해임되면 그 순간 못 본다 — 폐기 판정은 이 통로가 따로 안 적고 정본을 지난다',
+    (await 조회(점검질의, { 함수: 'deliver', 방법: 'POST', 판: null, 토큰: 원장토큰 })).status === 401);
+  await sql(`update engine.staff set active = true where auth_user_id = '${duid}'::uuid`);
+
   console.log(`\n[배달왕복시험] ${통과}/${통과 + 실패} 통과`);
   process.exit(실패 ? 1 : 0);
 }

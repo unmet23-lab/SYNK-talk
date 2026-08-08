@@ -71,3 +71,52 @@ export async function 오늘과제받기(토큰, 날짜) {
     contract_ver: 몸.contract_ver || null,
   };
 }
+
+/**
+ * 오늘 배치가 **덜 돌았나** — 원장만 답을 받는다(P0 §6-5 · 서버 `deliver?점검`).
+ *
+ * ■ 왜 앱이 이걸 부르나
+ *   배치가 죽으면 학생 전원이 조용히 고정 과제로 돌아간다 — **강등으로도 안 잡히고**
+ *   증상이 없다. 계약이 정한 수신자는 유호님 한 명이라 별도 발송 통로(메일·푸시)를
+ *   만들지 않는다: **화면에 뜨는 것이 알림이다.**
+ *
+ * 🔑 **던지지 않는다.** 이 자리는 학생 전원이 지나가고 그들은 전부 401 을 받는다(원장이
+ *   아니므로 — 권한은 화면이 아니라 서버가 정한다 · `원장초기화` 와 같은 규칙). 던지면
+ *   호출부가 학생의 401 을 오류로 다루게 되고, 최악은 그걸 세션 만료로 읽어 **멀쩡한
+ *   학생을 로그아웃**시키는 것이다. 볼 것이 없으면 `null` — 그게 이 함수의 전부다.
+ * 🔑 미달이 아닐 때도 `null` 이다: 호출부가 「값이 있으면 그린다」 하나로 끝나 조건이
+ *   두 곳(여기와 화면)으로 갈리지 않는다.
+ *
+ * @param {string} 토큰 access_token
+ * @returns {Promise<{날짜: string, 재적: number, 배정: number, 강등: number}|null>}
+ */
+export async function 배치미달받기(토큰) {
+  if (!URL_ || !ANON || !토큰) return null;
+
+  let r;
+  try {
+    r = await fetch(`${URL_}/functions/v1/deliver?${encodeURIComponent('점검')}`, {
+      method: 'POST',
+      headers: {
+        apikey: ANON,
+        Authorization: `Bearer ${토큰}`,
+        'X-Contract-Ver': 계약판,
+      },
+    });
+  } catch {
+    return null; // 회선 없음 — 미달과 구별할 재료가 없으니 아무 말도 하지 않는다
+  }
+
+  if (!r.ok) return null; // 401(원장 아님)·500 전부 여기로 — 조용한 것이 정상이다
+  const 몸 = await r.json().catch(() => null);
+  if (!몸 || 몸.미달 !== true) return null;
+
+  /* 🔴 판정(`미달`)은 **서버 값을 그대로 쓴다** — 여기서 `배정 < 재적` 을 다시 계산하면
+     그 부등호가 두 곳에 살고, 갈라지는 날 화면은 조용히 「정상」 쪽으로 눕는다. */
+  return {
+    날짜: String(몸.date || ''),
+    재적: Number(몸.재적) || 0,
+    배정: Number(몸.배정) || 0,
+    강등: Number(몸.강등) || 0,
+  };
+}

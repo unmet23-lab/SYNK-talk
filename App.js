@@ -10,6 +10,7 @@ import 인증화면, { 단계 } from './src/인증화면';
 import 원장초기화 from './src/원장초기화';
 import * as 인증 from './src/인증API';
 import { 교정목록받기 } from './src/교정API';
+import { 배치미달받기 } from './src/과제API';
 import { 세션읽기, 세션쓰기, 세션지우기 } from './src/저장';
 import { 색, 폰트, 모노트래킹 } from './src/테마';
 
@@ -27,6 +28,7 @@ export default function App() {
   const [복원중, set복원중] = useState(true);
   const [교정, set교정] = useState(null); // 나에게 온 최신 교정 1건 (없으면 답장 링크를 안 그린다)
   const [견줌값, set견줌값] = useState(null); // 오늘·어제 (첫날이면 null — 「어제의 나」 링크를 안 그린다)
+  const [배치미달, set배치미달] = useState(null); // 오늘 배달이 덜 돈 것 (원장만 값을 받는다 · P0 §6-5)
   const [fontsLoaded] = useFonts({
     'SUIT-Regular': require('./assets/fonts/SUIT-Regular.ttf'),
     'SUIT-Medium': require('./assets/fonts/SUIT-Medium.ttf'),
@@ -101,6 +103,19 @@ export default function App() {
 
   useEffect(() => { 견줌읽기(); }, [견줌읽기]);
 
+  /* 🔴 **배치가 안 돈 것은 강등으로 안 잡힌다**(P0 §6-5) — 큐가 비면 전원이 며칠 고정 과제로
+     돌아도 증상이 조용하고, 그걸 보는 눈은 원장 화면 하나뿐이다. 계약이 정한 수신자가
+     유호님 한 명이라 발송 통로(메일·푸시)를 만들지 않는다: **화면에 뜨는 것이 알림이다.**
+     🔑 **누가 원장인지 앱은 모른다** — 서버가 정하고 학생에게는 늘 `null` 이 온다(권한을
+        화면에서 숨기는 것은 편의이지 권한이 아니다 · `원장초기화` 와 같은 규칙).
+     🔑 한 번만 읽는다 — 배치는 하루 1회고, 이 값이 바뀌는 건 사람이 재실행했을 때뿐이다. */
+  useEffect(() => {
+    if (!세션) return undefined;
+    let 살아있음 = true;
+    배치미달받기(세션.access_token).then((v) => { if (살아있음) set배치미달(v); });
+    return () => { 살아있음 = false; };
+  }, [세션]);
+
   const 세션세움 = async (새것) => {
     set세션(새것);
     // 저장 실패가 로그인을 막지 않는다 — 세션은 이미 섰고, 최악은 다음 실행에 다시 묻는 것뿐이다
@@ -170,8 +185,14 @@ export default function App() {
       {/* 🔴 「어제의 나」도 있을 때만 그린다 — 첫날은 견줄 어제가 없다(`lib/견줌.js`).
           두 링크는 **한 줄에 나란히** 둔다: 각자 absolute 로 놓으면 같은 좌표에 겹치고,
           겹침은 한쪽이 없을 때만 안 보여서 「어떤 학생에게만」 깨진다. */}
-      {화면 === '말하기' && (교정 || 견줌값) && (
+      {/* 🔴 배치 미달은 **원장에게만** 값이 온다 — 학생 화면에는 이 칸이 아예 안 그려진다.
+          코랄을 쓰지 않는다: 이 화면의 신호 1점은 녹음 버튼이고(`테마.신호자리`), 둘로
+          만들면 R1 이 깨진다. 위계는 **밝기**로 준다(다른 두 링크보다 한 층 위). */}
+      {화면 === '말하기' && (배치미달 || 교정 || 견줌값) && (
         <View style={s.겉테줄}>
+          {배치미달 && (
+            <Text style={s.미달글}>오늘 배달 {배치미달.배정}/{배치미달.재적}</Text>
+          )}
           {교정 && (
             <Pressable onPress={() => set화면('답장')} hitSlop={8}>
               <Text style={s.겉테글}>답장</Text>
@@ -195,6 +216,8 @@ const s = StyleSheet.create({
      이 띠와 겹치지 않는다. 🚫 코랄로 칠하지 않는다: 그 화면의 신호 1점은 녹음 버튼이다. */
   겉테줄: { position: 'absolute', top: 34, left: 24, flexDirection: 'row', gap: 18 },
   겉테글: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_서브 },
+  // 같은 줄의 링크(잉크_서브)보다 한 층 위 — 색을 안 바꾸고 밝기만으로 먼저 읽히게 한다.
+  미달글: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크 },
   시스템링크: { position: 'absolute', top: 34, right: 24, opacity: 0.8 },
   시스템글: {
     fontFamily: 폰트.모노,
