@@ -31,6 +31,7 @@ import 출처모듈 from './사건출처.mjs';
 import 계약 from './계약.mjs';
 import 경로모듈 from './업로드경로.mjs';
 import 헤더모듈 from './음성헤더.mjs';
+import 전사모듈 from './전사.mjs';
 import 토큰모듈 from './토큰.mjs';
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
@@ -45,6 +46,7 @@ const { 헤더읽기, 길이초, 파일없음 } = 헤더모듈 as {
   길이초: (server: unknown) => number | null;
   파일없음: (status: number, 본문: string) => boolean;
 };
+const { 전사대상 } = 전사모듈 as { 전사대상: (audio_ref: string | null, server: unknown) => string | null };
 
 const 최대건수 = 100;
 const 최대바이트 = 1_000_000;
@@ -466,7 +468,8 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
         await tx`
           insert into engine.submissions (
             event_id, task_type, task_format, task_ref, task_snapshot, task_schema_ver,
-            body_original, image_refs, audio_ref, capture_meta, audio_duration_sec, occurred_at, schema_ver
+            body_original, image_refs, audio_ref, capture_meta, audio_duration_sec, transcript_state,
+            occurred_at, schema_ver
           ) values (
             ${event_id}::uuid, ${String(사건.task_type)}, ${(s.task_format ?? null) as string | null},
             ${(s.task_ref ?? null) as string | null},
@@ -481,6 +484,11 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
              * (여기 적으면 리허설을 쏴야만 검증되고, 그건 회귀가 못 지키는 자리다).
              * ⚠ 이 주석은 SQL 템플릿 리터럴 **안**이다 — 백틱 금지(위 c8 칸의 실사고). */
             ${길이초((capture_meta as Record<string, unknown> | null)?.server) as number | null},
+            /* 전사 분모를 **여기서** 만든다 — 안 적으면 「아직 전사 안 함」과 「전사 대상이
+             * 아님」이 둘 다 null 로 같은 모양이 되고, 그러면 대기 건수를 영원히 못 센다.
+             * 판정은 lib/전사.js 의 전사대상 이 진다(여기 적으면 리허설을 쏴야만 검증된다).
+             * 파일 없음(missing)만 제외한다 — 전사가 원리상 불가능한 행이다. */
+            ${전사대상((s.audio_ref ?? null) as string | null, (capture_meta as Record<string, unknown> | null)?.server) as string | null},
             ${occurred_at}::timestamptz, ${ver}
           )`;
       }
