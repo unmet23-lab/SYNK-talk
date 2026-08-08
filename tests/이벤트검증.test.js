@@ -14,7 +14,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const 계약 = JSON.parse(fs.readFileSync(path.join(ROOT, '계약', '수집_교정_계약.json'), 'utf8'));
-const { 검증, 공통필수, 널허용, 이벤트별필수, 문턱없음, 선택필드, 생산자, 서버칸, 서버사건 } = require('../lib/이벤트검증.js');
+const { 검증, 공통필수, 널허용, 이벤트별필수, 문턱없음, 선택필드, 생산자, 엔진도달, 도달0상한, 서버칸, 서버사건 } = require('../lib/이벤트검증.js');
 
 /* C0 §4-1 예시 그대로 — 서버가 채우는 칸은 뺐다(앱이 보내는 모양). */
 const 정상제출 = () => ({
@@ -405,6 +405,67 @@ test('생산자 장부 — 모든 event_type 은 파일 xor 사유를 가진다'
     // 「나중에」는 사유가 아니다 — 무엇이 서면 생기는지를 적게 한다(문턱없음과 같은 규칙).
     if (사유) assert.ok(v.사유.length >= 30, `${et} 의 사유가 너무 짧다`);
   }
+});
+
+/* ── 엔진도달 장부 — 「이 사건이 엔진 학습에 어떻게 닿는가」 (유호 상시 지시 2026-08-08) ──
+ * `생산자` 장부의 반대쪽 끝. 그 장부가 없어 **수집만 서 있고 도달이 0인 상태가 초록**이었다.
+ * 정본 = appsscript `docs/엔진도달_설계.md` §4 · 실측 = `docs/_ops/엔진도달_전수감사.md`.
+ * 탐지력은 픽스처가 지고 실저장소에는 거짓양성만 건다(위 장부들과 같은 규칙). */
+
+/** 도달 배열 중 「소비자 파일에 그 부품 문자열이 없는」 항목 — 낡은 지목 탐지기.
+ * 천장은 `낡은지목` 과 같다: **문자열 실재까지만** 잰다. */
+const 낡은도달 = (장부) => Object.entries(장부)
+  .filter(([, v]) => Array.isArray(v.도달))
+  .filter(([, v]) => v.도달.some((d) => {
+    try { return !fs.readFileSync(path.join(ROOT, d.소비자), 'utf8').includes(d.부품); }
+    catch (_) { return true; }
+  }))
+  .map(([et]) => et);
+
+test('엔진도달 장부 — 모든 event_type 은 도달 xor 사유를 가진다', () => {
+  const 값 = 계약.learning_events.값목록.event_type;
+  const 빠짐 = 값.filter((et) => !(et in 엔진도달));
+  assert.deepEqual(빠짐, [], `값목록에 있는데 엔진도달 장부에 없다 — 엔진 어디로 가는지 아무도 안 정했다: ${빠짐.join(', ')}`);
+
+  const 유령 = Object.keys(엔진도달).filter((et) => !값.includes(et));
+  assert.deepEqual(유령, [], `장부에 있는데 계약 값목록에 없다 — 낡은 줄이다: ${유령.join(', ')}`);
+
+  for (const [et, v] of Object.entries(엔진도달)) {
+    const 도달 = Array.isArray(v.도달) && v.도달.length > 0;
+    const 사유 = typeof v.사유 === 'string' && v.사유.trim();
+    assert.ok(Boolean(도달) !== Boolean(사유),
+      `${et}: 도달 xor 사유여야 한다 — 둘 다면 어느 쪽이 정본인지, 둘 다 아니면 아무것도 안 정한 것`);
+    if (사유) assert.ok(v.사유.length >= 30, `${et} 의 사유가 너무 짧다 — 무엇이 서면 닿는지를 적는다`);
+    if (도달) for (const d of v.도달) {
+      assert.ok(['A', 'B'].includes(d.경로), `${et}: 경로는 'A'(개인화·승격 불요) 또는 'B'(회사 훈련·승격 필수)`);
+      for (const k of ['부품', '소비자']) {
+        assert.ok(typeof d[k] === 'string' && d[k].trim(), `${et}: 도달 항목에 ${k} 가 없다`);
+      }
+    }
+  }
+});
+
+test('엔진도달 장부 — 도달형은 소비자 파일에 그 부품 문자열이 실재한다', () => {
+  // ① 탐지력(픽스처) — 그 문자열이 없는 실재 파일을 소비자로 지목하면 잡는다.
+  assert.deepEqual(낡은도달({ 'submission.created': { 도달: [{ 경로: 'B', 부품: '없는부품이름XYZ', 소비자: 'lib/오늘과제.js' }] } }),
+    ['submission.created'], '문자열 없는 소비자를 지목했는데 조용하다 — 이 검사가 아무것도 안 재고 있다');
+  // ② 파일이 아예 없어도 잡는다.
+  assert.deepEqual(낡은도달({ 'quiz.answered': { 도달: [{ 경로: 'A', 부품: '학습자 모델', 소비자: 'lib/없는파일.js' }] } }),
+    ['quiz.answered'], '없는 소비자 파일 지목이 통과했다');
+  // ③ 실저장소 — 거짓양성만.
+  assert.deepEqual(낡은도달(엔진도달), [],
+    '장부가 지목한 소비자에서 그 부품 문자열이 사라졌다 — 소비자를 옮겼으면 장부도 같이 옮긴다');
+});
+
+/* 🔑 유호님 지시의 기계적 실체 — 「앞으로 만들 것들이 전부 충족되어야 한다」 = **이 수가 늘면 안 된다.**
+ * 오늘 13종 전부 도달 0 이다(⑥승격·⑦소비 물리 0). 이 검사는 그 0 을 초록으로 덮지 않고
+ * **세어서 고정**한다 — 새 사건을 도달 없이 추가하면 여기서 빨개진다. 줄이는 것은 언제나 통과. */
+test('엔진도달 래칫 — 도달 0 인 사건이 늘어나면 빨개진다', () => {
+  const 도달0 = Object.entries(엔진도달).filter(([, v]) => !Array.isArray(v.도달)).map(([et]) => et);
+  assert.ok(도달0.length <= 도달0상한,
+    `엔진 도달이 없는 사건이 ${도달0상한} → ${도달0.length} 로 늘었다: ${도달0.join(', ')}\n` +
+    '새 수집을 늘리려면 그것이 엔진 학습에 «어떻게» 닿는지를 같이 적어야 한다(유호 상시 지시 08-08).');
+  assert.equal(도달0상한, 13, '상한을 올렸다 — 래칫은 내리기만 한다(도달을 적으면 준다)');
 });
 
 test('생산자 장부 — 파일 지목형은 그 파일에 그 사건 문자열이 실재한다', () => {
