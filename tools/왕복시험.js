@@ -155,7 +155,12 @@ async function main() {
     const fr = await fetch(`https://${ref}.supabase.co/functions/v1/auth/first-login`, {
       method: 'POST',
       headers: { apikey: anon, Authorization: `Bearer ${anon}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ student_code: 학생번호, phone_last4: 새뒷자리, password: 새비번 }),
+      /* 가입 1회 문항 셋은 첫 등록의 **필수**다(`lib/가입문항.js` · L0 §704). 안 실으면 400 이라
+       * 여기서 멈춘다 — 개원 첫날의 화면이 실제로 이 셋을 묻고 나서야 버튼이 열린다. */
+      body: JSON.stringify({
+        student_code: 학생번호, phone_last4: 새뒷자리, password: 새비번,
+        home_aimag: 'ulaanbaatar', gender: 'undisclosed', goal_track: 'study',
+      }),
     });
     const f본문 = JSON.parse((await fr.text()) || '{}');
     확인('갓 명부에 오른 학생이 첫 등록으로 계정을 만든다', fr.status === 200 && f본문.ok === true,

@@ -110,13 +110,22 @@ test('로그인 — 합성 이메일로 GoTrue 를 직접 부르고, 비밀번�
 // ── 첫 등록 ────────────────────────────────────────────────
 test('🔴 첫등록 — 본문 키가 계약 그대로고, `learner_id` 를 싣지 않는다 (실으면 서버가 400)', async () => {
   const { API, 부른것 } = 세우기({ 응답들: [{ 몸: { ok: true } }, { 몸: { access_token: 'A' } }] });
-  await API.첫등록({ 학생번호: 'SYNK-042', 뒷자리: '1234', 비밀번호: 'pw123456', 복구이메일: '', 복구전화: '' });
+  await API.첫등록({
+    학생번호: 'SYNK-042', 뒷자리: '1234', 비밀번호: 'pw123456', 복구이메일: '', 복구전화: '',
+    가입답: { home_aimag: 'khovd', gender: 'female', goal_track: 'work' },
+  });
 
   assert.equal(부른것[0].url, `${URL_}/functions/v1/auth/first-login`);
   assert.deepEqual(Object.keys(부른것[0].본문).sort(),
-    ['password', 'phone_last4', 'recovery_email', 'recovery_phone', 'student_code'],
+    ['gender', 'goal_track', 'home_aimag', 'password', 'phone_last4',
+      'recovery_email', 'recovery_phone', 'student_code'],
     '🔴 본문 키가 C0 §4-4 와 갈라졌다 — 갈라지면 전 학생이 못 들어온다');
   assert.equal(부른것[0].본문.recovery_email, null, '빈 문자열을 그대로 보냈다(계약은 null)');
+  /* 🔴 가입 1회 문항은 **이 요청에만** 실린다 — 여기서 새면 그 학생의 세 칸이 영구 null 이고
+   *   되물어도 못 채운다(L0 §704·§850). 키만 세는 위 검사는 값이 `undefined` 여도 통과한다. */
+  assert.equal(부른것[0].본문.home_aimag, 'khovd');
+  assert.equal(부른것[0].본문.gender, 'female');
+  assert.equal(부른것[0].본문.goal_track, 'work');
   // 🔑 성공해도 세션은 안 생긴다 — 곧바로 로그인까지 가야 화면이 다음으로 넘어간다.
   assert.equal(부른것[1].url, `${URL_}/auth/v1/token?grant_type=password`, '🔴 등록만 하고 로그인을 안 했다');
 });

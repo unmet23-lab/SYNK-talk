@@ -119,13 +119,18 @@ export async function 갱신(refresh_token, 학생번호) {
 }
 
 /** 첫 등록 — 계정이 서는 유일한 통로. 성공해도 세션은 안 생기므로 곧바로 로그인한다. */
-export async function 첫등록({ 학생번호, 뒷자리, 비밀번호, 복구이메일, 복구전화 }) {
+export async function 첫등록({ 학생번호, 뒷자리, 비밀번호, 복구이메일, 복구전화, 가입답 }) {
   await 함수부르기('first-login', {
     student_code: 학생번호,
     phone_last4: 뒷자리,
     password: 비밀번호,
     recovery_email: 복구이메일 || null,
     recovery_phone: 복구전화 || null,
+    /* 가입 1회 문항 셋 — **이 요청에만 실린다**(`lib/가입문항.js`). 서버가 계정을 만들기 전에
+     * 값목록을 대조하고, 등록을 잇는 그 UPDATE 에 같이 적는다. 🔴 「나중에 설정 화면에서」로
+     * 미루지 못하는 값이다: 목적은 덮어써지는 칸이라 나중에 물으면 그때 목적이 아니라 **오늘
+     * 목적**이 나온다(L0 §850 `goal_snapshot` = 유일한 완전 소급 불가). */
+    ...(가입답 || {}),
   });
   return 로그인(학생번호, 비밀번호);
 }

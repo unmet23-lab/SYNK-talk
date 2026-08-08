@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { 색, 폰트, 모노트래킹 } from './테마';
 import { 학생번호맞나 } from '../lib/학생계정.js';
+import { 문항, 답검사 } from '../lib/가입문항.js';
 import * as API from './인증API';
 
 /**
@@ -33,10 +34,15 @@ export default function 인증화면({ 로그인성공, 시작단계 = 단계.�
   const [새비번, set새비번] = useState('');
   const [복구메일, set복구메일] = useState('');
   const [복구전화, set복구전화] = useState('');
+  /* 가입 1회 문항 셋(`lib/가입문항.js`). 🔴 **첫 등록에만 있고 다시는 안 묻는다** — 나중에
+     설정 화면으로 미루면 그때는 이미 그 값이 아니다(L0 §850 · 유일한 완전 소급 불가). */
+  const [가입답, set가입답] = useState({});
   const [오류, set오류] = useState('');
   const [도는중, set도는중] = useState(false);
 
-  const 초기화입력 = () => { set비번(''); set뒷자리(''); set임시번호(''); set새비번(''); set오류(''); };
+  const 초기화입력 = () => {
+    set비번(''); set뒷자리(''); set임시번호(''); set새비번(''); set오류(''); set가입답({});
+  };
   const 옮기기 = (다음) => { 초기화입력(); set지금(다음); };
 
   async function 눌렀다(하는일) {
@@ -68,10 +74,13 @@ export default function 인증화면({ 로그인성공, 시작단계 = 단계.�
     },
     [단계.첫등록]: {
       제목: '처음 오셨네요',
-      쓸수있나: 번호형식 && 뒷자리.length === 4 && 새비번.length >= 6,
+      /* 🔴 세 문항을 **다 고르기 전엔 버튼이 안 열린다.** 선택으로 두면 건너뛴 학생의 세 칸이
+         영구 null 이고 그건 되물어도 못 채운다 — 그래서 「밝히지 않음」은 성별 **보기 안에**
+         있고(기록된 비공개 ≠ 빈 칸), 건너뛰기는 없다. 검사는 서버와 **같은 함수**를 쓴다. */
+      쓸수있나: 번호형식 && 뒷자리.length === 4 && 새비번.length >= 6 && !답검사(가입답),
       버튼: '시작하기',
       실행: async () => 로그인성공(await API.첫등록({
-        학생번호, 뒷자리, 비밀번호: 새비번, 복구이메일: 복구메일, 복구전화: 복구전화,
+        학생번호, 뒷자리, 비밀번호: 새비번, 복구이메일: 복구메일, 복구전화: 복구전화, 가입답,
       })),
     },
     [단계.임시]: {
@@ -124,6 +133,14 @@ export default function 인증화면({ 로그인성공, 시작단계 = 단계.�
             값={새비번} 바꾸기={set새비번} 비밀 도움말="6자 이상"
           />
         )}
+
+        {/* 가입 1회 문항 — 이 화면에만 있다. 🔑 왜 여기냐: 다시 물을 자리가 없기 때문이다
+            (L0 §704 「뒤에 붙이면 재적 전원에게 다시 물어야 한다」). 값은 학생에게 다시
+            보여주지 않는다 — 수집 축이지 프로필이 아니다(발주_수집파이프라인 [CHK-4]). */}
+        {지금 === 단계.첫등록 && 문항.map((q) => (
+          <고르기 key={q.필드} 라벨={q.라벨} 보기={q.보기} 값={가입답[q.필드]}
+            고르기={(v) => set가입답((앞) => ({ ...앞, [q.필드]: v }))} />
+        ))}
 
         {지금 === 단계.첫등록 && (
           <View style={s.선택묶음}>
@@ -194,6 +211,31 @@ function 칸({ 라벨, 값, 바꾸기, 자리표시, 비밀, 숫자, 이메일, 
   );
 }
 
+/* 보기에서 하나를 고른다 — 자유 입력이 아닌 이유는 `lib/가입문항.js` 머리말에 있다(표기가
+   갈리면 그 칸의 존재 이유가 죽는다). 세 문항이 한 컴포넌트를 쓴다: 갈라 두면 고른 표시가
+   문항마다 달라 보이고, 그 차이는 학생에게 「뭔가 다른 질문」으로 읽힌다. */
+function 고르기({ 라벨, 보기, 값, 고르기: 눌렀다 }) {
+  return (
+    <View style={s.칸}>
+      <View style={s.칸머리}><Text style={s.칸라벨}>{라벨}</Text></View>
+      <View style={s.보기줄}>
+        {보기.map((b) => {
+          const 골랐나 = 값 === b.값;
+          return (
+            <Pressable
+              key={b.값}
+              onPress={() => 눌렀다(b.값)}
+              style={({ pressed }) => [s.보기, 골랐나 && s.보기_고름, pressed && { opacity: 0.7 }]}
+            >
+              <Text style={[s.보기글, 골랐나 && s.보기글_고름]}>{b.라벨}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 function 곁길({ 글, 누르기 }) {
   return (
     <Pressable onPress={누르기} hitSlop={10} style={({ pressed }) => pressed && { opacity: 0.6 }}>
@@ -225,6 +267,21 @@ const s = StyleSheet.create({
     color: 색.잉크,
   },
   입력_모노: { fontFamily: 폰트.모노, letterSpacing: 1 },
+
+  /* 고른 칩은 **면을 채워** 표시한다 — 테두리만 굵게 하면 22개가 깔린 아이막 줄에서 고른 것을
+     눈으로 못 찾는다. 🚫 코랄은 안 쓴다: 이 화면의 신호 1점은 오류 메시지다(위 머리말). */
+  보기줄: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  보기: {
+    backgroundColor: 색.바탕띄움,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 색.잉크_희미,
+    paddingHorizontal: 13,
+    paddingVertical: 10,      // 칩 높이 ≈ 40 — 손가락이 닿는 최소치
+  },
+  보기_고름: { backgroundColor: 색.잉크, borderColor: 색.잉크 },
+  보기글: { fontFamily: 폰트.본문, fontSize: 14, color: 색.잉크_서브 },
+  보기글_고름: { fontFamily: 폰트.강조, color: 색.바탕 },
 
   선택묶음: {
     backgroundColor: 색.바탕띄움, borderRadius: 14, padding: 16, gap: 14,

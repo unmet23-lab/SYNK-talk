@@ -46,12 +46,18 @@
  */
 import postgres from 'npm:postgres@3.4.4';
 import 학생계정 from './학생계정.mjs';
+import 가입문항 from './가입문항.mjs';
 
 const { 학생번호맞나, 이메일, 뒷자리맞나, 시도상한 } = 학생계정 as {
   학생번호맞나: (v: unknown) => boolean;
   이메일: (v: string) => string;
   뒷자리맞나: (명단: unknown, 입력: unknown) => boolean;
   시도상한: number;
+};
+/* 🔴 값목록을 여기 다시 적지 않는다 — 앱과 서버가 각자 적으면 갈라지고, 갈라진 날 증상은
+ *   「어떤 학생만 등록이 안 된다」다(`학생계정` 을 동봉으로 쓰는 것과 같은 이유 · L0 §4-2). */
+const { 답검사 } = 가입문항 as {
+  답검사: (답: unknown) => { 필드: string; 사유: string } | null;
 };
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
@@ -354,6 +360,19 @@ Deno.serve(async (req: Request) => {
     const 규격 = 비번규격(비밀번호, ver);
     if (규격) return 규격;
 
+    /* 가입 1회 문항 3개 — **계정을 만들기 전에** 본다(`lib/가입문항.js`).
+     * 🔴 순서가 전부다: 계정이 선 뒤에 거절하면 그 학생은 `auth_user_id` 가 박힌 채 세 칸이
+     *   비어 남고, 그 상태를 고치는 길은 이 통로에 다시 못 들어온다(위 「이미 등록됨 = 게이트
+     *   실패」). 그러면 잃는 것이 **소급 불가인 그 세 값**이라 정확히 이 조항이 막으려던 손실이다.
+     * 🔑 게이트 실패(401)와 **다른 응답**이다 — 이건 학생번호의 존재를 감추는 자리가 아니라
+     *   호출부가 잘못 보낸 자리다. 어느 칸인지 말해 주지 않으면 앱 버그가 안 보인다. */
+    const 문항오류 = 답검사(본문);
+    if (문항오류) {
+      return 실패(400, {
+        code: 'CONTRACT_VIOLATION', field: 문항오류.필드, message: 문항오류.사유, retryable: false,
+      }, ver);
+    }
+
     // DB 계약판은 봉투용으로만 읽는다(게이트가 아니다).
     ver = await 계약판읽기();
 
@@ -425,12 +444,21 @@ Deno.serve(async (req: Request) => {
     }
 
     /* 🔴 `where auth_user_id is null` 이 **동시 요청의 심판**이다. 두 번 눌려도 한 번만 이긴다
-     *   — 조건 없이 쓰면 나중 요청이 앞선 연결을 덮어써 계정이 바뀐다. */
+     *   — 조건 없이 쓰면 나중 요청이 앞선 연결을 덮어써 계정이 바뀐다.
+     *
+     * 🔑 가입 1회 문항 셋도 **이 한 문장에 같이 실린다**(L0 §704 · §850). 두 번째 쓰기로
+     *   미루지 않는다: 이 문장은 이겼는데 뒤따르는 쓰기가 죽으면 그 학생은 등록은 됐는데 세
+     *   칸이 빈 채로 남고, 그 자리는 되물어도 못 채운다(`goal_track` 은 덮어써지는 값이라
+     *   나중에 물으면 **오늘의 목적**이 나온다 — `goal_snapshot` = 유일한 완전 소급 불가).
+     *   위 `답검사` 를 이미 지났으므로 여기 오는 값은 셋 다 값목록 안이다. */
     const 이음 = await sql`
       update engine.learners
          set auth_user_id = ${uid}::uuid,
              recovery_email = ${본문.recovery_email == null ? null : String(본문.recovery_email).trim() || null},
              recovery_phone = ${본문.recovery_phone == null ? null : String(본문.recovery_phone).trim() || null},
+             home_aimag = ${String(본문.home_aimag)},
+             gender = ${String(본문.gender)},
+             goal_track = ${String(본문.goal_track)},
              signup_attempts = 0
        where learner_id = ${학생.learner_id}
          and auth_user_id is null

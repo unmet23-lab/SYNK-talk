@@ -61,11 +61,15 @@ async function main() {
   // 원장 계정을 세우는 데만 쓴다(시험 판 깔기) — 함수를 부를 때는 절대 안 싣는다.
   const 서비스키 = 키들.find((k) => k.name === 'service_role').api_key;
 
-  const 부르기 = async (본문) => {
+  /* 가입 1회 문항 셋(`lib/가입문항.js`)은 첫 등록의 **필수**라, 안 실으면 게이트에 닿기도 전에
+   * 400 이 나서 아래 잠금·시도수 검사가 전부 다른 것을 재게 된다. 그래서 기본값을 여기 한 곳에
+   * 두고 본문이 덮어쓸 수 있게 한다 — 「안 실었을 때 400 인가」는 아래에서 **따로** 한 번 잰다. */
+  const 가입답 = { home_aimag: 'ulaanbaatar', gender: 'undisclosed', goal_track: 'study' };
+  const 부르기 = async (본문, { 문항생략 = false } = {}) => {
     const r = await fetch(`https://${ref}.supabase.co/functions/v1/auth/first-login`, {
       method: 'POST',
       headers: { apikey: anon, Authorization: `Bearer ${anon}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(본문),
+      body: JSON.stringify(문항생략 ? 본문 : { ...가입답, ...본문 }),
     });
     return { status: r.status, body: JSON.parse((await r.text()) || '{}') };
   };
@@ -96,6 +100,21 @@ async function main() {
       '6자 미만은 400 + 이유를 알려준다(본인이 방금 정한 값이라 새는 정보가 없다)');
     확인(await 시도수() === 1, '규격 오류는 시도 횟수를 안 올린다(게이트를 밟기 전이다)');
 
+    console.log('\n②-b 가입 1회 문항은 계정이 서기 전에 막는다 (L0 §704·§850 — 되물을 자리가 없다)');
+    const 문항없이 = await 부르기(
+      { student_code: 학생번호, phone_last4: 뒷자리, password: 새비번 }, { 문항생략: true });
+    확인(문항없이.status === 400 && 문항없이.body.error.code === 'CONTRACT_VIOLATION'
+      && 문항없이.body.error.field === 'home_aimag',
+      '세 문항이 없으면 400 + 어느 칸인지 말한다(게이트 401 과 다른 자리다 — 호출부 결함이다)');
+    const 값밖 = await 부르기({ student_code: 학생번호, phone_last4: 뒷자리, password: 새비번,
+                                goal_track: 'hobby' });
+    확인(값밖.status === 400 && 값밖.body.error.field === 'goal_track',
+      '값목록 밖은 400 — 자유 입력으로 새면 목적 축이 표기 흔들림으로 죽는다');
+    확인(await 시도수() === 1, '문항 오류는 시도 횟수를 안 올린다(게이트를 밟기 전이다)');
+    const [문항전] = await sql(`select auth_user_id from engine.learners where student_code='${학생번호}'`);
+    확인(!문항전.auth_user_id,
+      '🔴 거절된 요청이 계정을 세우지 않았다 — 세웠으면 그 학생의 세 칸은 영구 null 이다');
+
     console.log('\n③ 본문으로 학생을 주장할 수 없다');
     const 위조 = await 부르기({ student_code: 학생번호, phone_last4: 뒷자리, password: 새비번,
                                 learner_id: '00000000-0000-4000-8000-000000000000' });
@@ -106,11 +125,17 @@ async function main() {
     const 성공 = await 부르기({ student_code: 학생번호, phone_last4: 뒷자리, password: 새비번,
                                 recovery_email: 'parent@example.com', recovery_phone: '99001122' });
     확인(성공.status === 200 && 성공.body.ok === true, '200 ok');
-    const [행] = await sql(`select auth_user_id, recovery_email, recovery_phone, signup_attempts
+    const [행] = await sql(`select auth_user_id, recovery_email, recovery_phone, signup_attempts,
+                                   home_aimag, gender, goal_track
                               from engine.learners where student_code='${학생번호}'`);
     확인(!!행.auth_user_id, 'auth_user_id 가 이어졌다');
     확인(행.recovery_email === 'parent@example.com' && 행.recovery_phone === '99001122',
       '복구 정보가 저장됐다(발송은 안 한다 — 대조용)');
+    /* 🔴 이 줄이 이 도구에서 가장 소급 불가한 칸이다 — 여기가 비면 그 학생의 목적·지역·성별은
+     *   영영 없다(L0 §850 goal_snapshot = 유일한 완전 소급 불가). 등록이 200 인 것만 보고
+     *   넘기면 세 칸이 null 인 채로도 초록이다. */
+    확인(행.home_aimag === 'ulaanbaatar' && 행.gender === 'undisclosed' && 행.goal_track === 'study',
+      `가입 1회 문항 셋이 그 UPDATE 에 같이 적혔다 (실측: ${행.home_aimag}·${행.gender}·${행.goal_track})`);
     확인(Number(행.signup_attempts) === 0, '성공하면 시도 횟수가 0으로 풀린다');
 
     const lr = await fetch(`https://${ref}.supabase.co/auth/v1/token?grant_type=password`, {
