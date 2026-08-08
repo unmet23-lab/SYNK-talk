@@ -14,8 +14,13 @@ import {
   AudioModule,
   createAudioPlayer,
   setAudioModeAsync,
-  useAudioStream,
 } from 'expo-audio';
+/* 🔴 배럴(`expo-audio`)이 이 훅을 **안 내보낸다** — 57.0.3 의 `build/ExpoAudio.js` 에서
+ *   re-export 한 줄이 빠진 채 배포됐다(소스 `src/ExpoAudio.ts:661` 에는 있다). 네이티브
+ *   모듈도 컴파일본(`build/AudioStream.js`)도 멀쩡하니 실제 모듈에서 직접 가져온다.
+ *   ⚠ 소스만 보고 「배럴에 있다」고 읽으면 실기기에서만 죽는다 — 런타임이 읽는 것은
+ *     `package.json main` 이 가리키는 `build/` 다. 판이 올라 배럴이 고쳐지면 되돌린다. */
+import { useAudioStream } from 'expo-audio/build/AudioStream';
 import * as Speech from 'expo-speech';
 import { 색, 폰트, 모노트래킹 } from './테마';
 import { 머뭇거림추적, 발화문턱_DB, 데시벨, 다음호흡 } from '../lib/세호흡.js';
@@ -83,7 +88,7 @@ export default function 말하기화면({ 급수 = 0, 토큰 = null, 학생번�
   /* 서버가 준 `blocked` — **왜** 비었나(F176 ①). 아래 `녹음카드` 의 `막힘`(녹음이 시작되지
    * 못한 이유)과 이름이 겹치지 않게 `서버` 를 붙인다 — 같은 파일 안이라 헷갈리면 그대로 버그다. */
   const [서버막힘, set서버막힘] = useState(null);
-  const [date, setDate] = useState(오늘); // 서버가 답하면 **서버 날짜**로 바꾼다(아래)
+  const [date, setDate] = useState(몽골날짜); // 서버가 답하면 **서버 날짜**로 바꾼다(아래)
   const [호흡, set호흡] = useState('듣기');
   const [로그, set로그] = useState([]);
   const [오류, set오류] = useState(null); // 「모름」을 「정상」으로 바꾸지 않는다 — 실패는 글자로 보인다
