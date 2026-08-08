@@ -478,6 +478,7 @@ function 녹음카드({ step, 제시문, 안내, 선택지, 텍스트병기, dat
   const [병기글, set병기글] = useState('');
   const [듣는중, set듣는중] = useState(false);
   const [막힘, set막힘] = useState(null); // 녹음이 시작되지 못한 이유 — 버튼 옆에 글자로 선다
+  const [끊김, set끊김] = useState(false); // 배경으로 나가 녹음이 중간에 멈췄다 — 아래 `AppState`
   const 추적 = useRef(null);
   const 플레이어 = useRef(null);
   /* 🔴 「내 목소리 듣기」 관측 — **여기서 보내지 않는다**(절단문서 ①-2 의 마지막 값).
@@ -529,6 +530,7 @@ function 녹음카드({ step, 제시문, 안내, 선택지, 텍스트병기, dat
       return;
     }
     try {
+      set끊김(false);
       추적.current = 머뭇거림추적();
       조각들.current = [];
       실규격.current = null;
@@ -585,6 +587,24 @@ function 녹음카드({ step, 제시문, 안내, 선택지, 텍스트병기, dat
     set녹음({ uri, 바이트: 조립.바이트, duration_ms, hesitation_ms: r.머뭇거림_ms, spoke: r.발화있음 });
     set단계(r.발화있음 ? '확인' : '무발화');
   };
+
+  /* 🔴 **배경으로 나가면 마이크가 끊긴다 — 그런데 화면은 계속 '녹음중'이었다.**
+   *   `app.json` 은 배경 오디오를 선언하지 않는다(할 것도 아니다 — 학생 앱이 몰래 듣는 모양이
+   *   된다). 그래서 전화가 오거나 사전을 찾으러 나간 순간 `onBuffer` 가 멈추고, 돌아와 「다 말했으면
+   *   탭해서 마쳐요」를 누른 학생은 **잘린 발화를 온전한 것으로** 낸다. 그 파일은 자기가 멀쩡하다고
+   *   말한다 — 헤더를 담긴 조각으로 쓰므로 길이까지 앞뒤가 맞고, 사후에 절단을 가려낼 수가 없다.
+   * 🔑 그래서 나가는 그 순간 끊고 **담긴 것은 그대로 둔다** — 학생 원본은 버리지 않는다(규약 §4).
+   *   판단은 학생에게 준다: 들어 보고 「다시 말하기」나 「보내기」를 고른다.
+   * 🚫 `inactive` 로는 끊지 않는다 — 알림 센터를 내리거나 앱 전환기를 훑는 것까지 녹음을 죽인다.
+   *   마이크가 실제로 멈추는 상태는 `background` 다. */
+  useEffect(() => {
+    const 구독 = AppState.addEventListener('change', (상태) => {
+      if (상태 !== 'background' || 단계 !== '녹음중') return;
+      set끊김(true);
+      끝();
+    });
+    return () => 구독.remove();
+  }, [단계, stream]);
 
   const 남기기 = async (status) => {
     const attempt = 다음시도번호(로그, date, step);
@@ -686,6 +706,13 @@ function 녹음카드({ step, 제시문, 안내, 선택지, 텍스트병기, dat
           <Text style={s.확인글}>
             {초표시(녹음.duration_ms)} 담겼어요
           </Text>
+          {/* 🔴 「몇 초 담겼다」만 보이면 그 숫자가 절단을 감춘다 — **여기까지만**이라고 말한다.
+              🚫 지우지 않는다: 담긴 만큼은 학생 원본이고, 다시 말할지는 학생이 고른다(규약 §4). */}
+          {끊김 && (
+            <Text style={s.무발화설명}>
+              여기까지만 담겼어요 — 앱을 잠깐 나가서 녹음이 멈췄어요. 들어 보고 다시 말해도 돼요.
+            </Text>
+          )}
           <Pressable onPress={내목소리} style={({ pressed }) => [s.보조버튼, pressed && s.눌림]}>
             <Text style={s.보조버튼글}>{듣는중 ? '재생 중…' : '내 목소리 듣기'}</Text>
           </Pressable>
@@ -713,14 +740,24 @@ function 녹음카드({ step, 제시문, 안내, 선택지, 텍스트병기, dat
       {단계 === '무발화' && (
         <View style={s.확인묶음}>
           <Text style={s.확인글}>목소리가 안 담겼어요</Text>
-          <Text style={s.무발화설명}>괜찮아요 — 말이 안 나오는 날도 있어요. 그것도 선생님께 신호가 돼요.</Text>
+          {/* 🔴 **끊긴 것을 「막혔다」로 말하지 않는다** — 아래 버튼이 남기는 `abandoned` 는
+              이탈 예측(P0 S1-6)의 원신호라, 기술적 중단을 거기 섞으면 그 신호가 오염된다. */}
+          <Text style={s.무발화설명}>
+            {끊김
+              ? '앱을 잠깐 나가서 녹음이 멈췄어요. 다시 말해 볼까요?'
+              : '괜찮아요 — 말이 안 나오는 날도 있어요. 그것도 선생님께 신호가 돼요.'}
+          </Text>
           <View style={s.가로}>
             <Pressable onPress={다시} style={({ pressed }) => [s.주버튼, s.늘림, pressed && s.눌림]}>
               <Text style={s.주버튼글}>한 번 더 해볼래요</Text>
             </Pressable>
-            <Pressable onPress={넘어가기} style={({ pressed }) => [s.보조버튼, s.늘림, pressed && s.눌림]}>
-              <Text style={s.보조버튼글}>오늘은 넘어갈래요</Text>
-            </Pressable>
+            {/* 🚫 끊긴 자리에는 이 버튼을 안 그린다 — 누르면 「이 학생이 오늘 막혔다」가 행으로
+                남는다. 정말 넘어갈 학생은 다시 녹음해 바로 멈추면 되고, **그때의 무발화는 진짜다**. */}
+            {!끊김 && (
+              <Pressable onPress={넘어가기} style={({ pressed }) => [s.보조버튼, s.늘림, pressed && s.눌림]}>
+                <Text style={s.보조버튼글}>오늘은 넘어갈래요</Text>
+              </Pressable>
+            )}
           </View>
         </View>
       )}
