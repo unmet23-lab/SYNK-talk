@@ -23,7 +23,7 @@ import { wav조립 } from '../lib/wav조립.js';
 import { 정본 as 음성정본 } from '../lib/음성헤더.js';
 import { 마이크준비, 마이크끄기 } from '../lib/마이크권한.js';
 import { 흐름id, 항목추가, 다음시도번호, 학습출석, 전송기록, 밀린것, 배달상태 } from '../lib/제출로그.js';
-import { 화면과제, 몽골날짜, 열람사건 } from '../lib/오늘과제.js';
+import { 화면과제, 몽골날짜, 열람사건, 되듣기사건 } from '../lib/오늘과제.js';
 import { 사건보내기 } from './사건통로.js';
 import { 로그읽기, 로그쓰기, 음성쓰기, 지속저장 } from './저장.js';
 import { 오늘과제받기 } from './과제API.js';
@@ -117,7 +117,20 @@ export default function 말하기화면({ 급수 = 0, 토큰 = null, 학생번�
       r = { 오류: String((e && e.message) || e), 끝: false };
     }
     await 로그갱신(전송기록(로그참조.current, 항목.id, r));
-    if (r.오류) set오류(r.오류);
+    if (r.오류) {
+      set오류(r.오류);
+      return;
+    }
+    /* 🔴 **「내 목소리를 되들었다」 — c9 `content.viewed` 의 둘째 생산자**(절단문서 ①-2 의 마지막 값).
+     *   여기가 **제출이 착지한 직후**인 것이 요건이다: 이 관측의 부모는 방금 생긴 그 제출 사건이라,
+     *   녹음 화면에서 바로 보내면 부모가 아직 없어 서버가 `retryable:false` 로 접고 앱은 그것을
+     *   `send_final` 로 적는다 — 재시도가 아니라 **영구 소멸**이다(`lib/오늘과제.js` 되듣기사건 머리말).
+     * 🔑 되듣기는 **여기 한 곳**에서만 나간다 — 방금 낸 제출도, 사흘 밀렸다가 올라간 제출도 같은
+     *   통로를 지난다(`밀린것` 재전송이 이 함수를 그대로 부른다). 화면 쪽에 붙이면 offline 로 밀린
+     *   항목의 되듣기는 영영 안 나간다.
+     * 🔑 실패해도 화면에 오류를 안 세운다 — 학생이 **한 일**이 아니라 우리가 **잰 것**이다(열람과 같은 규칙). */
+    const 되듣기 = 되듣기사건(항목, r.event_id);
+    if (되듣기) await 사건보내기(토큰, 되듣기);
   };
 
   useEffect(() => {
@@ -397,6 +410,12 @@ function 녹음카드({ step, 제시문, 안내, 선택지, 텍스트병기, dat
   const [막힘, set막힘] = useState(null); // 녹음이 시작되지 못한 이유 — 버튼 옆에 글자로 선다
   const 추적 = useRef(null);
   const 플레이어 = useRef(null);
+  /* 🔴 「내 목소리 듣기」 관측 — **여기서 보내지 않는다**(절단문서 ①-2 의 마지막 값).
+   *   이 관측의 부모는 아직 만들어지지도 않은 자기 제출 사건이라, 지금 보내면 부모 없는 사건으로
+   *   `retryable:false` 거절 → `send_final` = 그 한 건 영구 소멸이다. 시각만 쥐고 항목에 실어 보낸다.
+   * 🔑 여러 번 들어도 **한 관측**이다 — 첫 완주 시각만 남긴다(횟수는 이 사건이 답할 질문이 아니고,
+   *   다시 말하기는 `attempt` 로 이미 남는다 · P0 S1-7). */
+  const 되들은때 = useRef(null);
   const 조각들 = useRef([]); // 마이크가 준 PCM 조각. 원본이 여기 말고 어디에도 없다.
   const 실규격 = useRef(null); // 🔴 스트림이 **보고한** 값 — 요청값과 다를 수 있다(폴백)
 
@@ -507,10 +526,15 @@ function 녹음카드({ step, 제시문, 안내, 선택지, 텍스트병기, dat
         audio = null; // 파일 보관 실패 — 로그에는 null 로 정직하게 남는다
       }
     }
+    /* 되듣기 관측은 **이 시도의 것**이다 — 넘겨 주고 비운다. 안 비우면 다음 시도가 남의 되듣기를
+     *   자기 것으로 물려받아, 「듣고 다시 말했다」와 「그냥 다시 말했다」가 다시 한 모양이 된다. */
+    const replayed_at = 되들은때.current;
+    되들은때.current = null;
     return 기록추가({
       date,
       step,
       status,
+      replayed_at,
       duration_ms: 녹음 ? 녹음.duration_ms : 0,
       hesitation_ms: 녹음 ? 녹음.hesitation_ms : 0,
       spoke: 녹음 ? 녹음.spoke : false,
@@ -542,6 +566,12 @@ function 녹음카드({ step, 제시문, 안내, 선택지, 텍스트병기, dat
     if (!녹음 || !녹음.uri) return;
     if (플레이어.current) 플레이어.current.remove();
     플레이어.current = createAudioPlayer({ uri: 녹음.uri });
+    /* 🔴 **끝까지 간 것만 관측이다** — 아래 타이머는 화면 글자를 되돌리는 안전망일 뿐, 재생이
+     *   시작조차 못한 기기에서도 똑같이 돈다. 거기서 세면 「들었다」가 「눌렀다」로 뜻을 갈아탄다
+     *   (①듣기 `onDone` 이 `onError` 를 일부러 비워 둔 것과 같은 규칙). */
+    플레이어.current.addListener('playbackStatusUpdate', (s) => {
+      if (s && s.didJustFinish && !되들은때.current) 되들은때.current = new Date().toISOString();
+    });
     set듣는중(true);
     플레이어.current.play();
     setTimeout(() => set듣는중(false), 녹음.duration_ms + 300);
