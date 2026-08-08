@@ -58,19 +58,19 @@
 | 헤더 | 예 | 없으면 |
 |---|---|---|
 | `Authorization` | `Bearer <access_token>` | 401 `AUTH_REQUIRED` |
-| `X-Contract-Ver` | `c9` | 400 `CONTRACT_VER_MISSING` |
+| `X-Contract-Ver` | `c10` | 400 `CONTRACT_VER_MISSING` |
 | `X-App-Ver` | `0.3.1 (42)` | 통과(로그용) |
 
 **응답 봉투 — 성공**
 
 ```json
-{ "ok": true, "contract_ver": "c9", "results": [ ... ] }
+{ "ok": true, "contract_ver": "c10", "results": [ ... ] }
 ```
 
 **응답 봉투 — 요청 전체 실패**
 
 ```json
-{ "ok": false, "contract_ver": "c9",
+{ "ok": false, "contract_ver": "c10",
   "error": { "code": "AUTH_EXPIRED", "message": "토큰이 만료됐습니다", "retryable": true } }
 ```
 
@@ -160,7 +160,7 @@
 **응답**
 
 ```json
-{ "ok": true, "contract_ver": "c9",
+{ "ok": true, "contract_ver": "c10",
   "results": [
     { "idempotency_key": "b6f1…", "status": "stored",    "event_id": "3c9e…" },
     { "idempotency_key": "77a2…", "status": "duplicate", "event_id": "1b40…" },
@@ -181,7 +181,7 @@
 
 ```json
 요청  { "kind": "audio", "content_type": "audio/wav", "byte_size": 482913 }
-응답  { "ok": true, "contract_ver": "c9",
+응답  { "ok": true, "contract_ver": "c10",
         "upload_url": "https://…", "audio_ref": "voice/9f2c…(learner_id)/3c9e….wav",
         "expires_at": "2026-08-05T13:35:00.000Z" }
 ```
@@ -244,7 +244,7 @@
 **응답 예 · 실패 표** (`supabase/functions/tasks`):
 
 ```json
-{ "ok": true, "contract_ver": "c9", "date": "2026-08-07", "next_cursor": null,
+{ "ok": true, "contract_ver": "c10", "date": "2026-08-07", "next_cursor": null,
   "data": [ { "task_id": "…", "task_snapshot": { "ver": 1, "호흡": [ … ] },
               "task_format": null, "task_ref": "task-2026-08-07",
               "level_snapshot": "Lv2", "goal_snapshot": "study", "degraded": false,
@@ -302,7 +302,7 @@
 | 🔴 경계 | 이 엔드포인트는 **집계값만** 낸다. 점수·등수·타 학생 값은 담지 않는다(`P0 §2-1` 랭킹 금지) |
 
 ```json
-{ "ok": true, "contract_ver": "c9", "date": "2026-08-07", "next_cursor": null,
+{ "ok": true, "contract_ver": "c10", "date": "2026-08-07", "next_cursor": null,
   "data": [ { "today":     { "submission_count": 2, "retry_count": 1, "correction_retry": true },
               "yesterday": { "submission_count": 1, "retry_count": 0, "correction_retry": false } } ] }
 ```

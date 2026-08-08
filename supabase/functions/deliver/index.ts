@@ -259,13 +259,22 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
         return { learner_id, status: 'duplicate', degraded: 결정.degraded, 출처: 결정.출처 };
       }
 
-      // ③ 그날 학생이 볼 것 그대로 — task_format 은 비운다(호흡마다 다르다).
+      /* ③ 그날 학생이 볼 것 그대로 — task_format 은 비운다(호흡마다 다르다).
+       * 🔴 `due_at`·`due_ver` = **마감 시각·마감 판본**(c10 · 소급 불가 · 유호님 승인 08-08).
+       *   습관 축의 원신호는 「몇 시에 냈나」가 아니라 «마감까지 몇 분 남기고 냈나»다. 수업표가
+       *   바뀌면 그때 그 학생의 마감은 다시 계산할 근거가 사라지므로 **배정 순간에 박는다.**
+       *   `due.v1` = 배정일의 끝 = 배정일 다음날 00:00. 🔑 오프셋 상수를 안 적고 **DB 에게
+       *   시킨다**(`at time zone`) — 여기서 JS 로 계산하면 그 자리가 절단문서 ①-14 의 재발이다.
+       *   ⚠ `오늘` 은 배치가 도는 날이 아니라 `몽골날짜()` 가 낸 **배정 대상일**이라, 배치가
+       *   자정을 넘겨 돌아도 마감이 하루 밀리지 않는다. */
       await tx`
         insert into engine.submissions (
-          event_id, task_type, task_ref, task_snapshot, task_schema_ver, occurred_at, schema_ver
+          event_id, task_type, task_ref, task_snapshot, task_schema_ver, occurred_at, schema_ver,
+          due_at, due_ver
         ) values (
           ${배정[0].event_id}::uuid, ${통로}, ${결정.task_ref},
-          ${sql.json(결정.task_snapshot)}, 'task.v1', ${지금}::timestamptz, ${ver}
+          ${sql.json(결정.task_snapshot)}, 'task.v1', ${지금}::timestamptz, ${ver},
+          (${오늘}::date + 1)::timestamp at time zone ${시간대}::text, 'due.v1'
         )`;
 
       return {

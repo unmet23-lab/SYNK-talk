@@ -17,6 +17,8 @@ with 기대열(t, c) as (values
   ('learning_events','source_kind'), ('learning_events','estimator_confidence'),
   ('learning_events','estimator_version'), ('learning_events','evidence_refs'),
   ('submissions','capture_meta'), ('skills','superseded_by'), ('daily_activity','expected'),
+  -- 마감 시각·마감 판본(20260808010000 · 소급 불가 · 유호님 승인 2026-08-08)
+  ('submissions','due_at'), ('submissions','due_ver'),
   ('schema_migrations','version'), ('schema_migrations','name'),
   ('schema_migrations','checksum'), ('schema_migrations','applied_at'),
   -- ⚠ 아래 세 묶음은 c7 **뒤에 붙은 조각들**이 낸 열이다. 이 확인 블록은 앞 조각에서
@@ -33,13 +35,14 @@ with 기대열(t, c) as (values
   -- 임시번호를 해시로 든다(L0 §4-2-2 · 20260807024500_temp_password_c7)
   ('learners','temp_password_hash')
 ), 기대제약(n) as (values
-  ('learning_events_event_type_c9'), ('learning_events_task_type_c9'),
-  ('submissions_task_format_c9'), ('submissions_translation_source_c9'), ('corrections_verdict_c9'),
+  ('learning_events_event_type_c10'), ('learning_events_task_type_c10'),
+  ('submissions_task_format_c10'), ('submissions_translation_source_c10'),
+  ('submissions_due_paired_c10'), ('corrections_verdict_c10'),
   ('learning_events_retry_same_learner'), ('learning_events_parent_same_learner'),
   ('corrections_reviewed_same_submission'), ('schema_migrations_pkey'),
-  ('learners_signup_attempts_nonneg_c9'), ('staff_role_c9'),
-  ('learners_temp_password_paired_c9'),
-  ('learning_events_correction_target_c9'), ('learning_events_correction_id_fkey'),
+  ('learners_signup_attempts_nonneg_c10'), ('staff_role_c10'),
+  ('learners_temp_password_paired_c10'),
+  ('learning_events_correction_target_c10'), ('learning_events_correction_id_fkey'),
   -- 동의 귀속(20260807120000)
   ('learning_events_consent_id_fkey')
 ), 기대트리거(n) as (values
@@ -125,19 +128,33 @@ with 기대열(t, c) as (values
   -- 수집→처리 배선(20260807120000): 제출이 있는데 job 이 없으면 고아다 — 0이어야 한다.
   (select count(*) from engine.submissions s
     where not exists (select 1 from engine.pipeline_jobs j
-                       where j.submission_id = s.submission_id)) as 잡없는제출
+                       where j.submission_id = s.submission_id)) as 잡없는제출,
+  -- 마감(20260808010000): 열만 서고 **아무도 안 채우는** 상태가 이 저장소에서 네 번째다
+  --   (`daily_activity.expected`·`model`·`prompt_ver` 가 그렇게 서 있다). 배정에 마감이
+  --   없으면 「마감 대비 여유」가 그 학생에게 영영 없다 — 조용히 빈칸으로 남지 않게 센다.
+  --   ⚠ **c10 이 선 뒤에 만들어진 배정만** 센다. 옛 행의 마감은 아무도 모르고, 지어내
+  --      채우는 것은 복원이 아니라 날조다(머리말 ⛔).
+  (select count(*) from engine.submissions s
+     join engine.learning_events e on e.event_id = s.event_id
+    where e.event_type = 'task.assigned' and s.due_at is null
+      and s.occurred_at >= (select applied_at from engine.schema_migrations
+                             where version = '20260808010000')) as 마감없는배정,
+  -- 분모의 정본은 `task.assigned` 사건 하나다(머리말). `daily_activity.expected` 는 파생
+  --   캐시 자리로 남겨 뒀고, 여기 값이 들어오면 분모가 둘이 된 것이다 — 그 순간 빨개진다.
+  (select count(*) from engine.daily_activity where expected is not null) as 분모칸오염
 )
 select case when 테이블수=11 and RLS켜짐=11 and 정책수=7
              and 새는테이블권한=0 and 새는스키마권한=0
              and 삭제차단=3 and 실패상태=1 and 이력정책=0
              and 잡없는제출=0 and 검수뷰=1 and 옛검수정책=0
+             and 마감없는배정=0 and 분모칸오염=0
              and (select v from 빠진열) is null
              and (select v from 빠진제약) is null
              and (select v from 빠진트리거) is null
-             and (select version from 현재이력)='20260807210000'
-              and (select checksum from 현재이력)='6539abce7a626aa59a03c213e331de94cc335fae9db7f4fc70e06b873831e85d' -- migration-checksum
+             and (select version from 현재이력)='20260808010000'
+              and (select checksum from 현재이력)='8422b5082ea79e1df1abe0f506d3876c4e2f2da3ef20f255aa6da5790fa2e856' -- migration-checksum
             then '✅ 전부 통과'
-            else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·7·0·0·3·1·0·0·1 · 빠진 칸은 전부 비어 있어야 합니다)'
+            else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·7·0·0·3·1·0·0·1·0·0 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
        (select version from 현재이력) as 현재버전,
        (select checksum from 현재이력) as checksum,
