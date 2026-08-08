@@ -137,9 +137,12 @@ function 머리에서(저장소경로) {
     return require('child_process')
       .execFileSync('git', ['show', `HEAD:${저장소경로}`], { cwd: ROOT, encoding: 'utf8', maxBuffer: 8 << 20 });
   } catch {
-    die(`HEAD 에 없는 경로: ${저장소경로}\n   배포되는 것은 언제나 커밋된 것이다 — 먼저 커밋한다:\n   git commit -m "..." -- ${저장소경로}`);
+    /* ⚠ `die`(=process.exit) 가 아니라 **던진다** — `require풀기`·`본체import검사` 와 같은 이유고,
+     *   여기엔 하나가 더 있다: 이 함수는 이제 읽기 전용인 `배포대조.js` 도 지난다(F274).
+     *   거기서 exit 하면 남의 미커밋 새 파일 하나가 **남의 왕복시험 5종을 통째로 죽인다**.
+     *   던지면 대조는 그것을 「미측정」으로 접고(경고), CLI 는 `main().catch(die)` 가 같은 문구로 받는다. */
+    throw new Error(`HEAD 에 없는 경로: ${저장소경로}\n   배포되는 것은 언제나 커밋된 것이다 — 먼저 커밋한다:\n   git commit -m "..." -- ${저장소경로}`);
   }
-  return '';
 }
 
 /** 작업본이 HEAD 와 다른가 — **판정만** 한다(막는 것은 부르는 쪽 · `판뒤처짐` 과 같은 자리다).
@@ -173,6 +176,45 @@ function 동봉묶기(디렉터리) {
     else out[이름] = `const module = { exports: {} };\nconst exports = module.exports;\n${require풀기(src, 이름, 표내용)}\nexport default module.exports;\n`;
   }
   return out;
+}
+
+/* 배포로 **나갈 것 전량** — 본체(`index.ts` 등 디렉터리 파일)와 동봉 lib 을 한 자리에서 조립한다.
+ *
+ * 🔴 2026-08-09 실측(**F274**): 이 조립이 `main()` 안에 인라인으로만 있어서 `배포대조.js` 는
+ *   `동봉묶기` 밖에 부를 수 없었고 — 그래서 **함수 본체를 한 번도 대조하지 않았다.** 리허설
+ *   `corrections` 는 몽골어 해설(`1420b93`)이 빠진 옛 판인데 대조는 「✅ 같다(**파일 1**)」였다.
+ *   배포가 보내는 것은 2개다. 가장 크고 가장 자주 바뀌는 파일이 비교 대상 밖이면, 그 대조를
+ *   발화점으로 쓰는 **왕복시험 5종**은 「지금 초록이 옛 판을 잰 것」을 영영 못 듣는다.
+ * 🔑 F273 의 대조판이다 — 그때는 **조립**이 반쪽이었고(본체만 작업본), 여기서는 **대조**가
+ *   반쪽이었다. 원인이 같으니 처방도 같다: 나갈 것을 정하는 자리를 하나로 둔다.
+ *
+ * @param 파일검사 파일마다 부르는 훅. 배포는 미커밋을 **막고**(기본), 대조는 읽기라 안 막는다 —
+ *   남의 미커밋 편집 때문에 남의 왕복시험이 죽으면 우회가 정상 통로가 된다(F073·F103). */
+function 배포묶음(디렉터리, 파일검사 = 미커밋검사) {
+  const out = {};
+  for (const 상대 of 파일들(디렉터리)) {
+    if (상대 === '동봉.json') continue;               // 명세지 코드가 아니다
+    // 본체도 동봉과 **같은 통로**를 지난다(F273 — 여기만 작업본이라 반쪽이 나갔다).
+    const 저장소경로 = path.relative(ROOT, path.join(디렉터리, 상대)).split(path.sep).join('/');
+    const src = 머리에서(저장소경로);
+    파일검사(저장소경로, src);
+    out[상대] = src;
+  }
+  return Object.assign(out, 동봉묶기(디렉터리));
+}
+
+/** 이 함수의 **나갈 파일 전량**을 마지막으로 바꾼 커밋 시각(ISO) — 없으면 null.
+ *  본체는 바이트로 대조할 수 없어서(배포 시 TS 가 벗겨진다) 시각 축이 대신 진다 · `배포대조.시각뒤처짐`. */
+function 마지막커밋(디렉터리) {
+  const 상대 = path.relative(ROOT, 디렉터리).split(path.sep).join('/');
+  const 표 = path.join(디렉터리, '동봉.json');
+  const 경로들 = [상대];
+  if (fs.existsSync(표)) 경로들.push(...Object.values(JSON.parse(fs.readFileSync(표, 'utf8'))));
+  try {
+    const out = require('child_process')
+      .execFileSync('git', ['log', '-1', '--format=%cI', '--', ...경로들], { cwd: ROOT, encoding: 'utf8' });
+    return out.trim() || null;
+  } catch { return null; }
 }
 
 function 안내() {
@@ -268,15 +310,7 @@ async function main() {
   if (!fs.existsSync(디렉터리)) die(`디렉터리가 없다: ${디렉터리}`);
   const slug = path.basename(디렉터리);
   const 내용물 = {};
-  for (const 상대 of 파일들(디렉터리)) {
-    if (상대 === '동봉.json') continue;               // 명세지 코드가 아니다
-    // 본체도 동봉과 **같은 통로**를 지난다(F273 — 여기만 작업본이라 반쪽이 나갔다).
-    const 저장소경로 = path.relative(ROOT, path.join(디렉터리, 상대)).split(path.sep).join('/');
-    const src = 머리에서(저장소경로);
-    미커밋검사(저장소경로, src);
-    내용물[상대] = Buffer.from(src, 'utf8');
-  }
-  for (const [이름, src] of Object.entries(동봉묶기(디렉터리))) 내용물[이름] = Buffer.from(src, 'utf8');
+  for (const [이름, src] of Object.entries(배포묶음(디렉터리))) 내용물[이름] = Buffer.from(src, 'utf8');
   if (!내용물['index.ts']) die(`${slug}/index.ts 가 없다 — 진입점 이름은 index.ts 로 고정한다`);
 
   const 상대들 = Object.keys(내용물);
@@ -347,5 +381,5 @@ async function main() {
   console.log(`   URL https://${ref}.supabase.co/functions/v1/${f.slug}`);
 }
 
-module.exports = { 파일들, 동봉묶기, 작업본다름, 저장소판, 판뒤처짐 };
+module.exports = { 파일들, 동봉묶기, 배포묶음, 마지막커밋, 작업본다름, 저장소판, 판뒤처짐 };
 if (require.main === module) main().catch((err) => die(String(err && err.message || err)));

@@ -9,8 +9,11 @@
  *   통로가 이 저장소에 하나도 없었다. 루트 Apps Script 에는 `tools/라이브대조` 가 이미 있다.
  *
  * ■ 무엇을 재나
- *   `원격배포.js` 의 `동봉묶기` 로 「지금 소스로 배포하면 나갈 내용」을 만든다 — 배포가 쓰는
+ *   `원격배포.js` 의 `배포묶음` 으로 「지금 소스로 배포하면 나갈 내용」을 만든다 — 배포가 쓰는
  *   **바로 그 함수**다. 여기서 다시 조립하면 그게 또 두 벌이고, 갈라지는 날 이 도구가 거짓말을 한다.
+ *   🔴 2026-08-09(**F274**) 까지 이 자리는 `동봉묶기` 였다 — 배포는 본체+동봉을 보내는데 대조는
+ *   **동봉만** 봤다. 「같은 함수를 쓴다」는 이 문단이 그대로 적혀 있는 채로 **반쪽 함수**를 썼고,
+ *   그래서 몽골어 해설이 빠진 옛 `corrections` 가 「✅ 같다(파일 1)」로 통과했다.
  *   원격은 Management API 의 함수 본문. 둘을 파일 단위로 맞춘다.
  *
  * ■ 못 쟀으면 못 쟀다고 한다
@@ -30,7 +33,7 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const 자격증명 = require('../lib/자격증명.js');
-const { 동봉묶기 } = require('./원격배포.js');   // 🔑 조립은 배포와 같은 함수에서
+const { 배포묶음, 마지막커밋 } = require('./원격배포.js');   // 🔑 조립은 배포와 같은 함수에서
 
 const API = 'https://api.supabase.com/v1/projects';
 const FN뿌리 = path.join(__dirname, '..', 'supabase', 'functions');
@@ -64,6 +67,43 @@ function 펴기(buf) {
  * 🚫 부분 일치로 「거의 같다」를 만들지 않는다 — 이 도구의 답은 같다/다르다/못 쟀다 셋뿐이다. */
 const 정규 = (내용) => 평평하게(내용).trim();
 
+/* 바이트로 잴 수 있는 파일과 없는 파일 — 이 경계가 이 도구의 해상도다.
+ *
+ * 🔴 2026-08-09 실측: 배포본에 담기는 것은 **`index.ts` 의 소스가 아니라 변환판**이다.
+ *   `catch (e) { ... (e as Error) }` 가 배포본에 없고, Node 24 `module.stripTypeScriptTypes`
+ *   로 타입만 벗겨 맞춰 봐도 안 맞는다(7종 전부 ❌). 주석·한글 산문은 그대로 살아 있으니
+ *   「없다」가 아니라 **다시 찍힌다**. `.mjs` 로 실린 동봉은 이미 JS 라 바이트 그대로 남는다.
+ * 🔑 그래서 본체를 바이트로 대조하면 **모든 함수가 영원히 적색**이 된다 — 그 가드는 하루 만에
+ *   꺼진다(F103). 잴 수 없는 것을 「같다」로도 「다르다」로도 부르지 않는다. */
+const 바이트로잴수있나 = (이름) => !/\.tsx?$/.test(이름);
+
+/** 배포본이 그 커밋을 **담을 수 없는** 시각인가 — 한 방향으로만 참인 증명이다.
+ *
+ * F273 이후 배포가 보내는 것은 언제나 **HEAD** 다. 그러니 「나갈 파일들의 마지막 커밋이 배포보다
+ * 나중」이면 그 배포본에 그 커밋은 **원리상 없다**. 반대(배포가 나중)는 아무것도 증명하지 않는다
+ * — 그 사이 또 커밋될 수 있으니까. 그래서 이 축은 「다르다」만 만들고 「같다」는 안 만든다.
+ * 🔑 이 도구 머리말이 시각을 「간접 증거」라고 물린 것은 **작업본을 밀던 시절**의 판단이다.
+ *   본체를 못 재는 지금, 한 방향만 참인 증명이 그 자리에 남은 유일한 실측이다(F274).
+ * ⚠ `여유초` = 시계 어긋남 흡수. 실측한 가장 좁은 간격이 14초(events)라 60초면 넉넉하고,
+ *   이 축이 늦게 우는 쪽으로만 틀린다(거짓 적색이 거짓 초록보다 여기선 더 비싸다). */
+function 시각뒤처짐(배포ISO, 커밋ISO, 여유초 = 60) {
+  if (!배포ISO || !커밋ISO) return false;          // 못 읽은 것은 이 축의 판정이 아니다
+  const [a, b] = [new Date(커밋ISO).getTime(), new Date(배포ISO).getTime()];
+  if (Number.isNaN(a) || Number.isNaN(b)) return false;
+  return a > b + 여유초 * 1000;
+}
+
+/** 배포된 함수들의 `updated_at` — 못 읽으면 빈 표(시각 축이 조용히 빠질 뿐 판정을 뒤집지 않는다). */
+async function 배포시각들(ref, 토큰, 가져오기) {
+  try {
+    const res = await 가져오기(`${API}/${ref}/functions`, { headers: { Authorization: `Bearer ${토큰}` } });
+    if (!res.ok) return {};
+    const fns = JSON.parse(Buffer.from(await res.arrayBuffer()).toString('utf8'));
+    if (!Array.isArray(fns)) return {};
+    return Object.fromEntries(fns.map((f) => [f.slug, f.updated_at]));
+  } catch { return {}; }
+}
+
 /** 함수 묶음을 원격 배포본과 대조한다 — 판정만 하고 **말하지 않는다**(문장은 부르는 쪽 몫).
  * `가져오기` 는 회귀가 네트워크 없이 재는 구멍 — 소스 문구 검사는 도달 불가를 못 보므로
  * 판정을 주입형으로 뽑아 실제로 돌려서 잰다(F196 계열 교훈).
@@ -71,6 +111,7 @@ const 정규 = (내용) => 평평하게(내용).trim();
  * @returns {Promise<Array<{slug:string, 상태:'같다'|'다르다'|'미측정', 상세:string}>>} */
 async function 대조(ref, 토큰, 목록 = 함수들(), 가져오기 = fetch) {
   const 헤더 = { Authorization: `Bearer ${토큰}` };
+  const 배포시각 = await 배포시각들(ref, 토큰, 가져오기);
   const 결과 = [];
   for (const slug of 목록) {
     const 디렉터리 = path.join(FN뿌리, slug);
@@ -83,14 +124,33 @@ async function 대조(ref, 토큰, 목록 = 함수들(), 가져오기 = fetch) {
     }
     if (!res.ok) { 결과.push({ slug, 상태: '미측정', 상세: `본문 HTTP ${res.status}` }); continue; }
     const 배포본 = 펴기(Buffer.from(await res.arrayBuffer()));
-    /* 동봉묶기 = { 파일명: 내용 } — index.ts 와 `.mjs` 로 실린 lib 들이 함께 온다.
-     * 그래서 이 대조는 **lib 이 옛 판인 채 배포된 자리**도 잡는다(그게 실제로 새던 층이다). */
-    const 나갈것 = 동봉묶기(디렉터리);
-    const 빠진것 = Object.entries(나갈것)
-      .filter(([, 내용]) => !배포본.includes(정규(내용)))
-      .map(([이름]) => 이름);
-    if (빠진것.length) 결과.push({ slug, 상태: '다르다', 상세: `배포본에 없는 판: ${빠진것.join(', ')}` });
-    else 결과.push({ slug, 상태: '같다', 상세: `파일 ${Object.keys(나갈것).length}` });
+    /* 배포묶음 = { 파일명: 내용 } — **본체(index.ts)** 와 `.mjs` 로 실린 lib 이 함께 온다.
+     * 🔴 2026-08-09 까지 여기가 `동봉묶기` 였다(F274) — 동봉 lib 만 재고 본체는 한 번도 안 봤다.
+     *   리허설 `corrections` 가 몽골어 해설 없는 옛 판인데 「✅ 같다(파일 1)」로 통과했다.
+     * 🔑 미커밋검사는 끈다 — 여긴 읽기 도구이자 남의 왕복시험의 발화점이라, 남의 작업본 하나로
+     *   죽으면 우회가 정상 통로가 된다(F073·F103). 나가는 것은 어차피 HEAD 다. */
+    let 나갈것;
+    try { 나갈것 = 배포묶음(디렉터리, () => {}); }
+    catch (err) { 결과.push({ slug, 상태: '미측정', 상세: `나갈 것을 못 모았다 — ${String((err && err.message) || err).split('\n')[0]}` }); continue; }
+    const 이름들 = Object.keys(나갈것);
+    const 잰것 = 이름들.filter(바이트로잴수있나);
+    const 못잰것 = 이름들.filter((n) => !바이트로잴수있나(n));
+    const 빠진것 = 잰것.filter((이름) => !배포본.includes(정규(나갈것[이름])));
+    /* 🔑 초록은 **분모와 함께만** 읽는다(F207) — 「파일 n」만 적으면 본체를 안 잰 것이
+     *   「n개 다 맞다」로 읽힌다. 그게 F274 가 두 날 동안 조용했던 이유다. */
+    const 분모 = `바이트 ${잰것.length - 빠진것.length}/${잰것.length}`
+      + (못잰것.length ? ` · 본체(${못잰것.join(', ')})는 배포 시 변환돼 시각으로만 잰다` : '');
+    if (빠진것.length) 결과.push({ slug, 상태: '다르다', 상세: `배포본에 없는 판: ${빠진것.join(', ')} · ${분모}` });
+    else if (시각뒤처짐(배포시각[slug], 마지막커밋(디렉터리))) {
+      // updated_at 은 epoch ms 로 온다 — 그대로 찍으면 사람이 커밋 시각과 대조할 수 없다.
+      const 때 = (v) => { const d = new Date(v); return Number.isNaN(d.getTime()) ? String(v) : d.toISOString(); };
+      결과.push({
+        slug,
+        상태: '다르다',
+        상세: `배포(${때(배포시각[slug])})가 마지막 커밋(${때(마지막커밋(디렉터리))})보다 이르다`
+          + ` — 그 배포본은 지금 본체를 담을 수 없다 · ${분모}`,
+      });
+    } else 결과.push({ slug, 상태: '같다', 상세: 분모 });
   }
   return 결과;
 }
@@ -181,4 +241,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch((err) => die(String((err && err.message) || err)));
-module.exports = { 정규, 펴기, 평평하게, 함수들, 대조, 게이트판정, 왕복전게이트 };
+module.exports = { 정규, 펴기, 평평하게, 함수들, 대조, 게이트판정, 왕복전게이트, 시각뒤처짐, 바이트로잴수있나 };
