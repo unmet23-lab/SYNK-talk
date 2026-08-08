@@ -21,22 +21,34 @@ import { 검증 } from '../lib/이벤트검증.js';
 const URL_ = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
-const 헤더 = (토큰) => ({
+/* 🔴 읽기에는 `Content-Type` 을 안 붙인다 — `application/json` 은 CORS 안전목록 밖이라
+ *   그것 하나 때문에 GET 이 **preflight(OPTIONS)** 를 부르고, 조회 함수들엔 OPTIONS 자리가 없다.
+ *   기기(RN)에서는 CORS 가 없어 안 드러나고 **웹에서만** 죽는 종류라 더 늦게 발견된다. */
+const 헤더 = (토큰, 읽기) => ({
   apikey: ANON,
   Authorization: `Bearer ${토큰}`,
-  'Content-Type': 'application/json',
+  ...(읽기 ? {} : { 'Content-Type': 'application/json' }),
   'X-Contract-Ver': 계약판,
 });
 
-/** 공통 왕복 — 네트워크 없음은 서버 오류와 **다른 사건**이라 다르게 말한다(다시 시도할 수 있다). */
+/**
+ * 공통 왕복 — 네트워크 없음은 서버 오류와 **다른 사건**이라 다르게 말한다(다시 시도할 수 있다).
+ *
+ * 🔑 **`몸` 을 안 주면 GET 이다.** 조회를 같은 문으로 들인 이유: 봉투 해석(`ok:false`·`error`)·
+ *   계약판 헤더·네트워크 구분이 조회에도 똑같이 필요한데, 엔드포인트마다 따로 적으면 갈라지고
+ *   갈라진 쪽은 조용하다. `과제API`·`교정API` 가 이미 각자 한 벌씩 적어 뒀고 이게 세 번째였다.
+ *   ponytail: 그 둘은 아직 자기 사본을 쓴다 — `계약판` 이 `과제API` 에 살아 지금 바꾸면
+ *   순환 import 가 된다. 그 상수를 옮기는 날 함께 이 문으로 들인다.
+ */
 export async function 부르기(길, 토큰, 몸) {
   if (!URL_ || !ANON) throw new 인증오류('CONFIG', '서버 설정이 없어요', false);
+  const 읽기 = 몸 === undefined;
   let r;
   try {
     r = await fetch(`${URL_}/functions/v1/${길}`, {
-      method: 'POST',
-      headers: 헤더(토큰),
-      body: JSON.stringify(몸),
+      method: 읽기 ? 'GET' : 'POST',
+      headers: 헤더(토큰, 읽기),
+      ...(읽기 ? {} : { body: JSON.stringify(몸) }),
     });
   } catch {
     throw new 인증오류('NETWORK', '인터넷 연결을 확인해 주세요', true);

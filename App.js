@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import 말하기화면 from './src/말하기화면';
 import 답장화면 from './src/답장화면';
+import 어제의나, { 진행받기 } from './src/어제의나';
 import 도착확인 from './src/도착확인';
 import 인증화면, { 단계 } from './src/인증화면';
 import 원장초기화 from './src/원장초기화';
@@ -25,6 +26,7 @@ export default function App() {
   const [세션, set세션] = useState(null);
   const [복원중, set복원중] = useState(true);
   const [교정, set교정] = useState(null); // 나에게 온 최신 교정 1건 (없으면 답장 링크를 안 그린다)
+  const [견줌값, set견줌값] = useState(null); // 오늘·어제 (첫날이면 null — 「어제의 나」 링크를 안 그린다)
   const [fontsLoaded] = useFonts({
     'SUIT-Regular': require('./assets/fonts/SUIT-Regular.ttf'),
     'SUIT-Medium': require('./assets/fonts/SUIT-Medium.ttf'),
@@ -79,6 +81,24 @@ export default function App() {
     return () => { 살아있음 = false; };
   }, [세션]);
 
+  /* 「어제의 나」도 같은 규칙이다(P0 §5 S1-11) — **한 번 읽어** 링크의 근거와 화면의 내용을
+     같은 것으로 만든다. 🔴 첫날이면 `null` 이 오고 그때는 링크 자체를 안 그린다: 눌러서
+     「어제 0 · 오늘 0」을 만나는 것은 빈 카드고, 없는 과거를 지어내는 것이기도 하다.
+     ⚠ 답장과 **따로** 읽는다 — 한 번에 묶으면 한쪽이 죽을 때 멀쩡한 쪽 링크까지 같이 사라진다. */
+  useEffect(() => {
+    if (!세션) return undefined;
+    let 살아있음 = true;
+    (async () => {
+      try {
+        const 값 = await 진행받기(세션.access_token);
+        if (살아있음) set견줌값(값);
+      } catch {
+        if (살아있음) set견줌값(null);
+      }
+    })();
+    return () => { 살아있음 = false; };
+  }, [세션]);
+
   const 세션세움 = async (새것) => {
     set세션(새것);
     // 저장 실패가 로그인을 막지 않는다 — 세션은 이미 섰고, 최악은 다음 실행에 다시 묻는 것뿐이다
@@ -126,6 +146,7 @@ export default function App() {
       {화면 === '초기화' && (
         <원장초기화 토큰={세션.access_token} 닫기={() => set화면('말하기')} />
       )}
+      {화면 === '어제' && <어제의나 값={견줌값} 돌아가기={() => set화면('말하기')} />}
       {화면 === '말하기' && (
         <Pressable onPress={() => set화면('시스템')} style={s.시스템링크} hitSlop={8}>
           <Text style={s.시스템글}>SYSTEM</Text>
@@ -137,10 +158,22 @@ export default function App() {
       {/* 🔴 「답장이 왔어요」라고 쓰지 않는다 — 조회는 **늘 최신 1건**(C0 §4-3 ②)이라 이미 읽은
           교정에도 링크가 그대로 선다. 그러면 그 문구는 첫날 말고는 매일 거짓이 된다.
           「새로 왔다」는 알림은 별건이다(발주_게임모듈 §137 — 검수 완료 시점을 앱이 모른다). */}
-      {화면 === '말하기' && 교정 && (
-        <Pressable onPress={() => set화면('답장')} style={s.답장링크} hitSlop={8}>
-          <Text style={s.답장글}>답장</Text>
-        </Pressable>
+      {/* 🔴 「어제의 나」도 있을 때만 그린다 — 첫날은 견줄 어제가 없다(`lib/견줌.js`).
+          두 링크는 **한 줄에 나란히** 둔다: 각자 absolute 로 놓으면 같은 좌표에 겹치고,
+          겹침은 한쪽이 없을 때만 안 보여서 「어떤 학생에게만」 깨진다. */}
+      {화면 === '말하기' && (교정 || 견줌값) && (
+        <View style={s.겉테줄}>
+          {교정 && (
+            <Pressable onPress={() => set화면('답장')} hitSlop={8}>
+              <Text style={s.겉테글}>답장</Text>
+            </Pressable>
+          )}
+          {견줌값 && (
+            <Pressable onPress={() => set화면('어제')} hitSlop={8}>
+              <Text style={s.겉테글}>어제의 나</Text>
+            </Pressable>
+          )}
+        </View>
       )}
     </View>
   );
@@ -151,8 +184,8 @@ const s = StyleSheet.create({
   로딩: { flex: 1, backgroundColor: 색.바탕 },
   /* 겉테 두 링크는 같은 띠에 마주 놓는다 — 말하기 화면 본문은 paddingTop 68 아래에서 시작해
      이 띠와 겹치지 않는다. 🚫 코랄로 칠하지 않는다: 그 화면의 신호 1점은 녹음 버튼이다. */
-  답장링크: { position: 'absolute', top: 34, left: 24 },
-  답장글: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_서브 },
+  겉테줄: { position: 'absolute', top: 34, left: 24, flexDirection: 'row', gap: 18 },
+  겉테글: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_서브 },
   시스템링크: { position: 'absolute', top: 34, right: 24, opacity: 0.8 },
   시스템글: {
     fontFamily: 폰트.모노,
