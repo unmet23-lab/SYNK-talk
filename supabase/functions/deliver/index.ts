@@ -115,7 +115,7 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
   const 대상 = await sql`
     select l.learner_id, l.level_current, l.goal_track,
            배정.occurred_at as 마지막배정, 배정.task_snapshot as 마지막스냅샷,
-           교정.corrected_text as 교정문, 동의.consent_ver, 동의.consent_id
+           교정.corrected_text as 교정문, 교정.원사건, 동의.consent_ver, 동의.consent_id
       from engine.learners l
       left join lateral (
         select e.occurred_at, s.task_snapshot
@@ -124,7 +124,14 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
          where e.learner_id = l.learner_id and e.event_type = 'task.assigned'
          order by e.occurred_at desc limit 1) 배정 on true
       left join lateral (
-        select c.corrected_text
+        /* 🔑 event_id 를 함께 집는다 — **그 교정이 무엇에 대한 것이었나**(원 제출 사건).
+         *   corrected_text 만 집으면 문장은 오늘 ②슬롯에 나가는데 「어느 제출의 교정인가」가
+         *   여기서 끊기고, 그러면 앱은 재발화 행에 retry_of_event_id 를 채울 재료가 없다 —
+         *   설계 전체의 **유일한 결과 변수**(L0 §9-2)가 생산자 0 인 채로 남는다. 조인은 이미
+         *   걷고 있던 것이라 한 칸 더 집는 것이 전부다.
+         * ⚠ 이 주석은 sql 템플릿 리터럴 **안**이다 — 백틱을 쓰면 리터럴이 거기서 끊긴다
+         *   (2026-08-08 실측: tests/화면구문 이 「Missing semicolon」으로 잡았다). */
+        select c.corrected_text, e.event_id as 원사건
           from engine.corrections c
           join engine.submissions s on s.submission_id = c.submission_id
           join engine.learning_events e on e.event_id = s.event_id
@@ -196,6 +203,17 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
     전날문장: 따라말하기문장(학생.마지막스냅샷),
   });
 
+  /* 🔴 **결과 변수의 고리를 여기서 잇는다**(L0 §9-2 · C0 §4-1 `retry_of_event_id`).
+   *   교정문이 오늘 ②슬롯에 나갔다면 오늘의 발화는 「그 교정을 받고 다시 낸 것」이다 —
+   *   그 사실을 아는 곳은 배정을 정한 이 자리 하나뿐이고, 뒤로 갈수록 알 길이 없어진다
+   *   (앱이 목록을 문장으로 대조하면 그건 추정이고, 같은 문장이 두 번 교정된 날 갈린다).
+   * 🔑 판정은 `결정.출처` 에서 **파생**시킨다 — `학생.교정문` 을 다시 보면 첫날 규칙(교정문이
+   *   있어도 도입이 이긴다 · `lib/오늘과제.js` §6-1)이 두 곳에 적히고 갈라진 쪽이 조용히 통과한다.
+   * ⚠ 이 값은 `task.assigned` 행에 남고 `GET /v1/tasks` 가 그대로 앱에 준다. 성과 집계
+   *   (`functions/progress` 교정재발화)는 `submission.created` 만 세므로 배정 행이 이 칸을
+   *   들어도 숫자는 안 흔들린다 — 그 행은 **앱이 되돌려 실을 재료**로만 산다. */
+  const 재발화고리 = 결정.출처 === '교정문' ? ((학생.원사건 ?? null) as string | null) : null;
+
   /* 개입 하나에 붙는 식별자다 — `event_id`(사건 채번)와 축이 다르다. 두 행이 **같은 값**을
    * 들어야 나중에 성과가 「어느 개입에 대한 것인가」를 이 값 하나로 잇는다(C0 §4-1 계승). */
   const intervention_id = crypto.randomUUID();
@@ -243,12 +261,13 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
         insert into engine.learning_events (
           learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
           level_snapshot, goal_snapshot, intervention_id, consent_ver, consent_id, degraded,
-          source_kind, payload, schema_ver
+          retry_of_event_id, source_kind, payload, schema_ver
         ) values (
           ${learner_id}::uuid, 'task.assigned', ${통로}, ${공통.actor_kind}, ${지금}::timestamptz,
           ${멱등키('task', learner_id, 오늘)},
           ${공통.level_snapshot}, ${공통.goal_snapshot}, ${개입id}::uuid,
           ${공통.consent_ver}, ${공통.consent_id}::uuid, ${결정.degraded},
+          ${재발화고리}::uuid,
           ${사건출처('task.assigned')}::engine.source_kind, ${sql.json({ ver: 1 })}, ${ver}
         )
         on conflict (learner_id, idempotency_key) do nothing

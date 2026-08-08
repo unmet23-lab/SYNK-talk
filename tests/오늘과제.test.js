@@ -789,3 +789,53 @@ test('🔴 `/tasks` 가 배달 사건의 event_id 를 실제로 실어 보낸다
   assert.ok(/개입\.event_id\s+as\s+intervention_event_id/.test(통로),
     '별칭이 사라졌다 — 위 줄이 남아 있어도 값이 늘 `undefined` 라, 증상은 「가리킬 대상이 없다」로 위장된다.');
 });
+
+/* ── 결과 변수 고리 `retry_of_event_id` (L0 §9-2 · C0 §4-1) ───────────────────
+ *
+ * 🔴 **설계 전체에서 결과 변수는 이것 하나다** — 없으면 엔진은 상관만 배우고 처방을 못 배운다.
+ *   생산자가 0이던 이유는 이름·물리(FK)·검증기·서버 INSERT 어느 것도 아니었다. 넷 다 서 있었고
+ *   끊긴 자리는 **배달**이다: `functions/deliver` 의 교정 lateral 이 `corrected_text` 만 집고
+ *   그 교정이 어느 제출에 대한 것이었는지를 버렸다. 그래서 교정문이 다음 날 ②슬롯에 나가도
+ *   앱에는 고리를 채울 재료 자체가 없었다(appsscript `docs/_ops/학습데이터_전층감사.md` 잔여 🔴).
+ *
+ * 🔑 이 네 검사는 **한 사슬의 네 마디**다 — deliver(집기·박기) → tasks(싣기) → 앱(되싣기).
+ *   한 마디만 빠져도 나머지 셋은 전부 초록이고 증상은 「결과축이 늘 비어 있다」 하나뿐이다.
+ *   그 모양은 「아직 재제출한 학생이 없다」와 구분되지 않는다 = 새는 방향이 통과다.
+ * ⚠ 천장: 값이 **맞는지**는 여기서 못 잰다(배포된 판이 진짜 그 사건 id 를 싣는가는
+ *   `tools/배달왕복시험.js` 몫). 여기가 잡는 것은 마디 하나가 통째로 사라지는 것이다.
+ */
+const 원사건값 = 'e1e1e1e1-0000-4000-8000-00000000beef';
+
+test('교정문 날의 제출 사건이 원 제출을 가리킨다 — 결과 변수의 유일한 생산자', () => {
+  const e = 제출사건(항목({ task_meta: 재료({ retry_of_event_id: 원사건값 }) }), 'voice/x/1.m4a');
+  assert.equal(e.retry_of_event_id, 원사건값);
+  // 지어낸 칸이 아니라 계약이 낸 이름인지까지 본다 — 아니면 서버가 400 으로 접고 그 발화는 사라진다.
+  assert.ok(검증(e, 계약).ok, 검증(e, 계약).오류들.join(' · '));
+});
+
+test('교정문 날이 아니면 그 칸은 아예 없다 — null 을 박으면 「재시도 아님」과 「모름」이 한 모양이다', () => {
+  assert.equal(재료().retry_of_event_id, null, '배정이 안 주면 재료도 null — 앱이 지어내지 않는다');
+  const e = 제출사건(항목(), 'voice/x/1.m4a');
+  assert.equal('retry_of_event_id' in e, false);
+});
+
+test('무발화는 재제출이 아니다 — `session.abandoned` 에는 안 싣는다', () => {
+  const e = 제출사건(
+    항목({ status: 'abandoned', audio: null, task_meta: 재료({ retry_of_event_id: 원사건값 }) }));
+  assert.equal(e.event_type, 'session.abandoned');
+  assert.equal('retry_of_event_id' in e, false, '받고 안 한 날은 이미 분모로 남는다 — 성과로 세면 안 된다');
+});
+
+test('🔴 배달·조회 두 마디가 실제로 서 있다 — 앱만 초록인 사슬은 값이 영영 안 온다', () => {
+  const 배달 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'deliver', 'index.ts'), 'utf8');
+  assert.ok(/e\.event_id\s+as\s+원사건/.test(배달),
+    '교정 lateral 이 원 제출 사건을 안 집는다 — 사슬이 첫 마디에서 끊기고 아래 셋은 전부 초록이다.');
+  assert.ok(/재발화고리\s*=\s*결정\.출처\s*===\s*'교정문'/.test(배달),
+    '판정을 `결정.출처` 에서 파생시키지 않으면 첫날 규칙(교정문이 있어도 도입이 이긴다)이 두 곳에 적히고 갈라진 쪽이 조용히 통과한다.');
+  assert.ok(/retry_of_event_id,\s*source_kind/.test(배달) && /\$\{재발화고리\}::uuid/.test(배달),
+    '배정 INSERT 가 그 값을 안 박는다 — lateral 이 집어 와도 행에 안 남으면 `/tasks` 가 줄 것이 없다.');
+
+  const 조회 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'tasks', 'index.ts'), 'utf8');
+  assert.ok(/e\.retry_of_event_id/.test(조회) && /retry_of_event_id:\s*r\.retry_of_event_id\b/.test(조회),
+    '`/tasks` 응답에서 고리가 빠졌다 — 별칭만 남고 응답 줄이 없으면 앱 값은 늘 `undefined` 다(위 c9 변이 ⑥ 과 같은 모양).');
+});

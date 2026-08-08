@@ -129,7 +129,7 @@ Deno.serve(async (req: Request) => {
     const 행들 = await sql`
       select e.event_id as task_id, e.degraded, e.intervention_id,
              s.task_snapshot, s.task_format, s.task_ref,
-             e.level_snapshot, e.goal_snapshot,
+             e.level_snapshot, e.goal_snapshot, e.retry_of_event_id,
              개입.payload->>'output_text' as output_text, 개입.event_id as intervention_event_id
         from engine.learning_events e
         join engine.submissions s on s.event_id = e.event_id
@@ -161,6 +161,13 @@ Deno.serve(async (req: Request) => {
       task_format: r.task_format,          // 🔴 배정 행은 비어 있다 — 형식은 호흡마다다(P0 §2-1)
       level_snapshot: r.level_snapshot ?? null,
       goal_snapshot: r.goal_snapshot ?? null,
+      /* 🔴 **오늘 것이 교정문이면 그 교정의 원 제출 사건**(`functions/deliver` 가 배정 행에 박는다).
+       *   앱은 이걸 제출 사건의 `retry_of_event_id` 로 되돌려 싣는다 — 설계 전체의 **유일한 결과
+       *   변수**(L0 §9-2)이고, 없으면 엔진이 상관만 배우고 처방을 못 배운다. `task_ref`·급수와
+       *   같은 무늬다: 앱이 채우는 칸인데 앱이 알 길이 없으니 배정 행의 값을 그대로 실어 준다.
+       * 🔑 `null` 이 정상이다 — 교정문 날이 아니면 재시도가 아니다(지어내면 첫 제출이 재시도로
+       *   둔갑하고, 그 오염은 결과축 자체를 못 믿게 만든다). */
+      retry_of_event_id: r.retry_of_event_id ?? null,
       degraded: r.degraded,
       /* 🔴 `event_id` 는 `intervention_id` 의 사본이 아니다 — **`content.viewed` 가 `parent_event_id`
        *   로 가리킬 유일한 값**이다(c9 · 절단문서 ①-2·①-12). `intervention_id` 는 업무 키라
