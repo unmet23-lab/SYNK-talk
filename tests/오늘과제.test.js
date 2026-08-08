@@ -828,8 +828,8 @@ test('무발화는 재제출이 아니다 — `session.abandoned` 에는 안 싣
 
 test('🔴 배달·조회 두 마디가 실제로 서 있다 — 앱만 초록인 사슬은 값이 영영 안 온다', () => {
   const 배달 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'deliver', 'index.ts'), 'utf8');
-  assert.ok(/e\.event_id\s+as\s+원사건/.test(배달),
-    '교정 lateral 이 원 제출 사건을 안 집는다 — 사슬이 첫 마디에서 끊기고 아래 셋은 전부 초록이다.');
+  assert.ok(/case\s+when\s+e\.event_type\s*=\s*'submission\.created'\s+then\s+e\.event_id\s+end\s+as\s+원사건/.test(배달),
+    '교정 lateral 이 원 제출 사건을 안 집는다(또는 술어 없이 집는다) — 사슬이 첫 마디에서 끊기면 아래 셋은 전부 초록이고, 술어가 없으면 engine.submissions 의 **제출 아닌 행**(배정 행도 거기 산다 · tools/교정확정.js:75)을 가리켜 뜻 없는 값이 결과축에 들어온다.');
   assert.ok(/재발화고리\s*=\s*결정\.출처\s*===\s*'교정문'/.test(배달),
     '판정을 `결정.출처` 에서 파생시키지 않으면 첫날 규칙(교정문이 있어도 도입이 이긴다)이 두 곳에 적히고 갈라진 쪽이 조용히 통과한다.');
   assert.ok(/retry_of_event_id,\s*source_kind/.test(배달) && /\$\{재발화고리\}::uuid/.test(배달),

@@ -129,9 +129,15 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
          *   여기서 끊기고, 그러면 앱은 재발화 행에 retry_of_event_id 를 채울 재료가 없다 —
          *   설계 전체의 **유일한 결과 변수**(L0 §9-2)가 생산자 0 인 채로 남는다. 조인은 이미
          *   걷고 있던 것이라 한 칸 더 집는 것이 전부다.
+         * 🔴 **고리는 submission.created 일 때만 잇는다** — engine.submissions 에는 제출이 아닌
+         *   행이 있다(배정 행도 여기 산다 · tools/교정확정.js:75 가 같은 자리를 같은 술어로 막는다).
+         *   그 행을 가리키면 결과 변수가 「학생이 다시 낸 발화 → 어제의 배정」을 가리키게 되고,
+         *   그건 틀린 게 아니라 **뜻이 없는** 값이다. 문장 배달은 그대로 나가고(기존 동작 불변)
+         *   못 믿는 것은 고리뿐이라 null 로 둔다 — 「모른다」를 거짓말로 바꾸지 않는다.
          * ⚠ 이 주석은 sql 템플릿 리터럴 **안**이다 — 백틱을 쓰면 리터럴이 거기서 끊긴다
          *   (2026-08-08 실측: tests/화면구문 이 「Missing semicolon」으로 잡았다). */
-        select c.corrected_text, e.event_id as 원사건
+        select c.corrected_text,
+               case when e.event_type = 'submission.created' then e.event_id end as 원사건
           from engine.corrections c
           join engine.submissions s on s.submission_id = c.submission_id
           join engine.learning_events e on e.event_id = s.event_id

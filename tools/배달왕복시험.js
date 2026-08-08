@@ -116,16 +116,40 @@ async function main() {
              '${어제날}T04:00:00Z'::timestamptz, '${판}' from ev`);
   }
 
+  /* 🔴 D 의 **어제 발화** — 교정은 이 행에 붙는다. 배정 행이 아니다.
+   *   `engine.submissions` 에는 제출이 아닌 행(배정)도 살아서, 교정을 아무 행에나 붙이면
+   *   결과 변수(`retry_of_event_id`)가 「학생이 다시 낸 발화 → 어제의 배정」을 가리키게 된다.
+   *   그건 틀린 게 아니라 **뜻이 없는** 값이고, 그 오염은 조회할 때에야 보인다.
+   *   그래서 배치가 그 술어로 거르고(`functions/deliver`), 이 픽스처는 **진짜 제출**을 심는다. */
+  await sql(`
+    with ev as (
+      insert into engine.learning_events
+        (learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
+         level_snapshot, consent_ver, degraded, payload, schema_ver)
+      values ('${id.D}'::uuid,'submission.created','발화녹음','learner',
+              '${어제날}T08:00:00Z'::timestamptz, 'sub:${id.D}:${어제날}',
+              'Lv2','v18.9', false, '{"ver":1,"attempt_no":1}'::jsonb, '${판}')
+      returning event_id)
+    insert into engine.submissions (event_id, task_type, task_ref, task_format, body_original, occurred_at, schema_ver)
+    select event_id, '발화녹음', 'task-${어제날}', '낭독', '어제 친구를 만나서 밥 먹었어요',
+           '${어제날}T08:00:00Z'::timestamptz, '${판}' from ev`);
+
   /* D 의 교정 — 어제 배정 **뒤에** 확정됐다. 「지난 배정 뒤에 새로 확정된 것만」이 조건이라
    * 이 시각이 배정보다 앞서면 ②슬롯에 안 와야 한다(그 경계도 아래에서 잰다). */
   await sql(`
     with s as (
       select s.submission_id from engine.submissions s
         join engine.learning_events e on e.event_id = s.event_id
-       where e.learner_id = '${id.D}'::uuid limit 1)
+       where e.learner_id = '${id.D}'::uuid
+         and e.event_type = 'submission.created' limit 1)
     insert into engine.corrections (submission_id, actor_kind, corrected_text, created_at, schema_ver)
     select submission_id, 'teacher', '어제 친구를 만나서 밥을 먹었어요',
            '${어제날}T09:00:00Z'::timestamptz, '${판}' from s`);
+
+  // 그 발화의 event_id — 아래 ⑤·⑧ 이 「배정이 이걸 가리키는가」로 결과 변수를 잰다.
+  const D원제출 = (await sql(`
+    select event_id from engine.learning_events
+     where learner_id = '${id.D}'::uuid and event_type = 'submission.created' limit 1`))[0].event_id;
   console.log(`  준비 완료 — 표식 ${표} · 오늘 ${오늘} · 판 ${판}\n`);
 
   /* ── ① 문 ──────────────────────────────────────────────────── */
@@ -149,7 +173,7 @@ async function main() {
    *   🔴 그래서 회귀(`tests/오늘과제.test.js`)의 리터럴 금지는 **출하 코드에만** 건다. */
   const 행 = async (k) => (await sql(`
     select e.event_id, e.event_type, e.actor_kind, e.degraded, e.intervention_id, e.idempotency_key,
-           e.payload, s.task_snapshot, s.task_format, s.task_ref
+           e.retry_of_event_id, e.payload, s.task_snapshot, s.task_format, s.task_ref
       from engine.learning_events e
       left join engine.submissions s on s.event_id = e.event_id
      where e.learner_id = '${id[k]}'::uuid
@@ -208,6 +232,14 @@ async function main() {
     D && 따라말하기문장(D.task_snapshot));
   확인('교정문 경로는 강등이 아니다 — 조회지 AI 호출이 아니다',
     D && D.degraded === false, D && D.degraded);
+
+  /* 🔴 **설계 전체의 유일한 결과 변수**(L0 §9-2). 여기까지는 문장만 나가고 「어느 제출의
+   *   교정인가」가 배달에서 끊겼다 — 이름·FK·CHECK·서버 INSERT 가 c5부터 다 서 있었는데도
+   *   생산자가 0이던 이유다. 없으면 엔진은 상관만 배우고 처방을 못 배운다. */
+  확인('🔴 D 의 배정이 원 제출 사건을 가리킨다 — 결과 변수의 첫 마디',
+    D && D.retry_of_event_id === D원제출, [D && D.retry_of_event_id, D원제출]);
+  확인('C(교정 없음)의 배정은 그 칸이 비어 있다 — 재시도가 아닌 날을 재시도로 만들지 않는다',
+    C && C.retry_of_event_id === null, C && C.retry_of_event_id);
 
   /* ── ⑥ 집계 오염 ──────────────────────────────────────────────
    * 🔴 `task_snapshot` 을 `submissions` 에 실은 대가다. 「제출 수」를 event_type 없이 세면
@@ -298,6 +330,9 @@ async function main() {
   확인('행의 task_format 은 비어서 온다 — 형식은 호흡 안에 있다',
     읽은.task_format === null && (읽은.task_snapshot.호흡 || []).length === 2, 읽은.task_format);
   확인('강등 여부가 그대로 전달된다', 읽은.degraded === false, 읽은.degraded);
+  // 첫날인 A 는 재시도가 아니다 — 칸은 오되 값은 null(키가 아예 없으면 앱이 「구 배포」와 못 가른다).
+  확인('첫날의 재발화 고리는 null 이다 — 지어내면 첫 제출이 재시도로 둔갑한다',
+    'retry_of_event_id' in 읽은 && 읽은.retry_of_event_id === null, 읽은.retry_of_event_id);
   확인('하루 1건이라 next_cursor 는 null 이다', t.몸.next_cursor === null, t.몸.next_cursor);
 
   /* ── ②-20 정답은 학생 응답에 안 실린다 ────────────────────────────
@@ -372,6 +407,19 @@ async function main() {
       && 막힌.몸.blocked && 막힌.몸.blocked.code === 'CONSENT_MISSING', 막힌.몸);
   확인('🔴 막혀도 200 이다 — 4xx 를 주면 앱이 「고장」 화면을 띄우고 학생은 이유를 못 듣는다',
     막힌.status === 200, 막힌.status);
+  /* 🔴 **결과 변수가 화면까지 닿는가** — 같은 토큰을 D 에게 옮겨 붙여 잰다(위 B 와 같은 수).
+   *   D 는 교정문 날이라 배정 행이 원 제출 사건을 들고 있다. 앱은 이 값을 제출 사건의
+   *   `retry_of_event_id` 로 되돌려 싣는다 — 응답에서 빠지면 앱은 채울 재료가 없고, 증상은
+   *   「결과축이 늘 비어 있다」뿐이라 「아직 재제출한 학생이 없다」와 구분되지 않는다. */
+  await sql(`update engine.learners set auth_user_id = null where auth_user_id = '${uid}'`);
+  await sql(`update engine.learners set auth_user_id = '${uid}' where learner_id = '${id.D}'::uuid`);
+  const D읽은 = ((await 조회()).몸.data || [])[0];
+  확인('🔴 /tasks 가 재발화 고리를 실어 보낸다 — 앱이 결과 변수를 채울 유일한 재료',
+    !!D읽은 && D읽은.retry_of_event_id === D원제출, [D읽은 && D읽은.retry_of_event_id, D원제출]);
+  확인('교정문 날의 ②슬롯이 그 교정문이다 — 고리와 문장이 같은 행에서 나온다',
+    !!D읽은 && 따라말하기문장(D읽은.task_snapshot) === '어제 친구를 만나서 밥을 먹었어요',
+    D읽은 && D읽은.task_snapshot);
+
   /* A 로 되돌린다 — 아래 ⑨ 가 같은 토큰으로 A 의 교정을 읽는다. 안 되돌리면 그쪽이 빈 채로 돈다. */
   await sql(`update engine.learners set auth_user_id = null where auth_user_id = '${uid}'`);
   await sql(`update engine.learners set auth_user_id = '${uid}' where learner_id = '${id.A}'::uuid`);
