@@ -7,6 +7,12 @@
  *   `service_role` Edge Function 뒤에 서고 그 역할은 **RLS 를 우회한다.** 즉 정책을 아무리
  *   좁혀도 진짜 통로는 안 좁혀진다(②-15 와 같은 자리). 좁히는 자리를 판(뷰)으로 옮겼다.
  *
+ * ■ 2026-08-09 — 판을 화면이 성립하는 집합까지 올렸다(`20260809050000_review_c10`)
+ *   12열로는 검수 화면을 못 그렸다: 검수자가 **판정하는 대상**인 AI 교정이 판에 없어서
+ *   「읽는 곳은 `review_queue` 하나다」와 화면 명세가 동시에 성립하지 않았다. 22열로 올리며
+ *   `event_id` 제외 판정을 뒤집었고(승격 멱등키 — 안 열면 직원 통로가 원표를 연다),
+ *   큐 조건에 `pipeline_jobs.status` **허용 목록**을 더했다(폐기 항목이 되돌아오던 자리).
+ *
  * ■ 이 검사가 지키는 넷
  *   ① 뷰가 **허용 목록 그대로**인가 — 넓히면 아무 증상 없이 개인정보가 한 칸 더 나간다.
  *   ② 새 열이 붙었을 때 **아무도 판정하지 않는 갈래가 없는가** — 허용도 아니고 사유 붙은
@@ -49,22 +55,42 @@ function 제출물열() {
   return [...new Set(열)];
 }
 
-/** 뷰가 실제로 내보내는 열 — 정본은 이 select 문 하나다. */
+/** 살아 있는 뷰 정의 — 🔑 **마지막** 것이다.
+ *  합본은 조각을 이어붙인 것이라 뒤 조각이 판을 올려도 **첫 정의를 읽으면 영영 못 본다**
+ *  (20260809050000 이 drop 후 create 로 판을 올린 자리 · 맹점 ①의 같은 계열). */
+function 뷰정의() {
+  const 전부 = [...스키마.matchAll(/create (?:or replace )?view engine\.review_queue as([\s\S]*?);\n/g)];
+  assert.ok(전부.length, 'engine.review_queue 뷰를 합본에서 못 찾았다 — 조각이 안 실렸다');
+  return 전부[전부.length - 1][1];
+}
+
+/** 뷰가 실제로 **내보내는 이름** — 별칭이 있으면 별칭이 그 열의 이름이다. */
 function 뷰열() {
-  const m = /create or replace view engine\.review_queue as([\s\S]*?);\n/.exec(스키마);
-  assert.ok(m, 'engine.review_queue 뷰를 합본에서 못 찾았다 — 조각이 안 실렸다');
-  const 몸 = m[1];
+  const 몸 = 뷰정의();
   const 셀렉트 = 몸.slice(0, 몸.indexOf('from engine.submissions'));
-  return [...셀렉트.matchAll(/\bs\.(\w+)/g)].map((x) => x[1]);
+  const 줄들 = 셀렉트.split('\n')
+    .map((l) => l.replace(/--.*$/u, '').trim())
+    .map((l) => l.replace(/^select\s+/u, ''))
+    .filter(Boolean);
+  const 이름 = 줄들.map((l) => {
+    const 별칭 = /\bas\s+([\w가-힣]+),?$/u.exec(l);
+    if (별칭) return 별칭[1];
+    const 그대로 = /^[\w가-힣]+\.([\w가-힣]+),?$/u.exec(l);
+    return 그대로 ? 그대로[1] : null;
+  });
+  // 🔴 못 읽은 줄을 조용히 버리면 **검사가 줄어든 것이 통과와 같은 모양**이 된다(분모를 밝힌다).
+  const 못읽음 = 줄들.filter((_, i) => 이름[i] === null);
+  assert.deepEqual(못읽음, [], `select 목록에서 못 읽은 줄이 있다 — 파서가 낡았다:\n  ${못읽음.join('\n  ')}`);
+  return 이름;
 }
 
 /* ── 반대방향 장부 — 안 내보내는 열마다 **사유**를 적는다 ─────────────
  * 여기 없는 열이 생기면 아래 ②가 빨개진다. 「몰라서 빠진 것」과 「정해서 뺀 것」을
  * 같은 모양으로 두지 않는다. */
 const 제외사유 = {
-  event_id: '학생 사건 줄 전체로 가는 지렛대 — 화면은 submission_id 로 돈다',
   task_ref: '콘텐츠 참조 — 검수 화면에 자리가 없다',
-  task_snapshot: '문항 판 전문 — 오늘 화면은 음성이다. 쓰기·번역 검수가 서는 날 판정한다',
+  task_snapshot: '문항 판 **전문**은 안 연다 — 계약이 그 안에 **정답**을 두기로 했다(L0 §3-3). '
+    + '과제 맥락은 필요한 키만 투영한다(`task_instruction`·`task_prompt` · 20260809050000)',
   task_schema_ver: '스냅샷 모양 판 — 화면에 자리가 없다',
   body_original: '작문 원문 — 오늘 화면은 음성이다. 쓰기 검수가 서는 날 판정한다(②-17 이 지목한 열)',
   image_refs: '이미지 업로드는 막다른 통로(절단문서 ③) — 화면에 자리가 없다',
@@ -80,10 +106,22 @@ const 제외사유 = {
 /* ── ① 허용 목록 그대로인가 ────────────────────────────────────────── */
 
 const 기대뷰열 = [
-  'submission_id', 'task_type', 'task_format', 'occurred_at',
+  // 제출물 (c8)
+  'submission_id',
+  // 🔴 c8 이 뺐던 열 — 승격 멱등키가 원본 event_id 하나라, 판에 없으면 **직원 통로가
+  //    원표를 직접 연다**(아래 ⑤ 가 막으려던 바로 그것). 20260809050000 이 판정을 뒤집었다.
+  'event_id',
+  'task_type', 'task_format', 'occurred_at',
   'audio_ref', 'audio_duration_sec',
   'transcript', 'transcript_verified', 'transcript_state',
   'stt_segments', 'stt_confidence', 'code_switch_spans',
+  // 과제 맥락 (20260809050000) — 맥락 없는 라벨은 무효다. `task_snapshot` 전문은 안 연다.
+  'task_instruction', 'task_prompt',
+  // 검수자가 판정할 대상 = AI 교정. 접두 `ai_` 는 승인이 만드는 teacher 행과 안 겹치려는 것이다.
+  'ai_correction_id', 'ai_corrected_text', 'ai_error_tags',
+  'ai_explanation', 'ai_model', 'ai_prompt_ver',
+  // 큐 순서의 첫 축 — `order by` 는 뷰가 아니라 읽는 쪽이 정한다.
+  'is_audit_sample',
 ];
 
 test('뷰가 내보내는 열이 허용 목록과 정확히 같다', () => {
@@ -123,9 +161,13 @@ test('넓은 옛 정책은 합본 끝에서 살아 있지 않다', () => {
     '`inspector_queue_submissions` 가 마지막에 살아 있다 — 뷰와 정책이 같이 서면 넓은 쪽이 이긴다');
 });
 
+/* 🔑 계수 이름은 **끝까지** 맞춰 본다 — `as 검수뷰` 로만 찾으면 `as 검수뷰_지움` 같은 개명이
+ *   그대로 통과한다(변이 ⑦ 실측: 이 앵커가 없어 계수를 지운 판이 초록이었다). */
+const 계수 = (이름) => new RegExp(`as ${이름}(?![\\w가-힣])`, 'u');
+
 test('확인 쿼리가 뷰 유무와 옛 정책 유무를 **둘 다** 센다', () => {
-  assert.match(확인, /as 검수뷰/, '확인 쿼리가 뷰를 안 센다 — 안 선 것과 선 것이 같은 모양이다');
-  assert.match(확인, /as 옛검수정책/, '확인 쿼리가 옛 정책을 안 센다 — 남아도 초록이다');
+  assert.match(확인, 계수('검수뷰'), '확인 쿼리가 뷰를 안 센다 — 안 선 것과 선 것이 같은 모양이다');
+  assert.match(확인, 계수('옛검수정책'), '확인 쿼리가 옛 정책을 안 센다 — 남아도 초록이다');
   assert.match(확인, /검수뷰=1 and 옛검수정책=0/, '판정 조건에 두 칸이 안 걸려 있다');
   assert.match(확인, /select viewname from pg_views where schemaname='engine'/,
     '새는 권한 검사가 뷰를 안 본다 — pg_tables 에 뷰는 없다(등록층 구멍)');
@@ -134,14 +176,37 @@ test('확인 쿼리가 뷰 유무와 옛 정책 유무를 **둘 다** 센다', (
 /* ── ④ 뷰가 자기 소비자를 죽이지 않는가 ────────────────────────────── */
 
 test('뷰에 역할 판정을 넣지 않았다 (service_role 은 auth.uid() 가 null 이다)', () => {
-  const m = /create or replace view engine\.review_queue as([\s\S]*?);\n/.exec(스키마);
-  assert.ok(!/current_staff|auth\.uid/.test(m[1]),
+  const 몸 = 뷰정의();
+  assert.ok(!/current_staff|auth\.uid/.test(몸),
     '뷰가 역할을 판정한다 — `service_role` 호출에서 0행이 되어 화면이 통째로 빈다.\n' +
     '  역할 확정은 L0 §4-5 ② 대로 Edge Function 이 `engine.staff` 에서 한다.');
-  assert.match(m[1], /engine\.in_review_queue\(s\.submission_id\)/,
-    '큐 조건이 없다 — 큐 밖 제출물까지 전부 실린다');
-  assert.match(m[1], /s\.audio_deleted_at is null/,
+  // 큐 조건 = 「AI 교정이 있나」. 20260809050000 부터 그 판정은 **join 하나**가 진다
+  // (열들을 실어야 해서 join 이 필요해졌고, 옛 `in_review_queue` 호출을 같이 두면 같은
+  //  판정이 두 곳에 적힌 것이라 언젠가 갈린다).
+  assert.match(몸, /\n\s+join lateral \(/u,
+    '큐 조건이 inner join 이 아니다 — left 면 AI 교정이 없는 제출물까지 큐에 실린다');
+  assert.match(몸, /actor_kind = 'ai'/u, '큐 조건(AI 교정 있음)이 없다 — 큐 밖 제출물까지 전부 실린다');
+  assert.match(몸, /j\.status = 'ai_processed'/u,
+    '큐가 `pipeline_jobs.status` 를 안 본다 — 폐기한 항목이 다음 조회에 되돌아온다(수용기준 17).\n' +
+    '  🔑 허용 목록이라야 한다: 차단 목록이면 나중에 생긴 상태가 조용히 큐에 실린다');
+  assert.match(몸, /s\.audio_deleted_at is null/u,
     '철회분 필터가 없다 — 학생이 지운 음성의 전사가 사람에게 다시 간다');
+  // 과제 맥락은 **키만** 투영한다 — 전문을 열면 계약이 거기 두기로 한 **정답**이 같이 나간다.
+  assert.ok(!/s\.task_snapshot(?!->)/u.test(몸),
+    '`task_snapshot` 을 통째로 싣는다 — 그 안에 정답이 있다(L0 §3-3). 키만 투영한다');
+  // 배열이 아닌 스냅샷 하나가 **큐 전체**를 죽이지 않게 한다(jsonb_array_elements 는 런타임 오류).
+  assert.match(몸, /jsonb_typeof\(s\.task_snapshot->'호흡'\) = 'array'/u,
+    '스냅샷 모양 가드가 없다 — `호흡` 이 배열이 아닌 행 하나에 큐 조회가 통째로 실패한다');
+});
+
+test('확인 쿼리가 판이 **올라간 판인지**까지 센다', () => {
+  assert.match(확인, 계수('검수판열'), '확인 쿼리가 판의 열 수를 안 센다 — 낡은 12열 판도 `검수뷰=1` 이라 초록이다');
+  assert.match(확인, 계수('검수판원문'), '확인 쿼리가 ②-17 세 열을 안 센다 — 실려도 초록이다');
+  const m = /검수판열=(\d+) and 검수판원문=0/u.exec(확인);
+  assert.ok(m, '판정 조건에 두 칸이 안 걸려 있다 — 세기만 하고 안 보는 것은 확인이 아니다');
+  // 🔑 기대 수를 두 곳에 적으면 갈라진다 — 뷰 정의에서 파생시켜 대조한다.
+  assert.equal(Number(m[1]), 뷰열().length,
+    '확인 쿼리의 기대 열 수가 뷰 정의와 갈렸다 — 정상 DB 가 ❌ 로 보고된다(같은 사고 실측 1회)');
 });
 
 /* ── ⑤ 직원 통로가 base table 을 직접 읽지 않는가 ──────────────────── */

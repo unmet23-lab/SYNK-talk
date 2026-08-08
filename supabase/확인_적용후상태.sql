@@ -141,20 +141,29 @@ with 기대열(t, c) as (values
                              where version = '20260808010000')) as 마감없는배정,
   -- 분모의 정본은 `task.assigned` 사건 하나다(머리말). `daily_activity.expected` 는 파생
   --   캐시 자리로 남겨 뒀고, 여기 값이 들어오면 분모가 둘이 된 것이다 — 그 순간 빨개진다.
-  (select count(*) from engine.daily_activity where expected is not null) as 분모칸오염
+  (select count(*) from engine.daily_activity where expected is not null) as 분모칸오염,
+  -- 검수 판이 **올라간 판인지**(20260809050000): `검수뷰=1` 은 뷰의 존재만 말한다.
+  --   c8 의 12열 판이 그대로 서 있어도 그 칸은 1이라 초록이다 — 열 수로 재야 갈린다.
+  (select count(*) from information_schema.columns
+    where table_schema='engine' and table_name='review_queue') as 검수판열,
+  -- ②-17 이 지목한 세 열이 판에 실렸나 — 0이어야 한다(L0 §4-5 ②-1 「안 연다」의 실측).
+  (select count(*) from information_schema.columns
+    where table_schema='engine' and table_name='review_queue'
+      and column_name in ('body_original','task_snapshot','redaction_result')) as 검수판원문
 )
 select case when 테이블수=11 and RLS켜짐=11 and 정책수=7
              and 새는테이블권한=0 and 새는스키마권한=0
              and 삭제차단=3 and 실패상태=1 and 이력정책=0
              and 잡없는제출=0 and 검수뷰=1 and 옛검수정책=0
              and 마감없는배정=0 and 분모칸오염=0
+             and 검수판열=22 and 검수판원문=0
              and (select v from 빠진열) is null
              and (select v from 빠진제약) is null
              and (select v from 빠진트리거) is null
-             and (select version from 현재이력)='20260808010000'
-              and (select checksum from 현재이력)='8422b5082ea79e1df1abe0f506d3876c4e2f2da3ef20f255aa6da5790fa2e856' -- migration-checksum
+             and (select version from 현재이력)='20260809050000'
+              and (select checksum from 현재이력)='05e87c5825f04dd7f65d96e827d24ac1681e9674364fe66b7ee5eaf3a1cd401f' -- migration-checksum
             then '✅ 전부 통과'
-            else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·7·0·0·3·1·0·0·1·0·0 · 빠진 칸은 전부 비어 있어야 합니다)'
+            else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·7·0·0·3·1·0·0·1·0·0·22·0 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
        (select version from 현재이력) as 현재버전,
        (select checksum from 현재이력) as checksum,
