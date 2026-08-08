@@ -45,7 +45,8 @@
           "microphonePermission": "말하기 연습을 녹음할 때만 마이크를 사용해요. · Зөвхөн ярианы дасгал бичих үед микрофон ашиглана."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {

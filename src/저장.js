@@ -1,14 +1,17 @@
 'use strict';
 /**
- * 저장 어댑터 — 로그(JSONL)와 음성 파일을 기기에 남긴다.
+ * 저장 어댑터 — 로그(JSONL)·음성 파일·로그인 세션을 기기에 남긴다.
  *
  * 네이티브: expo-file-system (문서 폴더 · 앱을 지우기 전까지 영구).
  * 웹: 파일시스템이 없다 → 메모리 폴백. **지속되지 않음을 숨기지 않는다** — 지속여부() 로 화면에 알린다.
  *   웹은 디자인 확인용이고 실사용은 APK 다(배포 경로 판정).
  *
  * 원본 음성은 지우지 않는다(설계 §3-2) — 이 모듈에 삭제 함수가 아예 없는 것은 의도다.
+ * 🔑 세션만 예외로 지우는 함수가 있다 — 만료된 토큰은 자산이 아니라 쓰레기이고, 남겨 두면
+ *   다음 실행이 매번 그것으로 갱신을 시도해 실패한다.
  */
 import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { 직렬화, 역직렬화 } from '../lib/제출로그.js';
 
 const 웹 = Platform.OS === 'web';
@@ -97,4 +100,40 @@ export async function 음성올리기(경로, url, content_type) {
   if (r.status < 200 || r.status >= 300) {
     throw new Error(`업로드 실패 HTTP ${r.status} — ${String(r.body || '').slice(0, 120)}`);
   }
+}
+
+/* ── 로그인 세션 ──────────────────────────────────────────────────────────────
+ * 🔴 **파일에 쓰지 않는다.** `talk_log.jsonl` 옆에 평문으로 두면 기기 백업·로그 수집에 딸려
+ *   나가고, 토큰 하나면 그 학생의 쓰기 통로가 전부 열린다. 키체인(iOS)·키스토어(Android)에 둔다.
+ * 🔑 저장하는 것은 **refresh_token 과 학생번호뿐**이다 — access_token 은 한 시간이면 죽어서
+ *   다음 실행에 못 쓴다. 갱신하면 새로 온다(`인증API.갱신`). 학생번호를 함께 두는 것은
+ *   토큰에 그 번호가 없기 때문이다(합성 이메일뿐 · 인증API 78행).
+ * ⚠ 웹은 SecureStore 가 없다 — 저장하지 않는다. `지속저장()` 이 이미 그 사실을 말하고 있다. */
+const 세션키 = 'synk_session_v1';
+
+export async function 세션쓰기(세션) {
+  if (웹 || !세션 || !세션.refresh_token) return;
+  await SecureStore.setItemAsync(
+    세션키,
+    JSON.stringify({ refresh_token: 세션.refresh_token, 학생번호: 세션.학생번호 || '' }),
+  );
+}
+
+/** @returns {Promise<{refresh_token:string,학생번호:string}|null>} 없거나 깨졌으면 null */
+export async function 세션읽기() {
+  if (웹) return null;
+  const 글 = await SecureStore.getItemAsync(세션키);
+  if (!글) return null;
+  try {
+    const s = JSON.parse(글);
+    return s && s.refresh_token ? s : null;
+  } catch {
+    // 깨진 값은 없는 것과 같다 — 던지면 앱이 로그인 화면에도 못 닿는다
+    return null;
+  }
+}
+
+export async function 세션지우기() {
+  if (웹) return;
+  await SecureStore.deleteItemAsync(세션키);
 }

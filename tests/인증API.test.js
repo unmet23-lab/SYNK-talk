@@ -235,3 +235,32 @@ test('🔴 앱은 `signUp` 을 부르지 않는다 (계정이 서는 통로는 f
   const 소스 = require('fs').readFileSync(SRC, 'utf8');
   assert.ok(!/\/auth\/v1\/signup|signUp\s*\(/.test(소스), '🔴 앱에서 계정을 만들려 한다');
 });
+
+// ── 세션 갱신 (앱을 껐다 켜도 로그인이 유지되는 자리) ──────────────
+test('갱신 — refresh_token 으로 부르고, 토큰에 없는 학생번호는 저장해 둔 값을 그대로 싣는다', async () => {
+  const { API, 부른것 } = 세우기({
+    응답들: [{ 몸: { access_token: 'new-a', refresh_token: 'new-r', user: { id: 'u1' } } }],
+  });
+  const s = await API.갱신('old-r', 'S-0007');
+  assert.match(부른것[0].url, /grant_type=refresh_token/);
+  assert.deepEqual(부른것[0].본문, { refresh_token: 'old-r' });
+  assert.equal(s.access_token, 'new-a');
+  // 🔑 회전한 새 refresh_token 을 돌려줘야 호출부가 덮어쓴다 — 옛것을 남기면 다음 실행이 실패한다
+  assert.equal(s.refresh_token, 'new-r');
+  assert.equal(s.학생번호, 'S-0007', '🔴 토큰에는 합성 이메일뿐이라 이 자리가 유일한 출처다');
+});
+
+test('🔴 갱신 실패는 **네트워크와 만료를 가른다** — 비행기 모드에서 세션을 지우면 자격을 잃는다', async () => {
+  const 끊김 = await 던진것(() => 세우기({ 응답들: [{ throw: true }] }).API.갱신('r', 'S-1'));
+  assert.equal(끊김.code, 'NETWORK', '🔴 네트워크 실패가 만료로 읽히면 호출부가 저장된 세션을 지운다');
+  assert.equal(끊김.retryable, true);
+
+  const 만료 = await 던진것(() => 세우기({ 응답들: [{ ok: false, status: 401, 몸: {} }] }).API.갱신('r', 'S-1'));
+  assert.equal(만료.code, 'REFRESH_FAILED');
+  assert.equal(만료.retryable, false, '🔴 되풀이해도 안 되는 것을 재시도로 두면 무한 대기가 된다');
+});
+
+test('🔴 200 인데 access_token 이 없으면 성공으로 치지 않는다 (빈 세션이 서면 뒤의 쓰기가 전부 401)', async () => {
+  const e = await 던진것(() => 세우기({ 응답들: [{ 몸: {} }] }).API.갱신('r', 'S-1'));
+  assert.equal(e.code, 'REFRESH_FAILED');
+});

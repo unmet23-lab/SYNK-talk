@@ -87,6 +87,37 @@ export async function 로그인(학생번호, 비밀번호) {
   };
 }
 
+/**
+ * 세션 갱신 — 저장된 refresh_token 으로 새 access_token 을 받는다.
+ *
+ * 🔑 로그인과 **같은 모양**을 돌려준다 — 호출부가 「처음 로그인」과 「복원」을 안 가르게.
+ * 🔴 학생번호는 토큰에서 못 꺼낸다(합성 이메일뿐 — 위 78행과 같은 사연). 저장해 둔 값을 그대로 싣는다.
+ * ⚠ **네트워크 실패와 만료를 가른다.** 둘 다 「로그인 화면」으로 보내면 같아 보이지만, 지운 뒤
+ *   비행기 모드였던 것으로 밝혀지면 학생은 이유 없이 다시 로그인해야 한다 — 호출부가 code 로 가른다.
+ */
+export async function 갱신(refresh_token, 학생번호) {
+  let r;
+  try {
+    r = await fetch(`${URL_}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { apikey: ANON, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token }),
+    });
+  } catch {
+    throw new 인증오류('NETWORK', '인터넷 연결을 확인해 주세요', true);
+  }
+  const 몸 = await r.json().catch(() => ({}));
+  if (!r.ok || !몸.access_token) {
+    throw new 인증오류('REFRESH_FAILED', '다시 로그인해 주세요', false);
+  }
+  return {
+    access_token: 몸.access_token,
+    refresh_token: 몸.refresh_token,
+    user: 몸.user,
+    학생번호,
+  };
+}
+
 /** 첫 등록 — 계정이 서는 유일한 통로. 성공해도 세션은 안 생기므로 곧바로 로그인한다. */
 export async function 첫등록({ 학생번호, 뒷자리, 비밀번호, 복구이메일, 복구전화 }) {
   await 함수부르기('first-login', {
