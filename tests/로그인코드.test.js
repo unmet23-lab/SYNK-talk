@@ -83,22 +83,15 @@ test('합성 도메인을 아는 파일은 lib/로그인코드.js 하나뿐이�
     + '  정규화·도메인은 lib/로그인코드.js 한 곳에서만 나온다 — 거기서 import 해라.');
 });
 
-/* 주석을 먼저 지운다 — 이 파일이 처음 빨개진 이유가 그것이었다: 도구의 **주석**에 적힌
- * 「Math.random 을 쓰면 안 된다」는 경고를 검사기가 위반으로 읽었다. 가드는 자기가 읽는
- * 텍스트의 층을 안 가리면 **바른 코드를 막는다**(원격SQL.js 가 같은 이유로 주석을 지운다). */
-const 주석제거 = (s) => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+/* 🔴 2026-08-09(F269): 코드 **생성기**가 이 저장소에서 사라졌다. 있던 자리는
+ *   `tools/로그인코드발급.js` 였는데, 그 도구가 만든 계정은 주소가 코드에서 나와
+ *   앱(주소가 `student_code` 에서 나온다)이 영원히 못 찾았다 — 학생 계정은 §4-1 대로
+ *   **첫 로그인에서만** 선다. 그래서 「난수가 약한가」를 잴 소스가 이제 없다.
+ *   ⚠ 직원 코드(§4-5 ① · 12자)를 지을 때 생성기가 되살아난다 — 그때 이 검사도 같이
+ *   되살린다(`crypto.randomInt` 만 · `Math.random` 금지). 지금 빈 파일을 읽게 두면
+ *   그건 「돌지 않는 검사가 초록으로 보이는」 형태가 된다. */
 
-test('발급 도구는 Math.random 을 쓰지 않는다 (이건 비밀번호다)', () => {
-  const src = 주석제거(fs.readFileSync(path.join(ROOT, 'tools', '로그인코드발급.js'), 'utf8'));
-  assert.ok(/crypto\.randomInt/.test(src), '암호학적 난수를 안 쓰면 코드가 예측 가능해진다');
-  assert.equal(/Math\.random/.test(src), false, 'Math.random 은 비밀 생성에 쓰면 안 된다');
-});
-
-test('탐지력 픽스처 — 사본·약한 난수가 되살아나면 잡는다', () => {
+test('탐지력 픽스처 — 사본 탐지기가 되살아나면 잡는다', () => {
   assert.ok('const 메일 = 코드 + "@synk.invalid";'.includes('@synk.invalid'),
     '사본 탐지기가 죽으면 위 검사는 무엇이든 통과시킨다');
-  assert.ok(/Math\.random/.test(주석제거('const c = 집합[Math.random()*32|0];')),
-    '약한 난수 탐지기가 죽으면 위 검사는 무엇이든 통과시킨다');
-  assert.equal(/Math\.random/.test(주석제거('/* Math.random 금지 */ crypto.randomInt(0, 32)')), false,
-    '주석 속 경고를 위반으로 읽으면 바른 코드가 막힌다 — 처음 이 파일이 빨개진 형태다');
 });
