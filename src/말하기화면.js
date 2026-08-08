@@ -81,6 +81,25 @@ function 초표시(ms) {
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
+/* 기기가 가진 한국어 음성 중 **품질이 높은 것**을 고른다. 기본값이 늘 좋은 게 아니라서 —
+ * 안드로이드는 보통 한국어 음성을 여러 벌 갖고 있고 그중 하나만 `Enhanced` 다.
+ * 🔑 못 고르면 그냥 기본값으로 읽는다. 여기서 막으면 「듣기」가 통째로 사라진다.
+ * ⚠ 이건 기기 TTS 의 상한 안에서의 개선이다 — 사람 목소리에 가까워지는 것은 별개 트랙
+ *   (문장이 굳은 뒤 배치로 미리 합성해 파일로 내려보내는 길). */
+let 고른음성 = null;
+async function 한국어음성() {
+  if (고른음성 !== null) return 고른음성;
+  try {
+    const 목록 = await Speech.getAvailableVoicesAsync();
+    const 한국어 = 목록.filter((v) => String(v.language || '').startsWith('ko'));
+    const 좋은 = 한국어.find((v) => v.quality === Speech.VoiceQuality.Enhanced);
+    고른음성 = ((좋은 || 한국어[0] || {}).identifier) || '';
+  } catch {
+    고른음성 = '';
+  }
+  return 고른음성;
+}
+
 export default function 말하기화면({ 급수 = 0, 토큰 = null, 학생번호 = null }) {
   const 폴백 = useMemo(() => 급수편지(급수), [급수]);
 
@@ -365,12 +384,14 @@ function 듣기카드({ 편지, 라벨 = '편지가 왔어요', 다음, 들었�
   const [읽는중, set읽는중] = useState(false);
   const [들었다, set들었다] = useState(false);
 
-  const 재생 = () => {
+  const 재생 = async () => {
     set읽는중(true);
     Speech.stop();
+    const voice = await 한국어음성();
     Speech.speak(편지.본문, {
       language: 'ko-KR',
       rate: 0.92,
+      ...(voice ? { voice } : {}),
       onDone: () => {
         set읽는중(false);
         set들었다(true);
