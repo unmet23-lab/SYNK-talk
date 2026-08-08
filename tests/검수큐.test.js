@@ -186,6 +186,11 @@ test('뷰에 역할 판정을 넣지 않았다 (service_role 은 auth.uid() 가 
   assert.match(몸, /\n\s+join lateral \(/u,
     '큐 조건이 inner join 이 아니다 — left 면 AI 교정이 없는 제출물까지 큐에 실린다');
   assert.match(몸, /actor_kind = 'ai'/u, '큐 조건(AI 교정 있음)이 없다 — 큐 밖 제출물까지 전부 실린다');
+  /* 🔴 소속 조건은 **둘**이다. `submissions` 는 배정 행(`task.assigned`)과 학생 제출 행을 함께
+   *   들고, 배정 행은 `audio_ref`·`transcript` 가 없어 화면이 아무것도 못 그린다.
+   *   2026-08-09 리허설 실측: 큐 19행이 **전부 배정 행**이었다(c8 부터 있던 구멍 · 20260809060000). */
+  assert.match(몸, /e\.event_type = 'submission\.created'/u,
+    '큐가 배정 행과 학생 제출 행을 안 가른다 — 배정 행은 음성도 전사도 없어 검수 화면이 빈다');
   /* 🔴 `status` 로 **소속을 정하지 않는다** — 그건 캐시고, 어긋나면 `corrections` 가 맞다(L0 §3).
    *   20260809050000 이 `= 'ai_processed'` 로 잡았다가 실측에서 물렸다: 그 칸을 쓰는 코드가
    *   저장소에 0곳이라 리허설 628건이 전부 `pending` 이었고 큐가 **0행**이 됐다(20260809055000).
