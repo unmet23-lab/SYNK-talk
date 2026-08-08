@@ -59,6 +59,27 @@ function 빈번호(쓰인 = []) {
   return null;
 }
 
+/**
+ * 오프라인으로 밀린 사건들의 `occurred_at` — C0 §7 왕복 6-④ 가 쓰는 시각 다섯 개.
+ *
+ * 🔴 **진짜 5일 전을 박으면 이 시험은 다른 것을 잰다.** 서버는 `occurred_at` **시점의** 동의를
+ *   고르므로(C0 §5 · 사후 동의가 과거를 유효하게 만들지 않는다), 동의보다 앞선 시각은
+ *   `CONSENT_MISSING` 으로 거절된다 — 빨강은 뜨지만 그 빨강엔 「오프라인이 깨졌다」가 아니라
+ *   아무 원인도 안 적혀 있다. 그래서 바닥은 **그 학생의 동의 시각**이다(같은 초는 경계라 +1s).
+ *   ⚠ 실제 학생에게 이 자리는 안 생긴다 — 동의는 첫 등록에서 서고 발화는 전부 그 뒤다.
+ * 🔑 다섯이 **서로 달라야** 뜻이 있다: 서버가 수신 시각으로 덮으면 다섯이 한 점에 뭉치는데,
+ *   보낸 값 자체가 같으면 뭉친 것과 보존된 것이 **같은 모양**이 되어 판정이 통째로 무력해진다.
+ *   창이 좁을 때(방금 동의) 간격이 0 초로 접히는 것이 정확히 그 자리라 최소 1초를 깐다.
+ *
+ * @param {number} 동의_ms 서버가 준 `agreed_at` (epoch ms — 기기 시계로 재면 시계차가 섞인다)
+ * @param {number} 지금_ms 지금 (epoch ms)
+ */
+function 밀린시각들(동의_ms, 지금_ms, 개수 = 5) {
+  const 바닥 = 동의_ms + 1000;
+  const 간격 = Math.max(1000, Math.floor((지금_ms - 바닥) / (개수 + 1)));
+  return Array.from({ length: 개수 }, (_, i) => new Date(바닥 + 간격 * i).toISOString());
+}
+
 const ROOT = path.resolve(__dirname, '..');
 const API = 'https://api.supabase.com/v1/projects';
 const die = (m) => { console.error('[왕복시험] ' + m); process.exit(1); };
@@ -494,10 +515,68 @@ async function main() {
     r.status === 200 && r.body.results?.[0]?.error?.code === 'CONTRACT_VIOLATION'
       && r.body.results?.[0]?.error?.retryable === false, { status: r.status, r: r.body.results?.[0] });
 
+  /* ── ⑯ 오프라인 5건 축적 후 복귀 (C0 §7 왕복 6-④) ────────────────────
+   *
+   * ■ 왜 이 칸이 필요한가 — ②③⑥ 이 「1건 저장」·「멱등」·「배치 부분 실패」를 이미 지지만
+   *   셋 다 **방금 만든 사건**을 보낸다. 오프라인 큐가 지는 것은 다른 사실이다: 사흘 들고 있던
+   *   다섯 건이 **전건** 닿는가, 그리고 각자의 `occurred_at` 이 **보낸 그대로** 남는가.
+   *   덮이면 증상이 조용하다 — 다섯 행은 멀쩡히 저장되고 조회도 200 인데 「학생이 언제 말했나」가
+   *   전부 「복귀한 순간」으로 뭉친다. 리듬·마감 대비 여유(L0)가 통째로 거짓이 되고, 발화 시각은
+   *   그때만 얻는 값이라 **소급 복구가 없다.**
+   * ■ 판정은 화면 동작이 아니라 **저장된 행 수**로 한다(C0 §7 각주 — 2·3·4 공통).
+   * 🔑 배치로 안 보낸다 — 앱은 `밀린것()` 을 **한 건씩 순서대로** 올린다(`src/말하기화면.js`).
+   *   한 번의 호출로 다섯을 보내면 그건 ⑥ 을 한 번 더 재는 것이고, 정작 기기에서 도는 통로는
+   *   안 재진 채 초록이 된다. */
+  console.log('\n⑯ 오프라인 5건 축적 후 복귀 (C0 §7-④)');
+  /* 동의 시각은 **서버에서** 받는다 — 기기 시계로 바닥을 잡으면 시계차가 그대로 섞여
+   * 「오프라인이 깨졌다」 자리에서 `CONSENT_MISSING` 이 나온다(위 `밀린시각들` 머리말). */
+  const [{ ms: 동의ms }] = await sql(
+    `select (extract(epoch from max(agreed_at)) * 1000)::bigint ms from engine.consents
+      where learner_id = '${learner_id}' and revoked_at is null`);
+  const 밀린사건 = 밀린시각들(Number(동의ms), Date.now()).map((t) => 기본({ occurred_at: t }));
+  const 보낸ms = new Map(밀린사건.map((e) => [e.idempotency_key, Date.parse(e.occurred_at)]));
+  const 키목록 = 밀린사건.map((e) => `'${e.idempotency_key}'`).join(',');
+
+  const 복귀 = [];
+  for (const ev of 밀린사건) 복귀.push((await 부르기({ events: [ev] })).body.results?.[0]);
+  const 저장됨 = 복귀.filter((x) => x?.status === 'stored').length;
+  확인(`복귀하자 다섯 건이 전건 저장됐다 (${저장됨}/5)`, 저장됨 === 5, 복귀);
+
+  const 행들 = await sql(
+    `select l.idempotency_key k,
+            (extract(epoch from l.occurred_at) * 1000)::bigint le,
+            (extract(epoch from s.occurred_at) * 1000)::bigint se
+       from engine.learning_events l
+       left join engine.submissions s on s.event_id = l.event_id
+      where l.idempotency_key in (${키목록})`);
+  확인(`행이 다섯이다 (${행들.length}/5)`, 행들.length === 5, 행들);
+
+  const 원값 = 행들.filter((r) => Number(r.le) === 보낸ms.get(r.k));
+  확인(`각 occurred_at 이 보낸 그대로다 — 수신 시각으로 안 덮였다 (${원값.length}/5)`,
+    원값.length === 5, 행들.map((r) => ({ k: r.k, 저장: Number(r.le), 보냄: 보낸ms.get(r.k) })));
+  /* 덮였는지를 「값이 같은가」로만 보면 다섯을 **같은 시각으로** 보낸 날 통과한다 —
+   * 서로 다른 다섯이 서로 다르게 남았을 때만 「보존」이 증명된다. */
+  확인('다섯이 서로 다른 시각으로 남았다 (덮였다면 한 점에 뭉친다)',
+    new Set(행들.map((r) => Number(r.le))).size === 5, 행들.map((r) => Number(r.le)));
+  /* 🔴 제출물 행도 같이 본다 — 두 테이블이 각자 `occurred_at` 을 들고(`functions/events`),
+   *   한쪽만 보존되면 사건은 사흘 전인데 발화는 오늘인 행이 조용히 쌓인다. */
+  const 제출원값 = 행들.filter((r) => Number(r.se) === 보낸ms.get(r.k));
+  확인(`제출물 행의 occurred_at 도 같은 값이다 (${제출원값.length}/5)`, 제출원값.length === 5, 행들);
+
+  /* 복귀 순간이 네트워크가 가장 불안한 자리다 — 올리다 끊기면 앱은 **같은 큐를 다시** 올린다
+   * (`밀린것()` 은 `event_id` 가 없는 항목을 계속 문다). 그때 다섯이 새 행으로 앉으면 그 학생의
+   * 발화 수가 두 배가 되고, 분모가 오염된 뒤엔 어느 쪽이 진짜였는지 못 가린다. */
+  const 재전송 = [];
+  for (const ev of 밀린사건) 재전송.push((await 부르기({ events: [ev] })).body.results?.[0]);
+  const 접힘 = 재전송.filter((x) => x?.status === 'duplicate').length;
+  확인(`끊겼다 다시 올려도 다섯 다 duplicate 로 접힌다 (${접힘}/5)`, 접힘 === 5, 재전송);
+  확인('그래도 행 수는 다섯이다',
+    (await sql(`select count(*)::int n from engine.learning_events where idempotency_key in (${키목록})`))[0].n === 5);
+
   console.log(`\n── 통과 ${통과} · 실패 ${실패} ──`);
   process.exit(실패 ? 1 : 0);
 }
 
-module.exports = { 빈번호, 대역시작, 대역끝 };
+module.exports = { 빈번호, 대역시작, 대역끝, 밀린시각들 };
 
 if (require.main === module) main().catch((err) => die(String(err && err.stack || err)));
