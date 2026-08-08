@@ -64,23 +64,32 @@ async function main() {
     return r.행;
   };
 
+  /* 🔴 **제약 이름에서 판 번호를 읽지 않는다**(2026-08-08 실측). 이 술어는 판이 오를 때마다
+   *   이름만 갈린다 — c8 → c9 → c10, 그런데 술어는 c9 주석이 적어 둔 대로 「한 글자도 같다」.
+   *   세 자리에 `_c8` 을 박아 뒀더니 c9 가 올라간 DB 에서 **제약 1 로 세어 거짓 적색**이 났고,
+   *   그 적색이 `die` 로 **아래 갈래를 전부 막았다** — 「DB 가 안 섰다」는 정반대 진단과 함께.
+   *   판을 앞세우는 저장소에서 이름에 판을 박은 검사는 **오를 때마다 깨지는 것이 예정**이다.
+   * 🔑 꼴은 **한 곳에서만 산다** — SQL 과 메시지 대조가 갈라지면 한쪽만 고쳐 놓고 통과한다. */
+  const 교정CHECK본 = 'learning_events_correction_target_c[0-9]+';
+  const 교정CHECK = new RegExp(교정CHECK본);
+
   /* ── ⓪ 판이 실제로 서 있는가 ─────────────────────────────────── */
-  console.log('■ ⓪ c8 물리');
+  console.log('■ ⓪ 교정 물리(판 무관)');
   const [물리] = await sql(`
     select (select count(*) from information_schema.columns
              where table_schema='engine' and table_name='learning_events'
                and column_name='correction_id') as 열,
            (select count(*) from pg_constraint
              where connamespace=to_regnamespace('engine')
-               and conname in ('learning_events_correction_target_c8',
-                               'learning_events_correction_id_fkey')) as 제약,
+               and (conname ~ '^${교정CHECK본}$'
+                    or conname = 'learning_events_correction_id_fkey')) as 제약,
            (select count(*) from pg_trigger g join pg_class r on r.oid=g.tgrelid
              where r.relnamespace=to_regnamespace('engine')
                and g.tgname='learning_events_correction_same_learner'
                and g.tgenabled <> 'D') as 트리거`);
   확인('열 1 · 제약 2 · 트리거 1(꺼짐 아님)이 서 있다',
     Number(물리.열) === 1 && Number(물리.제약) === 2 && Number(물리.트리거) === 1, 물리);
-  if (실패) die('c8 이 안 선 DB 다 — 아래 갈래는 「거절」과 「깨짐」을 구분 못 하므로 여기서 멈춘다.');
+  if (실패) die('교정 물리가 안 선 DB 다 — 아래 갈래는 「거절」과 「깨짐」을 구분 못 하므로 여기서 멈춘다.');
 
   /* ── 준비: 학생 둘, 각자 자기 교정 1건 ──────────────────────────
    * B가 있어야 ③(교차 학생)이 성립한다 — 없는 uuid 를 지목하는 것과는 다른 사고다. */
@@ -138,8 +147,8 @@ async function main() {
   console.log('\n■ ② 누락 — 지목 없이 열람했다고 한다');
   const r2 = await 실행(사건('A', 'correction.viewed', null, `view-null:${표}`));
   확인('거절된다 — 「있어도 되고 없어도 되는 칸」이 아니다', !r2.ok, r2.ok && r2.행);
-  확인('거절한 것은 CHECK `learning_events_correction_target_c8` 다',
-    !r2.ok && /learning_events_correction_target_c8/.test(r2.메시지), r2.메시지 && r2.메시지.slice(0, 300));
+  확인('거절한 것은 교정 대상 CHECK 다(판 무관)',
+    !r2.ok && 교정CHECK.test(r2.메시지), r2.메시지 && r2.메시지.slice(0, 300));
 
   /* ── ③ 타 학생 지목 ──────────────────────────────────────────── */
   console.log('\n■ ③ 교차 — A 가 B 의 교정을 지목한다');
@@ -155,7 +164,7 @@ async function main() {
   const r4 = await 실행(사건('A', 'submission.created', 교정.A, `sub-x:${표}`));
   확인('거절된다 — 두 사건 밖에서는 반드시 비어 있어야 한다', !r4.ok, r4.ok && r4.행);
   확인('같은 CHECK 가 양쪽을 다 진다',
-    !r4.ok && /learning_events_correction_target_c8/.test(r4.메시지), r4.메시지 && r4.메시지.slice(0, 300));
+    !r4.ok && 교정CHECK.test(r4.메시지), r4.메시지 && r4.메시지.slice(0, 300));
 
   /* ── ⑤ 없는 교정 ─────────────────────────────────────────────── */
   console.log('\n■ ⑤ 실재 — 없는 교정을 지목한다');
