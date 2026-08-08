@@ -7,7 +7,11 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
 const { 견줌, 늘어난말 } = require('../lib/견줌.js');
+
+const ROOT = path.join(__dirname, '..');
 
 /** 서버 응답 봉투 그대로의 모양(`GET /v1/progress`). */
 const 봉투 = (today, yesterday) => ({
@@ -60,4 +64,42 @@ test('숫자가 아닌 값은 0 — 화면에 NaN 을 그리지 않는다', () =
 test('탐지력 픽스처 — 판정기가 죽으면 위 검사들이 무엇이든 통과한다', () => {
   assert.equal(견줌(봉투(하루(1, 0, false), null)), null, 'yesterday 가 없으면 견줄 수 없다');
   assert.equal(견줌({ data: [{ today: 하루(1, 0, false) }] }), null);
+});
+
+/* ── 문구 사본 금지 ────────────────────────────────────────────────────────────
+ * 같은 말을 **두 화면**이 한다(「어제의 나」·말하기 완료 카드 · 유호님 확정 2026-08-09).
+ * 한쪽에 손으로 적으면 그날부터 갈라지고, 갈라져도 양쪽 화면은 멀쩡히 뜬다 — 학생만
+ * 같은 사실을 두 문장으로 듣는다. 그래서 **문장이 사는 곳이 하나뿐인지**를 따로 잰다.
+ *
+ * 주석을 먼저 지운다 — 주석에 적힌 설명을 위반으로 읽으면 바른 코드가 막히고, 막힌 사람은
+ * 우회를 정상 통로로 만든다(`tests/로그인코드.test.js` 가 같은 이유로 같은 전처리를 한다). */
+const 주석제거 = (s) => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+
+test('「어제보다」 문장을 아는 파일은 lib/견줌.js 하나뿐이다 (사본 금지)', () => {
+  const 걸린것 = fs.readdirSync(path.join(ROOT, 'src'))
+    .filter((f) => f.endsWith('.js'))
+    .filter((f) => 주석제거(fs.readFileSync(path.join(ROOT, 'src', f), 'utf8')).includes('어제보다'));
+  assert.deepEqual(걸린것, [],
+    `문구가 화면에 직접 적혀 있다: ${걸린것.join(', ')}\n`
+    + '  「어제보다 N개 더 냈어요」는 lib/견줌.js 의 `늘어난말` 하나에서만 나온다 — 거기서 import 해라.');
+});
+
+/* 🔴 **이름이 보이는 것과 부르는 것은 다르다.** 첫 판은 `/늘어난말/` 이었고, 호출을 지워도
+ *   `import { 견줌, 늘어난말 }` 이 남아 그대로 초록이었다(2026-08-09 변이로 실측 — 살아남았다).
+ *   그 상태가 정확히 사고의 모양이다: 문장이 화면에서 사라졌는데 검사는 「쓰고 있다」고 말한다. */
+test('두 화면 모두 그 함수를 **실제로 부른다** (import 만 남아도 못 통과한다)', () => {
+  for (const f of ['어제의나.js', '말하기화면.js']) {
+    const src = 주석제거(fs.readFileSync(path.join(ROOT, 'src', f), 'utf8'));
+    assert.ok(/늘어난말\s*\(/.test(src),
+      `${f} 가 늘어난말 을 안 부른다 — 이름만 import 에 남아 있으면 사본 금지도 같이 눈이 먼다`);
+  }
+});
+
+test('탐지력 픽스처 — 사본·미호출이 되살아나면 잡는다', () => {
+  assert.ok('const 말 = `어제보다 ${차}개 더 냈어요.`;'.includes('어제보다'),
+    '사본 탐지기가 죽으면 위 검사는 무엇이든 통과시킨다');
+  assert.equal(주석제거('/* 「어제보다 적어요」는 안 쓴다 */ 늘어난말(값)').includes('어제보다'), false,
+    '주석 속 설명을 위반으로 읽으면 바른 코드가 막힌다');
+  assert.equal(/늘어난말\s*\(/.test('import { 견줌, 늘어난말 } from "../lib/견줌.js";'), false,
+    'import 줄을 호출로 읽으면 「지웠는데 통과」가 되살아난다 — 실측으로 살아남았던 변이다');
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -84,20 +84,22 @@ export default function App() {
   /* 「어제의 나」도 같은 규칙이다(P0 §5 S1-11) — **한 번 읽어** 링크의 근거와 화면의 내용을
      같은 것으로 만든다. 🔴 첫날이면 `null` 이 오고 그때는 링크 자체를 안 그린다: 눌러서
      「어제 0 · 오늘 0」을 만나는 것은 빈 카드고, 없는 과거를 지어내는 것이기도 하다.
-     ⚠ 답장과 **따로** 읽는다 — 한 번에 묶으면 한쪽이 죽을 때 멀쩡한 쪽 링크까지 같이 사라진다. */
-  useEffect(() => {
-    if (!세션) return undefined;
-    let 살아있음 = true;
-    (async () => {
-      try {
-        const 값 = await 진행받기(세션.access_token);
-        if (살아있음) set견줌값(값);
-      } catch {
-        if (살아있음) set견줌값(null);
-      }
-    })();
-    return () => { 살아있음 = false; };
+     ⚠ 답장과 **따로** 읽는다 — 한 번에 묶으면 한쪽이 죽을 때 멀쩡한 쪽 링크까지 같이 사라진다.
+
+     읽는 자리가 둘이다 — ①앱을 켤 때 ②**제출이 다 닿은 직후**(완료 카드 · 유호님 확정 08-09).
+     ②가 값이 실제로 참이 되는 순간이라, 켤 때 읽은 값만 쓰면 오늘 낸 것을 영원히 모르는 수를 든다.
+     🔴 실패하면 **가진 값을 그대로 둔다**(지우지 않는다) — 낡은 오늘은 실제보다 작아서 말이
+     안 붙거나 작게 붙을 뿐 과장되지 않지만, 지우면 멀쩡히 서 있던 링크가 사라진다. */
+  const 견줌읽기 = useCallback(async () => {
+    if (!세션) return;
+    try {
+      set견줌값(await 진행받기(세션.access_token));
+    } catch {
+      /* 조용히 둔다 — 이 조회가 죽었다고 오늘 발화를 막지 않는다(답장 조회와 같은 규칙). */
+    }
   }, [세션]);
+
+  useEffect(() => { 견줌읽기(); }, [견줌읽기]);
 
   const 세션세움 = async (새것) => {
     set세션(새것);
@@ -130,7 +132,14 @@ export default function App() {
           그 상태가 실기기 데모를 통과하는 것이 P0 §4-3 이 순서를 뒤집은 이유다.
           학생번호도 함께 — 막힌 학생의 안내가 「선생님께 이 번호를 보여 주세요」로 끝나는데
           토큰에는 합성 이메일뿐이라, 이 자리를 지나지 않으면 화면이 그 번호를 모른다(F176 ①). */}
-      {화면 === '말하기' && <말하기화면 토큰={세션.access_token} 학생번호={세션.학생번호} />}
+      {화면 === '말하기' && (
+        <말하기화면
+          토큰={세션.access_token}
+          학생번호={세션.학생번호}
+          견줌={견줌값}
+          견줌다시읽기={견줌읽기}
+        />
+      )}
       {화면 === '답장' && (
         <답장화면 토큰={세션.access_token} 교정={교정} 돌아가기={() => set화면('말하기')} />
       )}
