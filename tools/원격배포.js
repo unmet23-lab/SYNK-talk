@@ -28,6 +28,34 @@ const 자격증명 = require('../lib/자격증명.js');   // .env 읽기 + 토�
 
 const die = (msg) => { console.error('[원격배포] ' + msg); process.exit(1); };
 
+/* 저장소가 요구하는 계약판 — 마이그레이션 **파일 이름**에서 읽는다(`20260808010000_engine_c10.sql`).
+ * 🔑 이름 규칙의 정본은 `tools/마이그레이션_합본.js` 고 여기선 같은 꼴만 본다 — 판을 손 상수로
+ *   두면 마이그레이션을 늘리는 사람이 두 곳을 고쳐야 하고, 잊은 쪽은 조용히 낡는다. */
+function 저장소판(root) {
+  const 방 = path.join(root, 'supabase', 'migrations');
+  const 이름들 = fs.existsSync(방)
+    ? fs.readdirSync(방).filter((n) => /^\d{14}_.+_c\d+\.sql$/u.test(n)).sort() : [];
+  const 최신 = 이름들[이름들.length - 1] || null;
+  return { 파일: 최신, 판: 최신 ? 최신.match(/_(c\d+)\.sql$/)[1] : null };
+}
+
+/* 「대상 DB 가 저장소보다 뒤처졌나」 — 뒤처졌으면 막을 말을, 아니면 null 을 낸다.
+ * 🔑 순수 함수다. 네트워크를 태우는 자리에 판정을 적으면 회귀가 못 닿고, 못 닿는 판정은
+ *   조용히 갈린다(이 저장소가 `동봉묶기` 에서 이미 겪은 자리). */
+function 판뒤처짐(저장소, db최신, 읽기실패) {
+  const n = (v) => (String(v || '').match(/c(\d+)/) || [])[1];
+  if (읽기실패) return `대상 DB 의 계약판을 못 읽었다(${읽기실패}) — 못 읽은 것은 통과가 아니다.`;
+  if (!저장소.판) return '저장소에서 마이그레이션 파일을 못 찾았다 — 대조할 기준이 없다.';
+  if (!db최신) return '대상 DB 에 engine.schema_migrations 기록이 없다 — 스키마가 안 선 프로젝트다.';
+  const [a, b] = [Number(n(저장소.판)), Number(n(db최신))];
+  if (!a || !b) return `판 이름을 못 읽었다(저장소 ${저장소.판} · DB ${db최신}).`;
+  if (a > b) {
+    return `저장소가 DB 보다 앞선다 — 저장소 ${저장소.판}(${저장소.파일}) · DB ${db최신}. `
+      + '이대로 나가면 배포는 ✅ 로 끝나고 **다음 호출**에서 없는 열로 죽는다.';
+  }
+  return null;
+}
+
 /* 동봉 — 함수가 저장소의 **정본 파일**을 그대로 쓰게 한다(베껴 두면 갈라진다).
  *
  * 🔴 **작업본이 아니라 `HEAD` 에서 읽는다.** 이 저장소는 세션이 동시에 돈다 —
@@ -140,6 +168,7 @@ function 파일들(디렉터리, 기준 = 디렉터리) {
 async function main() {
   const args = process.argv.slice(2);
   const 목록 = args.includes('--목록');
+  const 판무시 = args.includes('--판무시');
   const 적용 = args.includes('--적용');
   const 대상 = args.find((a) => !a.startsWith('--'));
 
@@ -225,6 +254,40 @@ async function main() {
     return;
   }
 
+  /* 🔴 **코드만 밀고 DB 판을 안 보면 배포는 성공하고 첫 호출에서 죽는다** (2026-08-08 실측).
+   *   `deliver` 를 HEAD 에서 리허설에 올렸더니 배치가 전건 실패했다 —
+   *   `column "due_at" of relation "submissions" does not exist`. c10 커밋이 코드와
+   *   마이그레이션을 같이 냈는데 **마이그레이션만 안 적용된 DB** 였기 때문이다.
+   *   증상이 배포 시점에 안 나온다는 것이 급소다: 배포는 ✅ 로 끝나고, 깨진 것은 **다음에
+   *   그 함수를 부르는 사람**이 본다(공유 환경이면 남이 본다).
+   * 🔑 그래서 판정을 배포 **전**으로 옮긴다 — 저장소 마이그레이션이 대상 DB 보다 앞서면 안 나간다.
+   * 🔑 못 읽으면 **막는다.** 「애매하면 통과」하는 가드는 가드가 아니고, 새는 방향은 늘 통과다.
+   *   진짜로 알고 넘길 때만 `--판무시`(그 사실이 출력에 남는다). */
+  if (!판무시) {
+    const 저장소 = 저장소판(ROOT);
+    let db = null, 읽기실패 = null;
+    try {
+      const r = await fetch(`${API}/${ref}/database/query`, {
+        method: 'POST',
+        headers: { ...헤더, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'select name from engine.schema_migrations order by version desc limit 1' }),
+      });
+      if (!r.ok) 읽기실패 = `HTTP ${r.status}`;
+      else db = (JSON.parse(await r.text())[0] || {}).name || null;
+    } catch (err) { 읽기실패 = String(err.message || err); }
+
+    const 말 = 판뒤처짐(저장소, db, 읽기실패);
+    if (말) {
+      console.error(`[원격배포] ⛔ ${말}`);
+      console.error('   → 적용 SQL 은 유호님 승인 뒤: node tools/원격SQL.js supabase/migrations/<파일> --적용');
+      console.error('   → 알고 넘기려면: 같은 명령에 --판무시');
+      process.exit(1);
+    }
+    console.error(`[원격배포] 판 대조 ✅ 저장소 ${저장소.판} · DB ${db}`);
+  } else {
+    console.error('[원격배포] ⚠ --판무시 — DB 판을 안 보고 나간다(깨지면 다음 호출자가 본다)');
+  }
+
   const form = new FormData();
   form.append('metadata', new Blob([JSON.stringify({
     name: slug,
@@ -251,5 +314,5 @@ async function main() {
   console.log(`   URL https://${ref}.supabase.co/functions/v1/${f.slug}`);
 }
 
-module.exports = { 파일들, 동봉묶기 };
+module.exports = { 파일들, 동봉묶기, 저장소판, 판뒤처짐 };
 if (require.main === module) main().catch((err) => die(String(err && err.message || err)));
