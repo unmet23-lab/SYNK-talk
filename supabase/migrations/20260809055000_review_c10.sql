@@ -1,11 +1,156 @@
 -- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
+-- 이 파일은 tools/마이그레이션_합본.js가 만드는 SYNK L0 기준선의 조각이다.
+-- 정본 문서: docs/L0_데이터계약.md §4-5 ②-1 · docs/발주_수집파이프라인.md §3
+-- 필드·값목록 정본: 계약/수집_교정_계약.json (c10 — 이 조각도 계약을 안 바꾼다.
+--   바뀌는 것은 `engine.review_queue` 의 **where 한 줄**이다.)
+-- 직접 고치지 않는다. 변경은 새 migration 조각으로 만들고 합본 생성기를 실행한다.
 --
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- ■ 무엇을 되돌리나 — **바로 앞 조각(20260809050000)의 내 판단이 틀렸다**
+--   그 조각은 폐기 항목이 큐로 되돌아오는 것을 막으려고 큐 조건을 `pipeline_jobs.status`
+--   **허용 목록**(`= 'ai_processed'`)으로 잡았다. 근거는 「차단 목록은 새 상태를 조용히
+--   싣는다」였고, 그 자체는 맞다. 틀린 것은 **그 칸에 값을 넣는 자가 있는지 안 재고** 썼다는
+--   것이다.
+--
+--   실측(2026-08-09 · 리허설 `baasvefzinrxaryksayl`):
+--     · `pipeline_jobs.status` 를 쓰는 코드가 **이 저장소에 0곳**이다(lib·src·functions·tools grep).
+--     · 리허설 628건이 **전부 `pending`** 이고, AI 교정은 418행이 이미 있다.
+--     · 그래서 판을 부은 직후 `select count(*) from engine.review_queue` = **0**.
+--   좁힌 게 아니라 **도달 불가**로 만들었다. 그 칸의 예정 생산자는 n8n(§2 6단계)인데 아직 없다.
+--
+-- ■ 그런데 더 깊은 자리가 있다 — **캐시에 소속을 걸면 안 된다**
+--   L0 §3 이 이미 적어 뒀다: 「`status` 는 **처리 상태이지 학습 사실이 아니다.** 「검수됐다」의
+--   진실은 언제나 `corrections` 행이고 `'verified'` 는 그 캐시다. **어긋나면 `corrections` 가
+--   맞다.**」 큐 **소속**을 그 캐시가 정하게 하면 이 문장을 판이 정면으로 뒤집는다.
+--   실패 모드도 조용하다: n8n 이 교정을 쓰고 상태 갱신 전에 죽으면 그 제출물은 **사람에게
+--   영영 안 보이고 증상이 없다**(교정은 있는데 큐에 없다). 데이터가 사라지는 것보다 나쁜
+--   자리다 — 사라진 줄도 모른다.
+--
+-- ■ 그래서 역할을 되돌린다
+--   · **소속** = 「AI 교정이 있나」 — 이미 lateral join 이 지고 있다(정본).
+--   · **`status`** = 그 캐시가 **유일하게 권위 있는 것**만 진다: **끝난 상태 셋을 뺀다.**
+--       `discarded`(폐기 · 수용기준 17) · `revoked`(철회) · `verified`(검수 끝).
+--   즉 이 조각은 「차단 목록으로 후퇴」가 아니라 **각 칸을 자기 권위 범위로 되돌리는 것**이다.
+--   🔑 새 상태가 생기면 기본값이 **「큐에 남는다」** 인데, 그게 맞는 방향이다 — 새 처리 단계가
+--      생겼다고 검수자가 봐야 할 항목이 조용히 사라지면 안 된다. 반대로 **빼야 할 상태는
+--      전부 이름이 있고**(끝났다는 뜻이라 새로 생길 일이 드물다), 하나라도 빠뜨리면 증상은
+--      「같은 항목을 또 만난다」라 검수자가 그날 안다.
+--
+-- ■ ⚠ 그래도 `verified` 는 여전히 승인 Edge Function 이 써야 한다
+--   안 쓰면 확정한 항목이 큐에 남는다. 바뀐 것은 **안 쓰면 큐가 통째로 비는 것**이
+--   **안 쓰면 확정분이 남는 것**으로 내려온 것뿐이다 — 뒤가 훨씬 싼 실패다.
+--   정본 = `docs/검수_내부계약.md` §5.
+--
+-- ■ 열은 한 칸도 안 바뀐다 — 22열 그대로다(확인 쿼리 `검수판열=22` 유지).
+--   `create or replace` 를 못 쓰는 이유도 그대로다(앞 조각 머리말 — 여기선 where 만 바뀌지만
+--   drop/create 한 짝으로 두는 편이 앞 조각과 같은 모양이라 읽는 사람이 안 헷갈린다).
+--
+-- 이 조각은 20260809050000 이 선 DB 위에서만 돈다.
 -- ============================================================================
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260809055000';
+  migration_name constant text := '20260809055000_review_c10.sql';
+  expected_checksum constant text := 'e6c9a0ddefb80526283863de9f742831f470a410beb4997fa63db7a3770ba6a2'; -- migration-checksum
+  base_version constant text := '20260809050000';
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 c10 위에서만 돈다 — engine.schema_migrations가 없다(빈 DB면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      '이 조각은 기준선 % 위에서만 돈다 — 이력에 그 판이 없다(부분·혼합·불명이라 중단한다)',
+      base_version;
+  end if;
+
+  drop view if exists engine.review_queue;
+
+  create view engine.review_queue as
+    select s.submission_id,
+           s.event_id,
+           s.task_type,
+           s.task_format,
+           s.occurred_at,
+           s.audio_ref,
+           s.audio_duration_sec,
+           s.transcript,
+           s.transcript_verified,
+           s.transcript_state,
+           s.stt_segments,
+           s.stt_confidence,
+           s.code_switch_spans,
+           과제.무엇 as task_instruction,
+           과제.제시 as task_prompt,
+           ai.correction_id  as ai_correction_id,
+           ai.corrected_text as ai_corrected_text,
+           ai.error_tags     as ai_error_tags,
+           ai.explanation    as ai_explanation,
+           ai.model          as ai_model,
+           ai.prompt_ver     as ai_prompt_ver,
+           j.is_audit_sample
+      from engine.submissions s
+      join engine.pipeline_jobs j
+        on j.submission_id = s.submission_id
+      -- 🔑 **소속을 정하는 것은 이 join 하나다** — 「AI 교정이 있나」가 곧 「사람이 볼 차례인가」.
+      --    L0 §3: status 는 캐시고 어긋나면 corrections 가 맞다.
+      join lateral (
+             select c.correction_id, c.corrected_text, c.error_tags,
+                    c.explanation, c.model, c.prompt_ver
+               from engine.corrections c
+              where c.submission_id = s.submission_id
+                and c.actor_kind = 'ai'
+              order by c.created_at desc
+              limit 1
+           ) ai on true
+      left join lateral (
+             select 호->>'무엇' as 무엇,
+                    coalesce(호->>'문장', 호->>'프롬프트') as 제시
+               from jsonb_array_elements(
+                      case when jsonb_typeof(s.task_snapshot->'호흡') = 'array'
+                           then s.task_snapshot->'호흡'
+                           else '[]'::jsonb
+                      end) 호
+              where 호->>'task_format' = s.task_format
+              limit 1
+           ) 과제 on true
+      -- `status` 가 유일하게 권위 있는 것 = **끝났다.** 그 셋만 뺀다(머리말).
+     where j.status not in ('discarded', 'revoked', 'verified')
+       and s.audio_deleted_at is null;
+
+  comment on view engine.review_queue is
+    '검수자에게 내보내도 되는 열 — 허용 목록(②-17). 소속=AI 교정 있음 · status 는 끝난 셋만 뺀다. 역할 판정은 Edge Function 몫.';
+
+  -- 🔴 grant 하지 않는다(§4-5 ④ — 읽는 지점이 하나라는 전제).
+
+  insert into engine.schema_migrations(version, name, checksum)
+  values (migration_version, migration_name, expected_checksum);
+end
+$migration$;
+
+commit;
+
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
+-- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'), ('learning_events','skill_taxonomy_ver'),
   ('learning_events','parent_event_id'), ('learning_events','turn_no'),
@@ -174,3 +319,23 @@ select case when 테이블수=11 and RLS켜짐=11 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
 from 셈;
+*/
+
+-- 확인
+-- ① 검수판열=22 · 검수판원문=0 — 앞 조각과 같다. **이 조각은 열을 한 칸도 안 바꾼다**(where 만).
+-- ② 그래서 이 조각이 실제로 섰는지는 열 수로 못 잰다 — **현재버전**으로 가른다(위 판정에 걸려 있다).
+-- ③ 🔴 **큐가 도는지는 판 파일이 못 잰다.** 앞 조각이 정확히 그 자리에서 물렸다(열은 22인데
+--    행이 0이었다). 부은 뒤 한 줄로 실측한다:
+--      select count(*) from engine.review_queue;
+--    AI 교정이 있는 제출물 수와 같아야 한다:
+--      select count(distinct submission_id) from engine.corrections where actor_kind='ai';
+--    둘이 갈리면 그 차이가 곧 「끝난 셋(discarded·revoked·verified)」이다.
+-- ④ CHECK 제약은 현행 접미사만 남아야 한다(이 조각은 CHECK 를 한 개도 안 바꾼다 — c10 그대로).
+--    ⚠ 이 줄은 **마지막 조각이 들고 있어야 한다.** 합본은 조각을 이어붙인 것이라
+--      `tests/L0스키마.test.js` 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 **파일명**이 제약 이름으로 읽혀 빨개진다.
+--    기대: corrections_verdict_c10 · learners_signup_attempts_nonneg_c10
+--         · learners_temp_password_paired_c10 · learning_events_correction_target_c10
+--         · learning_events_event_type_c10 · learning_events_task_type_c10
+--         · staff_role_c10 · submissions_due_paired_c10 · submissions_task_format_c10
+--         · submissions_translation_source_c10
