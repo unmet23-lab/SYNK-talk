@@ -120,6 +120,44 @@ function 본체import검사(디렉터리, 표내용) {
   }
 }
 
+/* 나가는 **모든** 파일이 지나는 한 통로 — 본체(index.ts)든 동봉 lib 이든 같은 규칙이다.
+ *
+ * 🔴 2026-08-09 실측(**F273**): 이 규칙이 동봉에만 걸려 있었고 본체는 작업본에서 읽고 있었다.
+ *   본체와 lib 을 함께 고친 커밋 **전**에 배포하니 **반쪽이 나갔다** — 새 `index.ts` + 옛
+ *   `음성헤더.mjs` → 배포는 ✅ 로 끝나고 첫 호출에서 `길이초 is not a function`.
+ *   경고는 lib 이름만 부르며 「미커밋 편집은 안 나간다」고 말하는데 **정작 호출부는 나갔다** —
+ *   새는 방향이 「통과」인 그 모양이고, 여기선 「안전하다」고 읽히기까지 한다.
+ * 🔑 위 머리말이 이미 이유를 다 적어 뒀다(「배포되는 것은 언제나 커밋된 것이어야 한다」).
+ *   본체가 그 예외일 이유가 없다 — 오히려 본체가 **남의 미커밋 편집이 실릴 가장 큰 파일**이다.
+ * 🔑 알림이 아니라 **막는다**: 반쪽 배포는 배포 시점에 증상이 없고, 깨진 것은 다음에 그 함수를
+ *   부르는 사람이 본다(공유 환경이면 남이 본다 — 위 판 대조가 막기로 한 것과 같은 실패 모양).
+ */
+function 머리에서(저장소경로) {
+  try {
+    return require('child_process')
+      .execFileSync('git', ['show', `HEAD:${저장소경로}`], { cwd: ROOT, encoding: 'utf8', maxBuffer: 8 << 20 });
+  } catch {
+    die(`HEAD 에 없는 경로: ${저장소경로}\n   배포되는 것은 언제나 커밋된 것이다 — 먼저 커밋한다:\n   git commit -m "..." -- ${저장소경로}`);
+  }
+  return '';
+}
+
+/** 작업본이 HEAD 와 다른가 — **판정만** 한다(막는 것은 부르는 쪽 · `판뒤처짐` 과 같은 자리다).
+ *  작업본에 없는 경로는 「같다」로 본다: 지운 파일을 배포로 되살리는 축은 여기 몫이 아니다. */
+function 작업본다름(저장소경로, src) {
+  const 작업본 = path.join(ROOT, 저장소경로);
+  if (!fs.existsSync(작업본)) return false;
+  return fs.readFileSync(작업본, 'utf8').replace(/\r\n/g, '\n') !== String(src).replace(/\r\n/g, '\n');
+}
+
+function 미커밋검사(저장소경로, src) {
+  if (!작업본다름(저장소경로, src)) return;
+  die(`작업본이 HEAD 와 다르다: ${저장소경로}\n`
+    + `   나가는 것은 HEAD 다 — 지금 밀면 **고친 절반만** 라이브에 선다(F273).\n`
+    + `   커밋하고 다시 민다:  git commit -m "..." -- ${저장소경로}\n`
+    + `   남의 편집이면 그대로 두고 그 세션이 커밋할 때까지 기다린다(F073).`);
+}
+
 function 동봉묶기(디렉터리) {
   const 표 = path.join(디렉터리, '동봉.json');
   if (!fs.existsSync(표)) return {};
@@ -127,17 +165,8 @@ function 동봉묶기(디렉터리) {
   본체import검사(디렉터리, 표내용);
   const out = {};
   for (const [이름, 저장소경로] of Object.entries(표내용)) {
-    let src;
-    try {
-      src = require('child_process')
-        .execFileSync('git', ['show', `HEAD:${저장소경로}`], { cwd: ROOT, encoding: 'utf8', maxBuffer: 8 << 20 });
-    } catch {
-      die(`동봉 실패 — HEAD 에 없는 경로: ${저장소경로}`);
-    }
-    const 작업본 = path.join(ROOT, 저장소경로);
-    if (fs.existsSync(작업본) && fs.readFileSync(작업본, 'utf8').replace(/\r\n/g, '\n') !== src.replace(/\r\n/g, '\n')) {
-      console.warn(`[원격배포] ⚠ ${저장소경로} — 작업본이 HEAD 와 다르다. **HEAD 를 묶는다**(미커밋 편집은 안 나간다)`);
-    }
+    const src = 머리에서(저장소경로);
+    미커밋검사(저장소경로, src);
     if (!이름.endsWith('.mjs')) out[이름] = src;                    // 그대로
     else if (저장소경로.endsWith('.json')) out[이름] = `export default ${src};\n`;  // JSON → ESM
     // ⚠ `import` 는 호이스팅되므로 껍데기 뒤에 와도 된다 — 순서를 바꾸지 않는다(바꾸면 diff 가 커진다).
@@ -241,7 +270,11 @@ async function main() {
   const 내용물 = {};
   for (const 상대 of 파일들(디렉터리)) {
     if (상대 === '동봉.json') continue;               // 명세지 코드가 아니다
-    내용물[상대] = fs.readFileSync(path.join(디렉터리, 상대));
+    // 본체도 동봉과 **같은 통로**를 지난다(F273 — 여기만 작업본이라 반쪽이 나갔다).
+    const 저장소경로 = path.relative(ROOT, path.join(디렉터리, 상대)).split(path.sep).join('/');
+    const src = 머리에서(저장소경로);
+    미커밋검사(저장소경로, src);
+    내용물[상대] = Buffer.from(src, 'utf8');
   }
   for (const [이름, src] of Object.entries(동봉묶기(디렉터리))) 내용물[이름] = Buffer.from(src, 'utf8');
   if (!내용물['index.ts']) die(`${slug}/index.ts 가 없다 — 진입점 이름은 index.ts 로 고정한다`);
@@ -314,5 +347,5 @@ async function main() {
   console.log(`   URL https://${ref}.supabase.co/functions/v1/${f.slug}`);
 }
 
-module.exports = { 파일들, 동봉묶기, 저장소판, 판뒤처짐 };
+module.exports = { 파일들, 동봉묶기, 작업본다름, 저장소판, 판뒤처짐 };
 if (require.main === module) main().catch((err) => die(String(err && err.message || err)));
