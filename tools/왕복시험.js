@@ -44,6 +44,19 @@ const 새연락처 = '+976 9911-2233';
 const 새뒷자리 = '2233';
 const 새비번 = 'Synk-Rehearsal-1';
 
+/* 시험 학생 대역 — 901 은 인증왕복시험이 쓰고 지운다(겹치면 그쪽 시험이 「이미 등록됨」을 만난다).
+ *
+ * 🔴 **가장 낮은 빈 번호**를 딴다 — 옛 판은 `max(...)+1` 이었다. 2026-08-09 실측: 손으로 만든
+ *   `SYNK-999`("유호 관통시험") **한 줄**이 max 를 끝으로 밀어, 실제로는 13/98 만 쓴 대역이
+ *   「찼다」로 죽었다. 빈 자리를 못 보는 채번은 고갈을 실제보다 먼저, 그리고 **틀린 사유로**
+ *   알린다 — 차단문이 시키는 처방("대역을 넓혀라·DB 를 새로 깔아라")이 둘 다 헛일이 된다. */
+const 대역시작 = 902, 대역끝 = 999;
+function 빈번호(쓰인 = []) {
+  const 찬 = new Set(쓰인);
+  for (let n = 대역시작; n <= 대역끝; n += 1) if (!찬.has(`SYNK-${n}`)) return `SYNK-${n}`;
+  return null;
+}
+
 const ROOT = path.resolve(__dirname, '..');
 const API = 'https://api.supabase.com/v1/projects';
 const die = (m) => { console.error('[왕복시험] ' + m); process.exit(1); };
@@ -102,13 +115,14 @@ async function main() {
     /* ⓪ 개원 첫 관문 — 명부 등록 → 학생이 앱에서 첫 등록.
      *   번호는 매 회차 새로 딴다: 이 시험이 남기는 `learning_events` 가 append-only 라
      *   같은 학생을 다시 쓰면 두 번째부터는 「갓 등록」이 아니다(그게 F176 이 밟은 함정이다).
-     *   ponytail: SYNK-9NN 대역 100개를 쓰고 고갈되면 die 한다 — 대역을 넓히는 건 그때 몫이다. */
+     *   ponytail: 대역 98칸을 다 쓰면 die 한다 — 대역을 넓히는 건 그때 몫이다. */
     console.log('⓪ 갓 명부에 오른 학생을 여기서 세운다');
-    const [{ 다음 }] = await sql(
-      `select coalesce(max(right(student_code, 3)::int), 901) + 1 as 다음
-         from engine.learners where student_code ~ '^SYNK-9[0-9][0-9]$'`);
-    if (Number(다음) > 999) die('SYNK-9NN 대역이 찼다 — 시험 학생 대역을 넓히거나 리허설 DB 를 새로 깔아라');
-    학생번호 = `SYNK-${다음}`;
+    const 쓰인 = (await sql(
+      `select student_code from engine.learners where student_code ~ '^SYNK-9[0-9][0-9]$'`))
+      .map((r) => r.student_code);
+    학생번호 = 빈번호(쓰인);
+    if (!학생번호) die(`SYNK-${대역시작}~${대역끝} 대역 ${대역끝 - 대역시작 + 1}칸이 **전부** 찼다`
+      + ` (지금 ${쓰인.length}명) — 시험 학생을 정리하거나 대역을 넓혀라`);
     await sql(`insert into engine.learners(student_code, contact, display_name, schema_ver)
                values ('${학생번호}', '${새연락처}', '왕복시험 새학생', 'probe')`);
     확인(`명부에 ${학생번호} 가 올랐다`,
@@ -482,4 +496,6 @@ async function main() {
   process.exit(실패 ? 1 : 0);
 }
 
-main().catch((err) => die(String(err && err.stack || err)));
+module.exports = { 빈번호, 대역시작, 대역끝 };
+
+if (require.main === module) main().catch((err) => die(String(err && err.stack || err)));

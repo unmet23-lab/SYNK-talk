@@ -42,6 +42,14 @@ const 잰다 = (이름, 통과, 곁 = '') => {
   console.log(`${통과 ? '  ✅' : '  ❌'} ${이름}${곁 ? ` — ${곁}` : ''}`);
 };
 
+/* 🔴 **분모가 움직인 것을 총계가 감춘다**(F207 · 2026-08-09 실측).
+ *   ⑪ 이 빨개지면 그 아래 앱 체인 7건이 `if (본.제출재료)` 에 걸려 **아예 안 돈다.**
+ *   그런데 총계는 `18/20` 으로 나와 「20건 중 2건 실패」로 읽힌다 — 실제는 「2건 실패 + 7건 미실행」이고
+ *   고친 뒤 같은 실행이 `27/27` 이 됐다. 미실행은 실패보다 조용해서 총계만 보면 영원히 안 보인다.
+ *   그래서 건너뛴 자리를 **세어서 마지막 줄에 함께 낸다** — 0 이 아니면 그 초록은 반쪽이다. */
+const 건너뜀 = [];
+const 건너뛴다 = (이유) => { 건너뜀.push(이유); console.log(`  ⏭ ${이유}`); };
+
 async function main() {
   const [auth_user_id, learner_id] = process.argv.slice(2);
   if (!auth_user_id || !learner_id) die('사용: node tools/업로드왕복시험.js <auth_user_id> <learner_id>');
@@ -221,7 +229,7 @@ async function main() {
   if (!배정) {
     /* 🔴 배정이 없으면 **건너뛴 것을 드러낸다** — 통과와 미실행이 같은 모양이면 안 된다.
      *   실패로 세지 않는 이유: 그건 이 학생에게 오늘 배달이 안 돈 것이지 앱 체인의 결함이 아니다. */
-    console.log(`  ⏭ 앱 체인 — 오늘 배정이 없어 건너뛴다 (HTTP ${큐r.status} · 먼저 배달왕복시험을 돌린다)`);
+    건너뛴다(`앱 체인 — 오늘 배정이 없어 건너뛴다 (HTTP ${큐r.status} · 먼저 배달왕복시험을 돌린다)`);
   } else {
     // 폴백은 이 갈래에서 **쓰이면 안 되는** 값이다 — 쓰였는지는 바로 아래 `출처` 로 잰다.
     const 폴백 = { id: null, 본문: '·', 핵심문장: '·', 질문: '·', 선택지: null };
@@ -237,6 +245,7 @@ async function main() {
       !!재료 && !!재료.task_ref && 'level_snapshot' in 재료 && 'goal_snapshot' in 재료,
       JSON.stringify(재료));
 
+    if (!본.제출재료) 건너뛴다(`앱 체인 뒷마디 — 봉투 재료가 없어 실행되지 않았다 (사유: ${본.사유 || '?'})`);
     if (본.제출재료) {
       const 지금 = new Date().toISOString();
       const { 항목 } = 항목추가([], {
@@ -327,7 +336,8 @@ async function main() {
   }
 
   const 실패 = 결과.filter((r) => !r.통과);
-  console.log(`\n[업로드왕복] ${결과.length - 실패.length}/${결과.length}`);
+  console.log(`\n[업로드왕복] ${결과.length - 실패.length}/${결과.length}`
+    + (건너뜀.length ? ` · ⏭ 건너뜀 ${건너뜀.length}묶음 — 이 총계는 반쪽이다` : ''));
   if (실패.length) process.exit(1);
 }
 
