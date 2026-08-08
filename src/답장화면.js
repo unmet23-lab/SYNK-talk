@@ -1,0 +1,223 @@
+'use strict';
+/**
+ * 「답장」 — 학생이 **받은 교정을 보고 답하는** 화면 (P0 §5 **S1-8** · C0 §4-3 ②).
+ *
+ * ■ 이 화면이 닫는 것 — 결과축 생산자가 런타임에 0이었다
+ *   `src/교정API.js` 는 이름(c8)·물리·검증기·서버 INSERT·조회 통로까지 다 서 있는데
+ *   **그 파일을 부르는 화면이 없었다.** 그래서 `correction.viewed`·`correction.responded` —
+ *   P0 가 「**학습이 일어났다」의 유일한 직접 신호**로 지목한 두 사건 — 은 회귀와 왕복시험의
+ *   합성 사건으로만 초록이었고 실제 행은 0이었다. 새는 방향은 언제나 「통과」다.
+ *   🔴 손실 시계는 **학생이 교정을 처음 보는 날** 시작되고 그날 이후는 소급이 없다 —
+ *   「봤는지」는 그때만 알 수 있는 값이다.
+ *
+ * ■ 🔑 목록이 아니라 **최신 1건**이다 (C0 §4-3 ② 「S1 사용」)
+ *   계약이 그렇게 정했다. 지난 것을 스크롤하는 화면은 「어제 것을 오늘 봤다」와 「오늘 것을
+ *   오늘 봤다」를 한 앉음에 섞고, 그 둘은 끈기 축에서 다른 신호다. 페이지 커서(`since`)는
+ *   서버에 이미 있으니 회고 화면이 정해지는 날 그때 붙인다.
+ *
+ * ■ 🚫 「무시」 버튼을 두지 않는다 — 버튼은 둘이다 (발주_게임모듈 §153·§191)
+ *   `무시` 는 앱이 보내지 않는다: 안 누른 것은 이미 **`viewed` 는 있고 `responded` 가 없는
+ *   모양**으로 남아 그 자체가 관측이다. 버튼을 세 개로 늘리면 「접었다」와 「안 열었다」가
+ *   한 값으로 섞인다(`src/교정API.js` 가 값목록을 지키며 화면에 넘긴 판정이 이 자리다).
+ *
+ * ■ 🔴 없는 것을 말하지 않는다 — 몽골어 해설 자리는 **비어 있다**
+ *   `engine.corrections.explanation` 은 물리에 있는데 `GET /v1/corrections` 의 `data[]`
+ *   (C0 §4-3 ②)에 없어 앱에 닿지 않는다. 발주_게임모듈 §138 이 요구한 「몽골어 해설이 아래에
+ *   붙는다」는 **계약 개정 자리**다 — 화면에서 지어내면 그날부터 학생이 읽는 것과 서버가 가진
+ *   것이 갈린다. 그래서 이 화면은 온 것만 그린다(오류 태그·고친 문장·누가·언제).
+ *
+ * ■ 디자인 (`테마.js` R1 · `신호자리`)
+ *   신호 1점 = **오류 태그**(코랄 글자). 이 화면엔 녹음 버튼이 없어서 성립한다 —
+ *   인증 화면이 오류 메시지로 같은 자리를 쓰는 것과 같은 근거다.
+ *   🚫 코랄 **면**을 만들지 않는다(그 위에 얹을 수 있는 글자색이 킷에 없다).
+ */
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { 색, 폰트, 모노트래킹 } from './테마';
+import { 교정앉음, 열람사건, 응답사건, 교정사건보내기, 학생응답값 } from './교정API.js';
+import { 항목추가, 응답값, 전송기록, 밀린것 } from '../lib/교정로그.js';
+import { 교정로그읽기, 교정로그쓰기 } from './저장.js';
+
+/** 누가 고쳤나 — `actor_kind` 그대로 말한다(계약이 이 칸을 준 이유다 · L0 §3-4). */
+const 고친이 = { teacher: '선생님이 고쳐 줬어요', ai: 'AI 가 고쳐 줬어요' };
+
+/** 버튼 문구 — 값은 계약 값목록(`학생응답값`)이고 문구는 이 화면 것이다. */
+const 답문구 = { 채택: '알겠어요', 수정: '다시 말해 볼래요' };
+
+/**
+ * @param {object} props
+ * @param {string} props.토큰
+ * @param {object|null} props.교정 `GET /v1/corrections` 의 `data[0]`. 없으면 **화면 자체가 안 뜬다**
+ *   (App.js 가 링크를 안 그린다 · C0 §4-3 ② 「빈 카드 금지」).
+ * @param {() => void} props.돌아가기
+ */
+export default function 답장화면({ 토큰, 교정, 돌아가기 }) {
+  const [로그, set로그] = useState([]);
+  const [오류, set오류] = useState(null);
+  const [도는중, set도는중] = useState(true);
+
+  /* 🔑 **한 번 열린 것이 한 앉음**이다 — 사건마다 새로 지으면 「한 번에 다 봤다」와
+     「나눠 봤다」가 같은 모양이 된다(`교정API.교정앉음` 머리말 · P0 §3-1 ④).
+     `useRef` 로 두는 것은 리렌더에 값이 바뀌지 않게 하기 위해서다. */
+  const 앉음 = useRef(교정앉음()).current;
+  const id = 교정 && 교정.correction_id;
+
+  /**
+   * 아직 안 닿은 항목을 **만들어진 순서대로** 보내고, 결과를 그 항목에 적는다.
+   * 🔑 열람과 응답이 같은 통로를 지난다 — 판정(계약 위반·`duplicate`)이 두 곳에 적히면
+   *   갈라지고, 갈라진 쪽은 조용히 영원히 재시도한다(`src/사건통로.js`).
+   */
+  const 흘려보내기 = async (시작로그) => {
+    let 다음 = 시작로그;
+    for (const 항목 of 밀린것(시작로그)) {
+      const 결과 = await 교정사건보내기(토큰, 항목.사건);
+      다음 = 전송기록(다음, 항목.id, 결과);
+    }
+    await 교정로그쓰기(다음).catch(() => {});
+    set로그(다음);
+    return 다음;
+  };
+
+  /* 화면에 카드가 **실제로 뜬 순간** 열람 사건 하나. 이미 만든 적이 있으면 `항목추가` 가
+     접는다 — 그래서 여기서 「이미 봤나」를 따로 묻지 않는다(묻는 곳이 둘이면 한 곳이 잊는다). */
+  useEffect(() => {
+    let 살아있음 = true;
+    (async () => {
+      try {
+        const { 로그: 저장된 } = await 교정로그읽기();
+        const { 로그: 더한것 } = 항목추가(저장된, 열람사건({ correction_id: id, correlation_id: 앉음 }));
+        await 교정로그쓰기(더한것).catch(() => {});
+        if (!살아있음) return;
+        set로그(더한것);
+        await 흘려보내기(더한것);
+      } catch (e) {
+        /* 🔴 읽기 실패를 빈 로그로 둔갑시키지 않는다 — 빈 로그로 이어 가면 이미 보낸 열람을
+           「처음」으로 취급해 사건이 두 벌 나간다. 카드는 그대로 보여주고 기록만 멈춘다. */
+        if (살아있음) set오류(String((e && e.message) || e));
+      } finally {
+        if (살아있음) set도는중(false);
+      }
+    })();
+    return () => { 살아있음 = false; };
+  }, [id]);
+
+  const 답하기 = async (값) => {
+    set도는중(true);
+    try {
+      const { 로그: 더한것 } = 항목추가(
+        로그,
+        응답사건({ correction_id: id, correlation_id: 앉음, 학생응답: 값 }),
+      );
+      await 교정로그쓰기(더한것).catch(() => {});
+      set로그(더한것);
+      await 흘려보내기(더한것);
+    } catch (e) {
+      set오류(String((e && e.message) || e));
+    } finally {
+      set도는중(false);
+    }
+  };
+
+  const 답한값 = id ? 응답값(로그, id) : null;
+  /* 🔴 「보냈다」고 말할 수 있는 것은 `event_id` 가 있을 때뿐이다(제출 완료 카드가 안 닿은
+     목소리를 「도착」이라 부르던 자리와 같은 축). 여기서는 **영구 실패만** 글자로 세운다 —
+     아직 밀린 것은 다음에 열 때 조용히 다시 나가므로 학생이 할 일이 없다. */
+  const 못보낸답 = 로그.some(
+    (e) => e.correction_id === id && e.event_type === 'correction.responded'
+      && !e.event_id && e.send_final,
+  );
+  const 태그 = (교정 && 교정.error_tags) || [];
+
+  return (
+    <ScrollView style={s.wrap} contentContainerStyle={s.inner}>
+      <Text style={s.머리}>답장</Text>
+
+      {교정 ? (
+        <View style={s.카드}>
+          <Text style={s.고친이}>{고친이[교정.actor_kind] || '고쳐 줬어요'}</Text>
+
+          {교정.corrected_text ? (
+            <Text style={s.문장} selectable>{교정.corrected_text}</Text>
+          ) : null}
+
+          {/* 신호 1점 — 이 화면의 코랄은 여기뿐이다. 태그는 한글이라 모노를 쓰지 않는다
+              (DM Mono 에 한글 글리프가 없다 · `테마.js`). */}
+          {태그.length ? (
+            <View style={s.태그줄}>
+              {태그.map((t) => <Text key={t} style={s.태그}>{t}</Text>)}
+            </View>
+          ) : null}
+
+          <Text style={s.메모}>내일 따라 말하기는 이 문장이에요.</Text>
+        </View>
+      ) : null}
+
+      {답한값 ? (
+        <Text style={s.답한줄}>{답문구[답한값] || 답한값} — 답했어요</Text>
+      ) : (
+        <View style={s.버튼줄}>
+          {학생응답값
+            .filter((값) => 답문구[값])
+            .map((값) => (
+              <Pressable
+                key={값}
+                disabled={도는중 || !id}
+                onPress={() => 답하기(값)}
+                style={({ pressed }) => [
+                  s.버튼,
+                  값 === '수정' && s.버튼_보조,
+                  (도는중 || !id) && s.버튼_잠김,
+                  pressed && s.버튼_눌림,
+                ]}
+              >
+                <Text style={[s.버튼글, 값 === '수정' && s.버튼글_보조]}>{답문구[값]}</Text>
+              </Pressable>
+            ))}
+        </View>
+      )}
+
+      {못보낸답 ? <Text style={s.알림}>답이 저장되지 않았어요. 선생님께 알려 주세요.</Text> : null}
+      {오류 ? <Text style={s.알림}>{오류}</Text> : null}
+
+      <Pressable onPress={돌아가기} style={({ pressed }) => [s.back, pressed && { opacity: 0.7 }]}>
+        <Text style={s.backText}>← 말하기로 돌아가기</Text>
+      </Pressable>
+    </ScrollView>
+  );
+}
+
+const s = StyleSheet.create({
+  wrap: { flex: 1, backgroundColor: 색.바탕 },
+  inner: { padding: 24, paddingTop: 84, paddingBottom: 48, gap: 18 },
+
+  머리: { fontFamily: 폰트.헤드, fontSize: 26, lineHeight: 36, color: 색.잉크 },
+
+  카드: { backgroundColor: 색.바탕띄움, borderRadius: 20, padding: 22, gap: 14 },
+  고친이: { fontFamily: 폰트.캡션, fontSize: 14, lineHeight: 22, color: 색.잉크_메타 },
+  문장: { fontFamily: 폰트.본문, fontSize: 20, lineHeight: 32, color: 색.잉크 },
+
+  태그줄: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  태그: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.신호 },
+
+  메모: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 21, color: 색.잉크_보조 },
+
+  버튼줄: { flexDirection: 'row', gap: 12 },
+  /* 인증 화면과 같은 버튼이다 — Cream 면 + Navy 2 글자(대비 15.74). 두 벌로 적으면 갈라진다. */
+  버튼: {
+    flex: 1, backgroundColor: 색.잉크, borderRadius: 14, height: 52,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  버튼_보조: { backgroundColor: 'transparent', borderWidth: 1, borderColor: 색.잉크_희미 },
+  버튼_잠김: { opacity: 0.35 },
+  버튼_눌림: { opacity: 0.82 },
+  버튼글: { fontFamily: 폰트.강조, fontSize: 16, color: 색.바탕 },
+  버튼글_보조: { color: 색.잉크_서브 },
+
+  답한줄: { fontFamily: 폰트.강조, fontSize: 15, lineHeight: 24, color: 색.잉크_서브 },
+  알림: { fontFamily: 폰트.캡션, fontSize: 14, lineHeight: 22, color: 색.잉크_서브 },
+
+  back: { paddingTop: 8 },
+  backText: {
+    fontFamily: 폰트.모노, fontSize: 11, letterSpacing: 모노트래킹.라벨, color: 색.잉크_메타,
+  },
+});

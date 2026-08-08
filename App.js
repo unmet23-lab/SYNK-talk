@@ -3,10 +3,12 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import 말하기화면 from './src/말하기화면';
+import 답장화면 from './src/답장화면';
 import 도착확인 from './src/도착확인';
 import 인증화면, { 단계 } from './src/인증화면';
 import 원장초기화 from './src/원장초기화';
 import * as 인증 from './src/인증API';
+import { 교정목록받기 } from './src/교정API';
 import { 세션읽기, 세션쓰기, 세션지우기 } from './src/저장';
 import { 색, 폰트, 모노트래킹 } from './src/테마';
 
@@ -22,6 +24,7 @@ export default function App() {
   const [화면, set화면] = useState('말하기');
   const [세션, set세션] = useState(null);
   const [복원중, set복원중] = useState(true);
+  const [교정, set교정] = useState(null); // 나에게 온 최신 교정 1건 (없으면 답장 링크를 안 그린다)
   const [fontsLoaded] = useFonts({
     'SUIT-Regular': require('./assets/fonts/SUIT-Regular.ttf'),
     'SUIT-Medium': require('./assets/fonts/SUIT-Medium.ttf'),
@@ -56,6 +59,26 @@ export default function App() {
     return () => { 살아있음 = false; };
   }, []);
 
+  /* 답장(교정)이 **있을 때만** 링크를 그린다 — P0 §5 S1-8 「교정이 없으면 화면에 안 뜸」 ·
+     C0 §4-3 ② 「빈 카드 금지」. 그래서 목록을 여기서 한 번 읽고 화면에 내려준다:
+     🔑 링크의 근거와 화면이 그리는 것이 **같은 한 번의 조회**여야 한다. 두 번 읽으면 링크는
+        떴는데 화면은 비는 날이 생기고, 학생 눈에는 앱이 고장난 것으로 보인다.
+     🔴 실패는 **조용하다** — 답장 링크가 안 뜰 뿐 말하기는 그대로 돌아야 한다(교정 조회가
+        죽었다고 오늘 발화를 막으면, 못 고칠 이유로 학생의 하루를 버린다). */
+  useEffect(() => {
+    if (!세션) return undefined;
+    let 살아있음 = true;
+    (async () => {
+      try {
+        const { 목록 } = await 교정목록받기(세션.access_token);
+        if (살아있음) set교정(목록[0] || null);
+      } catch {
+        if (살아있음) set교정(null);
+      }
+    })();
+    return () => { 살아있음 = false; };
+  }, [세션]);
+
   const 세션세움 = async (새것) => {
     set세션(새것);
     // 저장 실패가 로그인을 막지 않는다 — 세션은 이미 섰고, 최악은 다음 실행에 다시 묻는 것뿐이다
@@ -88,6 +111,9 @@ export default function App() {
           학생번호도 함께 — 막힌 학생의 안내가 「선생님께 이 번호를 보여 주세요」로 끝나는데
           토큰에는 합성 이메일뿐이라, 이 자리를 지나지 않으면 화면이 그 번호를 모른다(F176 ①). */}
       {화면 === '말하기' && <말하기화면 토큰={세션.access_token} 학생번호={세션.학생번호} />}
+      {화면 === '답장' && (
+        <답장화면 토큰={세션.access_token} 교정={교정} 돌아가기={() => set화면('말하기')} />
+      )}
       {화면 === '시스템' && <도착확인 돌아가기={() => set화면('말하기')} 가기={set화면} />}
       {화면 === '비번변경' && (
         <인증화면
@@ -105,6 +131,14 @@ export default function App() {
           <Text style={s.시스템글}>SYSTEM</Text>
         </Pressable>
       )}
+      {/* 🔑 링크를 **여기** 두는 이유: 말하기 화면은 「동사 하나」라 그 안에 다른 입구를 두면
+          90초 한 흐름이 끊긴다. 앱의 겉테(SYSTEM 링크와 같은 층)가 이 자리다.
+          🔴 교정이 없으면 아예 안 그린다 — 눌러서 빈 화면을 만나는 것이 더 큰 오해다. */}
+      {화면 === '말하기' && 교정 && (
+        <Pressable onPress={() => set화면('답장')} style={s.답장링크} hitSlop={8}>
+          <Text style={s.답장글}>답장이 왔어요</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -112,6 +146,10 @@ export default function App() {
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: 색.바탕 },
   로딩: { flex: 1, backgroundColor: 색.바탕 },
+  /* 겉테 두 링크는 같은 띠에 마주 놓는다 — 말하기 화면 본문은 paddingTop 68 아래에서 시작해
+     이 띠와 겹치지 않는다. 🚫 코랄로 칠하지 않는다: 그 화면의 신호 1점은 녹음 버튼이다. */
+  답장링크: { position: 'absolute', top: 34, left: 24 },
+  답장글: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_서브 },
   시스템링크: { position: 'absolute', top: 34, right: 24, opacity: 0.8 },
   시스템글: {
     fontFamily: 폰트.모노,

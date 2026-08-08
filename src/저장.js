@@ -50,6 +50,34 @@ export async function 로그쓰기(로그) {
   f.write(직렬화(로그));
 }
 
+/* ── 교정 사건 로그 ───────────────────────────────────────────────────────────
+ * 🔴 **제출 로그와 같은 파일에 섞지 않는다**(`lib/교정로그.js` 머리말) — `학습출석`·`배달상태`
+ *   가 `talk_log.jsonl` 의 모든 항목을 발화로 세므로, 교정 열람 한 건이 제출 수를 늘린다.
+ * 🔑 직렬화는 같은 것을 쓴다(JSONL · 한 줄 한 항목) — 파일이 중간에 깨져도 앞 줄들은 산다. */
+let 메모리교정로그 = [];
+
+export async function 교정로그읽기() {
+  if (웹) return { 로그: 메모리교정로그, 깨진줄: 0 };
+  try {
+    const f = new FS.File(FS.Paths.document, 'correction_log.jsonl');
+    if (!f.exists) return { 로그: [], 깨진줄: 0 };
+    return 역직렬화(f.textSync());
+  } catch (e) {
+    // 읽기 실패를 빈 로그로 둔갑시키지 않는다 — 빈 로그로 보면 이미 본 교정을 다시 「처음」으로
+    // 취급해 열람 사건이 두 벌 나간다(그게 이 로그가 막는 것이다).
+    throw new Error('교정 기록을 읽지 못했어요: ' + (e && e.message));
+  }
+}
+
+export async function 교정로그쓰기(로그) {
+  if (웹) {
+    메모리교정로그 = 로그;
+    return;
+  }
+  const f = new FS.File(FS.Paths.document, 'correction_log.jsonl');
+  f.write(직렬화(로그));
+}
+
 /**
  * 조립된 WAV 바이트를 기기에 쓴다(배선① — 앱이 컨테이너를 직접 만든다 · `lib/wav조립.js`).
  *
