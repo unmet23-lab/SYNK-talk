@@ -112,9 +112,15 @@
       "options_shown", "position", "recommended_option", "selected_option", "changed_selection", "latency_ms", "skipped", "selection_reason", "rejected_all",
       "cited_refs", "intervention_id", "degraded",
       "source_kind", "estimator_confidence", "evidence_refs", "estimator_version", "valid_from", "expires_at", "user_confirmed",
-      "consent_ver"
+      "consent_ver",
+      "session_id", "content_id", "task_schema_ver", "image_refs", "consent_id"
     ],
     "미구현_주의": {
+      "session_id": "2026-08-09 등재(C0 심문 B4) — **Supabase 쪽은 이미 저장한다**(`functions/events`). 여기서 「미구현」인 것은 **라이브 시트 수집층**이다: 시트는 한 행이 한 제출이라 「한 번 켠 것」을 묶을 칸이 없다. 시트 이관 어댑터가 서는 날 대응이 생긴다.",
+      "content_id": "위와 같음 — Supabase 저장 ✅ / 라이브 시트 대응 열 없음. 배달·게임 화면에서만 값이 있고, 자유발화·낭독처럼 콘텐츠 참조가 없는 과업은 비는 것이 정상이다.",
+      "task_schema_ver": "위와 같음 — `task_snapshot` 이 어느 «모양»인가(스냅샷 구조의 판). 스냅샷 자체가 시트에 없어 그 판도 없다. 🚫 문항 자체의 판과 다른 것이다(그건 스냅샷 안에 들어간다).",
+      "image_refs": "위와 같음 — 사진 제출 첨부. 🔴 이 이름은 B4 의 넷과 같은 조건인데 심문 목록에 없어 **역방향 회귀를 짓다가 실측으로 나왔다**(SYNK-talk `tests/계약역방향.test.js`).",
+      "consent_id": "2026-08-09 등재 — **어느 동의 «행»** 인가. 서버가 `engine.consents` 를 읽어 박는 **서버칸**이라 앱·시트가 보내면 거부된다(`consent_ver` 는 문서 «판»이라 다른 칸이다: 판만 알면 어느 학생의 어느 동의였는지 못 되짚는다).",
       "due_at": "c10 신설 — 라이브에 대응 열이 없다(시트는 「낸 시각」만 남기고 「언제까지였나」를 안 남긴다). 🔴배정 순간에만 참인 값이다: 수업표가 바뀌면 그때 그 학생의 마감을 다시 계산할 근거가 사라진다. 채우는 자는 `supabase/functions/deliver`(배정 insert 와 같은 트랜잭션)이고, 서버가 채우므로 앱이 보내면 거부된다(`lib/이벤트검증.js` 서버칸).",
       "due_ver": "c10 신설 — `due_at` 을 낸 규칙의 판. `due.v1` = 배정일의 끝(배정일 다음날 00:00 · `Asia/Ulaanbaatar`). 규칙이 바뀌면 새 판 이름을 쓰고 옛 행은 옛 이름을 그대로 든다 — 판본 없이 시각만 남기면 2년 뒤에 그 값이 무엇이었는지 아무도 못 말한다. 짝 CHECK(`submissions_due_paired_c10`)가 반쪽을 막는다.",
       "event_id": "라이브 시트의 `id` 열로 대신하지 않는다 — 시트마다 따로 채번해 한 테이블로 합치면 충돌한다.",
