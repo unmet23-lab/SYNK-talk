@@ -229,3 +229,31 @@ test('판 대조 — 저장소 판은 손 상수가 아니라 마이그레이션
   assert.match(v.판, /^c\d+$/, '실저장소에서 판을 못 읽었다');
   assert.match(v.파일, /^\d{14}_.+_c\d+\.sql$/u);
 });
+
+/* ── 텍스트(.md) 동봉 (2026-08-09 신설) ─────────────────────────────────────
+ * `prompts/교정.md` 는 **원문 자체가 정본**이다(교정 엔진의 지시문). 실어 보낼 통로가 없으면
+ * 그 원문을 코드에 베끼게 되고, 베낀 프롬프트는 `evals` 가 채점하는 것과 제품이 실제로 보내는
+ * 것을 갈라 놓는다 — **갈라진 채로도 양쪽 다 초록**이라 증상이 없다.
+ * 🔴 마크다운엔 백틱·역슬래시·따옴표가 흔하다. 템플릿 리터럴로 감싸면 프롬프트 한 줄이
+ *   배포 산출물의 **구문 오류**가 되고, 그 실패는 배포가 아니라 첫 호출에서 난다. */
+test('동봉 — .md 는 문자열 모듈이 되어 원문 그대로 import 된다', async () => {
+  const 방 = fs.mkdtempSync(path.join(os.tmpdir(), 'synk-동봉md-'));
+  try {
+    fs.writeFileSync(path.join(방, '동봉.json'),
+      JSON.stringify({ '교정프롬프트.mjs': 'prompts/교정.md' }));
+    const 묶음 = 동봉묶기(방);
+    const m = await 임시import('교정프롬프트.mjs', 묶음['교정프롬프트.mjs']);
+    const 원문 = fs.readFileSync(path.join(__dirname, '..', 'prompts', '교정.md'), 'utf8');
+    assert.equal(m.default, 원문, '동봉된 프롬프트가 원문과 다르다 — 베낀 것과 같아진다');
+  } finally {
+    fs.rmSync(방, { recursive: true, force: true });
+  }
+});
+
+test('동봉 — 백틱·역슬래시·따옴표가 든 텍스트도 깨지지 않는다', async () => {
+  /* 탐지력은 픽스처가 진다: 실물 프롬프트가 오늘 마침 안전한 글자만 쓰더라도, 내일 한 줄이
+   * 더해지면 깨진다. 그 하루를 배포 뒤에 알게 되면 안 된다. */
+  const 위험 = '```json\n{ "a": "b\\\\c" }\n```\n`백틱` 과 \'따옴표\' 와 ${템플릿}';
+  const m = await 임시import('위험.mjs', `export default ${JSON.stringify(위험)};\n`);
+  assert.equal(m.default, 위험);
+});

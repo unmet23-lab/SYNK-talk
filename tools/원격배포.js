@@ -172,6 +172,12 @@ function 동봉묶기(디렉터리) {
     미커밋검사(저장소경로, src);
     if (!이름.endsWith('.mjs')) out[이름] = src;                    // 그대로
     else if (저장소경로.endsWith('.json')) out[이름] = `export default ${src};\n`;  // JSON → ESM
+    /* 텍스트(.md) → ESM 문자열. **원문 자체가 정본**인 파일(프롬프트)을 함수가 그대로 쓰게 한다.
+     * 🔑 없으면 그 원문을 코드 안에 베껴야 하고, 베낀 프롬프트는 `evals` 가 재는 것과 제품이
+     *   실제로 보내는 것을 갈라 놓는다 — 갈라진 채로도 둘 다 초록이라 증상이 없다.
+     * 🔴 `JSON.stringify` 로 싣는다: 마크다운엔 백틱·역슬래시·따옴표가 흔해서 템플릿 리터럴로
+     *   감싸면 프롬프트 한 줄이 **배포 산출물의 구문 오류**가 된다(그 실패는 첫 호출에서 난다). */
+    else if (저장소경로.endsWith('.md')) out[이름] = `export default ${JSON.stringify(src)};\n`;
     // ⚠ `import` 는 호이스팅되므로 껍데기 뒤에 와도 된다 — 순서를 바꾸지 않는다(바꾸면 diff 가 커진다).
     else out[이름] = `const module = { exports: {} };\nconst exports = module.exports;\n${require풀기(src, 이름, 표내용)}\nexport default module.exports;\n`;
   }
