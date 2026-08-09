@@ -18,6 +18,13 @@ const { 문항, 아이막, 성별, 목표, 답검사 } = require('../lib/가입�
 const ROOT = path.join(__dirname, '..');
 const 읽기 = (상대) => fs.readFileSync(path.join(ROOT, 상대), 'utf8');
 
+/* 주석을 걷어낸 판. 🔴 **이 한 줄이 없으면 이 파일의 배선 검사가 전부 거짓 초록이다** — 변이
+ * 시험 실측(2026-08-09): `const 문항오류 = 답검사(본문);` 를 `= null; // 답검사(본문)` 로
+ * 바꿨는데 「답검사를 부른다」가 그대로 통과했다. 낱말이 남아 있었기 때문이다(CLAUDE.md
+ * 「가드는 자기 전처리에도 눈이 먼다」). 문자열 속 `//` 도 같이 잘리지만 여기 검사는 **어느
+ * 호출이 있나·먼저인가**만 보므로 그 손상은 결과를 안 바꾼다. */
+const 코드만 = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+
 const 온전한답 = () => ({ home_aimag: 'ulaanbaatar', gender: 'undisclosed', goal_track: 'study' });
 
 // ── 값목록 ──────────────────────────────────────────────────
@@ -82,9 +89,14 @@ test('🔴 auth 가 세 열을 **등록을 잇는 그 UPDATE** 에 적는다 (�
 });
 
 test('🔴 검사가 계정을 만들기 **전에** 돈다 — 뒤로 밀면 거절당한 학생이 빈 칸인 채 등록된다', () => {
-  const src = 읽기('supabase/functions/auth/index.ts');
-  assert.ok(src.indexOf('답검사(본문)') > 0, '서버가 답검사를 안 부른다');
-  assert.ok(src.indexOf('답검사(본문)') < src.indexOf('계정만들기(주소'),
+  const src = 코드만(읽기('supabase/functions/auth/index.ts'));
+  /* 🔑 「부른다」가 아니라 **「그 결과로 갈라진다」**를 잰다 — 부르기만 하고 값을 버리면
+     검사는 있는데 아무것도 안 막는다(그 모양이 실제로 변이에서 살아남았다). */
+  const 호출 = src.search(/const\s+문항오류\s*=\s*답검사\(본문\)\s*;/);
+  assert.ok(호출 > 0, '🔴 서버가 답검사의 결과를 안 받는다');
+  assert.ok(/if\s*\(문항오류\)\s*\{[\s\S]{0,400}?CONTRACT_VIOLATION/.test(src),
+    '🔴 문항오류를 받아 놓고 거절하지 않는다 — 검사가 통과 방향으로 샌다');
+  assert.ok(호출 < src.indexOf('계정만들기(주소'),
     '🔴 답검사가 계정 생성 뒤로 밀렸다 — 그 학생은 다시 이 통로에 못 들어온다(이미 등록됨 = 게이트 실패)');
 });
 
