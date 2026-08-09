@@ -9,7 +9,8 @@
  *   ⑥ 은 착수 순서 넷(판 22열 → `review` 함수 → c11 물리 → Expo 화면)이 **전부 코드로 섰고**
  *   배포판 대조도 닫혔는데(다름 0), 이 통로를 **한 번도 실제로 지나간 적이 없었다.**
  *   실측이 그 말을 그대로 했다 — `staff_access_log` 의 `action` 이 `learner.*` 둘뿐이라
- *   `review.queue`·`review.audio`·`review.approve`·`review.discard` 는 **0행**이었다.
+ *   `review.queue`·`review.audio`·`review.audio.played`·`review.approve`·`review.discard` 는
+ *   **0행**이었다.
  *   즉 「배포됨」과 「돈다」 사이가 통째로 비어 있었고, 그 구간의 결함은 증상이 없다.
  *
  * ■ 여기서만 잴 수 있는 것 — 파일 층 회귀가 원리상 못 보는 자리들
@@ -19,6 +20,12 @@
  *   · **폐기 어휘를 DB CHECK 에서 읽는 사슬**(`pg_get_constraintdef`) — 파싱이 실패하면
  *     증상이 400 이 아니라 **500** 이라 회귀에선 초록이고 여기서만 빨개진다.
  *   · **원자성 넷**(teacher 행 · `transcript_verified` · `status='verified'` · 감사).
+ *   · **게이트가 시간을 어떻게 세는가**(§2 개정 · ㉮) — 이 도구가 그 구멍을 **처음 냈다**:
+ *     서명 기록이 612초 된 확정분에 새 서명 없이 재검수를 보내니 200 이었다. 회귀는 코드에
+ *     `staff_access_log` 가 있는 것만 보지, 그 장부가 **append-only 라 영원히 산다**는 사실이
+ *     게이트를 무력화하는 것은 못 본다. 지금은 두 자리를 여기서 잰다:
+ *     ①서명만 받고 재생 안 한 승인이 거절되는가(프리로드 누수) ②마지막 판정 이후에 다시
+ *     듣지 않은 재검수가 거절되는가(옛 기록 재사용).
  *
  * ■ 🔴 리허설 전용 · 남기는 것이 있다
  *   확정은 `corrections`(트리거 `corrections_immutable`)에 **지울 수 없는 teacher 행**을 남기고
@@ -292,6 +299,14 @@ async function main() {
   });
   const 승인 = (o) => 부르기('approve', { 메서드: 'POST', 본문: 승인본문(o) });
 
+  /* 🔴 **㉮ 개정의 핵심 실증** — A 는 방금 §4 로 서명을 받았다(③). 옛 계약이면 그 발급 기록이
+   *   곧 게이트 ②의 증거라 여기서 **통과**했다. 이제는 거절돼야 한다: 발급은 「열 수 있게 해
+   *   준 것」이고 게이트를 여는 것은 「열었다」뿐이다. 이 한 줄이 프리로드 누수가 닫혔음을
+   *   서버 층에서 증명한다(화면 순서에 기대지 않는다). */
+  r = await 승인();
+  확인('🔴 서명만 받고 «재생은 안 했으면» 승인이 안 된다 — 프리로드가 게이트를 못 연다',
+    r.status === 409 && 코드(r) === 'GATE_NOT_MET' && r.body?.error?.field === 'audio', r);
+
   r = await 부르기('approve', {
     메서드: 'POST',
     본문: { submission_id: B.submission_id, reviewed_correction_id: B_AI, supersedes: null,
@@ -301,6 +316,20 @@ async function main() {
   확인('🔴 오디오를 연 기록이 없으면 승인이 안 된다 — 한 번도 안 들은 발화가 라벨이 되지 않는다',
     r.status === 409 && 코드(r) === 'GATE_NOT_MET', r);
   확인('   그 거절이 `audio` 칸을 지목한다', r.body?.error?.field === 'audio', r.body?.error);
+
+  /* ── ④-2 §4-2 재생 알림 — 게이트 ②의 증거를 만든다 ───────────── */
+  console.log('\n■ ④-2 §4-2 재생 알림 — 아무것도 발급하지 않고 「열었다」만 남긴다');
+  r = await 부르기('played', { 메서드: 'POST', 본문: { submission_id: 'abc' } });
+  확인('submission_id 모양이 아니면 400', r.status === 400 && r.body?.error?.field === 'submission_id', r);
+  r = await 부르기('played', { 메서드: 'POST', 본문: { submission_id: '00000000-0000-4000-8000-000000000000' } });
+  확인('큐 밖이고 확정분도 아니면 404 — 존재 여부가 새지 않는다', r.status === 404 && 코드(r) === 'NOT_FOUND', r);
+
+  const 청취전 = await 감사수('review.audio.played');
+  r = await 부르기('played', { 메서드: 'POST', 본문: { submission_id: A.submission_id } });
+  확인('200 이고 응답에 `ok` 말고는 없다 — 발급이 0이라 서명 누수 위험도 0이다',
+    r.status === 200 && r.body.ok === true && r.body.url === undefined && r.body.expires_at === undefined, r);
+  확인('감사에 review.audio.played 1행 — 게이트 ②가 읽는 입력이 여기서 생긴다',
+    (await 감사수('review.audio.played')) === 청취전 + 1);
 
   r = await 승인({ review_listened_ms: 0 });
   확인(`청취 0ms 는 거절 — 문턱 ${하한ms}ms(오늘은 하한 · 세그먼트 생산자가 아직 안 채웠다)`,
@@ -361,6 +390,22 @@ async function main() {
   r = await 승인({ supersedes: A_AI, corrected_text: 재검수문, transcript_verified: A전사 });
   확인('supersedes 는 teacher 행이어야 한다 — AI 행을 가리키면 400',
     r.status === 400 && r.body?.error?.field === 'supersedes', r);
+
+  /* 🔴 **612초 구멍의 실증** — 이 자리가 2026-08-09 에 200 이었다. 재생 기록은 살아 있지만
+   *   그것은 **확정 «전»**의 것이라 이번 판정의 증거가 못 된다. 옛 계약은 `exists` 만 봐서
+   *   append-only 장부의 아무 행이나 통과시켰고, 그래서 「정직한 검수자는 다시 들을 수 없는데
+   *   자백을 적어 보내면 통과」였다. 시간 상수는 여기 한 글자도 없다. */
+  r = await 승인({ supersedes: A확정, corrected_text: 재검수문, transcript_verified: A전사 });
+  확인('🔴 마지막 판정 «이후»에 다시 안 들었으면 재검수가 거절된다 — 옛 재생 기록은 증거가 아니다',
+    r.status === 409 && 코드(r) === 'GATE_NOT_MET' && r.body?.error?.field === 'audio', r);
+
+  /* 확정분에도 §4-2 는 열려 있다(소속 = 큐 안 **또는** verified). §4 는 여전히 404 인데
+   * 그 둘이 갈리는 것이 ㉮ 다 — 발급은 안 주고 「열었다」는 받는다. 다시 듣는 길은 아직 살아
+   * 있는 옛 URL 뿐이라, 그것이 죽으면 재검수가 자연히 닫힌다(창 = 시간 상수 0). */
+  r = await 부르기('played', { 메서드: 'POST', 본문: { submission_id: A.submission_id } });
+  확인('확정분에도 재생 알림은 받는다 — 서명은 안 나가지만 「다시 들었다」는 적힌다',
+    r.status === 200 && r.body.ok === true, r);
+
   r = await 승인({ supersedes: A확정, corrected_text: 재검수문, transcript_verified: A전사 });
   const 재검수됨 = 확인('확정분(verified)은 큐 밖이지만 재검수는 받는다', r.status === 200 && r.body.ok === true, r);
   const A재확정 = r.body.correction_id;
@@ -396,6 +441,11 @@ async function main() {
     확인('폐기분도 큐에서 빠진다 — 되돌아오지 않는다', !(await 큐에있나(B.submission_id)));
     r = await 폐기({ submission_id: B.submission_id, reason: 폐기어휘[0] });
     확인('이미 폐기된 것은 404(큐 밖)', r.status === 404 && 코드(r) === 'NOT_FOUND', r);
+    /* §4-2 의 소속은 큐 안 **또는** verified 다 — 폐기분은 어느 쪽도 아니라 막힌다.
+     * 안 막으면 폐기된 발화에 「열어 봄」 감사만 쌓이고, 그 장부는 지울 수 없다. */
+    r = await 부르기('played', { 메서드: 'POST', 본문: { submission_id: B.submission_id } });
+    확인('폐기분에는 재생 알림도 안 받는다 — 다시 들을 대상이 아니다',
+      r.status === 404 && 코드(r) === 'NOT_FOUND', r);
   }
 
   /* ── ⑧ 0건도 장부에 남는가 ────────────────────────────────────── */

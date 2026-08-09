@@ -22,6 +22,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const { 코드만, 구간, 코드만픽스처 } = require('./lib/소스검사.js');
 
 const 뿌리 = path.resolve(__dirname, '..');
 const 함수방 = path.join(뿌리, 'supabase', 'functions', 'review');
@@ -214,34 +215,16 @@ test('직원 폐기 판정은 lib 정본을 부른다 (사본을 두지 않는�
  *  §5 쪽은 아래 ⑦ 이 그 축을 응답 키 허용 목록으로 잰다. 범위를 안 좁히고 규칙만 지우면
  *  읽기 경로의 보호까지 같이 사라진다. */
 function 함수본문(시작앵커, 끝앵커) {
-  const i = 소스.indexOf(시작앵커);
-  assert.ok(i !== -1, `앵커 \`${시작앵커}\` 를 못 찾았다 — 이 검사가 통째로 미실행이다`);
-  const 잘린것 = 끝앵커 === null ? 소스.slice(i) : (() => {
-    const j = 소스.indexOf(끝앵커, i + 1);
-    assert.ok(j > i, `앵커 \`${끝앵커}\` 를 못 찾았다 — 구간을 못 자른다`);
-    return 소스.slice(i, j);
-  })();
-  return 코드만(잘린것);
-}
-
-/** 주석 줄을 뺀다.
- *  🔴 **변이 시험이 이 자리를 드러냈다**: `for update` 를 코드에서 지웠는데 검사가 초록이었다 —
- *  바로 위 주석이 「뷰에는 `for update` 를 걸 수 없다」고 **설명**하고 있었고, 검사는 그
- *  설명을 코드로 읽었다. 가드가 자기 주석에 눈이 먼 자리다(설명이 자세할수록 더 잘 먼다).
- *  ⚠ 줄 단위라 코드 줄 끝의 인라인 `/* … *\/` 는 남는다 — 이 파일의 주석은 전부 블록이라 충분하다. */
-function 코드만(본문) {
-  return 본문.split('\n').filter((l) => !/^\s*(\*|\/\*|\/\/)/u.test(l)).join('\n');
+  return 구간(소스, 시작앵커, 끝앵커);
 }
 
 test('탐지력 픽스처 — 주석 제거기가 「설명 속의 코드」를 실제로 지운다', () => {
-  const 예시 = ['  /* 뷰에는 `for update` 를 걸 수 없다.', '   * 그래서 잠금을 갈랐다. */',
-    '  const x = 1;', '  // for update 라고 적어 둔다'].join('\n');
-  assert.equal(코드만(예시), '  const x = 1;',
+  assert.equal(코드만(코드만픽스처.입력), 코드만픽스처.기대,
     '주석을 안 지운다 — 검사가 설명을 코드로 읽고, 그 상태는 「초록」과 같은 모양이다');
 });
 
 test('읽기 경로(큐·서명)가 원표를 직접 안 읽는다 — 읽는 곳은 판 하나다', () => {
-  const 읽기 = 함수본문('async function 큐읽기', '/* ── §5 승인·폐기');
+  const 읽기 = 함수본문('async function 큐읽기', '/* ── §4-2 POST');
   for (const 표 of ['engine.submissions', 'engine.corrections', 'engine.pipeline_jobs', 'engine.learning_events']) {
     assert.ok(!읽기.includes(`from ${표}`) && !읽기.includes(`join ${표}`),
       `${표} 를 직접 읽는다 — 판(②-17)이 막아 둔 열이 이 문으로 도로 나간다`);
@@ -249,15 +232,34 @@ test('읽기 경로(큐·서명)가 원표를 직접 안 읽는다 — 읽는 �
   assert.match(읽기, /from engine\.review_queue/u, '판을 안 읽는다 — 앵커가 낡았다');
 });
 
+/* §4-2 는 위 규칙의 **유일한 예외**다 — 그래서 예외인 이유를 기계가 지킨다.
+ * 소속을 가르려면 원표(`pipeline_jobs.status`)를 봐야 한다: 재검수 창은 **큐 밖**(확정분)이라
+ * 판만 보면 `Z` 가 원리상 못 지난다. 대신 그 값이 **응답에 한 글자도 안 실려야** 예외가 성립한다.
+ * 실리기 시작하면 판을 좁혀 둔 것이 이 문으로 새고, 증상은 「통과」다. */
+test('§4-2 는 원표를 읽지만 **아무것도 응답에 싣지 않는다**', () => {
+  const 열어봄 = 함수본문('async function 열어봄', '/* ── §5 승인·폐기');
+  assert.match(열어봄, /engine\.pipeline_jobs/u,
+    '소속을 원표에서 안 본다 — 그러면 확정분(재검수 창)이 이 경로를 못 지난다');
+  const 성공봉투 = [...열어봄.matchAll(/봉투\(200, \{([^}]*)\}/gu)].map((m) => m[1].trim());
+  assert.deepEqual(성공봉투, ['ok: true'],
+    '성공 응답에 `ok` 말고 다른 것이 실린다 — 이 경로가 원표를 읽는 예외였던 근거가 사라진다');
+  assert.ok(!/signedURL|storage|expires_at/u.test(열어봄),
+    '§4-2 가 무언가를 발급한다 — 「아무것도 발급하지 않는다」가 이 경로의 존재 이유다(§4-2)');
+});
+
 /* ── ⑥ 경로·동봉 ──────────────────────────────────────────────────── */
 
-test('경로는 넷이고 메서드가 갈린다 — 그 밖은 404 다', () => {
+test('경로는 다섯이고 메서드가 갈린다 — 그 밖은 404 다', () => {
   const m = /const 아는경로 = \[([^\]]*)\]/u.exec(소스);
   assert.ok(m, '`아는경로` 목록을 못 찾았다 — 뒷마디를 안 보면 `/review/아무거나` 가 큐 조회로 동작한다');
   assert.deepEqual([...m[1].matchAll(/'([a-z]+)'/gu)].map((x) => x[1]).sort(),
-    ['approve', 'audio', 'discard', 'queue'],
-    '경로 목록이 계약(§3·§4·§5)과 다르다');
+    ['approve', 'audio', 'discard', 'played', 'queue'],
+    '경로 목록이 계약(§3·§4·§4-2·§5)과 다르다');
   assert.match(소스, /경로 === 'queue' \? 'GET' : 'POST'/u, '경로별 메서드가 안 갈린다');
+  /* 🔑 목록에 있는 것과 **실제로 라우팅되는 것**은 다르다 — 목록에만 넣고 분기를 빠뜨리면
+   *   그 경로는 405 도 404 도 아닌 「승인·폐기 갈래」로 흘러 들어간다(마지막 삼항이 받는다). */
+  assert.match(소스, /경로 === 'played'\) return await 열어봄\(/u,
+    '`played` 가 목록에만 있고 분기가 없다 — 그 요청이 폐기 갈래로 떨어진다');
 });
 
 /* ── ⑦ §5 승인·폐기 ──────────────────────────────────────────────── */
@@ -329,15 +331,40 @@ test('🔴 §5 응답은 서버가 만든 값만 싣는다 — 원표 열이 안
     + '  → 원표에서 읽은 값을 그대로 내보내면 판(②-17)이 막아 둔 것이 이 문으로 나간다');
 });
 
-test('게이트 ②는 **요청자 본인의** 서명 기록을 본다', () => {
+test('게이트 ②는 **요청자 본인이 재생한 기록**을 본다 — 발급이 아니다', () => {
   const 승인 = 함수본문('async function 승인(', 'async function 폐기(');
   assert.match(승인, /staff_access_log l[\s\S]{0,200}l\.staff_id = \$\{staff_id\}/u,
     '남이 연 기록으로도 승인이 선다 — 그러면 이 게이트는 「누군가 들었다」만 보증한다(§5-1 ②)');
-  assert.match(승인, /l\.action = 'review\.audio'/u, '서명 발급 기록이 아닌 것을 증거로 쓴다');
+  assert.match(승인, /l\.action = 'review\.audio\.played'/u,
+    '재생 기록을 증거로 안 쓴다(§2 개정)');
+  /* 🔴 되돌림 금지 — 발급을 증거로 되돌리면 프리로드가 게이트를 미리 열고, 재검수는 612초 된
+   *   옛 기록으로 통과한다(2026-08-09 실측). 그 회귀는 **증상이 「통과」**라 아무도 못 본다. */
+  assert.ok(!/l\.action = 'review\.audio'/u.test(승인),
+    '발급(`review.audio`)을 다시 게이트 증거로 쓴다 — ㉮ 개정 이전으로 되돌아갔다');
 });
 
-test('감사 행위 이름 넷이 계약대로다', () => {
-  for (const 이름 of ['review.queue', 'review.audio', 'review.approve', 'review.discard']) {
+test('재검수는 **마지막 판정 이후의** 재생을 요구한다 — 그 비교가 SQL 에 있다', () => {
+  const 승인 = 함수본문('async function 승인(', 'async function 폐기(');
+  assert.match(승인, /판정후재청취/u, '재검수 갈래의 청취 판정이 없다 — 옛 기록으로 통과한다');
+  /* 비교 대상이 `supersedes` 행의 생성 시각이어야 한다. 다른 시각(예: 제출 시각)을 들면
+   * 「이번 판정 이후」가 아니라 「언젠가 이후」가 되어 게이트가 다시 헐거워진다. */
+  assert.match(승인, /max\(l\.at\)[\s\S]{0,400}>[\s\S]{0,200}c\.created_at[\s\S]{0,200}correction_id = \$\{q\.supersedes\}/u,
+    '재청취 비교가 `supersedes` 행의 `created_at` 을 안 든다');
+  assert.match(승인, /재검수 && !판정후재청취/u,
+    '그 값을 실제로 거절에 안 쓴다 — 계산만 하고 통과시키면 검사가 초록인 채 게이트가 없다');
+});
+
+test('게이트에 **시간 리터럴을 안 박는다** — 창은 서명 수명이 물리로 만든다', () => {
+  const 승인 = 함수본문('async function 승인(', 'async function 폐기(');
+  /* 🔑 「10분 안에 들었어야 한다」로 조이면 **첫 확정까지 같이 조인다** — 한 항목을 오래
+   *   붙들고 보는 검수는 정상 행동이고, 그 처방은 성실한 검수자만 막는다(§5 게이트 ② 🚫).
+   *   재검수 창은 확정분에 새 서명이 안 나가는 것으로 이미 닫힌다. */
+  assert.ok(!/interval\s|서명수명초|now\(\)\s*-/u.test(승인),
+    '승인 게이트가 시간 상수를 든다 — 첫 확정까지 같이 조인다(§5 🚫)');
+});
+
+test('감사 행위 이름 다섯이 계약대로다', () => {
+  for (const 이름 of ['review.queue', 'review.audio', 'review.audio.played', 'review.approve', 'review.discard']) {
     assert.ok(소스.includes(`'${이름}'`), `감사 이름 '${이름}' 이 없다 — 그 경로는 장부를 안 남긴다(§2)`);
   }
 });

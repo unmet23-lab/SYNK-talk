@@ -20,8 +20,16 @@
  *
  * ■ 감사가 **응답의 조건**이다 (§2)
  *   「큐 응답 1회 = `staff_access_log` 1행」은 나중에 보는 장부가 아니라 **다음 단계가 읽는
- *   입력**이다 — 승인 게이트 ②가 「그 항목의 서명 발급 기록이 실재하는가」를 묻는다. 그래서
- *   감사가 실패하면 응답을 내주지 않는다(큐는 같은 트랜잭션 · 서명은 아래 순서 주석).
+ *   입력**이다 — 승인 게이트 ②가 그 장부를 읽는다. 그래서 감사가 실패하면 응답을 내주지
+ *   않는다(큐는 같은 트랜잭션 · 서명은 아래 순서 주석).
+ *
+ * ■ 🔴 감사 종류가 **셋**이다 — 「미리 받음」과 「열어 봄」을 가른다 (§2 개정 · 유호 판정 ㉮)
+ *   `review.audio`(발급)를 게이트의 증거로 쓰면 **두 자리에서 동시에 샌다**:
+ *   ①프리로드가 다음 항목을 당기는 것만으로 열지도 않은 항목이 통과 상태가 되고
+ *   ②이 장부는 append-only 라 행이 영원히 살아, **612초 전 서명 기록으로 재검수가 통과**했다
+ *     (2026-08-09 실왕복 실측 · 같은 순간 §4 는 404 라 정직한 검수자는 다시 들을 수도 없었다).
+ *   그래서 `review.audio.played`(재생 시작)를 게이트 ②의 **유일한** 증거로 삼는다. 발급은
+ *   더 이상 증거가 아니므로 프리로드는 **몇 개를 당겨도 게이트를 0개 연다.**
  *
  * ■ §5 승인·폐기 — 물리 칸 넷이 서서(`20260809090000`) 이 경로가 열렸다
  *   🔴 **이름 둘이 이 머리말의 옛 판과 다르다**: 채택된 물리 정본은 `promotion_intent`·
@@ -32,8 +40,13 @@
  *
  * ■ 게이트의 주체는 **화면이 아니라 이 함수**다 (§5 · 발주 §3)
  *   UI 만 막으면 직접 호출·재전송으로 0초 승인 행이 그대로 만들어진다. 넷을 매 승인에서
- *   다시 잰다: ①청취 ②그 항목의 서명 발급 기록(§2 감사가 여기서 **입력**이 된다)
- *   ③활성 직원(위 공통 사슬) ④`reviewed_correction_id` 가 **그 제출물의** AI 행.
+ *   다시 잰다: ①청취 ②그 항목을 **본인이 재생한 기록**(§2 감사가 여기서 **입력**이 된다 ·
+ *   재검수는 **마지막 판정 이후의** 재생을 요구한다) ③활성 직원(위 공통 사슬)
+ *   ④`reviewed_correction_id` 가 **그 제출물의** AI 행.
+ *   🚫 게이트에 **시간 리터럴을 박지 않는다** — 재검수 창은 상수 없이 성립한다: 확정분에는
+ *   §4 가 새 서명을 안 주므로 다시 듣는 길은 **아직 살아 있는 옛 URL** 뿐이고, 그것이 죽으면
+ *   새 `played` 행을 만들 수 없어 재검수가 자연히 닫힌다(창을 만드는 것은 서버의 상수가
+ *   아니라 서명 수명이라는 물리다). 상수를 박으면 첫 확정까지 같이 조인다.
  */
 import postgres from 'npm:postgres@3.4.4';
 import 토큰모듈 from './토큰.mjs';
@@ -134,11 +147,11 @@ Deno.serve(async (req: Request) => {
    * 전부 큐 조회로 동작하고, §5 가 서는 날 옛 오타 경로가 **이미 돌던 것**이 된다. */
   const url = new URL(req.url);
   const 경로 = url.pathname.replace(/\/+$/, '').split('/').pop() ?? '';
-  const 아는경로 = ['queue', 'audio', 'approve', 'discard'];
+  const 아는경로 = ['queue', 'audio', 'played', 'approve', 'discard'];
   if (!아는경로.includes(경로)) {
     return 실패(404, {
       code: 'CONTRACT_VIOLATION', retryable: false,
-      message: '없는 경로입니다 — GET /v1/review/queue · POST /v1/review/{audio,approve,discard}',
+      message: '없는 경로입니다 — GET /v1/review/queue · POST /v1/review/{audio,played,approve,discard}',
     }, 선언);
   }
   const 기대메서드 = 경로 === 'queue' ? 'GET' : 'POST';
@@ -182,6 +195,7 @@ Deno.serve(async (req: Request) => {
   try {
     if (경로 === 'queue') return await 큐읽기(url, staff_id, ver);
     if (경로 === 'audio') return await 오디오서명(req, staff_id, ver);
+    if (경로 === 'played') return await 열어봄(req, staff_id, ver);
     const 본문 = await 본문읽기(req);
     if (본문 === undefined) {
       return 실패(400, { code: 'CONTRACT_VIOLATION', message: 'JSON 이 아닙니다', retryable: false }, ver);
@@ -250,7 +264,11 @@ async function 큐읽기(url: URL, staff_id: string, ver: string) {
 
 /* ── §4 POST /v1/review/audio ────────────────────────────────────────── */
 
-async function 오디오서명(req: Request, staff_id: string, ver: string) {
+/** §4·§4-2 가 **같은 모양의 요청**을 받는다 — 그 검증을 한 자리에 둔다.
+ *  두 곳에 적으면 갈라지고, 갈리는 방향은 보통 「느슨한 쪽」이다(uuid 가 아닌 값이 SQL 까지
+ *  내려가 400 이어야 할 것이 500 으로 나온다).
+ *  @returns 문자열이면 검증된 uuid · `Response` 면 그대로 내보낼 실패 봉투. */
+async function 제출물id(req: Request, ver: string): Promise<string | Response> {
   const 읽은것 = await 본문읽기(req);
   if (읽은것 === undefined) {
     return 실패(400, { code: 'CONTRACT_VIOLATION', message: 'JSON 이 아닙니다', retryable: false }, ver);
@@ -263,6 +281,13 @@ async function 오디오서명(req: Request, staff_id: string, ver: string) {
       message: 'submission_id(uuid)가 필요합니다',
     }, ver);
   }
+  return sid;
+}
+
+async function 오디오서명(req: Request, staff_id: string, ver: string) {
+  const 읽힌것 = await 제출물id(req, ver);
+  if (읽힌것 instanceof Response) return 읽힌것;
+  const sid = 읽힌것;
 
   /* 🔴 발급 전에 그 행이 **지금** 큐에 있는지 본다(§4). 폐기·철회·확정분에 서명이 나가면
    *   뷰가 막아 둔 것이 이 문으로 도로 나간다 — 큐 소속은 시간이 지나면 바뀐다. */
@@ -314,6 +339,51 @@ async function 오디오서명(req: Request, staff_id: string, ver: string) {
     url: `${base}/storage/v1${signedURL}`,
     expires_at: new Date(Date.now() + 서명수명초 * 1000).toISOString(),
   }, ver);
+}
+
+/* ── §4-2 POST /v1/review/played ─────────────────────────────────────── */
+
+/** 재생이 실제로 **시작**됐다 — 승인 게이트 ②의 유일한 증거를 남긴다.
+ *
+ *  🔑 **아무것도 발급하지 않는다.** 이 경로가 여는 것은 감사 1행뿐이라 서명 누수 위험이 0이고,
+ *    그래서 §4 가 지키는 「확정분에 서명을 안 준다」를 **한 글자도 안 건드리고** 재검수 창이
+ *    열린다. 그것이 ㉮ 가 ㉯(재검수 전용 서명 경로)보다 나은 유일한 이유다.
+ *
+ *  🔴 소속이 §4 보다 **넓다** — 큐 안 **또는** `verified`(재검수 창). 확정분은 뷰에서 빠지므로
+ *    큐만 보면 `Z` 가 원리상 못 지난다. 반대로 `discarded`·`revoked` 는 다시 들을 대상이
+ *    아니라서 막는다(폐기·철회분에 감사만 쌓이면 「누가 왜 열었나」가 흐려진다).
+ *
+ *  ⚠ 정직하게: 서명 URL 은 Storage 가 직접 내려주고 이 함수를 안 지나므로 **서버는 재생을
+ *    관측할 수 없다.** 이 경로는 자백을 없애지 않는다 — 자백의 단위를 「밀리초」에서 「열었다는
+ *    사실」로 옮겨, **아무 우회도 없이 통과하던 두 자리**(프리로드 · 옛 기록)를 없앤다.
+ */
+async function 열어봄(req: Request, staff_id: string, ver: string) {
+  const 읽힌것 = await 제출물id(req, ver);
+  if (읽힌것 instanceof Response) return 읽힌것;
+  const sid = 읽힌것;
+
+  /* 🔑 소속과 감사를 **한 트랜잭션**에 둔다(§2). 나누면 소속 판정 뒤 상태가 바뀌는 사이에
+   *   폐기된 항목의 `played` 가 남고, 그 행은 append-only 라 지울 수 없다. */
+  const 결과 = await sql.begin(async (tx) => {
+    const [소속] = await tx`
+      select exists (select 1 from engine.review_queue v
+                      where v.submission_id = ${sid}::uuid) as 큐안,
+             (select status::text from engine.pipeline_jobs
+               where submission_id = ${sid}::uuid) as status`;
+    /* 큐 밖이면서 `verified` 도 아니면 — 없는 제출물·폐기·철회가 전부 여기로 온다.
+     * 가르지 않는 이유는 §4 와 같다: 가르면 큐 밖 항목의 존재 여부가 샌다. */
+    if (!소속?.큐안 && 소속?.status !== 'verified') {
+      return { 거절: 'NOT_FOUND' as const, 문구: '지금 들을 수 있는 항목이 아닙니다' };
+    }
+
+    await tx`
+      insert into engine.staff_access_log (staff_id, action, target_ids)
+      values (${staff_id}::uuid, 'review.audio.played', array[${sid}::uuid])`;
+    return {};
+  });
+
+  if ('거절' in 결과) return 거절응답(결과 as { 거절: 거절코드; 문구: string }, ver);
+  return 봉투(200, { ok: true }, ver);
 }
 
 /* ── §5 승인·폐기 ────────────────────────────────────────────────── */
@@ -381,13 +451,17 @@ async function 승인(본문: unknown, staff_id: string, ver: string) {
                       where c.correction_id = ${q.reviewed_correction_id}::uuid
                         and c.submission_id = s.submission_id
                         and c.actor_kind = 'ai') as ai행,
-             /* 게이트 ② — **요청자 본인의** 발급 기록이어야 한다. 남이 연 기록으로 내가
-              *   확정하면 이 게이트는 「누군가 들었다」만 보증한다(검수자가 여럿이 되는
-              *   2027-02 에 새는 방향이 「통과」다). */
-             exists (select 1 from engine.staff_access_log l
-                      where l.staff_id = ${staff_id}::uuid
-                        and l.action = 'review.audio'
-                        and s.submission_id = any(l.target_ids)) as 서명기록
+             /* 게이트 ② — **요청자 본인이 재생한 기록**이어야 한다(§2 개정). 발급
+              *   (review.audio)이 아니다: 그건 프리로드가 미리 하므로 열지도 않은 항목을
+              *   통과시킨다. 남이 연 기록으로 내가 확정하면 이 게이트는 「누군가 들었다」만
+              *   보증한다(검수자가 여럿이 되는 2027-02 에 새는 방향이 「통과」다).
+              *   🔑 exists 가 아니라 max(at) 를 든다 — 재검수는 「있나」가 아니라
+              *   「마지막 판정 **이후**인가」를 물어야 하고, 그 비교는 아래 계보 질의가 한다.
+              *   ⚠ 이 주석은 템플릿 리터럴 «안»이다 — 백틱을 쓰면 SQL 이 거기서 끊긴다. */
+             (select max(l.at) from engine.staff_access_log l
+               where l.staff_id = ${staff_id}::uuid
+                 and l.action = 'review.audio.played'
+                 and s.submission_id = any(l.target_ids)) as 마지막청취
         from engine.submissions s
        where s.submission_id = ${q.submission_id}::uuid`;
     if (!재료) return { 거절: 'NOT_FOUND' as const, 문구: '없는 제출물입니다' };
@@ -403,6 +477,11 @@ async function 승인(본문: unknown, staff_id: string, ver: string) {
       return { 거절: 'NOT_FOUND' as const, 문구: '재검수할 수 있는 상태가 아닙니다(확정된 항목만)' };
     }
 
+    /* 재검수의 게이트 ②는 「들었나」가 아니라 「**마지막 판정 이후에** 들었나」다. 그 비교를
+     * JS 로 올리지 않고 SQL 에 두는 이유: 두 값이 다 `timestamptz` 라 DB 가 타임존·정밀도를
+     * 그대로 비교하고, 한쪽이 null 이면 결과가 null(=거짓)이라 **모르는 채 통과**가 없다. */
+    let 판정후재청취 = false;
+
     if (재검수) {
       const [계보] = await tx`
         select exists (select 1 from engine.corrections c
@@ -410,7 +489,14 @@ async function 승인(본문: unknown, staff_id: string, ver: string) {
                           and c.submission_id = ${q.submission_id}::uuid
                           and c.actor_kind = 'teacher') as 대상,
                exists (select 1 from engine.corrections x
-                        where x.supersedes = ${q.supersedes}::uuid) as 이미대체됨`;
+                        where x.supersedes = ${q.supersedes}::uuid) as 이미대체됨,
+               ((select max(l.at) from engine.staff_access_log l
+                  where l.staff_id = ${staff_id}::uuid
+                    and l.action = 'review.audio.played'
+                    and ${q.submission_id}::uuid = any(l.target_ids))
+                > (select c.created_at from engine.corrections c
+                    where c.correction_id = ${q.supersedes}::uuid)) as 판정후재청취`;
+      판정후재청취 = 계보?.판정후재청취 === true;
       if (!계보?.대상) {
         return {
           거절: 'CONTRACT_VIOLATION' as const, 칸: 'supersedes',
@@ -439,10 +525,21 @@ async function 승인(본문: unknown, staff_id: string, ver: string) {
         문구: 'reviewed_correction_id 가 그 제출물의 AI 교정이 아닙니다',
       };
     }
-    if (!재료.서명기록) {
+    /* 게이트 ② — 갈래 둘. 문구를 가르는 것이 UX 의 절반이다: 「한 번도 안 열었다」와
+     *   「옛날에 열었다」는 검수자가 할 일이 다른데, 한 문구로 뭉치면 재검수 중인 사람이
+     *   무엇을 해야 하는지 알 수 없다(그 마찰의 처방은 언제나 「자백을 적어 보낸다」다). */
+    if (!재료.마지막청취) {
       return {
         거절: 'GATE_NOT_MET' as const, 칸: 'audio',
         문구: '오디오를 연 기록이 없습니다 — 먼저 재생해 주세요',
+      };
+    }
+    /* 🔴 여기가 2026-08-09 실측으로 드러난 구멍이다 — 612초 된 기록으로 재검수가 200 이었다.
+     *   시간 상수는 안 건다(§5 🔑): 창은 서명 수명이 물리적으로 만든다. */
+    if (재검수 && !판정후재청취) {
+      return {
+        거절: 'GATE_NOT_MET' as const, 칸: 'audio',
+        문구: '마지막 판정 이후에 다시 듣지 않았습니다 — 한 번 더 재생해 주세요',
       };
     }
 

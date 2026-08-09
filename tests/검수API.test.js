@@ -95,6 +95,27 @@ test('오디오서명받기는 POST 로 submission_id 하나만 보낸다', asyn
   assert.equal(r.만료, '2026-08-09T00:10:00Z');
 });
 
+/* ─── §4-2 재생 알림 ─────────────────────────────────────────────────── */
+
+test('열어봤다알리기는 POST 로 review/played 를 부른다 — 게이트 ②의 유일한 증거다', async () => {
+  const { 모듈, 요청들 } = 세운판({ ok: true });
+  const r = await 모듈.열어봤다알리기('T', SID);
+  assert.equal(요청들[0].메서드, 'POST');
+  assert.ok(요청들[0].url.endsWith('/functions/v1/review/played'),
+    `엉뚱한 경로를 부른다: ${요청들[0].url}`);
+  assert.deepEqual(요청들[0].몸통, { submission_id: SID });
+  assert.equal(r, true);
+});
+
+test('🔴 서명 경로와 재생 경로가 **다른 자리**다 — 합치면 프리로드가 게이트를 도로 연다', async () => {
+  const { 모듈, 요청들 } = 세운판({ ok: true, url: 'https://x/sign' });
+  await 모듈.오디오서명받기('T', SID);
+  await 모듈.열어봤다알리기('T', SID);
+  const 경로들 = 요청들.map((q) => q.url.split('/').pop());
+  assert.deepEqual(경로들, ['audio', 'played'],
+    '두 호출이 같은 경로로 간다 — 발급과 재생이 다시 한 사건이 되면 ㉮ 개정이 무효다');
+});
+
 /* ─── §5 승인·폐기 ───────────────────────────────────────────────────── */
 
 test('승인하기는 verdict 를 안 보내고 서버가 낸 것을 그대로 받는다', async () => {
