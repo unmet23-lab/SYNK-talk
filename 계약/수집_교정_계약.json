@@ -114,9 +114,16 @@
       "cited_refs", "intervention_id", "degraded", "policy_ver",
       "source_kind", "estimator_confidence", "evidence_refs", "estimator_version", "valid_from", "expires_at", "user_confirmed",
       "consent_ver",
-      "session_id", "content_id", "task_schema_ver", "image_refs", "consent_id"
+      "session_id", "content_id", "task_schema_ver", "image_refs", "consent_id",
+      "explanation", "transcript_at_review", "verdict", "reviewer_confidence", "l1_source_phrase", "rubric_scores"
     ],
     "미구현_주의": {
+      "explanation": "2026-08-09 등재(역방향 회귀를 `engine.corrections` 까지 넓히며 실측) — **Supabase 쪽은 이미 저장한다**(`functions/correct` 가 쓰고 앱 「답장」 화면이 읽는다). 여기서 「미구현」인 것은 **라이브 시트 수집층**이다: 시트 교정 열은 교정문 하나뿐이라 몽골어 해설을 담을 칸이 없다.",
+      "transcript_at_review": "위와 같음 — 검수자가 **판정한 시점에 화면에 있던 전사**. `transcript_verified`(그 판정의 산출물)와 다른 칸이다 — 이름에 `verified` 를 넣으면 행마다 거짓을 적게 된다. 시트에는 전사 열 자체가 이 저장소 밖이라 대응이 없다.",
+      "verdict": "위와 같음 — 검수 판정이 세 텍스트에서 **서버가 파생**한 값이다(사람이 고르지 않는다). 값목록 정본은 이 파일의 `골든판정` 셋이고, 시트에는 그 판정을 적는 열이 없다.",
+      "reviewer_confidence": "위와 같음 — 검수자가 자기 판정에 매긴 확신도. 학생이 스스로 매기는 `confidence`(라이브 열 있음)와 **다른 축**이라 한쪽으로 대신 못 센다: 하나는 학습자 자기인식, 하나는 라벨 품질 가중치다.",
+      "l1_source_phrase": "위와 같음 — 그 오류를 낳은 **모국어(L1) 구문**. 몽골어 화자 특유의 간섭을 엔진이 배우는 재료인데 원어민 검수자가 있어야 채워지므로, 검수 콘솔이 라이브에 서기 전에는 어느 층에도 값이 없다.",
+      "rubric_scores": "위와 같음 — 루브릭 축별 점수. `error_tags`(라이브 열 있음)가 「무엇이 틀렸나」라면 이건 「얼마나」라 축이 다르다.",
       "session_id": "2026-08-09 등재(C0 심문 B4) — **Supabase 쪽은 이미 저장한다**(`functions/events`). 여기서 「미구현」인 것은 **라이브 시트 수집층**이다: 시트는 한 행이 한 제출이라 「한 번 켠 것」을 묶을 칸이 없다. 시트 이관 어댑터가 서는 날 대응이 생긴다.",
       "content_id": "위와 같음 — Supabase 저장 ✅ / 라이브 시트 대응 열 없음. 배달·게임 화면에서만 값이 있고, 자유발화·낭독처럼 콘텐츠 참조가 없는 과업은 비는 것이 정상이다.",
       "task_schema_ver": "위와 같음 — `task_snapshot` 이 어느 «모양»인가(스냅샷 구조의 판). 스냅샷 자체가 시트에 없어 그 판도 없다. 🚫 문항 자체의 판과 다른 것이다(그건 스냅샷 안에 들어간다).",
