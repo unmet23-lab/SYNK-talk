@@ -20,6 +20,9 @@ with 기대열(t, c) as (values
   ('submissions','capture_meta'), ('skills','superseded_by'), ('daily_activity','expected'),
   -- 마감 시각·마감 판본(20260808010000 · 소급 불가 · 유호님 승인 2026-08-08)
   ('submissions','due_at'), ('submissions','due_ver'),
+  -- 검수 확정이 담길 칸 넷(20260809090000 · 소급 불가 · 발주 §3 「c11 선행」)
+  ('corrections','supersedes'), ('corrections','promotion_intent'),
+  ('corrections','transcript_at_review'), ('pipeline_jobs','discard_reason'),
   ('schema_migrations','version'), ('schema_migrations','name'),
   ('schema_migrations','checksum'), ('schema_migrations','applied_at'),
   -- ⚠ 아래 세 묶음은 c7 **뒤에 붙은 조각들**이 낸 열이다. 이 확인 블록은 앞 조각에서
@@ -45,7 +48,10 @@ with 기대열(t, c) as (values
   ('learners_temp_password_paired_c10'),
   ('learning_events_correction_target_c10'), ('learning_events_correction_id_fkey'),
   -- 동의 귀속(20260807120000)
-  ('learning_events_consent_id_fkey')
+  ('learning_events_consent_id_fkey'),
+  -- 검수 확정 칸 넷(20260809090000) — FK 도 함께 센다(열만 서고 고리가 없으면 계보가 거짓이다)
+  ('corrections_supersedes_not_self_c10'), ('corrections_promotion_intent_c10'),
+  ('corrections_supersedes_fkey'), ('pipeline_jobs_discard_reason_c10')
 ), 기대트리거(n) as (values
   ('learning_events_immutable'), ('corrections_immutable'), ('submissions_original_immutable'),
   ('staff_access_log_immutable'), ('learning_events_correction_same_learner'),
@@ -143,6 +149,13 @@ with 기대열(t, c) as (values
   -- 분모의 정본은 `task.assigned` 사건 하나다(머리말). `daily_activity.expected` 는 파생
   --   캐시 자리로 남겨 뒀고, 여기 값이 들어오면 분모가 둘이 된 것이다 — 그 순간 빨개진다.
   (select count(*) from engine.daily_activity where expected is not null) as 분모칸오염,
+  -- 폐기 사유(20260809090000): CHECK 는 「사유가 있으면 폐기」만 걸고 역방향은 일부러 안 건다
+  --   (조각 이전 행이 있으면 부어지지 않는다 · F103). 그 자리를 이 카운터가 진다 —
+  --   **이 조각이 선 뒤에 갱신된 job 만** 센다. 옛 폐기의 사유는 아무도 모른다.
+  (select count(*) from engine.pipeline_jobs j
+    where j.status = 'discarded' and j.discard_reason is null
+      and j.updated_at >= (select applied_at from engine.schema_migrations
+                            where version = '20260809090000')) as 폐기사유없는폐기,
   -- 검수 판이 **올라간 판인지**(20260809050000): `검수뷰=1` 은 뷰의 존재만 말한다.
   --   c8 의 12열 판이 그대로 서 있어도 그 칸은 1이라 초록이다 — 열 수로 재야 갈린다.
   (select count(*) from information_schema.columns
@@ -156,15 +169,15 @@ select case when 테이블수=11 and RLS켜짐=11 and 정책수=7
              and 새는테이블권한=0 and 새는스키마권한=0
              and 삭제차단=3 and 실패상태=1 and 이력정책=0
              and 잡없는제출=0 and 검수뷰=1 and 옛검수정책=0
-             and 마감없는배정=0 and 분모칸오염=0
+             and 마감없는배정=0 and 분모칸오염=0 and 폐기사유없는폐기=0
              and 검수판열=22 and 검수판원문=0
              and (select v from 빠진열) is null
              and (select v from 빠진제약) is null
              and (select v from 빠진트리거) is null
-             and (select version from 현재이력)='20260809080000'
-              and (select checksum from 현재이력)='3b41867b0dac52d6c38bc52ced7a0cef2fe864115084f444840c27d62c91f58e' -- migration-checksum
+             and (select version from 현재이력)='20260809090000'
+              and (select checksum from 현재이력)='069f79efa1604a7f15e5c570e001b2318fc8699f320c9e7cd65ec49b1d2bf6b3' -- migration-checksum
             then '✅ 전부 통과'
-            else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·7·0·0·3·1·0·0·1·0·0·22·0 · 빠진 칸은 전부 비어 있어야 합니다)'
+            else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·7·0·0·3·1·0·0·1·0·0·0·0·22·0 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
        (select version from 현재이력) as 현재버전,
        (select checksum from 현재이력) as checksum,
