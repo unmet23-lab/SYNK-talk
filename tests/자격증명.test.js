@@ -11,9 +11,21 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
-const { 만료판정, 과녁판정, 새날짜, 만료칸, 운영REF, 리허설REF } = require('../lib/자격증명.js');
+const { 만료판정, 과녁판정, 대상알림, 새날짜, 만료칸, 운영REF, 리허설REF } = require('../lib/자격증명.js');
 
 const TOOLS = path.join(__dirname, '..', 'tools');
+const LIB = path.join(__dirname, '..', 'lib');
+
+/** console.error 를 잡아 둔 채 돌린다 — 알림은 **찍히는 것**이 전부라 반환값만 봐서는 못 잰다. */
+async function 찍힌것(fn) {
+  const 원래 = console.error;
+  const 줄들 = [];
+  console.error = (...a) => 줄들.push(a.join(' '));
+  try { await fn(); } finally { console.error = 원래; }
+  return 줄들;
+}
+
+const 응답 = (이름) => ({ ok: true, text: async () => JSON.stringify({ name: 이름 }) });
 
 test('만료일이 없으면 「없음」 — 조용한 통과와 구분된다', () => {
   assert.equal(만료판정({}).상태, '없음');
@@ -98,6 +110,115 @@ test('과녁 — 리허설·미설정·모르는 ref 는 마찰 0', () => {
   }
   assert.equal(과녁판정({}, []).상태, '통과');
   assert.equal(과녁판정(null, null).상태, '통과');
+});
+
+/* ── 대상 알림 (2026-08-09 신설) ──────────────────────────────────────────────
+ * 🔴 실사건: 과녁 게이트는 「운영이면 막는다」까지고 리허설로 갈 때는 **아무 말도 안 한다.**
+ *   그래서 운영에 올렸어야 할 명부가 리허설로 가도 화면은 「✅ 명부 등록 3명」으로 똑같았다
+ *   (리허설 `learners` 156행 / 운영 0행). 막는 것과 말하는 것은 다른 일이다.
+ * 🔑 알림은 **게이트가 아니다** — 조회가 실패해도 실행을 막지 않는다. 대신 ref 는 언제나 남긴다.
+ *   그 성질이 깨지면 네트워크가 한 번 흔들릴 때마다 원장의 명부 등록이 죽는다. */
+
+test('알림 — 프로젝트 이름을 읽어 대상을 찍는다', async () => {
+  const 줄들 = await 찍힌것(() => 대상알림('시험', { SUPABASE_PROJECT_REF: 리허설REF, SUPABASE_ACCESS_TOKEN: 't' },
+    { 조회: async () => 응답('synk-core-rehearsal') }));
+  assert.equal(줄들.length, 1, `한 줄이어야 한다 — 실제 ${줄들.length}줄`);
+  assert.match(줄들[0], /대상 ▸ synk-core-rehearsal/);
+  assert.ok(줄들[0].includes(리허설REF), 'ref 가 없으면 이름이 같은 프로젝트를 못 가른다');
+});
+
+test('🔴 알림 — 이름 조회가 실패해도 멈추지 않고 ref 는 찍는다', async () => {
+  for (const [설명, 조회] of [
+    ['HTTP 실패', async () => ({ ok: false, text: async () => 'nope' })],
+    ['네트워크 끊김', async () => { throw new Error('ECONNRESET'); }],
+    ['응답이 JSON 이 아님', async () => ({ ok: true, text: async () => '<html>' })],
+  ]) {
+    const 줄들 = await 찍힌것(() => 대상알림('시험', { SUPABASE_PROJECT_REF: 리허설REF }, { 조회 }));
+    assert.equal(줄들.length, 1, `${설명} — 알림이 통째로 사라졌다`);
+    assert.ok(줄들[0].includes(리허설REF), `${설명} — ref 마저 없으면 어디에 쏘는지 모른 채 진행한다`);
+    assert.match(줄들[0], /못 읽었다/, `${설명} — 못 읽은 사실을 숨기면 조용한 성공이 된다`);
+  }
+});
+
+test('알림 — 운영이면 눈에 띄게 다르다 (--운영 으로 게이트를 열고 온 자리다)', async () => {
+  const 줄들 = await 찍힌것(() => 대상알림('시험', { SUPABASE_PROJECT_REF: 운영REF },
+    { 조회: async () => 응답('Synk Core') }));
+  assert.match(줄들[0], /🔴 운영/, '게이트를 연 뒤에는 이 줄이 마지막 확인 자리다');
+});
+
+test('알림 — 쓰기와 미리보기가 같은 줄로 보이지 않는다', async () => {
+  const 조회 = async () => 응답('synk-core-rehearsal');
+  const env = { SUPABASE_PROJECT_REF: 리허설REF };
+  const 쓰기 = await 찍힌것(() => 대상알림('시험', env, { 쓰기: true, 조회 }));
+  const 보기 = await 찍힌것(() => 대상알림('시험', env, { 쓰기: false, 조회 }));
+  const 무표시 = await 찍힌것(() => 대상알림('시험', env, { 조회 }));
+  assert.match(쓰기[0], /⚠ 쓰기\(--적용\)/);
+  assert.match(보기[0], /미리보기/);
+  assert.notEqual(쓰기[0], 보기[0]);
+  assert.ok(!/쓰기|미리보기/.test(무표시[0]), '안 넘겼는데 둘 중 하나를 지어내면 그게 오정보다');
+});
+
+/* ── 「대상을 안 찍는 도구」 금지 ──────────────────────────────────────────────
+ * 🔑 탐지력은 픽스처가 지고, 실저장소에는 **거짓양성만** 검사한다(버그가 남아 있기를
+ *   요구하는 회귀를 만들지 않는다). */
+
+const 주석빼기 = (글) => 글.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
+/**
+ * 공용 통로를 지나면서 과녁을 소리 내어 읽지 않는 자리를 고른다. null = 문제 없음.
+ *
+ * 🔑 **순서는 여기서 안 잰다 — 못 재기 때문이다.** 두 번 시도해 두 번 다 멀쩡한 도구가 빨개졌다:
+ *   ①「질의보다 먼저 찍는가」 → 교정확정·동의발급·명부등록이 걸렸다. `database/query` 가 파일
+ *     위쪽 `sql()` **정의** 안에 있어서다. ②「자격증명 뒤에 찍는가」 → 원격SQL 이 걸렸다.
+ *     `대상알림` **정의**가 `자격증명.읽기` 위에 있어서다.
+ *   둘 다 코드가 틀린 게 아니라 **재는 층이 틀렸다** — 글자 위치는 실행 순서가 아니고,
+ *   정의와 호출을 글자로는 못 가른다. 호출부 이름은 도구마다 달라 전역에서 잡을 방법도 없다.
+ *   그래서 순서는 그 이름을 아는 각 도구의 회귀가 진다
+ *   (`tests/명부등록.test.js` — 「대상 알림은 자격증명 뒤·첫 질의 앞이다」).
+ *   전역이 지는 건 **「한 번도 안 찍는다」** 하나다. 실제로 샌 자리가 정확히 그 모양이었다.
+ */
+function 안찍는이유(원문) {
+  const 글 = 주석빼기(원문);
+  if (!/자격증명\.읽기\s*\(/.test(글)) return null;              // 이 통로 밖 — 여기서 판정하지 않는다
+  if (!/자격증명\.대상알림\s*\(|대상 ▸/.test(글)) return '대상을 한 번도 안 찍는다';
+  return null;
+}
+
+test('탐지력 픽스처 — 대상을 한 번도 안 찍는 도구를 반드시 잡는다', () => {
+  const 질의 = "await fetch('https://api.supabase.com/v1/projects/x/database/query');";
+  const 읽기 = "const e = 자격증명.읽기('가짜');";
+  const 알림 = "await 자격증명.대상알림('가짜', e, { 쓰기: 적용 });";
+
+  assert.equal(안찍는이유(`${읽기}\n${질의}`), '대상을 한 번도 안 찍는다');
+  assert.equal(안찍는이유(`${읽기}\n${알림}\n${질의}`), null, '제대로 찍는 것을 잡으면 거짓양성이다');
+  assert.equal(안찍는이유(`${읽기}\nconsole.error('[가짜] 대상 ▸ ' + 이름);\n${질의}`), null,
+    '형제 여덟이 쓰는 옛 표기(`대상 ▸`)도 알림으로 친다 — 지금 고칠 대상은 침묵하는 자리다');
+  assert.equal(안찍는이유(`${질의}`), null, '공용 통로를 안 지나면 이 규칙 밖이다');
+
+  /* 🔑 주석 속 낱말이 알림으로 세어지면 「// 대상알림 하기」 라고 적어 두기만 해도 초록이 된다. */
+  assert.equal(안찍는이유(`${읽기}\n/* 자격증명.대상알림 을 붙일 것 */\n${질의}`),
+    '대상을 한 번도 안 찍는다', '주석을 코드로 셌다');
+  assert.equal(안찍는이유(`${읽기}\n// 대상 ▸ 를 찍어야 한다\n${질의}`),
+    '대상을 한 번도 안 찍는다', '한 줄 주석을 코드로 셌다');
+});
+
+test('실저장소 — 공용 통로를 지나는 도구는 전부 대상을 찍는다', () => {
+  const 파일들 = [
+    ...fs.readdirSync(TOOLS).filter((f) => f.endsWith('.js')).map((f) => ['tools/' + f, path.join(TOOLS, f)]),
+    ...fs.readdirSync(LIB).filter((f) => f.endsWith('.js')).map((f) => ['lib/' + f, path.join(LIB, f)]),
+  ];
+  const 잰것 = [];
+  const 안찍는것 = [];
+  for (const [이름, p] of 파일들) {
+    const 글 = fs.readFileSync(p, 'utf8');
+    if (!/자격증명\.읽기\s*\(/.test(주석빼기(글))) continue;
+    잰것.push(이름);
+    const 이유 = 안찍는이유(글);
+    if (이유) 안찍는것.push(`${이름}: ${이유}`);
+  }
+  // 🔴 분모부터 밝힌다 — 0건을 잰 것과 통과는 같은 모양이다(F207).
+  assert.ok(잰것.length >= 8, `잰 파일이 ${잰것.length}개뿐이다 — 목록을 못 읽었을 수 있다: ${잰것.join(', ')}`);
+  assert.deepEqual(안찍는것, [], `대상을 안 찍는다: ${안찍는것.join(' · ')}`);
 });
 
 test('과녁 — ref 상수가 비거나 리허설과 같아지면 게이트가 조용히 꺼진다', () => {
