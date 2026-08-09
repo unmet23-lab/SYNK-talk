@@ -1,11 +1,78 @@
+/* 멱등 충돌 판정의 근거 열 — `learning_events.request_hash` (C0 심문 B2 ②/③)
+
+ * 🔴 **파일 이름의 `_c10` 은 장식이 아니다.** Edge Function 넷이 계약판을 `schema_migrations` 의
+ *   최신 이름 `_c<숫자>.sql` 에서 읽는다(회귀 `tests/마이그레이션이름.test.js`).
+ *   판을 올리는 게 아니므로 c10 을 **그대로** 이어 쓴다 — 값목록도 필드 정본도 안 바뀐다.
+ *   앱이 보내는 것도 없다(이 열은 **서버가 요청 본문에서 계산해** 적는다).
+ *
+ * ■ 무엇을 막나
+ *   `functions/events` 는 `on conflict (learner_id, idempotency_key) do nothing` 뒤에 내용을
+ *   **안 보고** `duplicate` + 기존 event_id 를 돌려줬다. 앱은 그것을 `stored` 와 같은 갈래로 읽고
+ *   큐에서 지운다(`src/사건통로.js`). 같은 키가 **다른 내용**에 두 번 쓰이면 뒤엣것이 통째로
+ *   사라지고, 사라지는 쪽은 늘 학생 발화다. 증상이 「조용함」뿐이라 개원 뒤엔 못 찾는다.
+ *   이 열이 생기면 서버가 「같은 키 + 다른 내용」을 **가를 수 있다**(가르는 코드는 함수 쪽).
+ *
+ * 🔑 인덱스를 안 만든다 — 이 열은 조건절에 안 쓰인다. `unique (learner_id, idempotency_key)`
+ *   로 이미 한 행을 집은 **뒤에** 그 행의 지문을 읽어 비교할 뿐이다.
+ *
+ * 🔑 null 을 허용한다 — 이 조각 이전에 쌓인 행은 지문이 없다. not null 로 걸면 그 행들 때문에
+ *   조각 자체가 안 부어지고, 기본값을 지어 넣으면 **없는 지문이 있는 척**한다(더 나쁘다).
+ *
+ * 되돌림: alter table engine.learning_events drop column if exists request_hash;
+ *        delete from engine.schema_migrations where version = '20260809080000'; */
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260809080000';
+  migration_name constant text := '20260809080000_engine_c10.sql';
+  expected_checksum constant text := '3b41867b0dac52d6c38bc52ced7a0cef2fe864115084f444840c27d62c91f58e'; -- migration-checksum
+  base_version constant text := '20260809070000';
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 c10 위에서만 돈다 — engine.schema_migrations가 없다(빈 DB면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      '이 조각은 기준선 % 위에서만 돈다 — 이력에 그 판이 없다(부분·혼합·불명이라 중단한다)',
+      base_version;
+  end if;
+
+  /* 요청 지문 — 서버가 `lib/요청해시.js` 로 계산해 적는다. 앱은 이 칸을 못 보낸다. */
+  alter table engine.learning_events
+    add column if not exists request_hash text;
+
+  comment on column engine.learning_events.request_hash is
+    '앱이 보낸 사건 원본의 sha256(lib/요청해시.js). 같은 idempotency_key 에 다른 내용이 왔는지 가른다. 이 조각 이전 행은 null.';
+
+  insert into engine.schema_migrations(version, name, checksum)
+  values (migration_version, migration_name, expected_checksum);
+end
+$migration$;
+
+commit;
+
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
 -- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
---
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
--- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -175,3 +242,39 @@ select case when 테이블수=11 and RLS켜짐=11 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
 from 셈;
+*/
+
+-- 확인
+-- ① 검수판열=22 · 검수판원문=0 — 앞 조각과 같다(이 조각은 review 판을 안 건드린다).
+--    🔑 이 조각이 더하는 것은 `learning_events.request_hash` 하나이고, 그 검사는 위
+--    확인 쿼리의 `기대열`(=`빠진열`)이 진다 — 판정 숫자를 손으로 늘리지 않았다.
+-- ② 🔴 **큐에 배정 행이 섞였는지는 판 파일이 못 잰다.** 부은 뒤 한 줄로 실측한다 — 0이어야 한다:
+--      select count(*) from engine.review_queue q
+--        join engine.submissions s on s.submission_id = q.submission_id
+--        join engine.learning_events e on e.event_id = s.event_id
+--       where e.event_type <> 'submission.created';
+-- ③ ⚠ 큐가 0행이어도 판이 틀린 게 아니다 — 2026-08-09 리허설 실측: 학생 제출 행에 붙은
+--    AI 교정이 **0**이다(생산자가 배정 행에 붙이고 있다). 그건 판이 아니라 그 생산자 자리다.
+--      select count(distinct c.submission_id) from engine.corrections c
+--        join engine.submissions s on s.submission_id=c.submission_id
+--        join engine.learning_events e on e.event_id=s.event_id
+--       where c.actor_kind='ai' and e.event_type='submission.created';
+-- ④ CHECK 제약은 현행 접미사만 남아야 한다(이 조각은 CHECK 를 한 개도 안 바꾼다 — c10 그대로).
+--    ⚠ 이 줄은 **마지막 조각이 들고 있어야 한다.** 합본은 조각을 이어붙인 것이라
+--      `tests/L0스키마.test.js` 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 **파일명**이 제약 이름으로 읽혀 빨개진다.
+--    기대: corrections_verdict_c10 · learners_signup_attempts_nonneg_c10
+--         · learners_temp_password_paired_c10 · learning_events_correction_target_c10
+--         · learning_events_event_type_c10 · learning_events_task_type_c10
+--         · staff_role_c10 · submissions_due_paired_c10 · submissions_task_format_c10
+--         · submissions_translation_source_c10
+-- ⑤ 스케줄러 3잡 실측 — 부은 뒤 한 줄로 (3 이어야 한다):
+--      select count(*) from cron.job
+--       where jobname in ('deliver-daily','deliver-check','transcribe-batch');
+--    ⚠ 리허설은 이 조각 머리말의 ⛔ 정책대로 일부러 안 붓는다 — 확인 쿼리 판정이
+--      「현재버전=20260809060000」으로 ❌ 를 내면 고장이 아니라 그 정책이다(✅ 대상은 운영뿐).
+-- ⑥ 지문 열 실측 — 부은 뒤 한 줄로 (1 이어야 한다):
+--      select count(*) from information_schema.columns
+--       where table_schema='engine' and table_name='learning_events' and column_name='request_hash';
+--    ⚠ 열만 서고 값은 **부은 뒤 들어오는 행부터** 찬다. 옛 행의 `request_hash` 는 null 이고,
+--      그 행과의 멱등 충돌은 판정 불가라 서버가 옛 동작(`duplicate`)으로 접는다 — 의도다.
