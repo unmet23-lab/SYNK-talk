@@ -65,6 +65,27 @@ require.extensions['.js'] = function (m, 파일) {
   m._compile(code, 파일);
 };
 
+/* ③ `expo-*` 네이티브 모듈 — node 에 **없다**(바인딩이 기기에만 있고, 배럴은 TS 소스를 가리켜
+   node 의 타입 스트립이 node_modules 안에서 거부한다 · 2026-08-09 실측 3종이 서로 다른 이유로
+   죽었다). 그래서 이름만 가로채 빈 판을 준다.
+   🔑 **값을 지어내지 않는다.** 스텁이 화면 코드를 베끼기 시작하면 이 통로는 화면이 아니라
+     자기 자신을 재게 된다. 첫 렌더가 실제로 부르는 것만 세우고, 안 부르는 자리는 비워 둔다 —
+     화면이 새로 부르는 날 `undefined is not a function` 으로 **드러나는** 편이 옳다(조용한 통과 ✗).
+   ⚠ 그래서 이 목록은 **늘어나는 게 정상**이다. 늘릴 때 채우는 것은 「그 화면이 첫 렌더에서
+     실제로 쓰는 값」뿐이고, 그 근거는 화면 소스에 있다(짐작으로 채우면 위 규칙이 깨진다). */
+const expo스텁 = {
+  'expo-secure-store': {},
+  'expo-updates': {},
+  'expo-speech': {},
+  'expo-audio': {},
+  'expo-audio/build/AudioStream': {},
+};
+const 원래로드 = Module._load;
+Module._load = function (요청, ...나머지) {
+  if (Object.prototype.hasOwnProperty.call(expo스텁, 요청)) return expo스텁[요청];
+  return 원래로드.call(this, 요청, ...나머지);
+};
+
 const React = require('react');
 const { renderToString } = require('react-dom/server');
 
