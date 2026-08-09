@@ -166,9 +166,20 @@ async function main() {
   const snap = A배정 && A배정.task_snapshot;
   확인('배정에 task_snapshot 이 붙어 있다 — 이것이 큐다(새 테이블 0)',
     !!snap && Array.isArray(snap.호흡) && snap.호흡.length === 2, snap);
-  확인('호흡마다 형식이 갈려 있다(낭독·자유발화)',
-    !!snap && snap.호흡[0].task_format === '낭독' && snap.호흡[1].task_format === '자유발화',
-    snap && snap.호흡.map((h) => h.task_format));
+  /* 🔴 ③의 형식을 값으로 얼리지 않는다 — `lib/오늘과제.js` 가 `고름 ? '응답' : '자유발화'` 로
+   *   **선택지 유무에서 파생**시키기 때문이다(급수 1~2·미정은 보기를 받는다 · talk edb92b4).
+   *   여기에 `자유발화` 를 박아 두면 초급 갈래가 서는 날 이 시험이 빨개지는데, 빨간 이유는
+   *   결함이 아니라 **설계가 바뀐 것**이라 다음 사람이 「고쳐야 할 것」을 잘못 짚는다.
+   *   그래서 값이 아니라 **그 파생 규칙 자체**를 잰다 — 「보기가 있는데 자유발화」가 성립하면
+   *   그때 빨개진다(그게 이 칸이 지키려던 c5 축 `왜_task_format이_따로인가` 그대로다).
+   *   ⚠ 실측 2026-08-09(`local_ddd51fde`): 이 자리가 왕복시험이 막혀 있던 동안 낡아 87/88 이었다. */
+  const 셋째 = snap && snap.호흡[1];
+  const 보기있음 = !!(셋째 && Array.isArray(셋째.선택지) && 셋째.선택지.length);
+  확인('호흡마다 형식이 갈려 있다 — ②는 낭독, ③은 «선택지 유무»에서 파생된다',
+    !!snap && snap.호흡[0].task_format === '낭독'
+      && 셋째.task_format === (보기있음 ? '응답' : '자유발화')
+      && 셋째.task_format !== snap.호흡[0].task_format,
+    snap && snap.호흡.map((h) => `${h.task_format}${Array.isArray(h.선택지) ? `(보기 ${h.선택지.length})` : ''}`));
   확인('🔴 행의 task_format 은 비어 있다 — 한 칸에 담으면 나중에 못 가른다',
     A배정 && A배정.task_format === null, A배정 && A배정.task_format);
   확인('개입 payload 에 output_text 가 있다 — 그날 학생에게 나간 말',
