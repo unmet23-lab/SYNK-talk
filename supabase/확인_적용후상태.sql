@@ -160,8 +160,8 @@ select case when 테이블수=11 and RLS켜짐=11 and 정책수=7
              and (select v from 빠진열) is null
              and (select v from 빠진제약) is null
              and (select v from 빠진트리거) is null
-             and (select version from 현재이력)='20260809060000'
-              and (select checksum from 현재이력)='17d6ae84650588c0a9e60c7271fcec5d33a87400bdb6859cdb84b0eca119d625' -- migration-checksum
+             and (select version from 현재이력)='20260809070000'
+              and (select checksum from 현재이력)='e520a69de0398278f517aeacd3ae4c1909aaa249bb8379de118e87f1022d4fd5' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·7·0·0·3·1·0·0·1·0·0·22·0 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
