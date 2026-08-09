@@ -72,7 +72,7 @@
       "내용": ["task_ref", "task_snapshot", "body_original", "transcript", "transcript_verified", "corrected_text", "capture_meta", "task_schema_ver", "image_refs"],
       "라벨": ["error_tags", "confidence", "attempt_no", "learner_response"],
       "선택로그": ["options_shown", "position", "recommended_option", "selected_option", "changed_selection", "latency_ms", "skipped", "selection_reason", "rejected_all"],
-      "출처": ["model", "prompt_ver", "cited_refs", "output_text", "audio_ref", "intervention_id", "degraded"],
+      "출처": ["model", "prompt_ver", "policy_ver", "cited_refs", "output_text", "audio_ref", "intervention_id", "degraded"],
       "추정메타": ["source_kind", "estimator_confidence", "evidence_refs", "estimator_version", "valid_from", "expires_at", "user_confirmed"],
       "권한": ["consent_ver", "consent_id"]
     },
@@ -110,7 +110,7 @@
       "transcript", "transcript_verified", "capture_meta", "output_text",
       "attempt_no", "learner_response",
       "options_shown", "position", "recommended_option", "selected_option", "changed_selection", "latency_ms", "skipped", "selection_reason", "rejected_all",
-      "cited_refs", "intervention_id", "degraded",
+      "cited_refs", "intervention_id", "degraded", "policy_ver",
       "source_kind", "estimator_confidence", "evidence_refs", "estimator_version", "valid_from", "expires_at", "user_confirmed",
       "consent_ver",
       "session_id", "content_id", "task_schema_ver", "image_refs", "consent_id"
@@ -123,6 +123,7 @@
       "consent_id": "2026-08-09 등재 — **어느 동의 «행»** 인가. 서버가 `engine.consents` 를 읽어 박는 **서버칸**이라 앱·시트가 보내면 거부된다(`consent_ver` 는 문서 «판»이라 다른 칸이다: 판만 알면 어느 학생의 어느 동의였는지 못 되짚는다).",
       "due_at": "c10 신설 — 라이브에 대응 열이 없다(시트는 「낸 시각」만 남기고 「언제까지였나」를 안 남긴다). 🔴배정 순간에만 참인 값이다: 수업표가 바뀌면 그때 그 학생의 마감을 다시 계산할 근거가 사라진다. 채우는 자는 `supabase/functions/deliver`(배정 insert 와 같은 트랜잭션)이고, 서버가 채우므로 앱이 보내면 거부된다(`lib/이벤트검증.js` 서버칸).",
       "due_ver": "c10 신설 — `due_at` 을 낸 규칙의 판. `due.v1` = 배정일의 끝(배정일 다음날 00:00 · `Asia/Ulaanbaatar`). 규칙이 바뀌면 새 판 이름을 쓰고 옛 행은 옛 이름을 그대로 든다 — 판본 없이 시각만 남기면 2년 뒤에 그 값이 무엇이었는지 아무도 못 말한다. 짝 CHECK(`submissions_due_paired_c10`)가 반쪽을 막는다.",
+      "policy_ver": "2026-08-09 등재 — **어떤 «선택 규칙»이 이 개입을 골랐나**. 열은 c6부터 물리에 있었고 L0 스키마·`docs/L0_데이터계약.md`도 이름을 들고 있었는데 **이 필드 목록에만 없었다**(`consent_id` 넷과 같은 뒤처짐이고, 그때는 저장하는 코드가 0줄이라 역방향 회귀도 못 봤다). 🔑 **판을 안 올린다** — 새 약속이 아니라 정본이 물리를 따라잡은 것이고, `X-Contract-Ver: c10`으로 보내는 앱은 한 글자도 안 바뀐다(서버칸이라 앱은 애초에 못 보낸다). ■ **`estimator_version`과 축이 다르다**: 저쪽은 「상태를 **어떻게 쟀나**」고 이쪽은 「그 상태 위에서 **무엇을 골랐나**」다. 둘을 한 칸에 담으면 추정식만 고친 날과 선택 규칙만 고친 날이 같은 모양이 되어, 「알고리즘을 바꿔 좋아진 것」과 「학생이 늘어 좋아진 것」을 가르려던 그 칸이 자기 목적을 깨뜨린다(`due_ver`·`prompt_ver`와 같은 계열). ■ 채우는 자 = `supabase/functions/deliver`(개입 insert와 같은 트랜잭션) · 값의 정본 = `lib/오늘과제.js`의 `선택판`. 🔑 그 판은 **행동 지문**과 한 벌로 못박혀 있어, 우선순위·문턱·고정 문구를 고치고 판을 안 올리면 회귀가 빨개진다(프로즈로는 안 지켜진다). ■ 라이브 시트에 대응 열이 없다 — 시트 수집층은 「무엇을 냈나」만 남기고 「무슨 규칙이 그걸 골랐나」를 안 남긴다. 🔴읽는 자는 이미 있다(`lib/성과회수.js` — 개입-효과 짝이 이 값으로 「무엇이 통했는지」를 규칙 단위로 가른다).",
       "event_id": "라이브 시트의 `id` 열로 대신하지 않는다 — 시트마다 따로 채번해 한 테이블로 합치면 충돌한다.",
       "task_type": "지금은 「어느 시트에 있느냐」가 과업을 말한다. 한 테이블이 되면 열로 나와야 한다.",
       "task_format": "c5 신설 — 라이브에 대응 열이 없다(지금은 낭독·자유발화를 나누는 축 자체가 없다). 🔴새 앱은 첫 제출부터 채운다: 나중에 붙이면 그 사이 녹음은 낭독인지 자유발화인지 **영원히 판정 불가**다(음성만 듣고는 못 가른다).",

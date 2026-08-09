@@ -57,6 +57,9 @@ const { 몽골날짜, 멱등키, 오늘과제, 따라말하기문장, 시간대 
   멱등키: (종류: string, learner_id: string, 날짜: string) => string;
   오늘과제: (재료: Record<string, unknown>) => {
     task_snapshot: Record<string, unknown>; task_ref: string; degraded: boolean; 출처: string;
+    /* 고른 자가 서명한 «선택 규칙의 판». 🔴 상수를 여기서 import 해 박지 않는다 — 그러면
+     * 「무슨 규칙이 골랐나」가 두 곳에 살고, 갈라진 날 행에는 고른 적 없는 이름이 찍힌다. */
+    policy_ver: string;
   };
   따라말하기문장: (snap: unknown) => string | null;
 };
@@ -341,7 +344,7 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
         insert into engine.learning_events (
           learner_id, event_type, actor_kind, occurred_at, idempotency_key,
           level_snapshot, goal_snapshot, intervention_id, consent_ver, consent_id, degraded,
-          estimator_version, estimator_confidence, evidence_refs,
+          estimator_version, estimator_confidence, evidence_refs, policy_ver,
           source_kind, payload, schema_ver
         ) values (
           ${learner_id}::uuid, 'intervention.delivered', ${공통.actor_kind}, ${지금}::timestamptz,
@@ -352,11 +355,19 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
            * §기록규격 · L0 스키마가 열까지 두고 writer 만 0 이던 자리). 셋이 함께 있어야
            * 나중에 **다시 계산해서 대조**할 수 있다 — 판·신뢰도·근거 중 하나만 빠져도 그때
            * 값이 왜 그랬는지 되짚을 길이 없다.
-           * 🔴 policy_ver(어떤 «선택 규칙»으로 골랐나)는 **비운다** — 추정판과 축이 다르고,
-           *   그 판을 정하려면 오늘과제 결정 규칙의 판 매기기가 먼저다. 지금 v1 을 박으면
-           *   「판이 관리되고 있다」는 거짓 신호만 남는다(다음 트랙 · 보드에 남긴다). */
+           * 🔴 policy_ver 는 **넷째 칸이지 추정메타가 아니다**(2026-08-09 · 이 자리가 「비운다」
+           *   였던 것을 닫는다). 위 셋은 「상태를 **어떻게 쟀나**」고 이 칸은 「그 상태 위에서
+           *   **무엇을 골랐나**」다 — 한 칸에 담으면 추정식만 고친 날과 선택 규칙만 고친 날이
+           *   행에서 같은 모양이 되어, 개입-효과 짝(lib/성과회수.js)이 「무엇이 통했는지」를
+           *   규칙 단위로 못 가른다.
+           * ⚠ 백틱을 쓰지 않는다 — 이 주석은 sql 템플릿 리터럴 «안»이라 백틱 한 글자가 리터럴을
+           *   끊고, 증상은 이 자리에서 한참 떨어진 「Missing semicolon」이다(2026-08-09 실측).
+           * 🔑 값은 **결정이 들고 온다** — 고른 자가 서명한다. 여기서 상수를 다시 적으면
+           *   같은 판정이 두 곳에 살고, 갈라진 날 행에는 고른 적 없는 규칙 이름이 찍힌다.
+           * 🔑 상태 계산이 실패해도(위 try) 이 칸은 **그대로 찍힌다** — 상태를 못 쟀다는 것과
+           *   무슨 규칙으로 골랐는지는 별개고, 실제로 그날도 규칙은 골랐다. */
           ${상태?.estimator_version ?? null}, ${상태?.estimator_confidence ?? null},
-          ${상태 ? sql.json(상태.evidence_refs) : null},
+          ${상태 ? sql.json(상태.evidence_refs) : null}, ${결정.policy_ver},
           /* 이 두 행은 관측이 아니라 **추정**이다 — 오늘 이 문장을 준 것은 「이 학생에게
            * 이게 맞겠다」는 판단이고, 판단이 틀린 날의 저조를 학생 특성으로 읽지 않으려면
            * 그 사실이 행에 남아 있어야 한다(절단문서 ①-7 · lib/사건출처.js 가 표를 진다). */
