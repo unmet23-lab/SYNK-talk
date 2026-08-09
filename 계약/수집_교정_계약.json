@@ -69,14 +69,15 @@
     "필드": {
       "봉투": ["event_id", "occurred_at", "ingested_at", "correlation_id", "idempotency_key", "schema_ver"],
       "주체·맥락": ["learner_id", "level_snapshot", "goal_snapshot", "skill_ids", "skill_taxonomy_ver", "task_type", "task_format", "event_type", "retry_of_event_id", "parent_event_id", "turn_no", "correction_id", "due_at", "due_ver", "session_id", "content_id"],
-      "내용": ["task_ref", "task_snapshot", "body_original", "transcript", "transcript_verified", "corrected_text", "capture_meta", "task_schema_ver", "image_refs"],
-      "라벨": ["error_tags", "confidence", "attempt_no", "learner_response"],
+      "내용": ["task_ref", "task_snapshot", "body_original", "transcript", "transcript_verified", "corrected_text", "explanation", "transcript_at_review", "capture_meta", "task_schema_ver", "image_refs"],
+      "라벨": ["error_tags", "confidence", "attempt_no", "learner_response", "verdict", "reviewer_confidence", "l1_source_phrase", "rubric_scores"],
       "선택로그": ["options_shown", "position", "recommended_option", "selected_option", "changed_selection", "latency_ms", "skipped", "selection_reason", "rejected_all"],
       "출처": ["model", "prompt_ver", "policy_ver", "cited_refs", "output_text", "audio_ref", "intervention_id", "degraded"],
       "추정메타": ["source_kind", "estimator_confidence", "evidence_refs", "estimator_version", "valid_from", "expires_at", "user_confirmed"],
       "권한": ["consent_ver", "consent_id"]
     },
     "필드정본_뒤처짐_수리_2026-08-09": "다섯 이름(`session_id`·`content_id`·`task_schema_ver`·`image_refs`·`consent_id`)은 **c10 때 이미 저장되고 있었는데 이 목록에만 없었다**(C0 심문 B4 · SYNK-talk `docs/C0_API계약.md` 「필드 정본에는 없다」 절 · `supabase/functions/events` 가 넷을 읽어 insert 하고 `image_refs` 는 이 수리를 만들며 같은 조건으로 **추가 실측**됐다). 그래서 이것은 새 약속이 아니라 **정본이 실물을 따라잡은 것**이고, 판을 올리지 않는다 — `X-Contract-Ver: c10` 으로 오늘 보내는 앱은 한 글자도 안 바뀐다(넷은 원래 선택이었고 `consent_id` 는 앱이 못 보내는 서버칸이다). ⚠ **왜 c11 이 아닌가**: c11 은 검수 승인·폐기의 물리 4자리(SYNK-talk `docs/검수_내부계약.md` §5)가 쓰는 번호라, 성격이 다른 두 개정을 한 판에 묶으면 「c11 을 지원한다」가 무엇을 뜻하는지 갈린다. ■ **왜 벌어졌나** — 장부 규칙이 「계약의 모든 필드가 어딘가에 요구된다」 **한 방향뿐**이라 반대 방향(**서버가 저장하는 열이 계약에 있는가**)은 아무 데서도 안 빨개졌다. 그 방향을 SYNK-talk `tests/계약역방향.test.js` 가 이제 기계로 잰다 — 다섯을 고치는 대신 **다섯이 생기는 자리를 막았다**.",
+    "필드정본_뒤처짐_수리_2026-08-09_교정칸": "위 수리가 만든 회귀(`tests/계약역방향.test.js`)는 그날 `learning_events`·`submissions` **두 표만** 쟀다. `engine.corrections` 를 셋째 표로 넣자 열 **열둘**이 계약에도 물리칸 장부에도 없이 저장되고 있었다 — 같은 병이 그 표에서 조용히 자라던 자리다(`supabase/functions/correct`·`review`). 여섯을 여기 올린다: `explanation`·`transcript_at_review`(내용) · `verdict`·`reviewer_confidence`·`l1_source_phrase`·`rubric_scores`(라벨). 나머지 여섯은 SYNK-talk `lib/이벤트검증.js` 의 `물리칸` 에 **계약 밖인 이유**와 함께 적었다(`submission_id`·`reviewed_correction_id`·`supersedes` = 표 사이 고리 · `reviewer` = 사람 식별자라 불변식 4 · `review_listened_ms` = 검수 절차 증거 · `promotion_intent` = `privacy_class` 기각을 이름만 바꿔 되살리는 자리). ■ **가른 자 하나** — 엔진이 그 값에서 «배우는가». 배우면 계약이 이름을 내야 계약만 읽는 소비자가 그 값이 실재하는 줄 안다. ■ **판을 올리지 않는다** — B4 와 같은 이유다: 여섯 다 c10 때부터 이미 저장되고 있었고 앱이 보내는 값은 하나도 없어 `X-Contract-Ver: c10` 으로 오늘 보내는 앱은 한 글자도 안 바뀐다. ⚠ 이것은 **정본이 실물을 따라잡은 것**이지 검수 계약(c11) 개정이 아니다.",
     "값목록": {
       "task_type": ["숙제제출", "다시쓰기", "퀴즈응답", "대화턴", "발화녹음", "출석발화"],
       "task_format": ["낭독", "응답", "자유발화", "모의면접", "높임전환", "쓰기첨삭", "번역"],

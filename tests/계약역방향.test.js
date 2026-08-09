@@ -31,7 +31,7 @@ const { 선택필드, 물리칸, 서버칸 } = require('../lib/이벤트검증.j
 
 /* 계약이 이름을 낸 표 둘. 🔑 여기를 늘릴 때는 그 표를 쓰는 통로도 같이 봐야 한다 —
  * 표를 안 늘리고 통로만 늘리면 이 검사가 조용히 좁아진다. */
-const 대상표 = ['learning_events', 'submissions'];
+const 대상표 = ['learning_events', 'submissions', 'corrections'];
 
 /* ── 추출기 ────────────────────────────────────────────────────────────────
  * `insert into engine.<표> ( … ) values` 의 **열 목록 구간만** 읽는다.
@@ -155,6 +155,40 @@ test('탐지력 — 열 목록 안 주석의 괄호에 안 속는다 (잘리면 
   assert.deepEqual(미등재(읽은것[0].열들), ['새로_생긴_열']);
 });
 
+/* ── `engine.corrections` — 셋째 표 (2026-08-09) ─────────────────────────────
+ * 그 표는 08-09 까지 이 검사 «밖»이었고, 넣자마자 미등재 열이 **열둘** 나왔다. 아래 픽스처가
+ * 탐지력을 진다 — 실저장소는 오늘 열둘을 처분해서 초록이라, 실저장소만으로는 이 검사가
+ * 「돈다」를 증명하지 못한다(초록은 분모와 함께 · F207).
+ * 🔴 `values` 가 아니라 **`select`** 로 넣는 통로가 실재한다(`functions/correct` 의 멱등 INSERT).
+ *   추출기를 `values` 로 좁히는 날 그 통로가 통째로 안 보이고, 안 보이는 열은 언제나 통과다. */
+const 가짜교정소스 = (열목록문자열, 꼬리 = 'values (\\${submissionId}::uuid)') => `
+  const 쓴것 = await sql\`
+    insert into engine.corrections (
+      ${열목록문자열}
+    )
+    ${꼬리}
+    returning correction_id\`;
+`;
+
+test('탐지력 — `engine.corrections` 도 잰다 (셋째 표를 넣은 이유)', () => {
+  const 읽은것 = 저장열들(가짜교정소스('submission_id, corrected_text, 검수자_새칸'));
+  assert.equal(읽은것.length, 1, '추출기가 corrections INSERT 를 못 찾았다');
+  assert.equal(읽은것[0].표, 'corrections');
+  assert.deepEqual(미등재(읽은것[0].열들), ['검수자_새칸']);
+});
+
+test('탐지력 — `insert … select` 형태도 읽는다 (`functions/correct` 의 멱등 INSERT 모양)', () => {
+  const 꼬리 = [
+    "select \\${submissionId}::uuid, 'ai'::engine.actor_kind",
+    ' where not exists (',
+    "        select 1 from engine.corrections c",
+    "         where c.submission_id = \\${submissionId}::uuid and c.actor_kind = 'ai')",
+  ].join('\n    ');
+  const 읽은것 = 저장열들(가짜교정소스('submission_id, corrected_text, 검수자_새칸', 꼬리));
+  assert.equal(읽은것.length, 1, '`values` 가 없으면 못 읽는다 — 그 통로가 통째로 사각이 된다');
+  assert.deepEqual(미등재(읽은것[0].열들), ['검수자_새칸']);
+});
+
 test('탐지력 — 다른 표에 넣는 것은 세지 않는다 (넓게 잡으면 거짓양성으로 곧 꺼진다)', () => {
   const 소스 = 가짜소스('learner_id').replace('engine.learning_events', 'engine.staff_access_log');
   assert.deepEqual(저장열들(소스), []);
@@ -229,4 +263,27 @@ test('B4 — 뒤늦게 등재한 다섯은 계약에 그대로 있다', () => {
   for (const n of ['session_id', 'content_id', 'task_schema_ver', 'image_refs']) {
     assert.ok(n in 선택필드, `${n} 이 선택장부에서 빠졌다 — 계약에 이름만 있고 아무도 안 채우는 상태로 되돌아간다`);
   }
+});
+
+/* 🔑 위 B4 절과 같은 이유로 **이름으로** 못박는다 — 위 검사들은 「새로 생기는 것」을 막지만,
+ * 처분된 열둘이 원래 자리에서 빠지면 그것도 그냥 새 위반으로만 잡히고 **왜 그쪽이었는지**를
+ * 잃는다. 여기 적어 두면 되돌린 사람이 그 자리에서 가른 기준을 읽는다. */
+const 교정칸_계약 = ['explanation', 'transcript_at_review', 'verdict', 'reviewer_confidence', 'l1_source_phrase', 'rubric_scores'];
+const 교정칸_물리 = ['submission_id', 'reviewed_correction_id', 'supersedes', 'reviewer', 'review_listened_ms', 'promotion_intent'];
+
+test('corrections 열둘 — 계약 여섯은 계약에, 물리칸 여섯은 장부에 (가른 자 = 엔진이 배우는가)', () => {
+  const 필드 = 계약필드();
+  for (const n of 교정칸_계약) {
+    assert.ok(필드.has(n), `${n} 이 계약 필드에서 빠졌다 — 학습 재료인데 계약만 읽는 소비자가 못 본다`);
+    assert.ok(n in 선택필드, `${n} 이 선택장부에서 빠졌다 — 계약에 이름만 있고 아무도 안 채우는 상태가 된다`);
+  }
+  for (const n of 교정칸_물리) {
+    assert.ok(n in 물리칸, `${n} 이 물리칸 장부에서 빠졌다 — 계약 밖인 이유가 사라지면 다음 사람이 계약으로 올린다`);
+  }
+});
+
+test('🔴 `reviewer` 와 `promotion_intent` 는 계약에 «없어야» 한다 (되돌리면 닫힌 판정이 열린다)', () => {
+  const 필드 = 계약필드();
+  assert.ok(!필드.has('reviewer'), '검수자 식별자가 계약 필드로 올라갔다 — 학습 재료 이름 정본에 사람 식별자가 들어가면 비식별 산출물 조립 목록에 그대로 실린다(코어엔진 불변식 4)');
+  assert.ok(!필드.has('promotion_intent'), '훈련 승격 의사가 계약 필드로 올라갔다 — 「이 행을 훈련에 써도 되나」를 말하는 열을 이름만 바꿔 되살린 것이다(`필드로_만들지_않는다.privacy_class` 유호님 기각)');
 });
