@@ -33,8 +33,10 @@ import 경로모듈 from './업로드경로.mjs';
 import 헤더모듈 from './음성헤더.mjs';
 import 전사모듈 from './전사.mjs';
 import 토큰모듈 from './토큰.mjs';
+import 해시모듈 from './요청해시.mjs';
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
+const { 요청해시 } = 해시모듈 as { 요청해시: (e: unknown) => Promise<string> };
 const { 검증 } = 검증모듈 as { 검증: (e: unknown, c: unknown) => { ok: boolean; 오류들: string[] } };
 const { 사건출처 } = 출처모듈 as { 사건출처: (event_type: string) => string | null };
 const { 버킷, 경로검사 } = 경로모듈 as {
@@ -288,6 +290,12 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
    *   `choice.selected` 의 보기·선택 기록이 통째로 죽는 자리였다. */
   const 제이슨 = (v: unknown) => (v == null ? null : sql.json(v as never));
 
+  /* 요청 지문 — **앱이 보낸 사건 원본**으로 잰다(C0 심문 B2 · `lib/요청해시.js`).
+   * ⚠ 반드시 여기서, 서버가 무엇을 얹기 **전에** 잰다. 위 `capture_meta` 는 서버 측정을 얹은
+   *   별도 변수라 `사건` 은 아직 앱이 준 그대로다 — 그 순서가 이 값의 의미를 정한다.
+   * ⚠ 트랜잭션 **밖**이다(해시는 CPU 일이고, 트랜잭션을 붙들 이유가 없다). */
+  const 지문 = await 요청해시(사건);
+
   try {
     return await sql.begin(async (tx) => {
       // ① 동의 — `occurred_at` 시점에 살아 있던 것만. 사후 동의는 과거를 유효하게 만들지 못한다(C0 §5).
@@ -419,7 +427,8 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
           idempotency_key, session_id, content_id, retry_of_event_id, parent_event_id, turn_no,
           correction_id,
           skill_ids, skill_taxonomy_ver, level_snapshot, goal_snapshot,
-          intervention_id, consent_id, consent_ver, source_kind, payload, schema_ver
+          intervention_id, consent_id, consent_ver, source_kind, payload, schema_ver,
+          request_hash
         ) values (
           ${learner_id}::uuid, ${String(사건.event_type)}, ${(사건.task_type ?? null) as string | null},
           'learner', ${occurred_at}::timestamptz, ${(사건.correlation_id ?? null) as string | null}::uuid,
@@ -449,15 +458,40 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
            * 표는 lib/사건출처.js 하나고 배달 통로도 같은 표를 읽는다 — 둘이 각자 적으면
            * 같은 사건이 한쪽에선 관측, 다른 쪽에선 추정이 된다.
            * event_type 은 위 검증에서 계약 값목록 안임이 확정됐다(값목록 밖이면 400). */
-          ${사건출처(String(사건.event_type))}::engine.source_kind, ${제이슨(payload)}, ${ver}
+          ${사건출처(String(사건.event_type))}::engine.source_kind, ${제이슨(payload)}, ${ver},
+          ${지문}
         )
         on conflict (learner_id, idempotency_key) do nothing
         returning event_id`;
 
       if (!넣기.length) {
+        /* 🔴 **여기가 발화가 사라지던 자리다**(C0 심문 B2 · 3벌 공통 · 소급 불가).
+         *   여기까지는 내용을 **안 보고** `duplicate` + 기존 event_id 를 돌려줬고, 앱은 그것을
+         *   `stored` 와 같은 갈래로 읽어 큐에서 지운다(`src/사건통로.js`). 그래서 같은 키가
+         *   **다른 내용**에 두 번 쓰이면 뒤엣것이 통째로 사라졌다 — 사라지는 쪽은 늘 학생
+         *   발화이고, 증상이 「조용함」뿐이라 개원 뒤엔 발견할 방법도 없다.
+         *   🔑 이제 지문으로 가른다: 같으면 그건 **정상 재전송**이고(멱등의 존재 이유),
+         *     다르면 **다른 사건이 남의 키를 쓴 것**이라 성공이라고 말하지 않는다. */
         const 기존 = await tx`
-          select event_id from engine.learning_events
+          select event_id, request_hash from engine.learning_events
            where learner_id = ${learner_id}::uuid and idempotency_key = ${String(key)}`;
+
+        /* 옛 행은 지문이 없다(열이 생기기 전에 쌓인 것). 없는 것을 「다르다」로 읽으면 그날
+         * 재전송이 통째로 거절되므로, 판정 불가는 **옛 동작 그대로** 접는다 — 다만 조용히
+         * 넘기지 않고 로그에 남긴다(이 줄이 안 보이면 소급 대상도 없다는 뜻이다). */
+        if (기존[0].request_hash == null) {
+          console.warn('[events] 지문 없는 행과의 멱등 재전송 — 판정 불가로 duplicate 처리', 기존[0].event_id);
+          return { idempotency_key: key, status: 'duplicate', event_id: 기존[0].event_id };
+        }
+        if (기존[0].request_hash !== 지문) {
+          /* `retryable: false` 다 — 같은 키로 100번 보내도 같은 충돌이다. 앱은 이 코드 하나를
+           * 특별히 알아, **키를 새로 지어 한 번 다시 보낸다**(`src/사건통로.js`). 거절만 하고
+           * 앱이 `send_final` 로 접으면 결과는 지금과 똑같은 소멸이라, 서버·앱이 한 벌이다. */
+          return 거절({
+            code: 'IDEMPOTENCY_CONFLICT', field: 'idempotency_key', retryable: false,
+            message: '이 멱등키는 이미 다른 내용으로 저장돼 있습니다 — 새 키로 다시 보내 주세요',
+          });
+        }
         return { idempotency_key: key, status: 'duplicate', event_id: 기존[0].event_id };
       }
       const event_id: string = 넣기[0].event_id;

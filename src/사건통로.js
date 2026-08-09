@@ -17,6 +17,9 @@
 import { 인증오류, 토큰되살리기 } from './인증API.js';
 import { 계약판 } from './계약판.js';
 import { 검증 } from '../lib/이벤트검증.js';
+// 멱등 충돌 때 지을 새 키. **키를 짓는 규칙은 저장소에 하나뿐이어야** 한다 — 여기서 따로
+// 지으면 기기에 `crypto` 가 없는 갈래(Hermes)가 이 자리에서만 조용히 깨진다(제출로그 머리말).
+import { 흐름id } from '../lib/제출로그.js';
 
 const URL_ = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -104,19 +107,42 @@ export async function 사건보내기(토큰, 사건) {
   const v = 검증(사건, {});
   if (!v.ok) return { 오류: `계약 위반: ${v.오류들.join(' · ')}`, 끝: true };
 
+  const 첫판 = await 한벌쏘기(토큰, 사건);
+  if (!첫판.충돌) return 첫판.결과;
+
+  /* 🔴 `IDEMPOTENCY_CONFLICT` = **이 키는 이미 다른 내용으로 저장돼 있다**(C0 심문 B2).
+   *   서버가 거절하는 것만으로는 처방이 아니다 — `retryable:false` 라 `lib/제출로그.js` 가
+   *   `send_final` 로 적고, 그러면 결과는 지금과 **똑같은 소멸**이다. 그래서 앱이 짝을 진다:
+   *   키를 새로 지어 **한 번** 다시 보낸다. 새 키라 같은 충돌은 원리상 안 난다.
+   * 🔑 재시도는 1회뿐이다. 새 키로도 충돌하면 그건 우리가 모르는 고장이고, 그때 루프를
+   *   돌면 몽골 모바일 회선으로 같은 발화가 영원히 나간다.
+   * 🔑 새 키는 로그 항목에 되적지 않는다 — 성공하면 그 자리에서 `event_id` 가 적히고, 이후
+   *   인과 참조는 전부 그 event_id 로 간다(서버 고리풀기는 event_id 를 먼저 본다). */
+  const 다시 = { ...사건, idempotency_key: 흐름id() };
+  const 둘째판 = await 한벌쏘기(토큰, 다시);
+  if (둘째판.충돌) {
+    return { 오류: '같은 키가 계속 충돌해요 — 이 발화는 보내지 못했어요', 끝: true };
+  }
+  return 둘째판.결과;
+}
+
+/** 한 번 쏘고 **충돌인지**를 갈라 돌려준다. 충돌 판정을 두 곳에 적으면 갈라지므로 여기 하나다.
+ *  ⚠ 이름이 `한번` 이 아닌 이유: 위 46행에 같은 이름의 HTTP 왕복 함수가 이미 있다. */
+async function 한벌쏘기(토큰, 사건) {
   let 본문;
   try {
     본문 = await 부르기('events', 토큰, { events: [사건] });
   } catch (e) {
-    return { 오류: String(e.message || e), 끝: e.retryable === false };
+    return { 충돌: false, 결과: { 오류: String(e.message || e), 끝: e.retryable === false } };
   }
 
   const 한건 = 본문.results && 본문.results[0];
-  // `duplicate` 는 실패가 아니라 **재전송이 접힌 것**이다 — 사건이 멱등키를 들고 있어서 안전하다
-  // (같은 사건 객체는 몇 번 보내도 같은 키다 · C0 §4-1).
+  // `duplicate` 는 실패가 아니라 **재전송이 접힌 것**이다 — 이제 서버가 **내용까지 대조하고**
+  // 같을 때만 그렇게 부른다(다르면 아래 `IDEMPOTENCY_CONFLICT` · C0 §4-1).
   if (한건 && (한건.status === 'stored' || 한건.status === 'duplicate')) {
-    return { event_id: 한건.event_id };
+    return { 충돌: false, 결과: { event_id: 한건.event_id } };
   }
   const e = (한건 && 한건.error) || {};
-  return { 오류: e.message || '서버가 받지 않았어요', 끝: e.retryable === false };
+  if (e.code === 'IDEMPOTENCY_CONFLICT') return { 충돌: true, 결과: null };
+  return { 충돌: false, 결과: { 오류: e.message || '서버가 받지 않았어요', 끝: e.retryable === false } };
 }
