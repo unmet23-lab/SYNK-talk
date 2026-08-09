@@ -23,16 +23,23 @@
  *   입력**이다 — 승인 게이트 ②가 「그 항목의 서명 발급 기록이 실재하는가」를 묻는다. 그래서
  *   감사가 실패하면 응답을 내주지 않는다(큐는 같은 트랜잭션 · 서명은 아래 순서 주석).
  *
- * ■ 아직 없는 것 — `POST /v1/review/approve`·`/discard` (§5 ⛔ c11 선행)
- *   담을 물리 칸이 넷 없다(`corrections.supersedes`·`promote_intent`·
- *   `transcript_verified_at_review` · `pipeline_jobs.discard_reason`). 열 없이 요청/응답을
- *   지어내면 **구현 불가능한 채로 정본이 된다** — 계약이 그 자리를 비워 둔 이유다.
- *   이 함수도 같은 이유로 그 경로를 **404 로 둔다**(빈 껍데기를 두면 화면이 그것을 부른다).
+ * ■ §5 승인·폐기 — 물리 칸 넷이 서서(`20260809090000`) 이 경로가 열렸다
+ *   🔴 **이름 둘이 이 머리말의 옛 판과 다르다**: 채택된 물리 정본은 `promotion_intent`·
+ *   `transcript_at_review` 다(`promote_intent`·`transcript_verified_at_review` 가 아니다 —
+ *   그 조각 머리말이 세션 조율로 못박았다. `_verified_` 를 뺀 것이 판정이다: 검수자가 보는
+ *   것은 보통 기계 전사이고 `transcript_verified` 는 그 판정의 **산출물**이라, 이름에 넣으면
+ *   행마다 거짓을 적게 된다).
+ *
+ * ■ 게이트의 주체는 **화면이 아니라 이 함수**다 (§5 · 발주 §3)
+ *   UI 만 막으면 직접 호출·재전송으로 0초 승인 행이 그대로 만들어진다. 넷을 매 승인에서
+ *   다시 잰다: ①청취 ②그 항목의 서명 발급 기록(§2 감사가 여기서 **입력**이 된다)
+ *   ③활성 직원(위 공통 사슬) ④`reviewed_correction_id` 가 **그 제출물의** AI 행.
  */
 import postgres from 'npm:postgres@3.4.4';
 import 토큰모듈 from './토큰.mjs';
 import 커서모듈 from './검수커서.mjs';
 import 경로모듈 from './업로드경로.mjs';
+import 확정모듈 from './검수확정.mjs';
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
 const { 버킷 } = 경로모듈 as { 버킷: string };
@@ -54,6 +61,15 @@ const { 쪽크기, 커서읽기, 커서만들기, 커서키 } = 커서모듈 as 
   커서키: (값: 커서값 | null) => { 감사키: boolean; 널키: boolean; 신뢰키: string; 시각: string; id: string } | null;
 };
 
+type 요청검증 = { 값: Record<string, never> | null; 이유: string | null; 칸: string | null };
+const { 판정, 청취문턱, 폐기어휘, 승인요청, 폐기요청 } = 확정모듈 as {
+  판정: (셋: { 검증전사: unknown; ai교정문: unknown; 최종교정문: unknown }) => string;
+  청취문턱: (세그먼트들: unknown) => { ms: number; 재료: boolean };
+  폐기어휘: (constraintdef: unknown) => string[];
+  승인요청: (본문: unknown) => 요청검증;
+  폐기요청: (본문: unknown) => 요청검증;
+};
+
 const 계약판 = /^c(\d+)$/;
 const uuid꼴 = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -66,6 +82,21 @@ const 검수역할 = ['inspector', 'director'];
 const 서명수명초 = 600;
 
 type 오류 = { code: string; message: string; retryable: boolean; field?: string };
+
+/* §5 거절 — 코드→상태를 **한 자리에 리터럴로** 둔다(계약 §1 표의 코드층 짝).
+ * 🔑 두 이유로 표가 필요하다:
+ *   ① 초판은 승인·폐기가 **각자** 삼항으로 상태를 정했고, 그 둘이 이미 갈려 있었다
+ *      (같은 `else` 가 한쪽은 409, 한쪽은 400). 같은 판정을 두 곳에 적으면 갈라진다.
+ *   ② 코드를 변수로 흘리면 `tests/검수통로.test.js` 의 계약 대조가 **눈이 먼다** —
+ *      그 검사는 리터럴을 세므로, 표에만 사는 코드가 생겨도 아무도 모르게 된다. */
+const 거절상태 = {
+  NOT_FOUND: 404,
+  CONTRACT_VIOLATION: 400,
+  GATE_NOT_MET: 409,
+  SUPERSEDE_CONFLICT: 409,
+  INTERNAL: 500,
+} as const;
+type 거절코드 = keyof typeof 거절상태;
 
 function 봉투(status: number, body: Record<string, unknown>, ver: string) {
   return new Response(JSON.stringify({ contract_ver: ver, ...body }), {
@@ -103,10 +134,11 @@ Deno.serve(async (req: Request) => {
    * 전부 큐 조회로 동작하고, §5 가 서는 날 옛 오타 경로가 **이미 돌던 것**이 된다. */
   const url = new URL(req.url);
   const 경로 = url.pathname.replace(/\/+$/, '').split('/').pop() ?? '';
-  if (경로 !== 'queue' && 경로 !== 'audio') {
+  const 아는경로 = ['queue', 'audio', 'approve', 'discard'];
+  if (!아는경로.includes(경로)) {
     return 실패(404, {
       code: 'CONTRACT_VIOLATION', retryable: false,
-      message: '없는 경로입니다 — GET /v1/review/queue · POST /v1/review/audio',
+      message: '없는 경로입니다 — GET /v1/review/queue · POST /v1/review/{audio,approve,discard}',
     }, 선언);
   }
   const 기대메서드 = 경로 === 'queue' ? 'GET' : 'POST';
@@ -148,9 +180,15 @@ Deno.serve(async (req: Request) => {
   const staff_id: string = 행.staff_id;
 
   try {
-    return 경로 === 'queue'
-      ? await 큐읽기(url, staff_id, ver)
-      : await 오디오서명(req, staff_id, ver);
+    if (경로 === 'queue') return await 큐읽기(url, staff_id, ver);
+    if (경로 === 'audio') return await 오디오서명(req, staff_id, ver);
+    const 본문 = await 본문읽기(req);
+    if (본문 === undefined) {
+      return 실패(400, { code: 'CONTRACT_VIOLATION', message: 'JSON 이 아닙니다', retryable: false }, ver);
+    }
+    return 경로 === 'approve'
+      ? await 승인(본문, staff_id, ver)
+      : await 폐기(본문, staff_id, ver);
   } catch (e) {
     console.error(`[review/${경로}] 실패`, String((e as Error)?.message ?? e));
     return 실패(500, { code: 'INTERNAL', message: '잠시 뒤 다시 시도해 주세요', retryable: true }, ver);
@@ -213,12 +251,11 @@ async function 큐읽기(url: URL, staff_id: string, ver: string) {
 /* ── §4 POST /v1/review/audio ────────────────────────────────────────── */
 
 async function 오디오서명(req: Request, staff_id: string, ver: string) {
-  let 본문: { submission_id?: unknown };
-  try {
-    본문 = JSON.parse((await req.text()) || '{}');
-  } catch {
+  const 읽은것 = await 본문읽기(req);
+  if (읽은것 === undefined) {
     return 실패(400, { code: 'CONTRACT_VIOLATION', message: 'JSON 이 아닙니다', retryable: false }, ver);
   }
+  const 본문 = (읽은것 ?? {}) as { submission_id?: unknown };
   const sid = String(본문.submission_id ?? '');
   if (!uuid꼴.test(sid)) {
     return 실패(400, {
@@ -277,4 +314,267 @@ async function 오디오서명(req: Request, staff_id: string, ver: string) {
     url: `${base}/storage/v1${signedURL}`,
     expires_at: new Date(Date.now() + 서명수명초 * 1000).toISOString(),
   }, ver);
+}
+
+/* ── §5 승인·폐기 ────────────────────────────────────────────────── */
+
+/** 본문 파서 — **통로를 하나로 둔다.** 경로마다 try/catch 를 따로 쓰면 새 경로가 그것을
+ *  빠뜨렸을 때 증상이 500 이고, 그건 「잘못된 JSON」과 구분이 안 된다.
+ *  @returns 파싱값 · `undefined` 면 JSON 이 아니다(본문이 비면 `{}`). */
+async function 본문읽기(req: Request): Promise<unknown> {
+  try {
+    return JSON.parse((await req.text()) || '{}');
+  } catch {
+    return undefined;
+  }
+}
+
+type 승인본문 = {
+  submission_id: string; reviewed_correction_id: string; supersedes: string | null;
+  transcript_verified: string; corrected_text: string; error_tags: string[];
+  explanation: string | null; l1_source_phrase: string | null;
+  rubric_scores: unknown; reviewer_confidence: number | null;
+  review_listened_ms: number; promote: boolean;
+};
+
+/** §5-1 `POST /v1/review/approve` — 확정 = 기록 둘(교정 판정 + 승격 의사)이 **한 쓰기**에.
+ *
+ *  🔴 이 함수의 원자성이 계약의 절반이다. 셋이 한 트랜잭션에 있어야 한다:
+ *    ①teacher 행 ②`submissions.transcript_verified` ③`pipeline_jobs.status='verified'`.
+ *    ③을 빠뜨리면 확정한 항목이 **큐에 남아** 검수자가 같은 발화를 또 만나고,
+ *    ②를 빠뜨리면 최신 판정과 제출물의 검증 전사가 갈린다.
+ *    승격 의사(`promotion_intent`)도 같은 쓰기다 — 뒤로 미루면 그 사이 실패에 **사람이 누른
+ *    의사가 증발**하고, 그 항목은 이미 큐에서 나가 다시 물을 방법이 없다(발주 §3).
+ */
+async function 승인(본문: unknown, staff_id: string, ver: string) {
+  const 검증 = 승인요청(본문);
+  if (검증.이유) {
+    return 실패(400, {
+      code: 'CONTRACT_VIOLATION', retryable: false,
+      message: 검증.이유, ...(검증.칸 ? { field: 검증.칸 } : {}),
+    }, ver);
+  }
+  const q = 검증.값 as unknown as 승인본문;
+  const 재검수 = q.supersedes !== null;
+
+  const 결과 = await sql.begin(async (tx) => {
+    /* ① **먼저 잠근다.** 소속의 상태 축을 지는 것이 이 표라, 여기를 잠그면 같은 항목의
+     *   동시 승인·폐기가 직렬화된다. 두 번째 요청은 잠금이 풀린 뒤 상태를 다시 읽어
+     *   「이미 끝난 항목」으로 떨어진다 — 중복 teacher 행이 원리상 안 생긴다.
+     *   🔴 뷰(`review_queue`)에는 `for update` 를 걸 수 없다. 그래서 잠금과 소속 판정을
+     *   갈랐고, 순서는 **잠금이 먼저**여야 한다(반대면 그 사이 상태가 바뀐다). */
+    const [job] = await tx`
+      select status::text as status from engine.pipeline_jobs
+       where submission_id = ${q.submission_id}::uuid
+       for update`;
+    if (!job) return { 거절: 'NOT_FOUND' as const, 문구: '없는 제출물입니다' };
+
+    const [재료] = await tx`
+      select s.stt_segments,
+             exists (select 1 from engine.review_queue v
+                      where v.submission_id = s.submission_id) as 큐안,
+             (select c.corrected_text from engine.corrections c
+               where c.correction_id = ${q.reviewed_correction_id}::uuid
+                 and c.submission_id = s.submission_id
+                 and c.actor_kind = 'ai') as ai교정문,
+             exists (select 1 from engine.corrections c
+                      where c.correction_id = ${q.reviewed_correction_id}::uuid
+                        and c.submission_id = s.submission_id
+                        and c.actor_kind = 'ai') as ai행,
+             /* 게이트 ② — **요청자 본인의** 발급 기록이어야 한다. 남이 연 기록으로 내가
+              *   확정하면 이 게이트는 「누군가 들었다」만 보증한다(검수자가 여럿이 되는
+              *   2027-02 에 새는 방향이 「통과」다). */
+             exists (select 1 from engine.staff_access_log l
+                      where l.staff_id = ${staff_id}::uuid
+                        and l.action = 'review.audio'
+                        and s.submission_id = any(l.target_ids)) as 서명기록
+        from engine.submissions s
+       where s.submission_id = ${q.submission_id}::uuid`;
+    if (!재료) return { 거절: 'NOT_FOUND' as const, 문구: '없는 제출물입니다' };
+
+    /* 소속 — 갈래가 둘이다.
+     *   ▸ 첫 확정: 지금 큐에 있어야 한다.
+     *   ▸ 재검수(`Z`): 확정으로 큐에서 **나간** 항목이라 큐에 없는 것이 정상이고,
+     *     대신 `verified` 여야 한다. 폐기·철회분은 어느 쪽으로도 안 받는다. */
+    if (!재검수 && !재료.큐안) {
+      return { 거절: 'NOT_FOUND' as const, 문구: '지금 큐에 없는 항목입니다' };
+    }
+    if (재검수 && job.status !== 'verified') {
+      return { 거절: 'NOT_FOUND' as const, 문구: '재검수할 수 있는 상태가 아닙니다(확정된 항목만)' };
+    }
+
+    if (재검수) {
+      const [계보] = await tx`
+        select exists (select 1 from engine.corrections c
+                        where c.correction_id = ${q.supersedes}::uuid
+                          and c.submission_id = ${q.submission_id}::uuid
+                          and c.actor_kind = 'teacher') as 대상,
+               exists (select 1 from engine.corrections x
+                        where x.supersedes = ${q.supersedes}::uuid) as 이미대체됨`;
+      if (!계보?.대상) {
+        return {
+          거절: 'CONTRACT_VIOLATION' as const, 칸: 'supersedes',
+          문구: 'supersedes 는 그 제출물의 teacher 교정이어야 합니다',
+        };
+      }
+      /* 🔴 사슬이 갈라지면 「원본당 최신 미폐기 행 하나」가 **둘**이 된다 — 소비자 쿼리는
+       *   그 순간 어느 라벨이 정본인지 못 고르고, 두 라벨이 나란히 훈련·개인화로 흘러간다.
+       *   c11 의 CHECK 는 자기 참조만 막는다(더 긴 갈래는 물리로 못 막는 자리라 여기가 진다).
+       *   ▶ c11 권고: `unique (supersedes) where supersedes is not null` 로 물리에 못박으면
+       *     이 검사는 잉여가 된다 — 그때까지는 이 줄이 유일한 방어선이다. */
+      if (계보.이미대체됨) {
+        return {
+          거절: 'SUPERSEDE_CONFLICT' as const,
+          문구: '그 판정은 이미 다른 재검수가 대신했습니다 — 최신 판정을 다시 열어 주세요',
+        };
+      }
+    }
+
+    /* 게이트 ④ — `reviewed_correction_id` 가 **그 제출물의** AI 행인가.
+     *   다른 제출물의 교정을 가리키는 것은 트리거가 막지만, `teacher` 행을 평가 대상으로
+     *   가리키는 것은 물리가 안 막는다(그러면 사람이 사람을 평가한 라벨이 된다). */
+    if (!재료.ai행) {
+      return {
+        거절: 'GATE_NOT_MET' as const, 칸: 'reviewed_correction_id',
+        문구: 'reviewed_correction_id 가 그 제출물의 AI 교정이 아닙니다',
+      };
+    }
+    if (!재료.서명기록) {
+      return {
+        거절: 'GATE_NOT_MET' as const, 칸: 'audio',
+        문구: '오디오를 연 기록이 없습니다 — 먼저 재생해 주세요',
+      };
+    }
+
+    /* 게이트 ① — 청취. ⚠ 오늘 `문턱.재료` 는 **항상 false** 다(`stt_segments` 생산자 0 ·
+     *   `lib/검수확정.js` 머리말). 그 사실을 응답에 실어 화면·로그가 「게이트가 세다」로
+     *   읽지 않게 한다 — 미측정을 통과로 두지 않는다. */
+    const 문턱 = 청취문턱(재료.stt_segments);
+    if (q.review_listened_ms < 문턱.ms) {
+      return {
+        거절: 'GATE_NOT_MET' as const, 칸: 'review_listened_ms',
+        문구: `아직 충분히 듣지 않았습니다(${문턱.ms}ms 필요 · 들은 ${q.review_listened_ms}ms)`,
+      };
+    }
+
+    const verdict = 판정({
+      검증전사: q.transcript_verified,
+      ai교정문: 재료.ai교정문,
+      최종교정문: q.corrected_text,
+    });
+
+    const [행] = await tx`
+      insert into engine.corrections (
+        submission_id, reviewed_correction_id, actor_kind, corrected_text, error_tags,
+        explanation, reviewer, verdict, reviewer_confidence, l1_source_phrase,
+        rubric_scores, review_listened_ms, supersedes, promotion_intent,
+        transcript_at_review, schema_ver
+      ) values (
+        ${q.submission_id}::uuid, ${q.reviewed_correction_id}::uuid, 'teacher'::engine.actor_kind,
+        ${q.corrected_text}, ${q.error_tags},
+        ${q.explanation}, ${staff_id}, ${verdict}, ${q.reviewer_confidence}, ${q.l1_source_phrase},
+        ${q.rubric_scores as never}, ${q.review_listened_ms}, ${q.supersedes}, ${q.promote},
+        ${q.transcript_verified}, ${ver}
+      ) returning correction_id`;
+
+    /* 제출물의 검증 전사는 **최신 판정에서 파생**한다(발주 §3 UX ③ 🔴). 계보는 teacher 행의
+     * `transcript_at_review` 가 들고 있으므로 여기를 덮어도 과거 판정의 근거는 안 사라진다.
+     * 🔑 기계 전사(`transcript`)는 안 건드린다 — 트리거가 그것을 막고, 그게 이 열의 존재 이유다. */
+    await tx`
+      update engine.submissions
+         set transcript_verified = ${q.transcript_verified}
+       where submission_id = ${q.submission_id}::uuid`;
+
+    await tx`
+      update engine.pipeline_jobs
+         set status = 'verified', updated_at = now()
+       where submission_id = ${q.submission_id}::uuid`;
+
+    await tx`
+      insert into engine.staff_access_log (staff_id, action, target_ids)
+      values (${staff_id}::uuid, 'review.approve', array[${q.submission_id}::uuid])`;
+
+    return {
+      correction_id: 행.correction_id as string,
+      verdict,
+      promotion_intent: q.promote,
+      listen_gate: { required_ms: 문턱.ms, measured: 문턱.재료 },
+    };
+  });
+
+  if ('거절' in 결과) return 거절응답(결과, ver);
+  return 봉투(200, { ok: true, ...결과 }, ver);
+}
+
+/** 거절 봉투 — 상태는 `거절상태` 하나에서 온다(승인·폐기가 각자 정하지 않는다). */
+function 거절응답(결과: { 거절: 거절코드; 문구: string; 칸?: string }, ver: string) {
+  return 실패(거절상태[결과.거절], {
+    code: 결과.거절,
+    message: 결과.문구,
+    /* 재시도가 뜻이 있는 것은 서버 쪽 사정뿐이다 — 게이트·계보 거절은 다시 눌러도 같다. */
+    retryable: 결과.거절 === 'INTERNAL',
+    ...(결과.칸 ? { field: 결과.칸 } : {}),
+  }, ver);
+}
+
+/** §5-2 `POST /v1/review/discard` — 소프트 폐기. 파일은 **남긴다**(노이즈도 강건성 재료).
+ *  ⚠ 철회(`revoked`)는 다른 사건이고 파일을 지운다(L0 §9-3) — 이 경로가 아니다. */
+async function 폐기(본문: unknown, staff_id: string, ver: string) {
+  const 검증 = 폐기요청(본문);
+  if (검증.이유) {
+    return 실패(400, {
+      code: 'CONTRACT_VIOLATION', retryable: false,
+      message: 검증.이유, ...(검증.칸 ? { field: 검증.칸 } : {}),
+    }, ver);
+  }
+  const q = 검증.값 as unknown as { submission_id: string; reason: string };
+
+  const 결과 = await sql.begin(async (tx) => {
+    const [job] = await tx`
+      select status::text as status from engine.pipeline_jobs
+       where submission_id = ${q.submission_id}::uuid
+       for update`;
+    if (!job) return { 거절: 'NOT_FOUND' as const, 문구: '없는 제출물입니다' };
+
+    const [소속] = await tx`
+      select exists (select 1 from engine.review_queue v
+                      where v.submission_id = ${q.submission_id}::uuid) as 큐안`;
+    if (!소속?.큐안) return { 거절: 'NOT_FOUND' as const, 문구: '지금 큐에 없는 항목입니다' };
+
+    /* 🔴 **어휘를 코드에 안 든다 — DB CHECK 에서 읽는다**(`lib/검수확정.js` 머리말).
+     *   이름을 접두로 찾는 이유: 판이 올라가면 제약 이름이 `_c11` 로 통째 바뀌는 것이
+     *   이 저장소의 관행이고, 이름을 박아 두면 그 날 **전 폐기가 조용히 500** 이 된다. */
+    const [제약] = await tx`
+      select pg_get_constraintdef(oid) as def from pg_constraint
+       where connamespace = to_regnamespace('engine')
+         and conname like 'pipeline_jobs_discard_reason_c%'
+       limit 1`;
+    const 어휘 = 폐기어휘(제약?.def);
+    if (어휘.length === 0) {
+      /* 조각이 아직 안 부어진 DB 다. 그 상태에서 폐기를 통과시키면 사유 없는 폐기가 남고
+       * 그건 「왜 뺐는지 모르는 행」이라 나중에 오염 데이터와 구별할 수 없다 — 거절이 맞다. */
+      console.error('[review/discard] 폐기 사유 CHECK 를 못 읽었다 — 20260809090000 미적용?');
+      return { 거절: 'INTERNAL' as const, 문구: '폐기 사유 목록을 읽지 못했습니다(서버 판 확인 필요)' };
+    }
+    if (!어휘.includes(q.reason)) {
+      return {
+        거절: 'CONTRACT_VIOLATION' as const, 칸: 'reason',
+        문구: `폐기 사유는 다음 중 하나입니다: ${어휘.join(' · ')}`,
+      };
+    }
+
+    await tx`
+      update engine.pipeline_jobs
+         set status = 'discarded', discard_reason = ${q.reason}, updated_at = now()
+       where submission_id = ${q.submission_id}::uuid`;
+
+    await tx`
+      insert into engine.staff_access_log (staff_id, action, target_ids)
+      values (${staff_id}::uuid, 'review.discard', array[${q.submission_id}::uuid])`;
+
+    return { discarded: true, reason: q.reason };
+  });
+
+  if ('거절' in 결과) return 거절응답(결과, ver);
+  return 봉투(200, { ok: true, ...결과 }, ver);
 }

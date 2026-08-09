@@ -45,17 +45,41 @@ function 계약오류표() {
   return 표;
 }
 
-/** 소스의 `실패(<status>, { … code: 'X' … })` 전량 → `{코드: Set<상태>}`. */
+/** 소스의 `거절상태` 표 → `{코드: 상태}`. §5 는 거절을 트랜잭션 «안»에서 정하고 밖에서
+ *  봉투로 바꾸므로 호출부에 리터럴이 없다 — 그 자리를 이 표가 대신 진다.
+ *  🔴 표를 못 읽으면 **거기서 실패한다**: 코드가 변수로만 흐르면 아래 계약 대조가 통째로
+ *  눈이 멀고, 그 상태는 「초록」과 같은 모양이다. */
+function 거절표() {
+  const m = /const 거절상태 = \{([\s\S]*?)\} as const;/u.exec(소스);
+  assert.ok(m, '`거절상태` 표를 못 찾았다 — §5 의 코드→상태 매핑이 어디 있는지 불명이다');
+  const 표 = {};
+  for (const 줄 of m[1].matchAll(/([A-Z_]+):\s*(\d{3})/gu)) 표[줄[1]] = Number(줄[2]);
+  assert.ok(Object.keys(표).length >= 4, `거절 표를 ${Object.keys(표).length}줄밖에 못 읽었다 — 파서가 낡았다`);
+  return 표;
+}
+
+/** 소스의 `실패(<status>, { … code: 'X' … })` 리터럴 + `거절상태` 표 → `{코드: Set<상태>}`. */
 function 코드사용() {
   const 쓰임 = {};
   for (const m of 소스.matchAll(/실패\(\s*(\d{3})\s*,\s*\{([\s\S]*?)\}\s*,/gu)) {
     const c = /code:\s*'([A-Z_]+)'/u.exec(m[2]);
-    assert.ok(c, `실패(${m[1]}, …) 에 code 가 없다 — 봉투가 코드 없이 나간다`);
+    if (!c) continue; /* `거절응답` 처럼 표에서 받아 넘기는 자리 — 아래에서 표로 센다. */
     (쓰임[c[1]] ??= new Set()).add(Number(m[1]));
   }
-  assert.ok(Object.keys(쓰임).length >= 5, `실패() 호출을 ${Object.keys(쓰임).length}종밖에 못 찾았다 — 정규식이 낡았다`);
+  for (const [코드, 상태] of Object.entries(거절표())) (쓰임[코드] ??= new Set()).add(상태);
+  assert.ok(Object.keys(쓰임).length >= 5, `오류 코드를 ${Object.keys(쓰임).length}종밖에 못 찾았다 — 정규식이 낡았다`);
   return 쓰임;
 }
+
+test('거절 코드→상태 매핑이 **한 자리**에만 있다', () => {
+  /* 초판은 승인·폐기가 각자 삼항으로 정했고 그 둘이 이미 갈려 있었다(같은 `else` 가
+   * 한쪽은 409, 한쪽은 400). 같은 판정을 두 곳에 적으면 갈라진다 — 목록은 하나에서 파생시킨다. */
+  const 삼항 = [...소스.matchAll(/코드 === '[A-Z_]+' \? \d{3}/gu)];
+  assert.deepEqual(삼항.map((m) => m[0]), [],
+    '거절 상태를 삼항으로 다시 적는 자리가 있다 — `거절상태` 표 하나에서만 나와야 한다');
+  assert.ok(Object.keys(거절표()).includes('SUPERSEDE_CONFLICT'),
+    '재검수 계보 충돌 코드가 표에 없다(§5-1)');
+});
 
 test('오류 코드·HTTP 상태가 계약 §1 표와 정확히 같다', () => {
   const 표 = 계약오류표();
@@ -70,11 +94,12 @@ test('오류 코드·HTTP 상태가 계약 §1 표와 정확히 같다', () => {
   assert.deepEqual(어긋남, [], 어긋남.join('\n'));
 });
 
-test('계약에 있는데 안 쓰는 코드는 §5(c11 선행) 몫 하나뿐이다', () => {
+test('계약이 적은 코드를 통로가 **전부** 쓴다 (§5 가 서면서 마지막 하나가 닫혔다)', () => {
   const 안씀 = Object.keys(계약오류표()).filter((c) => !코드사용()[c]);
-  assert.deepEqual(안씀, ['GATE_NOT_MET'],
-    '계약이 적은 코드를 통로가 안 쓴다 — 승인 게이트(§5)가 서면 이 줄이 그때 빨개져야 한다.\n'
-    + '  🔴 여기서 초록으로 덮지 마라: 안 쓰는 코드를 늘리면 계약과 통로가 갈라진 것이 안 보인다');
+  assert.deepEqual(안씀, [],
+    '계약이 적은 코드를 통로가 안 쓴다 — 표에만 사는 코드는 화면이 대비할 수 없다.\n'
+    + '  🔴 여기서 초록으로 덮지 마라: 안 쓰는 코드를 늘리면 계약과 통로가 갈라진 것이 안 보인다.\n'
+    + '  (§5 착수 전에는 `GATE_NOT_MET` 하나가 예외로 적혀 있었고, 그 줄이 「그 날」 빨개져 이 자리를 불렀다)');
 });
 
 /* ── ② 감사가 응답의 조건인가 (§2) ────────────────────────────────── */
@@ -94,11 +119,6 @@ test('큐 읽기와 조회 감사가 **한 트랜잭션**이다', () => {
     + '  블록 안의 질의는 전부 `tx` 로 건다');
   assert.match(트랜잭션[1], /await tx`\s*\n\s*insert into engine\.staff_access_log/u,
     '감사 insert 가 `tx` 로 안 걸려 있다 — 같은 트랜잭션이 아니다(§2)');
-});
-
-test('감사 행위 이름 둘이 계약대로다 — 큐와 서명은 다른 사건이다', () => {
-  assert.match(소스, /'review\.queue'/u, '큐 조회 감사 이름이 없다');
-  assert.match(소스, /'review\.audio'/u, '서명 발급 감사 이름이 없다');
 });
 
 test('🔴 감사에 적는 것은 **실제로 실어 보낸** 항목이다', () => {
@@ -185,28 +205,140 @@ test('직원 폐기 판정은 lib 정본을 부른다 (사본을 두지 않는�
     '폐기 술어를 이 파일이 직접 적는다 — 정본은 `lib/토큰.js` 하나다(절단문서 ②-15)');
 });
 
-/* ── ⑤ 판 하나만 읽는다 ───────────────────────────────────────────── */
+/* ── ⑤ **읽기** 경로는 판 하나만 읽는다 ───────────────────────────── */
 
-test('직원 통로가 원표를 직접 안 읽는다 — 읽는 곳은 판 하나다', () => {
+/** 함수 하나의 본문을 잘라낸다 — 앵커를 못 찾으면 거기서 실패한다.
+ *  🔑 §5 가 서면서 이 검사의 **범위를 좁혔다**: 승인·폐기는 원표에 **쓰는** 경로라
+ *  `pipeline_jobs`·`corrections`·`submissions` 를 직접 건드릴 수밖에 없다(판은 뷰라 못 쓴다).
+ *  진짜 축은 「원표를 안 읽는다」가 아니라 **「검수자에게 내보내는 열은 판에서만 온다」**였고,
+ *  §5 쪽은 아래 ⑦ 이 그 축을 응답 키 허용 목록으로 잰다. 범위를 안 좁히고 규칙만 지우면
+ *  읽기 경로의 보호까지 같이 사라진다. */
+function 함수본문(시작앵커, 끝앵커) {
+  const i = 소스.indexOf(시작앵커);
+  assert.ok(i !== -1, `앵커 \`${시작앵커}\` 를 못 찾았다 — 이 검사가 통째로 미실행이다`);
+  const 잘린것 = 끝앵커 === null ? 소스.slice(i) : (() => {
+    const j = 소스.indexOf(끝앵커, i + 1);
+    assert.ok(j > i, `앵커 \`${끝앵커}\` 를 못 찾았다 — 구간을 못 자른다`);
+    return 소스.slice(i, j);
+  })();
+  return 코드만(잘린것);
+}
+
+/** 주석 줄을 뺀다.
+ *  🔴 **변이 시험이 이 자리를 드러냈다**: `for update` 를 코드에서 지웠는데 검사가 초록이었다 —
+ *  바로 위 주석이 「뷰에는 `for update` 를 걸 수 없다」고 **설명**하고 있었고, 검사는 그
+ *  설명을 코드로 읽었다. 가드가 자기 주석에 눈이 먼 자리다(설명이 자세할수록 더 잘 먼다).
+ *  ⚠ 줄 단위라 코드 줄 끝의 인라인 `/* … *\/` 는 남는다 — 이 파일의 주석은 전부 블록이라 충분하다. */
+function 코드만(본문) {
+  return 본문.split('\n').filter((l) => !/^\s*(\*|\/\*|\/\/)/u.test(l)).join('\n');
+}
+
+test('탐지력 픽스처 — 주석 제거기가 「설명 속의 코드」를 실제로 지운다', () => {
+  const 예시 = ['  /* 뷰에는 `for update` 를 걸 수 없다.', '   * 그래서 잠금을 갈랐다. */',
+    '  const x = 1;', '  // for update 라고 적어 둔다'].join('\n');
+  assert.equal(코드만(예시), '  const x = 1;',
+    '주석을 안 지운다 — 검사가 설명을 코드로 읽고, 그 상태는 「초록」과 같은 모양이다');
+});
+
+test('읽기 경로(큐·서명)가 원표를 직접 안 읽는다 — 읽는 곳은 판 하나다', () => {
+  const 읽기 = 함수본문('async function 큐읽기', '/* ── §5 승인·폐기');
   for (const 표 of ['engine.submissions', 'engine.corrections', 'engine.pipeline_jobs', 'engine.learning_events']) {
-    assert.ok(!소스.includes(`from ${표}`) && !소스.includes(`join ${표}`),
+    assert.ok(!읽기.includes(`from ${표}`) && !읽기.includes(`join ${표}`),
       `${표} 를 직접 읽는다 — 판(②-17)이 막아 둔 열이 이 문으로 도로 나간다`);
   }
-  assert.match(소스, /from engine\.review_queue/u, '판을 안 읽는다 — 앵커가 낡았다');
+  assert.match(읽기, /from engine\.review_queue/u, '판을 안 읽는다 — 앵커가 낡았다');
 });
 
 /* ── ⑥ 경로·동봉 ──────────────────────────────────────────────────── */
 
-test('경로는 둘이고 메서드가 갈린다 — 그 밖은 404 다', () => {
-  assert.match(소스, /경로 !== 'queue' && 경로 !== 'audio'/u,
-    '뒷마디를 안 본다 — `/review/아무거나` 가 전부 큐 조회로 동작한다');
+test('경로는 넷이고 메서드가 갈린다 — 그 밖은 404 다', () => {
+  const m = /const 아는경로 = \[([^\]]*)\]/u.exec(소스);
+  assert.ok(m, '`아는경로` 목록을 못 찾았다 — 뒷마디를 안 보면 `/review/아무거나` 가 큐 조회로 동작한다');
+  assert.deepEqual([...m[1].matchAll(/'([a-z]+)'/gu)].map((x) => x[1]).sort(),
+    ['approve', 'audio', 'discard', 'queue'],
+    '경로 목록이 계약(§3·§4·§5)과 다르다');
   assert.match(소스, /경로 === 'queue' \? 'GET' : 'POST'/u, '경로별 메서드가 안 갈린다');
 });
 
-test('아직 없는 §5 경로를 빈 껍데기로 두지 않았다', () => {
-  for (const 이름 of ['approve', 'discard']) {
-    assert.ok(!new RegExp(`'${이름}'`, 'u').test(소스),
-      `\`${이름}\` 경로가 섰다 — 담을 물리 칸 넷이 아직 없다(c11 선행 · §5). 화면이 그것을 부르게 된다`);
+/* ── ⑦ §5 승인·폐기 ──────────────────────────────────────────────── */
+
+test('승인은 **한 트랜잭션**에 넷을 쓴다 — 하나라도 새면 확정이 반쪽이 된다', () => {
+  const 승인 = 함수본문('async function 승인(', 'async function 폐기(');
+  const 블록 = /sql\.begin\(async \(tx\) => \{([\s\S]*)\n  \}\);/u.exec(승인);
+  assert.ok(블록, '승인이 트랜잭션 안에서 안 돈다 — 확정이 부분만 남을 수 있다');
+  const 몸 = 블록[1];
+  for (const [무엇, 정규식] of [
+    ['teacher 교정 행', /insert into engine\.corrections/u],
+    ['검증 전사 갱신', /update engine\.submissions/u],
+    ["큐에서 빼기(status='verified')", /update engine\.pipeline_jobs/u],
+    ['승인 감사', /insert into engine\.staff_access_log/u],
+  ]) {
+    assert.match(몸, 정규식, `${무엇} 이 승인 트랜잭션 안에 없다(§5-1 「한 트랜잭션에 넷」)`);
+  }
+  /* 블록 «안»이라고 트랜잭션 안이 아니다 — `sql` 태그는 다른 커넥션이다(§2 검사와 같은 급소). */
+  assert.ok(!/\bsql`/u.test(몸),
+    '승인 트랜잭션 안에서 `sql` 태그를 쓴다 — 그 문장만 다른 커넥션으로 새고 원자성이 조용히 깨진다');
+  assert.match(몸, /for update/u,
+    '`pipeline_jobs` 를 안 잠근다 — 같은 항목의 동시 승인이 teacher 행을 둘 만든다(§5-1 동시성)');
+});
+
+test('🔴 `verdict` 를 요청에서 받지 않는다 — 서버가 세 텍스트에서 낸다', () => {
+  const 승인 = 함수본문('async function 승인(', 'async function 폐기(');
+  assert.match(승인, /const verdict = 판정\(\{/u, '판정을 안 부른다 — verdict 가 어디서 오는지 불명이다');
+  assert.ok(!/b\.verdict|q\.verdict|본문\.verdict/u.test(소스),
+    '요청 본문에서 verdict 를 읽는다 — 사람이 고르면 그 순서 판정이 화면마다 갈린다(§5-1)');
+});
+
+test('🔴 폐기 사유 어휘를 **코드가 안 든다** — DB CHECK 에서 읽는다', () => {
+  /* 값목록 사본이 이 저장소에서 낡은 것이 이미 두 번이다(F285). `tests/폐기사유.test.js` 는
+   * 산문 둘만 CHECK 와 대조하므로, 코드에 넷째 사본이 생기면 그 검사의 **눈 밖**이다. */
+  const lib = fs.readFileSync(path.join(뿌리, 'lib', '검수확정.js'), 'utf8');
+  for (const 값 of ['무음', '손상', '중복', '과제 불일치', '타인 음성', '판정 불가']) {
+    for (const [이름, 본문] of [['functions/review/index.ts', 소스], ['lib/검수확정.js', lib]]) {
+      assert.ok(!new RegExp(`'${값}'|"${값}"`, 'u').test(본문),
+        `${이름} 이 폐기 사유 '${값}' 를 문자열로 든다 — 정본은 DB CHECK 하나다(§5-2)`);
+    }
+  }
+  assert.match(소스, /pg_get_constraintdef/u, 'CHECK 정의를 안 읽는다 — 어휘 대조가 통째로 없다');
+  assert.match(소스, /conname like 'pipeline_jobs_discard_reason_c%'/u,
+    '제약 이름을 판 접미까지 박아 찾는다 — 판이 `_c11` 로 갈리는 날 전 폐기가 조용히 500 이 된다');
+});
+
+test('폐기는 파일을 안 지운다 — 소프트만이다(철회는 다른 사건)', () => {
+  const 폐기 = 함수본문('async function 폐기(', null);
+  assert.ok(!/storage|audio_deleted_at|delete from/u.test(폐기),
+    '폐기 경로가 파일·행을 지운다 — 노이즈도 강건성 재료라 소프트만이다(§5-2 · L0 §9-3)');
+});
+
+/** 승인·폐기 응답 봉투가 싣는 키 — 원표 열을 퍼가지 않는다는 것의 실측. */
+test('🔴 §5 응답은 서버가 만든 값만 싣는다 — 원표 열이 안 새어 나간다', () => {
+  const 허용 = new Set([
+    'ok', '...결과', 'correction_id', 'verdict', 'promotion_intent', 'listen_gate',
+    'discarded', 'reason',
+  ]);
+  const 구간 = 함수본문('/* ── §5 승인·폐기', null);
+  const 봉투들 = [...구간.matchAll(/봉투\(200, \{([^}]*)\}/gu)];
+  assert.equal(봉투들.length, 2, `§5 의 200 응답이 ${봉투들.length}개다 — 승인·폐기 둘이어야 한다`);
+  const 밖 = [];
+  for (const b of 봉투들) {
+    for (const 키 of b[1].split(',').map((s) => s.trim().replace(/:.*$/u, '')).filter(Boolean)) {
+      if (!허용.has(키)) 밖.push(키);
+    }
+  }
+  assert.deepEqual(밖, [], `허용 목록 밖의 키를 응답에 싣는다: ${밖.join(', ')}\n`
+    + '  → 원표에서 읽은 값을 그대로 내보내면 판(②-17)이 막아 둔 것이 이 문으로 나간다');
+});
+
+test('게이트 ②는 **요청자 본인의** 서명 기록을 본다', () => {
+  const 승인 = 함수본문('async function 승인(', 'async function 폐기(');
+  assert.match(승인, /staff_access_log l[\s\S]{0,200}l\.staff_id = \$\{staff_id\}/u,
+    '남이 연 기록으로도 승인이 선다 — 그러면 이 게이트는 「누군가 들었다」만 보증한다(§5-1 ②)');
+  assert.match(승인, /l\.action = 'review\.audio'/u, '서명 발급 기록이 아닌 것을 증거로 쓴다');
+});
+
+test('감사 행위 이름 넷이 계약대로다', () => {
+  for (const 이름 of ['review.queue', 'review.audio', 'review.approve', 'review.discard']) {
+    assert.ok(소스.includes(`'${이름}'`), `감사 이름 '${이름}' 이 없다 — 그 경로는 장부를 안 남긴다(§2)`);
   }
 });
 
