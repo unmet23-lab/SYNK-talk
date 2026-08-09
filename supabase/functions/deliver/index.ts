@@ -29,6 +29,7 @@ import postgres from 'npm:postgres@3.4.4';
 import 과제모듈 from './오늘과제.mjs';
 import 출처모듈 from './사건출처.mjs';
 import 토큰모듈 from './토큰.mjs';
+import 상태모듈 from './학습자상태.mjs';
 
 const { 서비스역할, 토큰주체, 발급시각 } = 토큰모듈 as {
   서비스역할: (req: Request) => boolean;
@@ -36,6 +37,18 @@ const { 서비스역할, 토큰주체, 발급시각 } = 토큰모듈 as {
   발급시각: (req: Request) => number | null;
 };
 const { 사건출처 } = 출처모듈 as { 사건출처: (event_type: string) => string | null };
+/* 사슬 ⑦칸(엔진이 배운다)의 첫 소비자. 🔴 상태를 **저장하지 않는다** — 계산해서 그 개입
+ * 사건에 스탬프한다(엔진도달_설계 §3 경로 A · 제품방향 불변식 6 「🚫C·D 파생 테이블 지금 신설」).
+ * `창일수`·`쓰는사건` 은 아래 질의가 **가져다 쓴다**: 여기 다시 적으면 축을 늘린 날 코드는
+ * 그 사건을 세려는데 질의가 안 실어 주고, 증상은 값이 조용히 낮아지는 것뿐이다. */
+const { 학습자상태, 창일수, 쓰는사건 } = 상태모듈 as {
+  창일수: number;
+  쓰는사건: string[];
+  학습자상태: (사건들: unknown[], 옵션: { as_of: string }) => {
+    estimator_version: string; estimator_confidence: number;
+    evidence_refs: Record<string, unknown>; 축: Record<string, unknown>;
+  };
+};
 /* 🔴 `시간대` 를 **가져다 쓴다** — IANA 이름을 여기에 다시 적으면 그 순간 날짜 경계가 두 곳에
  *   살고, 갈라진 날 배치는 오늘에 쓰고 조회는 어제를 센다(절단문서 ①-14 · 회귀가 막는다). */
 const { 몽골날짜, 멱등키, 오늘과제, 따라말하기문장, 시간대 } = 과제모듈 as {
@@ -53,6 +66,10 @@ const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
 /* 배정이 여는 통로는 「발화녹음」이다(계약 값목록). `submissions.task_type` 이 not null 이라
  * 배정 행도 통로를 말해야 하고, 그날 학생이 낼 것이 실제로 그것이다. */
 const 통로 = '발화녹음';
+
+/* 학생 한 명에게서 걷는 원신호 상한. 창(기본 30일) 안에서 이 수를 넘는 학생은 없어야 정상이라
+ * 값이 아니라 **방어**다 — 한 학생의 이상 행 수가 배치 전체의 메모리를 먹는 것을 막는다. */
+const 원신호상한 = 500;
 
 const 봉투 = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -151,7 +168,8 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
   const 대상 = await sql`
     select l.learner_id, l.level_current, l.goal_track,
            배정.occurred_at as 마지막배정, 배정.task_snapshot as 마지막스냅샷,
-           교정.corrected_text as 교정문, 교정.원사건, 동의.consent_ver, 동의.consent_id
+           교정.corrected_text as 교정문, 교정.원사건, 동의.consent_ver, 동의.consent_id,
+           원신호.행들 as 원신호
       from engine.learners l
       left join lateral (
         select e.occurred_at, s.task_snapshot
@@ -195,6 +213,29 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
            and agreed_at <= now()
            and (revoked_at is null or revoked_at > now())
          order by agreed_at desc limit 1) 동의 on true
+      /* ⑦ 학습자 상태의 **원신호**. 사슬 마지막 칸의 첫 소비자이고, 여기서 걷지 않으면
+       * 상태 계산은 읽을 것이 없다(도달의 정의는 「읽힌 것」이지 보이는 것이 아니다 · 설계 §5).
+       * · 목록·창은 lib 이 정본이라 여기에 다시 안 적는다 — 갈라지면 축이 조용히 죽는다.
+       * · 마감(due_at)은 submissions 에 사니 같이 걷는다. 배정 행에만 있고 나머지는 null 이다.
+       * · limit 은 값이 아니라 **방어**다: 창 안에서 이 수를 넘는 학생은 없어야 정상이고,
+       *   넘으면 최신부터 남는다(옛 배정이 잘려 제출률 분모가 줄 수 있다 — 상한을 넉넉히 둔 이유).
+       * ⚠ 이 주석은 SQL 템플릿 리터럴 «안»이다 — 백틱을 쓰면 문자열이 여기서 끝나고 함수가
+       *   번들조차 안 된다(F180). 강조는 「」로 한다. */
+      left join lateral (
+        select coalesce(jsonb_agg(jsonb_build_object(
+                 'event_id', x.event_id, 'event_type', x.event_type, 'occurred_at', x.occurred_at,
+                 'retry_of_event_id', x.retry_of_event_id, 'correction_id', x.correction_id,
+                 'payload', x.payload, 'due_at', x.due_at)), '[]'::jsonb) as 행들
+          from (
+            select e.event_id, e.event_type, e.occurred_at, e.retry_of_event_id,
+                   e.correction_id, e.payload, s.due_at
+              from engine.learning_events e
+              left join engine.submissions s on s.event_id = e.event_id
+             where e.learner_id = l.learner_id
+               and e.event_type = any(${쓰는사건}::text[])
+               and e.occurred_at >= now() - make_interval(days => ${창일수})
+             order by e.occurred_at desc
+             limit ${원신호상한}) x) 원신호 on true
       ${좁히기}`;
 
   /* 🔴 단건인데 0건 = 없는 learner_id 로 불렸다는 뜻이다. 200 으로 넘기면 「배정 0/재적 0」이라
@@ -265,6 +306,25 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
    * 들어야 나중에 성과가 「어느 개입에 대한 것인가」를 이 값 하나로 잇는다(C0 §4-1 계승). */
   const intervention_id = crypto.randomUUID();
   const 지금 = new Date().toISOString();
+
+  /* 🔴 **사슬 ⑦칸이 여기서 처음 돈다** — 쌓인 원신호를 읽어 그 시점의 상태를 파생하고, 그
+   *   결과를 개입 행에 스탬프한다(엔진도달_설계 §3 경로 A).
+   * 🔑 `as_of` 를 「지금」으로 주는 것이 여기서는 **맞다** — 이 개입은 지금 나가고, 상태는
+   *   그 직전까지의 것이어야 한다. 모듈이 기본값을 안 주는 이유는 «과거» 개입을 나중에
+   *   평가하는 자리에서 그 절단을 빠뜨리면 미래가 섞이기 때문이고, 그 자리는 여기가 아니다.
+   * 🔴 상태가 오늘의 과제를 **고르지는 않는다.** 지금 고르게 하면 그건 모델 없이 규칙을
+   *   하드코딩하는 것이라 제품방향 불변식 5 의 「죽는 쪽」에 그대로 걸리고, 학생 0명이라
+   *   그 규칙이 맞는지 잴 방법도 없다. 지금 남기는 것은 소급 불가한 것 — 「그때 그 학생이
+   *   어떤 상태였고 그 판단의 근거가 무엇이었나」 — 뿐이고, 그것이 있어야 나중에 개입-효과
+   *   짝(불변식 6)이 성립한다. 근거 없이 지나간 날은 되살릴 수 없다.
+   * ⚠ 계산이 실패해도 배달은 나간다 — 스탬프는 부속이고 과제가 본체다. */
+  let 상태: { estimator_version: string; estimator_confidence: number;
+    evidence_refs: Record<string, unknown> } | null = null;
+  try {
+    상태 = 학습자상태((학생.원신호 ?? []) as unknown[], { as_of: 지금 });
+  } catch (e) {
+    console.error('[deliver] 학습자 상태 계산 실패(배달은 계속한다)', learner_id, String((e as Error)?.message ?? e));
+  }
   const 공통 = {
     actor_kind: 'ai' as const,   // 배치가 만드는 사건의 행위자(§10-A-1 — `system` 을 새로 만들지 않는다)
     level_snapshot: (학생.level_current ?? null) as string | null,
@@ -281,12 +341,22 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
         insert into engine.learning_events (
           learner_id, event_type, actor_kind, occurred_at, idempotency_key,
           level_snapshot, goal_snapshot, intervention_id, consent_ver, consent_id, degraded,
+          estimator_version, estimator_confidence, evidence_refs,
           source_kind, payload, schema_ver
         ) values (
           ${learner_id}::uuid, 'intervention.delivered', ${공통.actor_kind}, ${지금}::timestamptz,
           ${멱등키('intervention', learner_id, 오늘)},
           ${공통.level_snapshot}, ${공통.goal_snapshot}, ${intervention_id}::uuid,
           ${공통.consent_ver}, ${공통.consent_id}::uuid, ${결정.degraded},
+          /* ⑦ 상태 스탬프. 계약이 이 셋을 「추정에 반드시 따라붙는 것」으로 정했다(코어엔진
+           * §기록규격 · L0 스키마가 열까지 두고 writer 만 0 이던 자리). 셋이 함께 있어야
+           * 나중에 **다시 계산해서 대조**할 수 있다 — 판·신뢰도·근거 중 하나만 빠져도 그때
+           * 값이 왜 그랬는지 되짚을 길이 없다.
+           * 🔴 policy_ver(어떤 «선택 규칙»으로 골랐나)는 **비운다** — 추정판과 축이 다르고,
+           *   그 판을 정하려면 오늘과제 결정 규칙의 판 매기기가 먼저다. 지금 v1 을 박으면
+           *   「판이 관리되고 있다」는 거짓 신호만 남는다(다음 트랙 · 보드에 남긴다). */
+          ${상태?.estimator_version ?? null}, ${상태?.estimator_confidence ?? null},
+          ${상태 ? sql.json(상태.evidence_refs) : null},
           /* 이 두 행은 관측이 아니라 **추정**이다 — 오늘 이 문장을 준 것은 「이 학생에게
            * 이게 맞겠다」는 판단이고, 판단이 틀린 날의 저조를 학생 특성으로 읽지 않으려면
            * 그 사실이 행에 남아 있어야 한다(절단문서 ①-7 · lib/사건출처.js 가 표를 진다). */
