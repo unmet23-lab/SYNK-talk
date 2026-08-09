@@ -77,7 +77,16 @@ const expo스텁 = {
   'expo-secure-store': {},
   'expo-updates': {},
   'expo-speech': {},
-  'expo-audio': {},
+  /* 🔑 훅 둘만 세운다 — `src/검수화면.js` 가 **첫 렌더에서 실제로 부르는 것**이 그 둘뿐이다.
+     · `useAudioPlayer()` → 빈 판. 재생기의 메서드(`replace`·`play`·`seekTo`)는 전부 effect·
+       콜백에서만 불리는데 서버 렌더는 그것을 안 돌린다. 미리 채우면 「안 부르는 자리」를
+       채우는 것이라 이 통로가 화면이 아니라 자기 자신을 재게 된다(머리말 🔑).
+     · `useAudioPlayerStatus()` → **`null`**. 지어낸 값이 아니라 실제로 있는 상태다(재생기에
+       소스가 붙기 전). 화면이 그 자리를 안 지키면 여기서 드러난다. */
+  'expo-audio': {
+    useAudioPlayer: () => ({}),
+    useAudioPlayerStatus: () => null,
+  },
   'expo-audio/build/AudioStream': {},
 };
 const 원래로드 = Module._load;

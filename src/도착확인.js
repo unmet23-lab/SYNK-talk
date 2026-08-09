@@ -91,6 +91,13 @@ export default function 도착확인({ 돌아가기, 가기 }) {
             style={({ pressed }) => [s.줄버튼, pressed && { opacity: 0.65 }]}>
             <Text style={s.줄버튼글}>학생 비밀번호 초기화 (원장)</Text>
           </Pressable>
+          {/* 🔑 초기화와 같은 규칙 — **숨기지 않는다.** 검수 권한은 서버가 정하고(`inspector`·
+              `director`), 아닌 토큰은 403 `NOT_STAFF` 를 받는다. 화면에서 감추는 것은 편의이지
+              권한이 아니다. 2027-02 채용 전까지 이 통로를 쓰는 사람은 원장 본인이다. */}
+          <Pressable onPress={() => 가기('검수')} hitSlop={6}
+            style={({ pressed }) => [s.줄버튼, pressed && { opacity: 0.65 }]}>
+            <Text style={s.줄버튼글}>발화 검수 (원장·검수자)</Text>
+          </Pressable>
           {/* 🔴 이 통로가 없으면 한 기기는 **영원히 한 계정**이다 — 공용·형제 기기에서 다음
               학생의 발화가 앞 학생 행으로 저장되고, append-only 라 되돌릴 방법이 없다. */}
           <Pressable onPress={물어보기} hitSlop={6}
