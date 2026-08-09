@@ -28,7 +28,7 @@ import { 머뭇거림추적, 발화문턱_DB, 데시벨, 다음호흡 } from '..
 import { wav조립 } from '../lib/wav조립.js';
 import { 정본 as 음성정본 } from '../lib/음성헤더.js';
 import { 마이크준비, 마이크끄기 } from '../lib/마이크권한.js';
-import { 흐름id, 항목추가, 다음시도번호, 학습출석, 전송기록, 밀린것, 배달상태 } from '../lib/제출로그.js';
+import { 흐름id, 항목추가, 다음시도번호, 학습출석, 전송기록, 보낼것, 배달상태 } from '../lib/제출로그.js';
 /* 문구는 「어제의 나」 화면과 **같은 함수**에서 나온다 — 두 곳에 적으면 한쪽만 고쳐지고,
    갈라진 날 학생은 같은 사실을 두 문장으로 듣는다(`lib/견줌.js`). */
 import { 늘어난말 } from '../lib/견줌.js';
@@ -113,6 +113,9 @@ export default function 말하기화면({
   /* 서버가 준 `blocked` — **왜** 비었나(F176 ①). 아래 `녹음카드` 의 `막힘`(녹음이 시작되지
    * 못한 이유)과 이름이 겹치지 않게 `서버` 를 붙인다 — 같은 파일 안이라 헷갈리면 그대로 버그다. */
   const [서버막힘, set서버막힘] = useState(null);
+  /* 🔑 같은 값을 **ref 로도** 쥔다 — 아래 `AppState` 리스너는 `[date, 토큰]` 으로 등록돼
+   *   state 를 낡은 채 보고, 그 자리가 곧 큐를 미는 두 자리 중 하나다(`로그참조` 와 같은 이유). */
+  const 막힘참조 = useRef(null);
   const [date, setDate] = useState(몽골날짜); // 서버가 답하면 **서버 날짜**로 바꾼다(아래)
   const [호흡, set호흡] = useState('듣기');
   const [로그, set로그] = useState([]);
@@ -172,7 +175,7 @@ export default function 말하기화면({
    *   사라지면 멈춰야 하고(다음 화면에서 또 밀게 된다), 복귀 쪽은 이미 시작한 전송을 끝까지
    *   보내는 편이 옳다(기기 저장은 이미 끝났고, 중간에 접으면 그 항목이 다음 열림까지 밀린다). */
   const 밀린것보내기 = async (살아있나 = () => true) => {
-    for (const e of 밀린것(로그참조.current)) {
+    for (const e of 보낼것(로그참조.current, 막힘참조.current)) {
       if (!살아있나()) return;
       await 보내기(e);
     }
@@ -208,6 +211,12 @@ export default function 말하기화면({
       try {
         if (!토큰) throw new Error('토큰 없음');
         const { 항목, 막힘 } = await 오늘과제받기(토큰);
+        /* 🔴 **큐를 세우는 자리다** — 아래 `밀린것보내기` 가 이 값을 보고 멈춘다. 막힌 학생의
+         *   발화를 보내면 서버가 `CONSENT_MISSING`(`retryable:false`)으로 접고 앱은 그것을
+         *   `send_final` 로 적어 다시 못 보낸다 = 동의가 서는 날 나갈 수 있었던 발화가 죽는다.
+         *   화면은 `서버막힘` 으로 막지만 그건 **렌더 층**뿐이고 이 효과는 그대로 이어 돈다.
+         * 🔑 ref 는 `살아있음` 과 무관하게 적는다 — 화면이 사라져도 복귀 리스너는 산다. */
+        막힘참조.current = 막힘;
         if (살아있음) set서버막힘(막힘);
         결과 = 화면과제(항목, 폴백);
         // 🔴 날짜의 정본은 **서버**다 — 기기 시계로 끊으면 몽골 아침에 어제 것이 오늘이 된다.
@@ -255,7 +264,7 @@ export default function 말하기화면({
   useEffect(() => {
     const 구독 = AppState.addEventListener('change', (상태) => {
       if (상태 !== 'active') return;
-      const 할일 = 복귀행동(date, 몽골날짜(), 밀린것(로그참조.current).length);
+      const 할일 = 복귀행동(date, 몽골날짜(), 보낼것(로그참조.current, 막힘참조.current).length);
       if (할일 === '재초기화') set세대((n) => n + 1);
       else if (할일 === '밀린것') 밀린것보내기();
     });
