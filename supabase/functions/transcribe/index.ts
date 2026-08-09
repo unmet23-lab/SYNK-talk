@@ -22,9 +22,10 @@ import 토큰모듈 from './토큰.mjs';
 
 const { 서비스역할 } = 토큰모듈 as { 서비스역할: (req: Request) => boolean };
 const { 버킷 } = 경로모듈 as { 버킷: string };
-const { 상태, 전사값, 전사실패 } = 전사모듈 as {
+const { 상태, 전사값, 세그먼트값, 전사실패 } = 전사모듈 as {
   상태: Record<string, string>;
   전사값: (본문: unknown) => { transcript: string; 언어: string | null } | null;
+  세그먼트값: (본문: unknown) => { stt_segments: unknown[]; stt_confidence: number | null } | null;
   전사실패: (status: number) => { state: string | null; 재시도: boolean };
 };
 
@@ -96,7 +97,10 @@ Deno.serve(async (req) => {
      order by occurred_at
      limit ${배치}`;
 
-  let 성공 = 0; let 못박음 = 0; let 미룸 = 0;
+  /* 🔑 구간을 **따로 센다**(F207). 전사만 세면 「전사 5」가 「구간도 5」로 읽히는데, 세그먼트
+   *   형식이 바뀐 날엔 전사만 들어오고 검수 게이트는 조용히 하한으로 되돌아간다 — 그 차이가
+   *   응답 두 수의 차이로 그 자리에서 보여야 한다. */
+  let 성공 = 0; let 구간실림 = 0; let 못박음 = 0; let 미룸 = 0;
   for (const 행 of 행들) {
     try {
       const 받음 = await 원본받기(행.audio_ref);
@@ -130,7 +134,8 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const 값 = 전사값(await r.json());
+      const 본문 = await r.json();
+      const 값 = 전사값(본문);
       if (!값) {
         /* 우리가 아는 모양이 아니다 — 벤더가 형식을 바꿨거나 딴것을 줬다. 못박으면 그 배포
          * 구간의 발화가 전부 죽으므로 미룬다(고칠 사람은 우리다). */
@@ -138,19 +143,28 @@ Deno.serve(async (req) => {
         미룸 += 1;
         continue;
       }
+      /* 🔴 구간은 **전사와 같은 UPDATE 로** 나간다 — 나누면 둘 사이에서 죽은 행이 「전사는
+       *   있는데 구간은 없는」 반쪽으로 남고, 그 행은 `transcript is null` 이 아니라서 다음
+       *   배치가 두 번 다시 안 집는다(구간만 영구 소멸한다).
+       * 🔑 형식 밖이면 **그 칸을 안 건드린다** — `[]` 로 적으면 「쟀는데 구간이 없었다」가 되고,
+       *   무발화(진짜 `[]`)와 벤더 형식 변경이 같은 모양으로 접힌다. */
+      const 구간 = 세그먼트값(본문);
+      if (!구간) console.error('[transcribe] 세그먼트 형식 밖 — 그 칸은 안 건드린다', 행.event_id);
       /* 🔴 `transcript is null` — 자물쇠와 **같은 방향**이다. 이게 없으면 두 배치가 겹친 날
        *   DB 트리거가 예외를 던지고 그 예외가 배치를 통째로 세운다. */
       const 쓴것 = await sql`
         update engine.submissions
-           set transcript = ${값.transcript}, transcript_state = ${상태.기계}
+           set transcript = ${값.transcript}, transcript_state = ${상태.기계}${구간
+             ? sql`, stt_segments = ${sql.json(구간.stt_segments as never)}, stt_confidence = ${구간.stt_confidence}`
+             : sql``}
          where event_id = ${행.event_id}::uuid and transcript is null
          returning event_id`;
-      if (쓴것.length) 성공 += 1; else 미룸 += 1;
+      if (쓴것.length) { 성공 += 1; if (구간 && 구간.stt_segments.length) 구간실림 += 1; } else 미룸 += 1;
     } catch (e) {
       console.error('[transcribe] 예외', 행.event_id, String((e as Error)?.message ?? e));
       미룸 += 1;
     }
   }
 
-  return 봉투(200, { 대기: 대기수, 집음: 행들.length, 전사: 성공, 못박음, 미룸 });
+  return 봉투(200, { 대기: 대기수, 집음: 행들.length, 전사: 성공, 구간: 구간실림, 못박음, 미룸 });
 });

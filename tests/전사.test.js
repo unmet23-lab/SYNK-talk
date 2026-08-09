@@ -11,7 +11,10 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { 상태, 전사대상, 전사값, 전사실패, 최대글자 } = require('../lib/전사.js');
+const { 상태, 전사대상, 전사값, 세그먼트값, 전사실패, 최대글자 } = require('../lib/전사.js');
+/* 🔑 소비자를 **함께 건다.** 생산자만 재면 「내가 낸 모양을 내가 읽는다」를 증명할 뿐이고,
+ *   이 트랙이 실제로 걸린 함정이 정확히 그 자리였다(설계 §228 모양엔 `confidence` 가 없다). */
+const { 세그먼트펴기, 청취문턱 } = require('../lib/검수확정.js');
 
 const 읽기 = (...p) => fs.readFileSync(path.resolve(__dirname, '..', ...p), 'utf8');
 const EVENTS = 읽기('supabase', 'functions', 'events', 'index.ts');
@@ -63,6 +66,106 @@ test('응답 형식 밖은 null — 벤더가 딴것을 준 것을 전사로 적
 test('상한 넘는 응답은 안 받는다 — 25MB 발화가 낼 수 있는 글이 아니다', () => {
   assert.strictEqual(전사값({ text: 'ㄱ'.repeat(최대글자 + 1) }), null);
   assert.ok(전사값({ text: 'ㄱ'.repeat(최대글자) }));
+});
+
+/* ── 세그먼트값 — 소비자 셋이 선 채로 재료가 0이던 자리 ─────────────── */
+
+/** Whisper `verbose_json` 세그먼트 한 조각. 신뢰도는 확률로 주고 로그로 바꿔 넣는다. */
+const 조각 = (start, end, 확률, 나머지 = {}) => ({
+  start, end, text: '말했다', avg_logprob: Math.log(확률), no_speech_prob: 0.01, ...나머지,
+});
+
+test('🔴 생산자가 낸 모양을 소비자가 그대로 읽는다 — 저신뢰 구간이 실제로 문턱을 올린다', () => {
+  /* 이 트랙의 급소. 설계 §228 이 적은 네 칸(start·end·text·avg_logprob·no_speech_prob)만
+   * 저장하면 `세그먼트펴기` 가 보는 `confidence` 가 없어 저신뢰가 **원리상 0**이 되고,
+   * 게이트는 생산자가 서 있는데도 하한 3초로 되돌아간다 — 증상 없는 초록이다. */
+  const { stt_segments } = 세그먼트값({ segments: [조각(0, 5, 0.5), 조각(5, 8, 0.95)] });
+  const 펴진 = 세그먼트펴기(stt_segments);
+  assert.deepStrictEqual(펴진.map((s) => s.저신뢰), [true, false], '소비자가 저신뢰를 못 가른다');
+  const 문턱 = 청취문턱(stt_segments);
+  assert.strictEqual(문턱.재료, true, '재료=false 면 게이트는 여전히 안 선 것이다');
+  assert.strictEqual(문턱.ms, 5000, '저신뢰 5초 구간이 문턱이 돼야 한다(하한 3초가 아니라)');
+});
+
+test('벤더 원값을 지우지 않는다 — 파생 해석을 고치는 날 옛 행을 다시 계산한다', () => {
+  const { stt_segments } = 세그먼트값({ segments: [조각(0, 2, 0.8, { no_speech_prob: 0.42 })] });
+  assert.strictEqual(stt_segments.length, 1);
+  const s = stt_segments[0];
+  assert.ok(Math.abs(s.avg_logprob - Math.log(0.8)) < 1e-12, 'avg_logprob 원값이 사라졌다');
+  assert.strictEqual(s.no_speech_prob, 0.42, 'no_speech_prob 원값이 사라졌다');
+  assert.strictEqual(s.text, '말했다');
+  assert.deepStrictEqual([s.start, s.end], [0, 2]);
+});
+
+test('confidence = exp(avg_logprob) — 지어낸 눈금이 아니라 벤더 값의 정의다', () => {
+  const { stt_segments } = 세그먼트값({ segments: [조각(0, 1, 0.37)] });
+  assert.ok(Math.abs(stt_segments[0].confidence - 0.37) < 1e-12);
+  // 양수 로그확률(형식 밖 값)이 와도 1을 안 넘는다 — 확률이 1보다 큰 척하지 않는다.
+  const 넘침 = 세그먼트값({ segments: [{ start: 0, end: 1, avg_logprob: 3 }] });
+  assert.strictEqual(넘침.stt_segments[0].confidence, 1);
+});
+
+test('🔴 무발화는 값이다 — `[]` 와 「형식 밖」이 갈려야 한다', () => {
+  const r = 세그먼트값({ text: '', segments: [] });
+  assert.deepStrictEqual(r, { stt_segments: [], stt_confidence: null });
+  // 신뢰도는 0 이 아니라 null 이다 — 「안 쟀다」를 「나빴다」로 적으면 검수 우선순위가 뒤집힌다.
+  assert.strictEqual(r.stt_confidence, null);
+});
+
+test('형식 밖은 null — 부르는 쪽이 그 칸을 안 건드린다', () => {
+  for (const 본문 of [null, undefined, 'x', 42, {}, { segments: null }, { segments: '[]' }]) {
+    assert.strictEqual(세그먼트값(본문), null, `본문 ${JSON.stringify(본문)}`);
+  }
+});
+
+test('시간에 못 놓는 조각은 버린다 — 남기면 길이 가중이 정의되지 않는다', () => {
+  const { stt_segments } = 세그먼트값({
+    segments: [조각(0, 2, 0.9), { start: 5, end: 5 }, { start: 'a', end: 2 }, null, 조각(2, 3, 0.9)],
+  });
+  assert.deepStrictEqual(stt_segments.map((s) => [s.start, s.end]), [[0, 2], [2, 3]]);
+});
+
+test('🔴 신뢰도를 못 읽은 조각은 분모에서 뺀다 — 0 으로 접으면 「안 쟀다」가 「나빴다」가 된다', () => {
+  const r = 세그먼트값({ segments: [조각(0, 1, 0.8), { start: 1, end: 99, text: '긴데 신뢰도 없음' }] });
+  assert.strictEqual(r.stt_segments[1].confidence, null);
+  assert.strictEqual(r.stt_confidence, 0.8, '신뢰도 없는 98초가 값을 0 쪽으로 끌었다');
+});
+
+test('발화 신뢰도는 **길이 가중** 평균이다 — 짧은 추임새가 긴 문장과 같은 무게면 안 된다', () => {
+  const r = 세그먼트값({ segments: [조각(0, 1, 0.9), 조각(1, 11, 0.5)] });
+  // 단순 평균이면 0.7. 길이 가중이면 (0.9·1 + 0.5·10)/11 = 0.536.
+  assert.strictEqual(r.stt_confidence, 0.536);
+});
+
+test('신뢰도는 세 자리로 맞춘다 — 열이 numeric(6,3) 이라 안 맞추면 대조가 매번 거짓 불일치를 낸다', () => {
+  const r = 세그먼트값({ segments: [조각(0, 3, 1 / 3)] });
+  assert.strictEqual(r.stt_confidence, 0.333);
+});
+
+/* ── 세그먼트 배선 — 판정이 실제로 행에 닿는가 ─────────────────────── */
+
+test('🔴 구간이 전사와 **같은 UPDATE** 로 나간다 — 나누면 반쪽 행이 영구히 안 집어진다', () => {
+  const m = /update engine\.submissions[\s\S]*?returning event_id/.exec(배치);
+  assert.ok(m, 'UPDATE 문을 못 찾았다');
+  assert.match(m[0], /transcript =/);
+  assert.match(m[0], /stt_segments =/, '전사만 실리면 구간은 다음 배치가 두 번 다시 안 집는다');
+  assert.match(m[0], /stt_confidence =/);
+  assert.match(m[0], /transcript is null/, '자물쇠와 같은 방향이어야 트리거 예외로 안 죽는다');
+});
+
+test('세그먼트 형식 밖이면 그 칸을 안 건드린다 — `[]` 로 적으면 무발화와 같은 모양이 된다', () => {
+  assert.match(배치, /세그먼트값\(/, '배치가 판정을 안 부르면 이 칸은 영원히 null 이다');
+  assert.match(배치, /구간\s*\n?\s*\?\s*sql`, stt_segments/,
+    '조건부가 아니면 형식 밖인 날 빈 배열이 「쟀는데 없었다」로 적힌다');
+});
+
+test('구간 건수를 전사 건수와 **따로** 싣는다 (F207)', () => {
+  // 세그먼트 형식이 바뀐 날엔 전사만 들어오고 게이트는 조용히 하한으로 되돌아간다.
+  assert.match(배치, /전사: 성공, 구간:/, '두 수가 한 수로 접히면 그 차이가 응답에서 안 보인다');
+});
+
+test('jsonb 는 드라이버의 sql.json 으로 싣는다 — 문자열로 보내면 텍스트로 박힌다', () => {
+  assert.match(배치, /stt_segments = \$\{sql\.json\(/);
 });
 
 /* ── 전사실패 — 여기가 이 파일의 급소다 ────────────────────────────── */
