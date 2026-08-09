@@ -81,16 +81,8 @@ function 밀린시각들(동의_ms, 지금_ms, 개수 = 5) {
 }
 
 const ROOT = path.resolve(__dirname, '..');
-const API = 'https://api.supabase.com/v1/projects';
 const die = (m) => { console.error('[왕복시험] ' + m); process.exit(1); };
-
-const 자격증명 = require('../lib/자격증명.js');   // .env 읽기 + 토큰 만료 게이트(공용 통로)
-
-let 통과 = 0, 실패 = 0;
-function 확인(이름, 조건, 실제) {
-  if (조건) { 통과++; console.log(`  ✅ ${이름}`); }
-  else { 실패++; console.log(`  ❌ ${이름}\n     실제: ${JSON.stringify(실제)}`); }
-}
+const 골격 = require('../lib/왕복골격.js');   // 공통 머리(환경→과녁→게이트→키→판정) — 왕복 5종 공용
 
 async function main() {
   const args = process.argv.slice(2);
@@ -100,36 +92,12 @@ async function main() {
     die('사용: node tools/왕복시험.js <student_code> <로그인코드>   또는   --새학생');
   }
 
-  const e = 자격증명.읽기('왕복시험');
-  const 토큰 = e.SUPABASE_ACCESS_TOKEN, ref = e.SUPABASE_PROJECT_REF;
-  if (!토큰 || !ref) die('.env 에 SUPABASE_ACCESS_TOKEN·SUPABASE_PROJECT_REF 가 필요하다');
-  const M = { Authorization: `Bearer ${토큰}`, 'Content-Type': 'application/json' };
-
-  const pr = await fetch(`${API}/${ref}`, { headers: M });
-  const 이름 = pr.ok ? JSON.parse(await pr.text()).name : '(모름)';
-  console.log(`[왕복시험] 대상 ▸ ${이름}  (${ref})\n`);
-  if (!/rehearsal/i.test(이름) && !args.includes('--운영승인')) {
-    die(`「${이름}」 은 리허설이 아니다. 이 시험은 **지울 수 없는 행**을 남긴다 —\n` +
-        '     유호님 승인 뒤에만: --운영승인');
-  }
-  // 발화점 — 배포판 ≠ 소스(HEAD)면 이 왕복의 초록은 옛 판을 잰 것이다(다르면 여기서 죽는다).
-  await require('./배포대조.js').왕복전게이트('왕복시험', e);
+  const { ref, 리허설이다, sql, anon, 확인, 보고 } = await 골격.열기('왕복시험', { 운영승인가능: true });
   /* --새학생 은 `--운영승인` 으로도 안 뚫린다 — 운영 명부에 시험 학생을 만드는 것은
    * 사건 몇 행과 달리 **사람 한 명이 생기는 것**이고, FK restrict 라 지울 수도 없다. */
-  if (새학생 && !/rehearsal/i.test(이름)) {
+  if (새학생 && !리허설이다) {
     die('--새학생 은 리허설 전용이다 — 운영 명부에 시험 학생을 만들지 않는다(지워지지도 않는다)');
   }
-
-  /** Management API 로 SQL — 준비·검증용(함수를 안 거치고 DB 를 직접 본다). */
-  const sql = async (q) => {
-    const r = await fetch(`${API}/${ref}/database/query`, { method: 'POST', headers: M, body: JSON.stringify({ query: q }) });
-    const t = await r.text();
-    if (!r.ok) throw new Error(`SQL HTTP ${r.status} ${t.slice(0, 300)}`);
-    return JSON.parse(t);
-  };
-
-  const kr = await fetch(`${API}/${ref}/api-keys`, { headers: M });
-  const anon = JSON.parse(await kr.text()).find((k) => k.name === 'anon').api_key;
 
   let 학생번호 = code용학생;
   let 자격 = 새학생 ? null : { email: 이메일(평문코드), password: 비밀번호(정규형(평문코드)) };
@@ -578,8 +546,7 @@ async function main() {
   확인('그래도 행 수는 다섯이다',
     (await sql(`select count(*)::int n from engine.learning_events where idempotency_key in (${키목록})`))[0].n === 5);
 
-  console.log(`\n── 통과 ${통과} · 실패 ${실패} ──`);
-  process.exit(실패 ? 1 : 0);
+  보고();
 }
 
 module.exports = { 빈번호, 대역시작, 대역끝, 밀린시각들 };

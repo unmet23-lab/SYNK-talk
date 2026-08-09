@@ -18,19 +18,12 @@
  *   프로젝트 이름에 `rehearsal` 이 없으면 거부한다 — 막히는 방향이 안전한 방향이다.
  */
 const path = require('path');
-const API = 'https://api.supabase.com/v1/projects';
 const die = (m) => { console.error('[배달왕복시험] ' + m); process.exit(1); };
 
-const 자격증명 = require(path.join(__dirname, '..', 'lib', '자격증명.js'));
+const 골격 = require(path.join(__dirname, '..', 'lib', '왕복골격.js'));   // 공통 머리 — 왕복 5종 공용
 const { 오늘과제, 몽골날짜, 따라말하기문장 } = require(path.join(__dirname, '..', 'lib', '오늘과제.js'));
 // 합성 도메인은 정본에서 가져온다 — 여기 박으면 도메인이 바뀌는 날 조용히 갈린다.
 const { 도메인 } = require(path.join(__dirname, '..', 'lib', '로그인코드.js'));
-
-let 통과 = 0, 실패 = 0;
-function 확인(이름, 조건, 실제) {
-  if (조건) { 통과++; console.log(`  ✅ ${이름}`); }
-  else { 실패++; console.log(`  ❌ ${이름}\n     실제: ${JSON.stringify(실제)}`); }
-}
 
 /* 어제 배정을 손으로 심는다 — 「첫날이 아닌 학생」은 그렇게만 만들어진다.
  * 배치를 어제 한 번 돌리는 것으로는 못 만든다(그날 날짜로 돌 뿐이다). */
@@ -41,31 +34,7 @@ const 어제 = (오늘) => {
 };
 
 async function main() {
-  const e = 자격증명.읽기('배달왕복시험');
-  const 토큰 = e.SUPABASE_ACCESS_TOKEN, ref = e.SUPABASE_PROJECT_REF;
-  if (!토큰 || !ref) die('.env 에 SUPABASE_ACCESS_TOKEN·SUPABASE_PROJECT_REF 가 필요하다');
-  const M = { Authorization: `Bearer ${토큰}`, 'Content-Type': 'application/json' };
-
-  const pr = await fetch(`${API}/${ref}`, { headers: M });
-  const 이름 = pr.ok ? JSON.parse(await pr.text()).name : '(모름)';
-  console.log(`[배달왕복시험] 대상 ▸ ${이름}  (${ref})\n`);
-  if (!/rehearsal/i.test(이름)) {
-    die(`「${이름}」 은 리허설이 아니다 — 이 시험은 지울 수 없는 행을 남긴다.`);
-  }
-  // 발화점 — 배포판 ≠ 소스(HEAD)면 이 왕복의 초록은 옛 판을 잰 것이다(다르면 여기서 죽는다).
-  await require('./배포대조.js').왕복전게이트('배달왕복시험', e);
-
-  const sql = async (q) => {
-    const r = await fetch(`${API}/${ref}/database/query`, { method: 'POST', headers: M, body: JSON.stringify({ query: q }) });
-    const t = await r.text();
-    if (!r.ok) throw new Error(`SQL HTTP ${r.status} ${t.slice(0, 400)}`);
-    return JSON.parse(t);
-  };
-
-  const kr = await fetch(`${API}/${ref}/api-keys`, { headers: M });
-  const 키들 = JSON.parse(await kr.text());
-  const service = (키들.find((k) => k.name === 'service_role') || {}).api_key;
-  if (!service) die('service_role 키를 못 읽었다');
+  const { ref, sql, anon, service_role: service, 확인, 보고 } = await 골격.열기('배달왕복시험');
 
   const 호출 = async (질의 = '', 키 = service) => {
     const r = await fetch(`https://${ref}.supabase.co/functions/v1/deliver${질의}`, {
@@ -154,7 +123,6 @@ async function main() {
 
   /* ── ① 문 ──────────────────────────────────────────────────── */
   console.log('■ ① 호출자');
-  const anon = (키들.find((k) => k.name === 'anon') || {}).api_key;
   const 익명 = await 호출('', anon);
   확인('anon 키로는 못 부른다 — 배치는 서버 사건을 만든다', 익명.status === 401, 익명);
 
@@ -650,8 +618,7 @@ async function main() {
     (await 조회(점검질의, { 함수: 'deliver', 방법: 'POST', 판: null, 토큰: 원장토큰 })).status === 401);
   await sql(`update engine.staff set active = true where auth_user_id = '${duid}'::uuid`);
 
-  console.log(`\n[배달왕복시험] ${통과}/${통과 + 실패} 통과`);
-  process.exit(실패 ? 1 : 0);
+  보고();
 }
 
 main().catch((e) => die(String((e && e.message) || e)));

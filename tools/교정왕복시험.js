@@ -21,48 +21,14 @@
  *   안 서 있으면 ②③은 「거절이 안 났다」가 아니라 「열이 없어서 SQL이 깨졌다」로 나오고,
  *   그 둘은 로그에서 구분이 안 된다. 조용한 미적용을 통과로 읽지 않기 위한 자리다.
  */
-const path = require('path');
-const API = 'https://api.supabase.com/v1/projects';
 const die = (m) => { console.error('[교정왕복시험] ' + m); process.exit(1); };
-
-const 자격증명 = require(path.join(__dirname, '..', 'lib', '자격증명.js'));
-
-let 통과 = 0, 실패 = 0;
-function 확인(이름, 조건, 실제) {
-  if (조건) { 통과++; console.log(`  ✅ ${이름}`); }
-  else { 실패++; console.log(`  ❌ ${이름}\n     실제: ${JSON.stringify(실제)}`); }
-}
+const 골격 = require('../lib/왕복골격.js');   // 공통 머리(환경→과녁→게이트→키→판정) — 왕복 5종 공용
 
 async function main() {
-  const e = 자격증명.읽기('교정왕복시험');
-  const 토큰 = e.SUPABASE_ACCESS_TOKEN, ref = e.SUPABASE_PROJECT_REF;
-  if (!토큰 || !ref) die('.env 에 SUPABASE_ACCESS_TOKEN·SUPABASE_PROJECT_REF 가 필요하다');
-  const M = { Authorization: `Bearer ${토큰}`, 'Content-Type': 'application/json' };
-
-  const pr = await fetch(`${API}/${ref}`, { headers: M });
-  const 이름 = pr.ok ? JSON.parse(await pr.text()).name : '(모름)';
-  console.log(`[교정왕복시험] 대상 ▸ ${이름}  (${ref})\n`);
-  if (!/rehearsal/i.test(이름)) {
-    die(`「${이름}」 은 리허설이 아니다 — 이 시험은 지울 수 없는 행을 남긴다.`);
-  }
-  // 발화점 — 배포판 ≠ 소스(HEAD)면 이 왕복의 초록은 옛 판을 잰 것이다(다르면 여기서 죽는다).
-  await require('./배포대조.js').왕복전게이트('교정왕복시험', e);
-
-  /* 실행 — **거절도 결과다.** 던지지 않고 {ok, 메시지}로 돌려준다.
-   * 이 시험의 절반은 「안 들어가는 것」을 증명하는 것이라, 실패를 예외로 처리하면 그 절반을 못 쓴다. */
-  const 실행 = async (q) => {
-    const r = await fetch(`${API}/${ref}/database/query`, {
-      method: 'POST', headers: M, body: JSON.stringify({ query: q }),
-    });
-    const t = await r.text();
-    if (!r.ok) return { ok: false, 메시지: t };
-    return { ok: true, 행: JSON.parse(t) };
-  };
-  const sql = async (q) => {
-    const r = await 실행(q);
-    if (!r.ok) throw new Error(`SQL 실패 — ${r.메시지.slice(0, 400)}\n  질의: ${q.slice(0, 200)}`);
-    return r.행;
-  };
+  /* `실행` — **거절도 결과다.** 던지지 않고 {ok, 메시지}로 돌려준다.
+   * 이 시험의 절반은 「안 들어가는 것」을 증명하는 것이라, 실패를 예외로 처리하면 그 절반을 못 쓴다.
+   * 키는 안 가져온다 — 이 시험은 함수를 안 부르고 DB 만 본다. */
+  const { 실행, sql, 확인, 보고 } = await 골격.열기('교정왕복시험', { 키: false });
 
   /* 🔴 **제약 이름에서 판 번호를 읽지 않는다**(2026-08-08 실측). 이 술어는 판이 오를 때마다
    *   이름만 갈린다 — c8 → c9 → c10, 그런데 술어는 c9 주석이 적어 둔 대로 「한 글자도 같다」.
@@ -87,9 +53,9 @@ async function main() {
              where r.relnamespace=to_regnamespace('engine')
                and g.tgname='learning_events_correction_same_learner'
                and g.tgenabled <> 'D') as 트리거`);
-  확인('열 1 · 제약 2 · 트리거 1(꺼짐 아님)이 서 있다',
+  const 물리섰다 = 확인('열 1 · 제약 2 · 트리거 1(꺼짐 아님)이 서 있다',
     Number(물리.열) === 1 && Number(물리.제약) === 2 && Number(물리.트리거) === 1, 물리);
-  if (실패) die('교정 물리가 안 선 DB 다 — 아래 갈래는 「거절」과 「깨짐」을 구분 못 하므로 여기서 멈춘다.');
+  if (!물리섰다) die('교정 물리가 안 선 DB 다 — 아래 갈래는 「거절」과 「깨짐」을 구분 못 하므로 여기서 멈춘다.');
 
   /* ── 준비: 학생 둘, 각자 자기 교정 1건 ──────────────────────────
    * B가 있어야 ③(교차 학생)이 성립한다 — 없는 uuid 를 지목하는 것과는 다른 사고다. */
@@ -179,8 +145,7 @@ async function main() {
   확인('교정 1건에 달린 열람·응답이 2건으로 세어진다 — A-11 이 열려던 바로 그 질의',
     Number(열람) === 2, 열람);
 
-  console.log(`\n[교정왕복시험] ${통과}/${통과 + 실패} 통과`);
-  process.exit(실패 ? 1 : 0);
+  보고();
 }
 
 main().catch((e) => die(String((e && e.message) || e)));

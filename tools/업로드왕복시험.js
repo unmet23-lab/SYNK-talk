@@ -19,10 +19,9 @@ const { 화면과제, 제출사건 } = require('../lib/오늘과제.js');
 const { 항목추가, 흐름id } = require('../lib/제출로그.js');
 const 계약정본 = require('../계약/수집_교정_계약.json');
 
-const API = 'https://api.supabase.com/v1/projects';
 const die = (m) => { console.error(`[업로드왕복] ${m}`); process.exit(1); };
 
-const 자격증명 = require('../lib/자격증명.js');   // .env 읽기 + 토큰 만료 게이트(공용 통로)
+const 골격 = require('../lib/왕복골격.js');   // 공통 머리(환경→과녁→게이트→키→판정) — 왕복 5종 공용
 
 /** 16kHz·16bit·mono PCM WAV 한 조각 — 기본값이 규격 정본(C0 §4-2)과 같은 모양이다. */
 function wav(샘플수 = 1600, { 레이트 = 16000, 채널 = 1 } = {}) {
@@ -54,27 +53,9 @@ async function main() {
   const [auth_user_id, learner_id] = process.argv.slice(2);
   if (!auth_user_id || !learner_id) die('사용: node tools/업로드왕복시험.js <auth_user_id> <learner_id>');
 
-  const e = 자격증명.읽기('업로드왕복');
-  const 토큰 = e.SUPABASE_ACCESS_TOKEN;
-  const ref = e.SUPABASE_PROJECT_REF;
-  if (!토큰 || !ref) die('.env 에 SUPABASE_ACCESS_TOKEN·SUPABASE_PROJECT_REF 가 필요하다');
-  const 헤더 = { Authorization: `Bearer ${토큰}` };
-
-  const pr = await fetch(`${API}/${ref}`, { headers: 헤더 });
-  const 이름 = pr.ok ? (JSON.parse(await pr.text()).name ?? '') : '';
-  console.log(`[업로드왕복] 대상 ▸ ${이름}  (${ref})`);
-  if (!/rehearsal/i.test(이름)) {
-    die(`리허설이 아니다(${이름}) — 이 시험은 파일을 남기고 비밀번호를 갈아끼운다. 운영에는 안 돌린다.`);
-  }
-  // 발화점 — 배포판 ≠ 소스(HEAD)면 이 왕복의 초록은 옛 판을 잰 것이다(다르면 여기서 죽는다).
-  await require('./배포대조.js').왕복전게이트('업로드왕복', e);
-
-  const kr = await fetch(`${API}/${ref}/api-keys`, { headers: 헤더 });
-  if (!kr.ok) die(`api-keys HTTP ${kr.status}`);
-  const 키들 = JSON.parse(await kr.text());
-  const anon = 키들.find((k) => k.name === 'anon')?.api_key;
-  const svc = 키들.find((k) => k.name === 'service_role')?.api_key;
-  if (!anon || !svc) die('anon·service_role 키를 못 찾았다');
+  const { ref, sql, anon, service_role: svc } = await 골격.열기('업로드왕복', {
+    사유: '이 시험은 파일을 남기고 비밀번호를 갈아끼운다. 운영에는 안 돌린다',
+  });
 
   const base = `https://${ref}.supabase.co`;
   const 관리 = { apikey: svc, Authorization: `Bearer ${svc}`, 'Content-Type': 'application/json' };
@@ -149,14 +130,6 @@ async function main() {
    *   여기까지 와야 증명이 끝난다: 회귀는 헤더 파서만 재고, 「함수가 Storage 를 정말 읽는가」는
    *   08-06 에 하루를 태운 자리다(서비스키가 Storage 에서 안 먹었고 증상은 「측정만 안 됨」뿐이었다).
    *   그리고 읽어서 **행에 적히는 것**까지 봐야 한다 — jsonb 는 오류 없이 조용히 죽는 자리다. */
-  const 질의 = async (q) => {
-    const r = await fetch(`${API}/${ref}/database/query`, {
-      method: 'POST', headers: { ...헤더, 'Content-Type': 'application/json' }, body: JSON.stringify({ query: q }),
-    });
-    if (!r.ok) die(`질의 HTTP ${r.status} — ${(await r.text()).slice(0, 200)}`);
-    return r.json();
-  };
-
   const 제출 = async (audio_ref) => {
     const r = await fetch(`${base}/functions/v1/events`, {
       method: 'POST',
@@ -182,7 +155,7 @@ async function main() {
     if (!한건 || 한건.status !== 'stored') {
       return { 저장: false, 곁: `HTTP ${r.status} · ${JSON.stringify(한건 ?? b).slice(0, 200)}` };
     }
-    const [행] = await 질의(`select capture_meta, audio_duration_sec from engine.submissions where event_id = '${한건.event_id}'::uuid`);
+    const [행] = await sql(`select capture_meta, audio_duration_sec from engine.submissions where event_id = '${한건.event_id}'::uuid`);
     return {
       저장: true,
       server: (행 && 행.capture_meta && 행.capture_meta.server) || null,
@@ -310,7 +283,7 @@ async function main() {
         `HTTP ${er.status} · ${한건 ? JSON.stringify(한건).slice(0, 200) : e원문.slice(0, 400)}`);
 
       if (한건?.event_id) {
-        const [행] = await 질의(
+        const [행] = await sql(
           `select s.task_ref, s.task_format, e.level_snapshot, e.goal_snapshot,
                   e.payload->>'attempt_no' as attempt_no, s.capture_meta
              from engine.learning_events e join engine.submissions s on s.event_id = e.event_id

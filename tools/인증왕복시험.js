@@ -11,13 +11,12 @@
  * 사용: SUPABASE_PROJECT_REF=<리허설 ref> node tools/인증왕복시험.js
  */
 'use strict';
-const 자격증명 = require('../lib/자격증명.js');
+const 골격 = require('../lib/왕복골격.js');   // 공통 머리(환경→과녁→게이트→키→판정) — 왕복 5종 공용
 const { 이메일 } = require('../lib/학생계정.js');
 // 🔑 합성 도메인은 **정본에서 가져온다** — 여기 문자열로 박으면 도메인이 바뀌는 날 조용히
 //   갈라진다(`tests/로그인코드.test.js` 가 그 사본을 기계로 막는다).
 const { 도메인 } = require('../lib/로그인코드.js');
 
-const API = 'https://api.supabase.com/v1/projects';
 const die = (m) => { console.error('[인증왕복시험] ' + m); process.exit(1); };
 
 /* 이 시험이 쓰는 학생. 🔑 실제 발급기가 내는 형식(`SYNK-NNN`)이어야 한다 —
@@ -27,39 +26,14 @@ const 연락처 = '+976 9911-2233';
 const 뒷자리 = '2233';
 const 새비번 = 'Synk-Rehearsal-1';
 
-let 통과 = 0;
-const 확인 = (조건, 무엇) => {
-  if (조건) { 통과 += 1; console.log(`  ✅ ${무엇}`); } else { die(`❌ ${무엇}`); }
-};
-
 async function main() {
-  const e = 자격증명.읽기('인증왕복시험');
-  const 토큰 = e.SUPABASE_ACCESS_TOKEN;
-  const ref = e.SUPABASE_PROJECT_REF;
-  if (!토큰 || !ref) die('.env 에 SUPABASE_ACCESS_TOKEN·SUPABASE_PROJECT_REF 가 필요하다');
-  const M = { Authorization: `Bearer ${토큰}`, 'Content-Type': 'application/json' };
-
-  const pr = await fetch(`${API}/${ref}`, { headers: M });
-  const 이름 = pr.ok ? JSON.parse(await pr.text()).name : '(모름)';
-  console.log(`[인증왕복시험] 대상 ▸ ${이름}  (${ref})\n`);
-  if (!/rehearsal/i.test(이름)) {
-    die(`「${이름}」 은 리허설이 아니다. 이 시험은 계정을 만든다 — 운영에서는 돌리지 않는다.`);
-  }
-  // 발화점 — 배포판 ≠ 소스(HEAD)면 이 왕복의 초록은 옛 판을 잰 것이다(다르면 여기서 죽는다).
-  await require('./배포대조.js').왕복전게이트('인증왕복시험', e);
-
-  const sql = async (q) => {
-    const r = await fetch(`${API}/${ref}/database/query`, { method: 'POST', headers: M, body: JSON.stringify({ query: q }) });
-    const t = await r.text();
-    if (!r.ok) throw new Error(`SQL HTTP ${r.status} ${t.slice(0, 400)}`);
-    return JSON.parse(t);
-  };
-
-  const kr = await fetch(`${API}/${ref}/api-keys`, { headers: M });
-  const 키들 = JSON.parse(await kr.text());
-  const anon = 키들.find((k) => k.name === 'anon').api_key;
-  // 원장 계정을 세우는 데만 쓴다(시험 판 깔기) — 함수를 부를 때는 절대 안 싣는다.
-  const 서비스키 = 키들.find((k) => k.name === 'service_role').api_key;
+  // 서비스키는 원장 계정을 세우는 데만 쓴다(시험 판 깔기) — 함수를 부를 때는 절대 안 싣는다.
+  const { ref, sql, anon, service_role: 서비스키, 치명확인, 보고 } = await 골격.열기('인증왕복시험', {
+    사유: '이 시험은 계정을 만든다 — 운영에서는 돌리지 않는다',
+  });
+  // 이 시험의 검사는 사슬이라 첫 실패에서 멈춘다. 옛 인자 순서(조건, 무엇)는 호출부 30여 곳이 들고
+  // 있어 그대로 둔다 — 순서까지 뒤집으면 이식이 옮겨 적기 사고 30번의 기회가 된다.
+  const 확인 = (조건, 무엇) => 치명확인(무엇, 조건);
 
   /* 가입 1회 문항 셋(`lib/가입문항.js`)은 첫 등록의 **필수**라, 안 실으면 게이트에 닿기도 전에
    * 400 이 나서 아래 잠금·시도수 검사가 전부 다른 것을 재게 된다. 그래서 기본값을 여기 한 곳에
@@ -310,7 +284,7 @@ async function main() {
     await 치우기();   // 학생과 그 계정만 치운다. 원장은 감사가 물고 있어 남긴다(설계대로다).
   }
 
-  console.log(`\n[인증왕복시험] ✅ ${통과}/${통과} 통과 · 시험 학생·계정 정리 · 원장은 감사 때문에 존치`);
+  보고('시험 학생·계정 정리 · 원장은 감사 때문에 존치');
 }
 
 main().catch((err) => die(String((err && err.message) || err)));
