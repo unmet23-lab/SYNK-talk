@@ -28,10 +28,29 @@ MSG_FILE="$1"
 [ -f "$MSG_FILE" ] || exit 0
 [ -n "$CLAUDE_CODE_HOST_SESSION_ID" ] || exit 0
 
+# 손으로 적어 둔 값이 **내 id 의 축약형**이면 교체한다 (마찰 F300, appsscript 2026-08-09).
+#   `--if-exists doNothing` 은 틀린 값도 그대로 둔다. 실측: 커밋 메시지 파일 끝에
+#   `Session-Id: local_c23ccb25`(보드 지문 8자리)를 손으로 적었더니 훅이 비켜서 그게 박혔고,
+#   `track-collision` 이 즉시 「남의 커밋이 내 자리에 착지했다」고 알렸다 — 소유 판별은 전부
+#   이 값을 **문자열 그대로** 비교하므로 축약형은 어떤 세션과도 안 맞는다(내 것이 남의 것이 된다).
+#   보드 지문(8자리)과 이 트레일러(전체)는 서로 다른 식별자다 — 헷갈리기 쉬운 자리다.
+#
+# 🔑 **접두사일 때만** 교체한다. `--if-exists replace` 통째로는 안 된다 — cherry-pick 도 이 훅을
+#   부르므로 원저자의 완전한 트레일러를 내 것으로 덮어쓴다. 남의 UUID 는 내 id 의 접두사가
+#   아니므로 이 조건에 안 걸린다(회귀는 appsscript `tests/커밋트레일러.test.js` 가 양쪽을 다 잰다).
+EXISTING=$(git interpret-trailers --parse "$MSG_FILE" 2>/dev/null \
+  | sed -n 's/^Session-Id:[[:space:]]*//p' | tail -1)
+
+MODE=doNothing
+if [ -n "$EXISTING" ] && [ "$EXISTING" != "$CLAUDE_CODE_HOST_SESSION_ID" ] \
+   && [ "${CLAUDE_CODE_HOST_SESSION_ID#"$EXISTING"}" != "$CLAUDE_CODE_HOST_SESSION_ID" ]; then
+  MODE=replace
+fi
+
 # git interpret-trailers를 쓴다 — 손으로 append하면 주석 블록·빈 줄 때문에 트레일러 문단이
 # 갈라져 `%(trailers)`로 안 읽힌다(그러면 박아도 못 찾는 셈이라 목적이 통째로 무너진다).
 git interpret-trailers --in-place \
-  --if-exists doNothing \
+  --if-exists "$MODE" \
   --trailer "Session-Id: $CLAUDE_CODE_HOST_SESSION_ID" \
   "$MSG_FILE" 2>/dev/null
 
