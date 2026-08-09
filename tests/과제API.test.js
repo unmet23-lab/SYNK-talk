@@ -15,31 +15,20 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const path = require('path');
-const vm = require('vm');
-const babel = require('@babel/core');
+const { 세우기: 앱모듈 } = require('./lib/앱모듈세우기.js');
 
 const SRC = path.join(__dirname, '..', 'src', '과제API.js');
 
-/** 응답 하나를 주는 가짜 fetch 와 함께 모듈을 세운다. `던짐` 이면 fetch 자체가 실패한다(회선 없음). */
+/** 응답 하나를 주는 가짜 fetch 와 함께 모듈을 세운다. `던짐` 이면 fetch 자체가 실패한다(회선 없음).
+ *
+ * 🔴 상대 import 를 **재귀로 같이 세운다**(`tests/lib/앱모듈세우기.js`). 여기 있던 사본은 상대
+ *   경로를 그냥 `require` 해서, 이 파일이 통로(`src/사건통로.js`)를 쓰기 시작한 날 **진짜 모듈**이
+ *   섞여 들어왔다 — 그 모듈은 실제 `process.env` 를 읽어 `CONFIG` 로 죽었다. */
 function 세우기(몸, status = 200, 던짐 = false) {
-  const { code } = babel.transformFileSync(SRC, {
-    babelrc: false,
-    configFile: false,
-    plugins: ['@babel/plugin-transform-modules-commonjs'],
+  return 앱모듈(SRC, async () => {
+    if (던짐) throw new TypeError('Network request failed');
+    return { ok: status < 400, status, json: async () => 몸 };
   });
-  const module_ = { exports: {} };
-  vm.runInNewContext(code, {
-    module: module_,
-    exports: module_.exports,
-    require: (p) => require(path.resolve(path.dirname(SRC), p)),
-    process: { env: { EXPO_PUBLIC_SUPABASE_URL: 'https://x.supabase.co', EXPO_PUBLIC_SUPABASE_ANON_KEY: 'anon' } },
-    fetch: async () => {
-      if (던짐) throw new TypeError('Network request failed');
-      return { ok: status < 400, status, json: async () => 몸 };
-    },
-    console,
-  });
-  return module_.exports;
 }
 
 test('🔴 막힘이 앱까지 그대로 온다 — 서버가 실은 이유를 이 층에서 버리지 않는다', async () => {

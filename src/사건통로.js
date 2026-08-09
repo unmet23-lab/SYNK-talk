@@ -14,8 +14,8 @@
  *
  * ⚠ `EXPO_PUBLIC_*` 는 번들에 인라인된다 — 여기 있어도 되는 것은 **anon 키뿐**이다.
  */
-import { 인증오류 } from './인증API.js';
-import { 계약판 } from './과제API.js';
+import { 인증오류, 토큰되살리기 } from './인증API.js';
+import { 계약판 } from './계약판.js';
 import { 검증 } from '../lib/이벤트검증.js';
 
 const URL_ = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
@@ -36,16 +36,13 @@ const 헤더 = (토큰, 읽기) => ({
  *
  * 🔑 **`몸` 을 안 주면 GET 이다.** 조회를 같은 문으로 들인 이유: 봉투 해석(`ok:false`·`error`)·
  *   계약판 헤더·네트워크 구분이 조회에도 똑같이 필요한데, 엔드포인트마다 따로 적으면 갈라지고
- *   갈라진 쪽은 조용하다. `과제API`·`교정API` 가 이미 각자 한 벌씩 적어 뒀고 이게 세 번째였다.
- *   ponytail: 그 둘은 아직 자기 사본을 쓴다 — `계약판` 이 `과제API` 에 살아 지금 바꾸면
- *   순환 import 가 된다. 그 상수를 옮기는 날 함께 이 문으로 들인다.
+ *   갈라진 쪽은 조용하다. `과제API`·`교정API` 가 각자 한 벌씩 적어 뒀고 이게 세 번째였다 —
+ *   **만료 갱신(§7 왕복 6-⑥)이 서면서 그 셋이 갈라진 값이 됐고**, 그래서 셋을 여기로 모았다.
+ *   (`계약판` 을 `src/계약판.js` 로 뗀 것이 그 순환 import 를 푼 한 수다.)
  */
-export async function 부르기(길, 토큰, 몸) {
-  if (!URL_ || !ANON) throw new 인증오류('CONFIG', '서버 설정이 없어요', false);
-  const 읽기 = 몸 === undefined;
-  let r;
+async function 한번(길, 토큰, 몸, 읽기) {
   try {
-    r = await fetch(`${URL_}/functions/v1/${길}`, {
+    return await fetch(`${URL_}/functions/v1/${길}`, {
       method: 읽기 ? 'GET' : 'POST',
       headers: 헤더(토큰, 읽기),
       ...(읽기 ? {} : { body: JSON.stringify(몸) }),
@@ -53,9 +50,35 @@ export async function 부르기(길, 토큰, 몸) {
   } catch {
     throw new 인증오류('NETWORK', '인터넷 연결을 확인해 주세요', true);
   }
+}
+
+export async function 부르기(길, 토큰, 몸) {
+  if (!URL_ || !ANON) throw new 인증오류('CONFIG', '서버 설정이 없어요', false);
+  const 읽기 = 몸 === undefined;
+  let r = await 한번(길, 토큰, 몸, 읽기);
+
+  /* ── 만료 갱신 (C0 §7 왕복 6-⑥) ────────────────────────────────────────────
+   * 🔴 갱신이 **앱 시작 때 한 번뿐**이라, 한 시간을 넘긴 학생은 그 뒤 모든 요청이 401 이었다.
+   * 🔴 방아쇠는 **HTTP 401 이지 `AUTH_EXPIRED` 가 아니다** — `verify_jwt=true` 라 만료 토큰은
+   *   게이트웨이가 우리 함수 앞에서 자르고, 그 응답에는 우리 봉투가 없다(`error.code` 가 비어 온다).
+   *   코드로 가르려 하면 이 통로는 **한 번도 안 돈다**.
+   * 🔑 **재시도는 한 번뿐**이다(§7-6 「무한 루프 없음」) — 두 번째 401 은 그대로 아래로 내린다.
+   *   갱신 자체의 단일 비행·기억 갱신은 `인증API.토큰되살리기` 가 진다. */
+  if (r.status === 401) {
+    const 새토큰 = await 토큰되살리기(토큰);
+    if (새토큰) r = await 한번(길, 새토큰, 몸, 읽기);
+  }
+
   const 본문 = await r.json().catch(() => ({}));
   if (!r.ok || 본문.ok === false) {
     const e = 본문.error || {};
+    /* 🔴 게이트웨이의 401 에는 코드 칸이 없고, 빈 칸은 `SERVER_ERROR`·`retryable:false` 로 접힌다.
+     *   그러면 `lib/제출로그.js` 가 그 발화를 `send_final` 로 적고 **`밀린것` 에서 영영 뺀다** —
+     *   다시 로그인하면 나갈 수 있었던 발화를 버리는 셈이다. 그 한 칸만 메운다(우리 함수가
+     *   낸 401 `AUTH_REQUIRED`(`retryable:false`)는 그대로 둔다 — 그건 재시도가 무의미한 게 맞다). */
+    if (r.status === 401 && !e.code) {
+      throw new 인증오류('AUTH_EXPIRED', '로그인이 풀렸어요 — 다시 로그인해 주세요', true);
+    }
     throw new 인증오류(e.code, e.message, e.retryable);
   }
   return 본문;

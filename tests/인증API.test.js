@@ -18,8 +18,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const path = require('path');
-const vm = require('vm');
-const babel = require('@babel/core');
+const { 세우기: 앱모듈 } = require('./lib/앱모듈세우기.js');
 
 const SRC = path.join(__dirname, '..', 'src', '인증API.js');
 const URL_ = 'https://x.supabase.co';
@@ -40,21 +39,12 @@ function 세우기({ 응답들 = [], url = URL_, anon = ANON } = {}) {
     if (r.throw) throw new Error('network down');
     return { ok: r.ok !== false, status: r.status || 200, json: async () => r.몸 || {} };
   };
-  const { code } = babel.transformFileSync(SRC, {
-    babelrc: false,
-    configFile: false,
-    plugins: ['@babel/plugin-transform-modules-commonjs'],
+  // 조립은 공용 통로가 진다(`tests/lib/앱모듈세우기.js`) — 사본이 넷이었고 그 중 하나가
+  // 상대 import 재귀를 빠뜨려 진짜 모듈을 끌어들였다(그 사연은 통로 파일 머리말).
+  const API = 앱모듈(SRC, fetch, {
+    환경: { EXPO_PUBLIC_SUPABASE_URL: url, EXPO_PUBLIC_SUPABASE_ANON_KEY: anon },
   });
-  const module_ = { exports: {} };
-  vm.runInNewContext(code, {
-    module: module_,
-    exports: module_.exports,
-    require: (p) => require(path.resolve(path.dirname(SRC), p)),
-    process: { env: { EXPO_PUBLIC_SUPABASE_URL: url, EXPO_PUBLIC_SUPABASE_ANON_KEY: anon } },
-    fetch,
-    console,
-  });
-  return { API: module_.exports, 부른것 };
+  return { API, 부른것 };
 }
 
 /** 던진 오류를 잡아 온다 — `instanceof` 는 vm 경계를 못 넘으니 `code` 로 본다. */

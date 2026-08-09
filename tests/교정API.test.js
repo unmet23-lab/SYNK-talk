@@ -19,49 +19,14 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
-const vm = require('vm');
-const babel = require('@babel/core');
+const { 세우기: 앱모듈 } = require('./lib/앱모듈세우기.js');
 
 const ROOT = path.join(__dirname, '..');
 const SRC = path.join(ROOT, 'src', '교정API.js');
 const 계약 = JSON.parse(fs.readFileSync(path.join(ROOT, '계약', '수집_교정_계약.json'), 'utf8'));
 
-const 환경 = { EXPO_PUBLIC_SUPABASE_URL: 'https://x.supabase.co', EXPO_PUBLIC_SUPABASE_ANON_KEY: 'anon' };
-
-/**
- * ESM 한 파일을 세운다 — 상대 경로 import 는 **같은 방식으로 재귀**해서 세운다.
- * CJS(`lib/*.js`)는 그냥 require 한다.
- */
-function 세우기(파일, fetch가짜, 캐시 = new Map()) {
-  const abs = path.resolve(파일);
-  if (캐시.has(abs)) return 캐시.get(abs);
-  const 원문 = fs.readFileSync(abs, 'utf8');
-  const esm = /^\s*(import|export)\s/m.test(원문);
-  if (!esm) {
-    const m = require(abs);
-    캐시.set(abs, m);
-    return m;
-  }
-  const { code } = babel.transformFileSync(abs, {
-    babelrc: false,
-    configFile: false,
-    plugins: ['@babel/plugin-transform-modules-commonjs'],
-  });
-  const module_ = { exports: {} };
-  캐시.set(abs, module_.exports);           // 순환 import 대비 — 먼저 자리를 잡아 둔다
-  vm.runInNewContext(code, {
-    module: module_,
-    exports: module_.exports,
-    require: (p) => (p.startsWith('.')
-      ? 세우기(path.resolve(path.dirname(abs), p), fetch가짜, 캐시)
-      : require(p)),
-    process: { env: 환경 },
-    fetch: fetch가짜,
-    console,
-  });
-  캐시.set(abs, module_.exports);
-  return module_.exports;
-}
+/** 상대 import 를 재귀로 같이 세우는 공용 통로 — 사본이 갈라진 사연은 그 파일 머리말에. */
+const 세우기 = (파일, fetch가짜) => 앱모듈(파일, fetch가짜);
 
 /** 응답 하나를 주는 가짜 fetch + 보낸 요청 기록 */
 function 세운판(몸, status = 200) {

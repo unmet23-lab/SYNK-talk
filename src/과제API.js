@@ -16,20 +16,15 @@
  *
  * ⚠ `EXPO_PUBLIC_*` 는 번들에 인라인된다 — 여기 있어도 되는 것은 **anon 키뿐**이다.
  */
-import { 인증오류 } from './인증API.js';
+import { 부르기 } from './사건통로.js';
+import { 계약판 } from './계약판.js';
 
 const URL_ = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
-/**
- * 앱이 선언하는 계약판(C0 §6).
- *
- * 🔑 **계약 JSON 을 import 하지 않는다.** 그 파일은 28KB 짜리 개정 이력이고 앱이 쓰는 것은
- *   이 두 글자뿐인데, import 하면 그 28KB 가 통째로 번들에 인라인돼 몽골 모바일 회선으로 나간다.
- *   대신 손 상수를 두고 **`tests/계약.test.js` 가 정본과 같은지 기계로 묶는다** — 갈라지면
- *   CI 가 빨개진다. 갈라진 채 나가면 증상은 426 이고 학생 눈에는 「업데이트하래요」로 보인다.
- */
-export const 계약판 = 'c10';
+/* 상수의 정본은 `src/계약판.js` 다 — 여기 살면 통로가 이 파일을 import 해야 해서 과제 조회가
+   통로를 거꾸로 못 쓴다(순환). 옛 호출부를 위해 이름만 그대로 다시 낸다. */
+export { 계약판 };
 
 /**
  * 오늘(또는 지정한 날)의 과제를 읽는다.
@@ -39,29 +34,11 @@ export const 계약판 = 'c10';
  * @returns {Promise<{항목: object|null, 막힘: {code: string}|null, contract_ver: string}>}
  */
 export async function 오늘과제받기(토큰, 날짜) {
-  if (!URL_ || !ANON) throw new 인증오류('CONFIG', '서버 설정이 없어요', false);
-
   const 질의 = 날짜 ? `?date=${encodeURIComponent(날짜)}` : '';
-  let r;
-  try {
-    r = await fetch(`${URL_}/functions/v1/tasks${질의}`, {
-      method: 'GET',
-      headers: {
-        apikey: ANON,
-        Authorization: `Bearer ${토큰}`,
-        'X-Contract-Ver': 계약판,
-      },
-    });
-  } catch {
-    // 네트워크 없음은 서버 오류와 **다른 사건**이다 — 다르게 말해야 다시 시도할 수 있다.
-    throw new 인증오류('NETWORK', '인터넷 연결을 확인해 주세요', true);
-  }
-
-  const 몸 = await r.json().catch(() => ({}));
-  if (!r.ok || 몸.ok === false) {
-    const e = 몸.error || {};
-    throw new 인증오류(e.code, e.message, e.retryable);
-  }
+  /* 🔑 **자기 사본을 안 쓰고 통로를 지난다**(`src/사건통로.js`). 여기 있던 사본은 봉투 해석·
+   *   계약판 헤더·네트워크 구분까지 통로와 똑같았는데, **만료 갱신(§7 왕복 6-⑥)만 없었다** —
+   *   갈라진 쪽 증상은 「한 시간 지나면 오늘 과제가 안 뜬다」다. 학생이 매일 처음 만나는 화면이다. */
+  const 몸 = await 부르기(`tasks${질의}`, 토큰);
   const data = Array.isArray(몸.data) ? 몸.data : [];
   /* 🔑 `data` 가 있어도 그대로 싣는다 — 배정 뒤에 철회한 학생은 **과제를 보면서 업로드만 막힌다.**
    *   「비었을 때만」 읽으면 `막힘: null` 이 측정이 아니라 추측이 된다(동의게이트 정본과 같은 규칙). */
@@ -86,6 +63,11 @@ export async function 오늘과제받기(토큰, 날짜) {
  *   학생을 로그아웃**시키는 것이다. 볼 것이 없으면 `null` — 그게 이 함수의 전부다.
  * 🔑 미달이 아닐 때도 `null` 이다: 호출부가 「값이 있으면 그린다」 하나로 끝나 조건이
  *   두 곳(여기와 화면)으로 갈리지 않는다.
+ * 🔴 **이 하나만 통로(`부르기`)를 안 지난다** — 위 두 줄이 그 이유다. 여기서 401 은 사고가
+ *   아니라 **학생 전원의 정상 응답**이라, 통로에 얹으면 앱을 켠 학생마다 만료도 아닌 401 에
+ *   토큰 갱신이 한 번씩 붙는다(§7 왕복 6-⑥ 이 그 401 을 만료로 읽는다). 통로에 「이 길만
+ *   예외」를 다는 대신 사본을 남긴 것이고, 사본이라도 **판정이 없다** — 무슨 일이 나든 `null`
+ *   하나라 갈라질 값이 없다. 곁들여 이 길은 **본문 없는 POST** 라 `부르기` 의 GET/POST 규약과도 안 맞는다.
  *
  * @param {string} 토큰 access_token
  * @returns {Promise<{날짜: string, 재적: number, 배정: number, 강등: number}|null>}

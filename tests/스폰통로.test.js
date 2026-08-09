@@ -57,12 +57,24 @@ function 위반들(원문) {
     .map((m) => src.slice(0, m.index).split('\n').length);
 }
 
-function 스캔(dir) {
+/** 한 파일의 위반 행 번호들 — 앱 ESM 모듈을 **자기 손으로** 조립하는 자리(2026-08-09).
+ *
+ * 실측: 이 조립이 `과제API`·`교정API`·`사건통로` 세 곳에 복사돼 있었고 **한 벌만 상대 import 를
+ *   재귀하지 않았다.** 그 사본은 상대 경로를 그냥 `require` 해서, 그 파일이 다른 앱 모듈을
+ *   import 하기 시작한 날 **진짜 모듈**을 끌어들였다 — 실제 `process.env` 를 읽어 죽었고 증상은
+ *   「테스트가 갑자기 서버 설정이 없다고 한다」였다. 통로는 `tests/lib/앱모듈세우기.js` 하나다. */
+function 앱모듈위반들(원문) {
+  const src = 코드만(원문);
+  return [...src.matchAll(/babel\s*\.\s*transform(?:File)?Sync\s*\(/g)]
+    .map((m) => src.slice(0, m.index).split('\n').length);
+}
+
+function 스캔(dir, 찾기 = 위반들) {
   const 결과 = [];
   for (const f of fs.readdirSync(dir)) {
     if (!/\.test\.js$/.test(f)) continue; // lib/ 하위(통로 자신)는 대상이 아니다 — 통로는 spawnSync 를 써야 한다
     if (f === path.basename(__filename)) continue; // 자기 제외 — 픽스처가 패턴을 문자열로 들어야 하는 유일한 파일
-    const 줄 = 위반들(fs.readFileSync(path.join(dir, f), 'utf8'));
+    const 줄 = 찾기(fs.readFileSync(path.join(dir, f), 'utf8'));
     if (줄.length) 결과.push(`${f}:${줄.join(',')}`);
   }
   return 결과;
@@ -101,6 +113,30 @@ test('새 통로는 통과한다 — 거짓양성이 곧 우회 손버릇이 된
     "const { 띄우기 } = require('./lib/띄우기');\n"
     + 'const r = 띄우기([도구, "인자"], { encoding: "utf8", 통과코드: [1] });\n');
   assert.deepStrictEqual(스캔(d), [], '고친 형태를 위반이라 했다');
+});
+
+// ── ①-b 앱 ESM 모듈 조립도 통로가 하나다 (사본 셋 중 하나가 갈라졌던 자리) ──────
+
+test('🔴 테스트가 자기 손으로 앱 모듈을 조립하면 잡는다 — 사본은 재귀를 빠뜨리는 쪽으로 갈라졌다', () => {
+  const d = 임시();
+  fs.writeFileSync(path.join(d, '나쁜3.test.js'),
+    'const { code } = babel.transformFileSync(SRC, { plugins: ["@babel/plugin-transform-modules-commonjs"] });\n'
+    + 'vm.runInNewContext(code, { require: (p) => require(path.resolve(path.dirname(SRC), p)) });\n');
+  assert.deepStrictEqual(스캔(d, 앱모듈위반들), ['나쁜3.test.js:1'],
+    '옛 형태를 못 잡았다 — 다음 사본도 같은 자리에서 갈라진다');
+});
+
+test('새 통로(앱모듈세우기)는 통과한다', () => {
+  const d = 임시();
+  fs.writeFileSync(path.join(d, '좋은2.test.js'),
+    "const { 세우기 } = require('./lib/앱모듈세우기.js');\n"
+    + 'const 모듈 = 세우기(SRC, 가짜fetch, { 캐시 });\n');
+  assert.deepStrictEqual(스캔(d, 앱모듈위반들), [], '고친 형태를 위반이라 했다');
+});
+
+test('실저장소 — 앱 모듈을 자기 손으로 조립하는 테스트가 없다', () => {
+  assert.deepStrictEqual(스캔(TESTS, 앱모듈위반들), [],
+    '통로를 안 쓰는 사본이 남았다 — tests/lib/앱모듈세우기.js 의 세우기() 를 쓴다');
 });
 
 // ── ② 통로가 실제로 미실행을 드러내는가 (통로가 조용하면 위 규칙이 장식이 된다) ──

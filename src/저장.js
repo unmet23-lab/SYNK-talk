@@ -13,6 +13,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { 직렬화, 역직렬화 } from '../lib/제출로그.js';
+import { 세션남기기세움, 세션잊기 } from './인증API.js';
 
 const 웹 = Platform.OS === 'web';
 
@@ -147,6 +148,14 @@ export async function 세션쓰기(세션) {
   );
 }
 
+/* 🔑 **갱신이 회전시킨 refresh_token 을 남기는 손을 여기서 건다**(C0 §7 왕복 6-⑥).
+ *   만료 갱신은 `인증API` 안에서 나는데 그 파일은 키체인을 모른다 — 알게 하면 react-native 가
+ *   통로 사슬에 들어와 `tests/사건통로.test.js` 가 원리상 못 돈다(`src/사건통로.js` 머리말).
+ * ⚠ **이 한 줄이 등록층이다.** 빠지면 갱신은 되는데 다음 실행이 이미 쓴 토큰으로 시작하고,
+ *   증상은 「가끔 로그인이 풀린다」뿐이다 — 새는 방향이 「통과」라 `tests/기기비우기.test.js`
+ *   가 이 줄의 존재를 기계로 잰다. */
+세션남기기세움(세션쓰기);
+
 /** @returns {Promise<{refresh_token:string,학생번호:string}|null>} 없거나 깨졌으면 null */
 export async function 세션읽기() {
   if (웹) return null;
@@ -188,4 +197,9 @@ export async function 기기비우기() {
   await 로그쓰기([]);
   await 교정로그쓰기([]);
   await 세션지우기();
+  /* 🔴 **키체인만 지우면 절반이다** — 만료 갱신이 세션을 메모리에도 쥐고 있고(`인증API`),
+   *   안 비우면 다음 학생의 첫 401 이 **앞 학생의 refresh_token 으로** 되살아난다. 그 뒤 발화는
+   *   앞 학생 `learner_id` 로 저장되고 `learning_events` 는 append-only 라 소급 복구가 없다 —
+   *   이 함수가 막으려던 바로 그 상태가 새 통로로 되돌아오는 자리다. */
+  세션잊기();
 }

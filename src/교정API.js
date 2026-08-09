@@ -32,15 +32,10 @@
  *   「열어보고 접었다」와 「열어만 봤다」가 영영 한 모양이 된다. 값을 고르는 것은 화면이고
  *   이 파일은 계약 값목록만 지킨다 — 「무시」 버튼을 둘지는 모듈별 연출 판정이다.
  *
- * ⚠ `EXPO_PUBLIC_*` 는 번들에 인라인된다 — 여기 있어도 되는 것은 **anon 키뿐**이다.
+ * ⚠ 이 파일은 서버 주소도 키도 직접 안 든다 — 읽기·쓰기 둘 다 통로(`src/사건통로.js`)를 지난다.
  */
-import { 인증오류 } from './인증API.js';
-import { 계약판 } from './과제API.js';
-import { 사건보내기 } from './사건통로.js';
+import { 부르기, 사건보내기 } from './사건통로.js';
 import { 흐름id } from '../lib/제출로그.js';
-
-const URL_ = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
 /**
  * `learner_response` 값목록(계약 §값목록).
@@ -61,29 +56,11 @@ export const 학생응답값 = Object.freeze(['채택', '무시', '수정']);
  * @returns {Promise<{목록: object[], 다음커서: string|null, contract_ver: string|null}>}
  */
 export async function 교정목록받기(토큰, 커서) {
-  if (!URL_ || !ANON) throw new 인증오류('CONFIG', '서버 설정이 없어요', false);
-
   const 질의 = 커서 ? `?since=${encodeURIComponent(커서)}` : '';
-  let r;
-  try {
-    r = await fetch(`${URL_}/functions/v1/corrections${질의}`, {
-      method: 'GET',
-      headers: {
-        apikey: ANON,
-        Authorization: `Bearer ${토큰}`,
-        'X-Contract-Ver': 계약판,
-      },
-    });
-  } catch {
-    // 네트워크 없음은 서버 오류와 **다른 사건**이다 — 다르게 말해야 다시 시도할 수 있다.
-    throw new 인증오류('NETWORK', '인터넷 연결을 확인해 주세요', true);
-  }
-
-  const 몸 = await r.json().catch(() => ({}));
-  if (!r.ok || 몸.ok === false) {
-    const e = 몸.error || {};
-    throw new 인증오류(e.code, e.message, e.retryable);
-  }
+  /* 🔑 **자기 사본을 안 쓰고 통로를 지난다**(`src/사건통로.js`). 봉투 해석·계약판 헤더·네트워크
+   *   구분이 여기 한 벌 더 있었고, 거기에 만료 갱신(§7 왕복 6-⑥)이 더해지면서 갈라지면 조용한
+   *   판정이 넷이 됐다 — 갈라진 쪽 증상은 「한 시간 뒤 답장만 안 뜬다」다. */
+  const 몸 = await 부르기(`corrections${질의}`, 토큰);
   return {
     목록: Array.isArray(몸.data) ? 몸.data : [],
     다음커서: 몸.next_cursor || null,

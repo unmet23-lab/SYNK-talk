@@ -33,6 +33,71 @@ export class 인증오류 extends Error {
   }
 }
 
+/* ── 세션 기억 · 만료 갱신 (C0 §7 왕복 6-⑥) ──────────────────────────────────
+ * 🔴 `access_token` 은 **한 시간이면 죽는데** 갱신은 앱 시작 때 한 번뿐이었다. 수업 중 그 시간을
+ *   넘긴 학생은 이후 모든 요청이 401 이고, 화면에 뜨는 것은 「잠시 뒤 다시 시도해 주세요」뿐이다.
+ * 🔴 방아쇠는 **HTTP 401 이지 `AUTH_EXPIRED` 가 아니다.** `verify_jwt=true` 라 만료 토큰은
+ *   게이트웨이가 우리 함수 앞에서 자르고, 그 응답은 우리 봉투가 아니다 — `error.code` 가 비어 온다.
+ *   (§5 표가 `AUTH_EXPIRED` 를 적어 뒀지만 그 코드를 내는 서버 코드는 저장소에 0줄이다.)
+ * 🔑 기억을 **여기** 두는 이유: 세션이 발급되는 자리가 이 파일 넷뿐이라(로그인·갱신·첫등록·임시번호)
+ *   호출부가 등록을 잊을 자리가 없다. 등록층은 새면 언제나 「통과」 방향이라 잊을 자리를 안 만든다.
+ * ⚠ 키체인은 여기서 안 만진다 — `src/저장.js` 가 react-native 를 끌고 오고, 그 모듈이 이 사슬에
+ *   들어오면 통로 회귀(`tests/사건통로.test.js`)가 원리상 못 돈다. 남기는 손만 받아 둔다. */
+let 최근세션 = null;
+let 갱신중 = null; // refresh_token 은 **회전한다** — 동시에 두 번 부르면 뒤엣것이 이미 쓴 토큰을 쓴다
+let 남기기 = null; // 기기에 남기는 함수. `src/저장.js` 가 자기를 세운다(그 파일만 키체인을 안다)
+
+/** 갱신한 세션을 기기에 남기는 손을 건다 — `src/저장.js` 가 자기를 세운다. */
+export function 세션남기기세움(fn) {
+  남기기 = typeof fn === 'function' ? fn : null;
+}
+
+/** 로그아웃 — 기억을 비운다. 🔴 안 비우면 다음 학생의 401 이 **앞 학생 계정으로** 되살아난다. */
+export function 세션잊기() {
+  최근세션 = null;
+  갱신중 = null;
+}
+
+function 기억(세션) {
+  최근세션 = 세션;
+  return 세션;
+}
+
+/**
+ * 만료된 토큰을 **한 번** 되살린다 — 401 을 만난 통로가 부른다(`src/사건통로.js`).
+ *
+ * @param {string} 쓴토큰  방금 401 을 맞은 access_token
+ * @returns {Promise<string|null>} 새 access_token. 재료가 없거나 갱신이 거절되면 `null`.
+ *
+ * 🔑 **왕복 없이 끝나는 갈래가 먼저다.** 화면이 쥔 토큰은 props 로 내려온 것이라 갱신 뒤에도
+ *   낡은 채 남는다 — 기억이 이미 더 새것이면 그걸 그대로 준다(안 그러면 호출마다 401 을 한 번씩 산다).
+ * 🔑 **단일 비행** — 화면 셋이 동시에 401 을 맞아도 갱신은 한 번만 난다.
+ * 🔴 여기서 재시도하지 않는다 — 재시도는 부른 쪽이 **1회만** 한다(§7-6 「무한 루프 없음」).
+ */
+export async function 토큰되살리기(쓴토큰) {
+  if (최근세션 && 최근세션.access_token && 최근세션.access_token !== 쓴토큰) {
+    return 최근세션.access_token;
+  }
+  if (!최근세션 || !최근세션.refresh_token) return null;
+  if (!갱신중) {
+    갱신중 = 갱신(최근세션.refresh_token, 최근세션.학생번호)
+      .then(async (새것) => {
+        /* 🔴 회전한 refresh_token 을 **기기에 남긴다.** 안 남기면 다음 실행이 이미 쓴 토큰으로
+           갱신을 시도해 실패한다 — 증상은 「가끔 로그인이 풀린다」다(App.js 50행과 같은 사연). */
+        if (남기기) await Promise.resolve(남기기(새것)).catch(() => {});
+        return 새것.access_token;
+      })
+      .catch((e) => {
+        /* 만료면 기억을 버리고, 네트워크면 남긴다 — App.js 복원과 같은 규칙. 버리지 않으면
+           죽은 refresh_token 으로 호출마다 갱신을 한 번씩 더 사게 된다. */
+        if (!e || e.code !== 'NETWORK') 최근세션 = null;
+        return null;
+      })
+      .finally(() => { 갱신중 = null; });
+  }
+  return 갱신중;
+}
+
 async function 함수부르기(갈래, 본문, 토큰) {
   let r;
   try {
@@ -79,12 +144,12 @@ export async function 로그인(학생번호, 비밀번호) {
    *   토큰에 실려 오는 것은 **합성 이메일**뿐이라, 안 실으면 화면이 그 번호를 모른다.
    *   여기서 **표기형으로 접는다**: 세 통로(로그인·첫등록·임시번호)가 전부 이 한 줄을 지나므로
    *   화면마다 다시 다듬을 일이 없다. */
-  return {
+  return 기억({
     access_token: 몸.access_token,
     refresh_token: 몸.refresh_token,
     user: 몸.user,
     학생번호: 학생번호표기(학생번호),
-  };
+  });
 }
 
 /**
@@ -110,12 +175,12 @@ export async function 갱신(refresh_token, 학생번호) {
   if (!r.ok || !몸.access_token) {
     throw new 인증오류('REFRESH_FAILED', '다시 로그인해 주세요', false);
   }
-  return {
+  return 기억({
     access_token: 몸.access_token,
     refresh_token: 몸.refresh_token,
     user: 몸.user,
     학생번호,
-  };
+  });
 }
 
 /** 첫 등록 — 계정이 서는 유일한 통로. 성공해도 세션은 안 생기므로 곧바로 로그인한다. */
