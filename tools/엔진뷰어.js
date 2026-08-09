@@ -271,7 +271,13 @@ function 자가검사() {
   console.log('[엔진뷰어] 자가검사 통과 — 질의 읽기전용 · 참조수집 · 확장자 정규화 · 저장소 출력 거부 · **스크립트 없이 렌더**');
 }
 
-if (process.argv.includes('--자가검사')) 자가검사();
-else main().catch((err) => die(String(err && err.message || err)));
+/* 🔴 `require.main` 가드 — 이 파일을 **부품으로 부르는 쪽**(`tools/성과계기판.js` 가 `출력검사` 를
+ *   그대로 쓴다)이 생기면서 드러났다. 가드가 없으면 `require()` 한 것만으로 여기서 원격 질의가
+ *   나가고 파일이 써지며, 자격증명이 없는 곳(CI)에서는 `die` 가 **부른 쪽 프로세스를 죽인다.**
+ *   증상이 「그 도구가 실패했다」로 보이기 때문에 원인이 이 줄이라는 것은 안 보인다. */
+if (require.main === module) {
+  if (process.argv.includes('--자가검사')) 자가검사();
+  else main().catch((err) => die(String(err && err.message || err)));
+}
 
 module.exports = { 참조수집, 확장자, 질의, 출력검사 };
