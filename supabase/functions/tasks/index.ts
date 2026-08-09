@@ -38,14 +38,65 @@ const { 지금유효, 거절몸통 } = 동의모듈 as {
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
 /* 🔴 `시간대` 도 여기서 가져온다 — 리터럴을 다시 적으면 배치와 조회가 갈린다(절단문서 ①-14). */
-const { 몽골날짜, 시간대, 학생판스냅샷 } = 과제모듈 as {
+const { 몽골날짜, 시간대, 학생판스냅샷, 구제할까 } = 과제모듈 as {
   몽골날짜: (때?: Date) => string;
   시간대: string;
+  /* 🔴 배정 0인 날을 구제할지의 판정 — **여기 인라인으로 다시 적지 않는다**(B3).
+   *   글자로만 검사되는 조건은 하나를 통째로 죽여도 초록이라(F287), 판정은 순수 함수가 지고
+   *   회귀는 값을 먹여 행동으로 잰다. */
+  구제할까: (상황: { 배정수: number; 막힘: unknown; 날짜: string; 오늘: string }) => boolean;
   /* 🔴 이 응답이 답안지가 되지 않게 거르는 자리(절단문서 ②-20) — 목록도 정본도 저 파일 하나다. */
   학생판스냅샷: (snap: unknown) => unknown;
 };
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
+
+/* 배정이 0인 날을 구제할 때만 쓴다(아래 `지금세우기`) — `auth` 의 첫배정과 **같은 통로**다. */
+const 함수기지 = `${Deno.env.get('SUPABASE_URL') ?? ''}/functions/v1`;
+const 서비스키 = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+/* 오늘 배정을 **지금** 세운다 — C0 심문 B3 (소급 불가).
+ *
+ * ■ 무엇이 새고 있었나
+ *   배치(`deliver`)는 하루 1회다. 그 배치가 죽은 날, 또는 첫 등록 때 `auth` 의 첫배정이 실패한 날,
+ *   `/tasks` 는 빈 배열을 낸다. 그러면 앱은 고정 도입 과제로 내려가고 **발화를 서버로 보내지
+ *   않는다**(`lib/오늘과제.js` 화면과제 → `제출재료: null` → `src/제출API.js` 가 `끝: true`).
+ *   즉 그날 학생이 말한 것은 기기에만 남고 **사건이 되지 않는다.** 다음 날 배치가 돌아도
+ *   어제 목소리는 소급되지 않는다 — 이 자리의 손실만 되돌릴 수 없다.
+ *
+ * ■ 🔑 새 통로를 만들지 않는다
+ *   배정을 만드는 코드는 `deliver` 하나여야 한다(`auth:첫배정세우기` 가 같은 이유로 그렇게 섰다).
+ *   여기서 INSERT 하면 배정 생성이 셋이 되고, 갈라진 쪽이 낸 행은 계약 밖 모양이 된다.
+ *
+ * ■ ⚠ **한 번만 부른다 — 루프가 아니다**
+ *   불러도 여전히 0일 수 있다(그 학생이 오늘 대상이 아닌 경우). 그때 다시 부르면 그건 재시도가
+ *   아니라 매 요청마다 배치를 때리는 것이다. 한 번 부르고, 다시 읽고, 그래도 비면 **빈 채로 낸다.**
+ *
+ * ■ ⚠ 실패해도 200 을 깨지 않는다
+ *   「빈 상태는 오류가 아니다」(C0 §4-3)가 이 함수의 계약이다. 구제 시도가 실패했다고 500 을 내면
+ *   정상 경로가 오류 경로로 바뀌고, 앱은 고장 화면을 띄운다. 실패는 로그로만 남긴다.
+ */
+async function 지금세우기(learner_id: string): Promise<'세움' | '설정없음' | '실패'> {
+  if (!서비스키 || !함수기지.startsWith('http')) {
+    console.error('[tasks] 🔴 배정 0인데 구제를 못 부른다 — SUPABASE_URL·SERVICE_ROLE_KEY 미설정', learner_id);
+    return '설정없음';
+  }
+  try {
+    const r = await fetch(`${함수기지}/deliver?learner_id=${encodeURIComponent(learner_id)}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${서비스키}`, 'Content-Type': 'application/json' },
+    });
+    if (!r.ok) {
+      console.error('[tasks] 🔴 배정 0 구제 실패 — 오늘 발화가 사건으로 안 남는다',
+        learner_id, r.status, (await r.text()).slice(0, 200));
+      return '실패';
+    }
+    return '세움';
+  } catch (e) {
+    console.error('[tasks] 🔴 배정 0 구제 호출 예외', learner_id, e instanceof Error ? e.message : String(e));
+    return '실패';
+  }
+}
 
 /* 「누구인가」 다음은 「아직 살아 있는가」 — 정본은 `lib/토큰.js` 하나다(절단문서 ②-15).
  * `sql` 뒤에서 꺼낸다: 조각의 타입이 이 클라이언트에 매여 있다. */
@@ -126,7 +177,7 @@ Deno.serve(async (req: Request) => {
      *
      * ①듣기(`intervention.delivered` 의 `output_text`)는 배정과 **같은 `intervention_id`** 로
      *   붙어 있다. 시각·순서로 잇지 않는다 — 그건 하루 2건이 서는 날 조용히 어긋난다. */
-    const 행들 = await sql`
+    const 배정읽기 = () => sql`
       select e.event_id as task_id, e.degraded, e.intervention_id,
              s.task_snapshot, s.task_format, s.task_ref,
              e.level_snapshot, e.goal_snapshot, e.retry_of_event_id,
@@ -143,6 +194,31 @@ Deno.serve(async (req: Request) => {
          and e.event_type = 'task.assigned'
          and (e.occurred_at at time zone ${시간대})::date = ${날짜}::date
        order by e.occurred_at desc`;
+
+    let 행들 = await 배정읽기();
+
+    /* 동의는 **여기서** 읽는다 — 아래 구제가 「동의 있는데 배정만 0인 날」에만 도는데,
+     *   그 판정을 하려면 `blocked` 가 먼저 서야 한다. 정본은 `lib/동의게이트.js` 하나다.
+     * 🔑 `data` 가 있어도 잰다 — 배정 뒤 철회한 학생은 과제를 보면서 업로드만 막힌다.
+     *   「비었을 때만」 재면 `blocked: null` 이 **측정이 아니라 추측**이 된다. */
+    const 동의 = await 지금유효(sql, 행.learner_id as string);
+    const blocked = 동의.length ? null : { code: 거절몸통.code };
+
+    /* 🔴 **배정 0인 날을 여기서 구제한다** — C0 심문 B3(소급 불가).
+     *   조건 셋(배정 0 · 동의 있음 · 오늘)의 정본은 `lib/오늘과제.js` 의 `구제할까` 다.
+     * ⚠ 한 번만 부르고 한 번만 다시 읽는다. 그래도 비면 빈 채로 낸다(루프 금지 — 위 주석).
+     *   횟수는 이 **구조**가 지고 판정은 저 함수가 진다 — 한쪽에 둘 다 넣으면 갈라진다. */
+    if (구제할까({ 배정수: 행들.length, 막힘: blocked, 날짜, 오늘: 몽골날짜() })) {
+      if (await 지금세우기(행.learner_id as string) === '세움') {
+        /* 다시 읽기가 죽어도 **빈 응답으로 돌아간다** — 첫 조회는 이미 성공했으니 여기서 500 을
+         * 내면 「빈 상태는 오류가 아니다」를 구제 시도가 깨뜨리는 꼴이다. */
+        try {
+          행들 = await 배정읽기();
+        } catch (e) {
+          console.error('[tasks] 구제 뒤 재조회 실패 — 빈 채로 낸다', String((e as Error)?.message ?? e));
+        }
+      }
+    }
 
     /* 🔑 `task_ref`·`level_snapshot`·`goal_snapshot` 은 **되돌려 주려고** 싣는다(C0 §4-1).
      *   셋 다 제출 사건의 필드인데 **앱이 채우는 칸**이다 — 그때 화면이 알던 값을 그때 적는 것이
@@ -197,10 +273,7 @@ Deno.serve(async (req: Request) => {
      * 🔑 이 함수는 **막지 않는다.** 게이트는 `uploads`(서명)·`events`(적재)·`deliver`(배정)이고
      *   여기는 그 게이트를 **미리 읽어 알려주는** 자리다. 술어가 갈라지면 「화면은 초록인데
      *   업로드는 403」이 되므로 정본(`lib/동의게이트.js`)을 그대로 부른다.
-     * 🔑 `data` 가 있어도 잰다 — 배정 뒤 철회한 학생은 과제를 보면서 업로드만 막힌다.
-     *   「비었을 때만」 재면 `blocked: null` 이 **측정이 아니라 추측**이 된다. */
-    const 동의 = await 지금유효(sql, 행.learner_id as string);
-    const blocked = 동의.length ? null : { code: 거절몸통.code };
+     * 🔑 `동의`·`blocked` 는 위에서 이미 읽었다(구제 판정이 그것을 먼저 필요로 한다). */
 
     // 하루 1건이 멱등으로 보장되므로 `next_cursor` 는 항상 null 이다(C0 §4-3 ①).
     return 봉투(200, { ok: true, date: 날짜, data, blocked, next_cursor: null }, ver);
