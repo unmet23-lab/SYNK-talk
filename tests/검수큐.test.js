@@ -225,13 +225,60 @@ test('확인 쿼리가 판이 **올라간 판인지**까지 센다', () => {
 
 const 위험한열 = Object.keys(제외사유).filter((c) => c !== 'audio_deleted_at');
 
+const 직원표식 = /engine\.staff\b|current_staff\s*\(|staff_access_log/;
+
+/* 🔴 이 검사는 **파일 하나를 한 덩어리 문자열**로 봤다. 그래서 세 가지를 뭉갰다
+ *   (F277 · 2026-08-09 실측 — `deliver` 를 직원 통로로 잡아 talk 배포 게이트가 이틀 막혔다):
+ *     ① 주석·타입 선언의 열 이름을 **읽는 코드**로 셌다 — 지목된 6열 중 `due_at`·`due_ver` 는
+ *        c10 을 설명하는 주석에만, `task_ref` 는 TS 인터페이스 선언에도 있었다.
+ *     ② `insert` 의 열 목록을 **읽는다**로 셌다 — 배정 행을 **적는** 자리다.
+ *     ③ 권한 게이트가 있다고 파일 전체를 직원 통로로 봤다 — `deliver` 에서 원장이 닿는
+ *        경로(`점검하기`)는 submissions 를 한 번도 안 읽는다(집계 3개뿐).
+ *   셋 다 새는 방향이 **거짓양성**이라 조용하지 않았지만, 위반 아닌 것을 막는 가드는
+ *   낱말 회피를 정상 통로로 만든다(F272 가 같은 병을 C0 계약 검사에서 신고했다). */
+
+/** 주석을 지운다 — 주석에 적힌 열 이름은 읽는 코드가 아니다(위 ①).
+ *  `//` 는 `://`(URL)를 피해 앞 글자를 함께 본다. */
+function 주석없이(s) {
+  return s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+}
+
+/** sql 템플릿 리터럴 **안쪽만** — TS 타입 선언은 쿼리가 아니다(위 ①).
+ *  이 저장소는 sql 리터럴 안에 백틱을 쓰지 않는다(`deliver/index.ts:173` 이 그 규약을 못박는다). */
+function 쿼리들(조각) {
+  return [...주석없이(조각).matchAll(/sql`([^`]*)`/g)].map((m) => m[1]);
+}
+
+/* ②(쓰기를 읽기로 세는 것)에는 **따로 붙일 코드가 없다.** `from|join engine.submissions` 조건이
+ * 이미 가른다 — `insert … values` 에는 그 절이 없고, `insert … select` 에는 있어 그대로 잡힌다.
+ * 실측(2026-08-09): 그 자리에 `읽기부분()` 이라는 함수를 한 벌 두었는데 변이 시험이
+ * 「아무도 안 잡는다」로 드러냈다. 하는 일이 없는 코드는 **잘못 고칠 여지만** 만들어서 지웠다
+ * (그 함수를 망가뜨리는 변이는 `insert … select` 탐지를 통째로 껐다). 아래 두 픽스처가 그 자리를 진다. */
+
+/** 톱레벨 함수 단위로 자른다 (위 ③) — 함수 앞의 JSDoc 은 앞 조각에 붙지만 `주석없이` 가 지운다.
+ *  ⚠ **좁히는 방향이라 미탐이 생긴다** — 직원 확인을 A 함수에서 하고 원표를 B 함수에서 읽으면
+ *    이 검사는 못 본다. 그 자리는 1차 방어선이 진다: 검수 판은 뷰 하나뿐이고(①②),
+ *    원표를 여는 `inspector_queue_submissions` 정책이 살아 있으면 ③ 이 잡는다.
+ *    여기(⑤)는 코드 층의 2차 방어선이지 유일한 방어선이 아니다. */
+function 스코프들(본문) {
+  const 자리 = [...본문.matchAll(/^(?:export\s+)?(?:async\s+)?function\s+/gm)].map((m) => m.index);
+  if (!자리.length) return [본문];
+  const 조각 = [본문.slice(0, 자리[0])];
+  자리.forEach((v, i) => 조각.push(본문.slice(v, 자리[i + 1] ?? 본문.length)));
+  return 조각.filter((s) => s.trim());
+}
+
 /** 한 파일이 「직원 통로인데 submissions 를 직접 읽는다」인지 — 사유는 문자열로 돌려준다. */
 function 직접읽기(본문) {
-  const 직원통로 = /engine\.staff\b|current_staff\s*\(|staff_access_log/.test(본문);
-  if (!직원통로) return null;
-  if (!/(from|join)\s+engine\.submissions\b/.test(본문)) return null;
-  const 실린것 = 위험한열.filter((c) => new RegExp(`\\bs?\\.?${c}\\b`).test(본문));
-  return 실린것.length ? `직원 통로가 submissions 에서 직접 읽는다: ${실린것.join(', ')}` : null;
+  const 실린것 = new Set();
+  for (const 조각 of 스코프들(본문)) {
+    if (!직원표식.test(주석없이(조각))) continue;
+    for (const q of 쿼리들(조각)) {
+      if (!/(from|join)\s+engine\.submissions\b/.test(q)) continue;
+      for (const c of 위험한열) if (new RegExp(`\\bs?\\.?${c}\\b`).test(q)) 실린것.add(c);
+    }
+  }
+  return 실린것.size ? `직원 통로가 submissions 에서 직접 읽는다: ${[...실린것].join(', ')}` : null;
 }
 
 test('탐지력 픽스처 — 직원 통로가 원문을 직접 퍼가면 잡는다', () => {
@@ -248,6 +295,77 @@ test('탐지력 픽스처 — 직원 통로가 원문을 직접 퍼가면 잡는
 
   const 학생것 = 'const r = await sql`select s.body_original from engine.submissions s`;';
   assert.equal(직접읽기(학생것), null, '직원 통로가 아닌 곳까지 잡는다 — 학생 통로는 이 검사 밖이다');
+});
+
+/* F277 이 실제로 밟은 세 모양. 실물(`deliver/index.ts`)에서 그대로 뽑았다 — 픽스처가 실사용과
+ * 갈라지면 이 검사는 다시 자기 눈이 먼 자리를 못 본다. */
+test('거짓양성 픽스처 — 주석·insert 열 목록·딴 함수는 「읽는다」가 아니다 (F277)', () => {
+  /* ⚠ 함수 선언을 **줄머리**에 둔다 — 실물 Edge Function 이 그 모양이고, 스코프 앵커도 줄머리다.
+   *   들여써서 쓰면 조각이 안 갈리고, 그러면 이 픽스처들은 「스코프 자르기」를 한 번도 안 시험한
+   *   채 초록이 된다(첫 판이 실제로 그렇게 빨갛게 났다). */
+  /* 🔑 세 축을 **한 모양에 섞지 않는다.** 섞으면 앞 축(스코프)이 먼저 걸러 뒤 축(주석·insert)은
+   *   한 번도 실행되지 않고, 그 픽스처는 자기가 아무것도 안 시험한다는 사실을 못 말한다
+   *   (첫 판이 실제로 그랬다 — 변이 ①②가 「아무도 안 잡는다」로 드러냈다).
+   *   그래서 아래 셋은 각각 **자기 축만 남기고** 나머지 축은 통과하도록 짰다. */
+  const 주석만 = `
+async function 검수큐() {
+  const [직원] = await sql\`select role from engine.staff\`;
+  return await sql\`select s.submission_id
+    /* body_original 은 뷰에서 뺐다(②-17) — 여기선 안 읽는다 */
+    from engine.submissions s\`; }`;
+  assert.equal(직접읽기(주석만), null,
+    '쿼리 **안의 주석**에 적힌 열 이름을 읽는 코드로 센다 — 산문을 값으로 세면 낱말 회피가 정상 통로가 된다');
+
+  const 쓰기만 = `
+async function 승격() {
+  const [직원] = await sql\`select role from engine.staff\`;
+  await sql\`insert into engine.submissions (event_id, task_ref, task_snapshot, due_at, due_ver)
+             values (\${e}::uuid, \${r}, \${s}, \${d}, 1)\`; }`;
+  assert.equal(직접읽기(쓰기만), null,
+    'insert 의 열 목록을 「읽는다」로 센다 — 적는 자리와 읽는 자리는 반대 사건이다');
+
+  const 딴함수 = `
+async function 원장인가(req) { return await sql\`select role from engine.current_staff()\`; }
+async function 배달하기() {
+  return await sql\`select e.occurred_at, s.task_snapshot from engine.learning_events e
+                     join engine.submissions s on s.event_id = e.event_id\`; }`;
+  assert.equal(직접읽기(딴함수), null,
+    '권한 게이트가 있다고 파일 전체를 직원 통로로 센다 — 원장이 닿는 경로와 service_role 경로가 뭉개진다');
+});
+
+/* 위 셋은 전부 **좁히는** 수리다. 좁힘마다 그것을 우회하는 모양을 여기서 못박는다 —
+ * 안 그러면 「거짓양성이 사라졌다」와 「아무것도 안 막는다」가 같은 초록이 된다. */
+test('탐지력 — 좁힌 세 축을 우회하는 모양은 그대로 잡는다', () => {
+  const insert_select = `
+async function 검수큐() {
+  const [직원] = await sql\`select role from engine.staff where auth_user_id = \${주체}\`;
+  await sql\`insert into engine.review_export (t) select s.body_original from engine.submissions s\`; }`;
+  assert.match(String(직접읽기(insert_select)), /body_original/,
+    'insert 를 통째로 건너뛴다 — `insert … select` 는 읽기가 섞인 자리다');
+
+  const 같은함수 = `
+async function 검수큐() {
+  const [직원] = await sql\`select role from engine.current_staff()\`;
+  return await sql\`select s.body_original, s.redaction_result from engine.submissions s\`; }`;
+  assert.match(String(직접읽기(같은함수)), /body_original/,
+    '직원 게이트와 원표 읽기가 **같은 함수**에 있는데도 못 본다 — 스코프 자르기가 너무 넓다');
+
+  const 함수없음 = `
+    const [직원] = await sql\`select role from engine.staff\`;
+    const 큐 = await sql\`select s.capture_meta from engine.submissions s\`;`;
+  assert.match(String(직접읽기(함수없음)), /capture_meta/,
+    '톱레벨 코드(함수 경계 0)를 통째로 놓친다 — 조각이 하나뿐인 자리다');
+
+  /* 🔑 스코프 앵커가 **줄머리**인 이유를 못박는다. `^\\s*` 로 넓히면 중첩 함수가 바깥에서
+   *   잘려 나가고, 그러면 바깥의 직원 게이트와 안쪽의 원표 읽기가 서로를 못 본다 —
+   *   중첩 함수는 바깥 스코프를 그대로 쓰므로 **같은 통로**다. */
+  const 중첩함수 = `
+async function 검수큐() {
+  const [직원] = await sql\`select role from engine.staff\`;
+  async function 안쪽() { return await sql\`select s.body_original from engine.submissions s\`; }
+  return 안쪽(); }`;
+  assert.match(String(직접읽기(중첩함수)), /body_original/,
+    '중첩 함수를 딴 스코프로 센다 — 앵커가 줄머리가 아니면 바깥 게이트와 안쪽 읽기가 갈린다');
 });
 
 test('실저장소 — 오늘 직원 통로는 원문을 직접 안 읽는다', (t) => {
