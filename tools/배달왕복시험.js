@@ -24,6 +24,8 @@ const 골격 = require(path.join(__dirname, '..', 'lib', '왕복골격.js'));   
 const { 오늘과제, 몽골날짜, 따라말하기문장 } = require(path.join(__dirname, '..', 'lib', '오늘과제.js'));
 // 합성 도메인은 정본에서 가져온다 — 여기 박으면 도메인이 바뀌는 날 조용히 갈린다.
 const { 도메인 } = require(path.join(__dirname, '..', 'lib', '로그인코드.js'));
+// 동의 귀속 — 술어를 여기 다시 적지 않는다(`lib/동의게이트.js` 가 유일 정본)
+const { 지금유효id식 } = require(path.join(__dirname, '..', 'lib', '동의게이트.js'));
 
 /* 어제 배정을 손으로 심는다 — 「첫날이 아닌 학생」은 그렇게만 만들어진다.
  * 배치를 어제 한 번 돌리는 것으로는 못 만든다(그날 날짜로 돌 뿐이다). */
@@ -61,10 +63,10 @@ async function main() {
   const id = Object.fromEntries(학생들.map((r) => [r.student_code.slice(-1), r.learner_id]));
 
   await sql(`
-    insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver)
-    values ('${id.A}'::uuid,'v18.9', now() - interval '30 days','${판}'),
-           ('${id.C}'::uuid,'v18.9', now() - interval '30 days','${판}'),
-           ('${id.D}'::uuid,'v18.9', now() - interval '30 days','${판}')`);
+    insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver, recorded_by)
+    values ('${id.A}'::uuid,'v18.9', now() - interval '30 days','${판}','tools/배달왕복시험.js'),
+           ('${id.C}'::uuid,'v18.9', now() - interval '30 days','${판}','tools/배달왕복시험.js'),
+           ('${id.D}'::uuid,'v18.9', now() - interval '30 days','${판}','tools/배달왕복시험.js')`);
 
   // C·D 에게 어제 배정을 심는다 — 배정 행 = learning_events + submissions 쌍이다.
   const 어제날 = 어제(오늘);
@@ -74,10 +76,10 @@ async function main() {
       with ev as (
         insert into engine.learning_events
           (learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
-           level_snapshot, consent_ver, degraded, payload, schema_ver)
+           level_snapshot, consent_ver, consent_id, degraded, payload, schema_ver)
         values ('${id[k]}'::uuid,'task.assigned','발화녹음','ai',
                 '${어제날}T04:00:00Z'::timestamptz, 'task:${id[k]}:${어제날}',
-                'Lv2','v18.9', false, '{"ver":1}'::jsonb, '${판}')
+                'Lv2','v18.9', ${지금유효id식(`'${id[k]}'::uuid`)}, false, '{"ver":1}'::jsonb, '${판}')
         returning event_id)
       insert into engine.submissions (event_id, task_type, task_ref, task_snapshot, occurred_at, schema_ver)
       select event_id, '발화녹음', 'task-${어제날}',
@@ -94,10 +96,10 @@ async function main() {
     with ev as (
       insert into engine.learning_events
         (learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
-         level_snapshot, consent_ver, degraded, payload, schema_ver)
+         level_snapshot, consent_ver, consent_id, degraded, payload, schema_ver)
       values ('${id.D}'::uuid,'submission.created','발화녹음','learner',
               '${어제날}T08:00:00Z'::timestamptz, 'sub:${id.D}:${어제날}',
-              'Lv2','v18.9', false, '{"ver":1,"attempt_no":1}'::jsonb, '${판}')
+              'Lv2','v18.9', ${지금유효id식(`'${id.D}'::uuid`)}, false, '{"ver":1,"attempt_no":1}'::jsonb, '${판}')
       returning event_id)
     insert into engine.submissions (event_id, task_type, task_ref, task_format, body_original, occurred_at, schema_ver)
     select event_id, '발화녹음', 'task-${어제날}', '낭독', '어제 친구를 만나서 밥 먹었어요',
@@ -328,10 +330,10 @@ async function main() {
     with ev as (
       insert into engine.learning_events
         (learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
-         level_snapshot, consent_ver, degraded, payload, schema_ver)
+         level_snapshot, consent_ver, consent_id, degraded, payload, schema_ver)
       values ('${id.A}'::uuid,'task.assigned','발화녹음','ai',
               '${답날}T04:00:00Z'::timestamptz, 'task:${id.A}:${답날}',
-              'Lv2','v18.9', false, '{"ver":1}'::jsonb, '${판}')
+              'Lv2','v18.9', ${지금유효id식(`'${id.A}'::uuid`)}, false, '{"ver":1}'::jsonb, '${판}')
       returning event_id)
     insert into engine.submissions (event_id, task_type, task_ref, task_snapshot, occurred_at, schema_ver)
     select event_id, '발화녹음', 'task-${답날}',
@@ -511,22 +513,24 @@ async function main() {
   const 어제제출 = (await sql(`
     insert into engine.learning_events
       (learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
-       level_snapshot, consent_ver, degraded, payload, schema_ver)
+       level_snapshot, consent_ver, consent_id, degraded, payload, schema_ver)
     values ('${id.A}'::uuid,'submission.created','발화녹음','learner',
-            '${어제날}T05:00:00Z'::timestamptz,'sub:${표}:A:1','Lv2','v18.9', false,
+            '${어제날}T05:00:00Z'::timestamptz,'sub:${표}:A:1','Lv2','v18.9',
+            ${지금유효id식(`'${id.A}'::uuid`)}, false,
             '{"ver":1,"attempt_no":"많이"}'::jsonb,'${판}')
     returning event_id`))[0].event_id;
 
+  const A동의 = 지금유효id식(`'${id.A}'::uuid`);   // 세 행이 같은 학생이라 한 번 만들어 돌려 쓴다
   await sql(`
     insert into engine.learning_events
       (learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
-       level_snapshot, consent_ver, degraded, payload, retry_of_event_id, schema_ver)
+       level_snapshot, consent_ver, consent_id, degraded, payload, retry_of_event_id, schema_ver)
     values ('${id.A}'::uuid,'submission.created','발화녹음','learner','${오늘}T05:00:00Z'::timestamptz,
-            'sub:${표}:A:2','Lv2','v18.9', false,'{"ver":1,"attempt_no":1}'::jsonb, null,'${판}'),
+            'sub:${표}:A:2','Lv2','v18.9', ${A동의}, false,'{"ver":1,"attempt_no":1}'::jsonb, null,'${판}'),
            ('${id.A}'::uuid,'submission.created','발화녹음','learner','${오늘}T05:10:00Z'::timestamptz,
-            'sub:${표}:A:3','Lv2','v18.9', false,'{"ver":1,"attempt_no":3}'::jsonb, null,'${판}'),
+            'sub:${표}:A:3','Lv2','v18.9', ${A동의}, false,'{"ver":1,"attempt_no":3}'::jsonb, null,'${판}'),
            ('${id.A}'::uuid,'submission.created','발화녹음','learner','${오늘}T05:20:00Z'::timestamptz,
-            'sub:${표}:A:4','Lv2','v18.9', false,'{"ver":1,"attempt_no":1}'::jsonb,
+            'sub:${표}:A:4','Lv2','v18.9', ${A동의}, false,'{"ver":1,"attempt_no":1}'::jsonb,
             '${어제제출}'::uuid,'${판}')`);
 
   const g1 = await 조회('', { 함수: 'progress' });
@@ -554,9 +558,10 @@ async function main() {
   await sql(`
     insert into engine.learning_events
       (learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
-       level_snapshot, consent_ver, degraded, payload, schema_ver)
+       level_snapshot, consent_ver, consent_id, degraded, payload, schema_ver)
     values ('${id.D}'::uuid,'submission.created','발화녹음','learner','${오늘}T06:00:00Z'::timestamptz,
-            'sub:${표}:D:1','Lv2','v18.9', false,'{"ver":1,"attempt_no":1}'::jsonb,'${판}')`);
+            'sub:${표}:D:1','Lv2','v18.9', ${지금유효id식(`'${id.D}'::uuid`)}, false,
+            '{"ver":1,"attempt_no":1}'::jsonb,'${판}')`);
   const g2 = await 조회('', { 함수: 'progress' });
   확인('🔴 남의 제출은 안 세어진다 — 학생은 토큰에서 확정되고 쿼리로 못 지정한다',
     (((g2.몸.data || [])[0] || {}).today || {}).submission_count === 3, g2.몸.data);

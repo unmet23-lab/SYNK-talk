@@ -118,13 +118,21 @@ function 대조SQL(학생, 받은날) {
      where l.student_code = ${따옴표(학생)}`;
 }
 
-/** 동의 1건 insert. `doc_hash` 는 없으면 null — 있으면 「어느 글에 동의했나」의 증거가 된다. */
-function 삽입SQL({ learner_id, 판, 해시, 받은날, 스키마판 }) {
+/**
+ * 동의 1건 insert. `doc_hash` 는 없으면 null — 있으면 「어느 글에 동의했나」의 증거가 된다.
+ *
+ * 🔑 `recorded_by` = `--확정자`. 이 값은 **2026-08-07 부터 08-10 까지 화면에만 찍혔다** —
+ *   넣을 칸이 없어서였고(그때는 정말 없었다), 그 사이 `20260807140000` 이 열을 열면서
+ *   머리말에 「강제는 다음 조각 몫」이라 적어 뒀다. 도구가 그 열을 모르고 있었을 뿐이다.
+ *   동의는 법적 근거고 근거에 출처가 없으면 「이 동의는 누가 받았나」에 아무도 답할 수 없다.
+ *   ⚠ 소급은 없다 — 이 커밋 **전에** 선 행은 영영 `null` 이다(없는 사실을 지어내는 것이 백필이다).
+ */
+function 삽입SQL({ learner_id, 판, 해시, 받은날, 스키마판, 확정자 }) {
   return `
-    insert into engine.consents (learner_id, consent_ver, doc_hash, agreed_at, schema_ver)
+    insert into engine.consents (learner_id, consent_ver, doc_hash, agreed_at, schema_ver, recorded_by)
     values (${따옴표(learner_id)}::uuid, ${따옴표(판)}, ${해시 ? 따옴표(해시) : 'null'},
-            ${시각식(받은날)}, ${따옴표(스키마판)})
-    returning consent_id, agreed_at`;
+            ${시각식(받은날)}, ${따옴표(스키마판)}, ${따옴표(String(확정자 || '').trim())})
+    returning consent_id, agreed_at, recorded_by`;
 }
 
 /** 넣은 뒤 **서버 게이트와 같은 질의**로 되읽는다 — 넣었다는 응답이 아니라 게이트가 보는 값을 본다. */
@@ -230,7 +238,7 @@ async function main() {
       + '     꼴 = v + 숫자로 시작하는 한 낱말(예 v18.9 · v2). 문장·공백은 판 이름이 아니다.');
   }
   if (!opt.확정자 || !opt.확정자.trim()) {
-    die('--확정자 가 필요하다 (누가 이 동의를 받았는지 · 화면 기록에만 남는다).');
+    die('--확정자 가 필요하다 (누가 이 동의를 받았는지 · 행의 `recorded_by` 에 박힌다).');
   }
   if (opt.받은날 && !/^\d{4}-\d{2}-\d{2}([ T].+)?$/.test(opt.받은날)) {
     die(`--받은날 꼴이 아니다: ${opt.받은날} (YYYY-MM-DD 또는 YYYY-MM-DD HH:MM)`);
@@ -280,6 +288,7 @@ async function main() {
   const c = 계약();
   const [난것] = await sql(삽입SQL({
     learner_id: 대상.learner_id, 판: opt.판, 해시, 받은날: opt.받은날, 스키마판: c.버전,
+    확정자: opt.확정자,
   }));
   /* 🔴 넣었다는 응답이 아니라 **게이트가 보는 값**을 되읽는다 — 조용한 미적용은 통과와 같은 모양이다. */
   const [게이트] = await sql(확인SQL(대상.learner_id));
@@ -294,7 +303,15 @@ async function main() {
   console.log(`   ${대상.student_code} 가 이제 할 수 있는 것: **녹음 업로드**(uploads 403 해제)`
     + ' · **오늘의 과제 배정**(deliver 대상에 든다 · 다음 배치부터)');
   console.log(`   📌 기록: ${new Date().toISOString()} · 확정자 ${opt.확정자.trim()} · 판 ${opt.판}`);
-  console.log('      ⚠ 확정자를 넣을 표가 아직 없어 화면에만 남는다(발급기와 같은 자리) — 필요하면 지금 옮겨 적는다.');
+  /* 🔴 되읽기와 같은 이유로 **응답을 믿지 않고 값을 본다** — `recorded_by` 는 열이 없는 DB 에서도
+   *   조용히 실패하지 않고 에러를 내지만, 빈 문자열이 박히는 경로(공백만 준 --확정자)는 통과와
+   *   같은 모양이다. 출처 없는 동의는 이 도구가 막으려던 바로 그것이다. */
+  if (!난것.recorded_by) {
+    console.log('   🔴 그런데 행의 recorded_by 가 비었다 — 출처 없는 동의가 섰다. 이 행을 확인한다.');
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`      출처 recorded_by=«${난것.recorded_by}» 가 행에 박혔다 — 「누가 이 동의를 받았나」에 답할 수 있다.`);
   console.log('   철회는 여기 없다 — 학원 연락 → 수동 처리가 유일 경로다(D5 · P0 §192).');
 }
 

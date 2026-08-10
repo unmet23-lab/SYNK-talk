@@ -23,6 +23,7 @@
  */
 const die = (m) => { console.error('[교정왕복시험] ' + m); process.exit(1); };
 const 골격 = require('../lib/왕복골격.js');   // 공통 머리(환경→과녁→게이트→키→판정) — 왕복 5종 공용
+const { 지금유효id식 } = require('../lib/동의게이트.js');   // 동의 귀속 — 술어를 여기 다시 적지 않는다
 
 async function main() {
   /* `실행` — **거절도 결과다.** 던지지 않고 {ok, 메시지}로 돌려준다.
@@ -70,13 +71,24 @@ async function main() {
     returning learner_id, student_code`);
   const id = Object.fromEntries(학생들.map((r) => [r.student_code.slice(-1), r.learner_id]));
 
+  /* 🔴 동의 — 이 시험은 여기까지 동의 행을 **한 번도 만들지 않았다**(08-10 실측). 학생을 만들고
+   *   바로 사건을 심었으니 아래 INSERT 들의 `consent_id` 는 채울 재료 자체가 없었고, 그 상태로
+   *   `20260807140000` 이 예고한 NOT NULL 을 조이면 이 시험은 통째로 죽는다. 열만 더해선 안 되고
+   *   **픽스처가 먼저 서야** 한다 — 그게 이 세 줄이다(전층감사 묶음 ①-3 이 「열 없이 INSERT」로만
+   *   적어 둔 자리 중 유일하게 성격이 다른 곳). 교정은 발화에 붙고 발화는 동의 아래에서만 수집된다. */
+  await sql(`
+    insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver, recorded_by)
+    values ('${id.A}'::uuid,'v18.9', now() - interval '30 days','${판}','tools/교정왕복시험.js'),
+           ('${id.B}'::uuid,'v18.9', now() - interval '30 days','${판}','tools/교정왕복시험.js')`);
+
   const 교정만들기 = async (k) => (await sql(`
     with ev as (
       insert into engine.learning_events
         (learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
-         level_snapshot, consent_ver, degraded, payload, schema_ver)
+         level_snapshot, consent_ver, consent_id, degraded, payload, schema_ver)
       values ('${id[k]}'::uuid,'submission.created','발화녹음','learner', now(),
-              'sub:${표}:${k}', 'Lv2','v18.9', false, '{"ver":1}'::jsonb, '${판}')
+              'sub:${표}:${k}', 'Lv2','v18.9', ${지금유효id식(`'${id[k]}'::uuid`)},
+              false, '{"ver":1}'::jsonb, '${판}')
       returning event_id),
     sb as (
       insert into engine.submissions (event_id, task_type, task_ref, occurred_at, schema_ver)
@@ -93,9 +105,10 @@ async function main() {
   const 사건 = (학생, 종류, 지목, 키) => `
     insert into engine.learning_events
       (learner_id, event_type, actor_kind, occurred_at, idempotency_key,
-       level_snapshot, consent_ver, degraded, payload, schema_ver${지목 ? ', correction_id' : ''})
+       level_snapshot, consent_ver, consent_id, degraded, payload, schema_ver${지목 ? ', correction_id' : ''})
     values ('${id[학생]}'::uuid,'${종류}','learner', now(), '${키}',
-            'Lv2','v18.9', false, '{"ver":1}'::jsonb, '${판}'${지목 ? `, '${지목}'::uuid` : ''})
+            'Lv2','v18.9', ${지금유효id식(`'${id[학생]}'::uuid`)},
+            false, '{"ver":1}'::jsonb, '${판}'${지목 ? `, '${지목}'::uuid` : ''})
     returning event_id, correction_id`;
 
   /* ── ① 정상 ─────────────────────────────────────────────────── */

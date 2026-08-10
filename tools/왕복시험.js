@@ -36,6 +36,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { 정규형, 이메일, 비밀번호 } = require('../lib/로그인코드.js');
+const { 지금유효id식 } = require('../lib/동의게이트.js');   // 동의 귀속 — 술어를 여기 다시 적지 않는다
 // --새학생 이 쓰는 통로. 로그인 코드 계정과 **다른 이메일 규칙**이라 정본에서 따로 가져온다.
 const { 이메일: 학생이메일 } = require('../lib/학생계정.js');
 const { execFileSync } = require('child_process');
@@ -201,8 +202,11 @@ async function main() {
                    where learner_id='${learner_id}' and revoked_at is null`))[0].n === 1);
   } else {
     // 동의를 **과거로** 넣는다 — occurred_at 보다 앞서야 유효하다
-    await sql(`insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver)
-               values ('${learner_id}', 'v18.9', now() - interval '1 day', 'test')`);
+    /* `recorded_by` = 이 통로. 위 새학생 갈래는 운영 도구를 태워 `--확정자 왕복시험` 이 박히는데,
+     * 여기서 비워 두면 같은 시험의 두 갈래가 서로 다른 출처 규약을 갖는다(20260807140000 이
+     * 트리거로 조이는 날 이 갈래만 죽는다 — 그 조각 머리말이 지목한 통로가 정확히 여기다). */
+    await sql(`insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver, recorded_by)
+               values ('${learner_id}', 'v18.9', now() - interval '1 day', 'test', 'tools/왕복시험.js')`);
   }
 
   // ── ② 정상 저장 + 제출물 연결
@@ -373,8 +377,8 @@ async function main() {
    *   저장된다」지 두 시계의 오차가 아니다. ⚠ 이 여백은 **시험의 편의**이고, 두 시계를
    *   직접 비교하는 설계 자체는 남아 있다(기기 시계가 뒤처진 학생은 방금 동의하고도
    *   거절될 수 있다 — sol 심문 C0 P0 「신뢰하지 않는 occurred_at 이 동의 효력을 결정한다」). */
-  await sql(`insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver)
-             values ('${learner_id}', 'v18.9', now() - interval '2 seconds', 'test')`);
+  await sql(`insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver, recorded_by)
+             values ('${learner_id}', 'v18.9', now() - interval '2 seconds', 'test', 'tools/왕복시험.js')`);
   r = await 부르기({ events: [기본()] });
   확인('재동의(새 행) 뒤에는 다시 저장된다', r.body.results?.[0]?.status === 'stored', r.body.results?.[0]);
 
@@ -418,9 +422,10 @@ async function main() {
   const [{ event_id: 배정사건 }] = await sql(`
     insert into engine.learning_events
       (learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
-       intervention_id, consent_ver, schema_ver)
+       intervention_id, consent_ver, consent_id, schema_ver)
     values ('${learner_id}', 'task.assigned', '숙제제출', 'ai', now() - interval '1 hour',
-            '${배정표}', '${개입값}', 'v18.9', '${await 현재판()}')
+            '${배정표}', '${개입값}', 'v18.9',
+            ${지금유효id식(`'${learner_id}'::uuid`)}, '${await 현재판()}')
     returning event_id`);
   await sql(`insert into engine.submissions (event_id, task_type, task_ref, occurred_at, schema_ver)
              values ('${배정사건}', '숙제제출', '${배정표}', now() - interval '1 hour', '${await 현재판()}')`);

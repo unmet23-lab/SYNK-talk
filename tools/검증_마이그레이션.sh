@@ -58,13 +58,23 @@ seed_current() {
   "${PSQL[@]}" <<'SQL' >/dev/null
 insert into engine.learners(learner_id, student_code, schema_ver)
 values ('00000000-0000-4000-8000-000000000001', 'CI-CURRENT', 'c6');
+/* 🔴 동의가 사건보다 **먼저** 선다. 예전엔 맨 뒤였는데, 사건이 `consent_id` 로 동의를 가리키는
+ *   순간 그 순서는 FK 위반이다. 시드는 「무엇이든 들어가기만 하면 되는」 것이 아니라 실제
+ *   수집 순서(동의 → 수집)를 닮아야 한다 — 닮지 않으면 조이는 날 CI 가 먼저 죽는다. */
+insert into engine.consents(
+  consent_id, learner_id, consent_ver, agreed_at, schema_ver, recorded_by
+) values (
+  '00000000-0000-4000-8000-000000000401',
+  '00000000-0000-4000-8000-000000000001', 'v1', now(), 'c6', 'tools/검증_마이그레이션.sh'
+);
 insert into engine.learning_events(
   event_id, learner_id, event_type, task_type, occurred_at,
-  idempotency_key, consent_ver, schema_ver
+  idempotency_key, consent_ver, consent_id, schema_ver
 ) values (
   '00000000-0000-4000-8000-000000000101',
   '00000000-0000-4000-8000-000000000001',
-  'submission.created', '숙제제출', now(), 'ci-current-event', 'v1', 'c6'
+  'submission.created', '숙제제출', now(), 'ci-current-event', 'v1',
+  '00000000-0000-4000-8000-000000000401', 'c6'
 );
 insert into engine.submissions(
   submission_id, event_id, task_type, body_original, occurred_at, schema_ver
@@ -80,12 +90,6 @@ insert into engine.corrections(
   '00000000-0000-4000-8000-000000000201',
   'ai', '합성 현재판 문장', 'c6'
 );
-insert into engine.consents(
-  consent_id, learner_id, consent_ver, agreed_at, schema_ver
-) values (
-  '00000000-0000-4000-8000-000000000401',
-  '00000000-0000-4000-8000-000000000001', 'v1', now(), 'c6'
-);
 insert into engine.skills(skill_id, label_ko, domain, schema_ver)
 values ('ci-skill', '합성 기술', 'grammar', 'c6');
 SQL
@@ -96,13 +100,20 @@ seed_lower() {
   "${PSQL[@]}" <<SQL >/dev/null
 insert into engine.learners(learner_id, student_code, schema_ver)
 values ('10000000-0000-4000-8000-000000000001', 'CI-${label}', '${label}');
+insert into engine.consents(
+  consent_id, learner_id, consent_ver, agreed_at, schema_ver, recorded_by
+) values (
+  '10000000-0000-4000-8000-000000000401',
+  '10000000-0000-4000-8000-000000000001', 'v1', now(), '${label}', 'tools/검증_마이그레이션.sh'
+);
 insert into engine.learning_events(
   event_id, learner_id, event_type, task_type, occurred_at,
-  idempotency_key, consent_ver, schema_ver
+  idempotency_key, consent_ver, consent_id, schema_ver
 ) values (
   '10000000-0000-4000-8000-000000000101',
   '10000000-0000-4000-8000-000000000001',
-  'submission.created', '숙제제출', now(), 'ci-${label}-event', 'v1', '${label}'
+  'submission.created', '숙제제출', now(), 'ci-${label}-event', 'v1',
+  '10000000-0000-4000-8000-000000000401', '${label}'
 );
 insert into engine.submissions(
   submission_id, event_id, task_type, body_original, occurred_at, schema_ver
@@ -117,12 +128,6 @@ insert into engine.corrections(
   '10000000-0000-4000-8000-000000000301',
   '10000000-0000-4000-8000-000000000201',
   'ai', '합성 낮은판 문장', '${label}'
-);
-insert into engine.consents(
-  consent_id, learner_id, consent_ver, agreed_at, schema_ver
-) values (
-  '10000000-0000-4000-8000-000000000401',
-  '10000000-0000-4000-8000-000000000001', 'v1', now(), '${label}'
 );
 insert into engine.skills(skill_id, label_ko, domain, schema_ver)
 values ('ci-lower-skill', '합성 낮은판 기술', 'grammar', '${label}');
@@ -256,13 +261,20 @@ insert into engine.learners(learner_id, auth_user_id, student_code, schema_ver)
 values
   ('20000000-0000-4000-8000-000000000001', :'uid1', 'CI-AUTH-1', 'c6'),
   ('20000000-0000-4000-8000-000000000002', :'uid2', 'CI-AUTH-2', 'c6');
+insert into engine.consents(
+  consent_id, learner_id, consent_ver, agreed_at, schema_ver, recorded_by
+) values
+  ('20000000-0000-4000-8000-000000000401', '20000000-0000-4000-8000-000000000001',
+   'v1', now(), 'c6', 'tools/검증_마이그레이션.sh'),
+  ('20000000-0000-4000-8000-000000000402', '20000000-0000-4000-8000-000000000002',
+   'v1', now(), 'c6', 'tools/검증_마이그레이션.sh');
 insert into engine.learning_events(
-  event_id, learner_id, event_type, occurred_at, idempotency_key, consent_ver, schema_ver
+  event_id, learner_id, event_type, occurred_at, idempotency_key, consent_ver, consent_id, schema_ver
 ) values
   ('20000000-0000-4000-8000-000000000101', '20000000-0000-4000-8000-000000000001',
-   'preference.stated', now(), 'ci-auth-1', 'v1', 'c6'),
+   'preference.stated', now(), 'ci-auth-1', 'v1', '20000000-0000-4000-8000-000000000401', 'c6'),
   ('20000000-0000-4000-8000-000000000102', '20000000-0000-4000-8000-000000000002',
-   'preference.stated', now(), 'ci-auth-2', 'v1', 'c6');
+   'preference.stated', now(), 'ci-auth-2', 'v1', '20000000-0000-4000-8000-000000000402', 'c6');
 SQL
 
 "${PSQL[@]}" -v uid1="$uid1" <<'SQL' >/dev/null
@@ -350,11 +362,15 @@ grant usage on schema engine to authenticated;
 grant insert on engine.learning_events to authenticated;
 select set_config('request.jwt.claims', json_build_object('sub', :'uid1', 'role', 'authenticated')::text, true);
 set local role authenticated;
+/* 🔴 `consent_id` 를 **채워서** 넣는다. 이 블록이 재는 것은 「RLS 가 막는가」 하나뿐인데,
+ *   열을 비워 두면 NOT NULL 이 조여지는 날 INSERT 가 **다른 이유로** 실패하고 이 검사는
+ *   그대로 초록이 된다 — RLS 가 통째로 열려 있어도 못 잡는 거짓 초록이다(08-10 발견 ·
+ *   전층감사 묶음 ①-3 목록에 없던 자리). 실패 사유가 하나만 남아야 검사가 뜻을 갖는다. */
 insert into engine.learning_events(
-  learner_id, event_type, occurred_at, idempotency_key, consent_ver, schema_ver
+  learner_id, event_type, occurred_at, idempotency_key, consent_ver, consent_id, schema_ver
 ) values (
   '20000000-0000-4000-8000-000000000001', 'preference.stated', now(),
-  'ci-write-must-fail', 'v1', 'c6'
+  'ci-write-must-fail', 'v1', '20000000-0000-4000-8000-000000000401', 'c6'
 );
 rollback;
 SQL
