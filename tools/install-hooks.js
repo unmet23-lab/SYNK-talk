@@ -14,7 +14,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 /* 목록은 하나에서 파생시킨다 — 훅을 늘리고 이 배열을 안 늘리면 그 훅은 실행 비트도 못 받고
  * 온전성 검사에서도 빠진다. 증상은 「그 훅만 조용히 안 돈다」라 통과와 같은 모양이다. */
-const 훅들 = ['pre-commit', 'prepare-commit-msg'];
+const 훅들 = ['pre-commit', 'prepare-commit-msg', 'post-commit'];
 
 for (const 이름 of 훅들) {
   if (!fs.existsSync(path.join(root, '.githooks', 이름))) {

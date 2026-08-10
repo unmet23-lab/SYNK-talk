@@ -1,0 +1,12 @@
+#!/bin/sh
+# SYNK-talk post-commit — 동봉 파일을 고쳤으면 「재배포까지가 한 벌」이라고 그 자리에서 알린다.
+#
+# 왜 post-commit 인가 (F313 · 2026-08-10):
+#   `lib/*` 을 고친 사람에게는 아무 신호도 안 간다 — 그 파일이 Edge Function 에 실려 나가는
+#   줄을 모르기 때문이다. 빨개지는 건 남의 왕복시험이라 편집한 쪽엔 증상이 0 이다.
+#   막는 자리(pre-commit)에 두지 않는 이유: 배포는 라이브를 바꾸는 **승인 자리**라
+#   커밋을 막으면 우회가 정상 통로가 된다(F103). 알리기만 한다.
+#
+# 설치: node tools/install-hooks.js  (git config core.hooksPath .githooks)
+# 경로는 훅 자신 기준 상대 + PATH 의 node — 절대경로를 박으면 다른 기계에서 통째로 죽는다.
+exec node "$(dirname "$0")/../tools/동봉신호.js"

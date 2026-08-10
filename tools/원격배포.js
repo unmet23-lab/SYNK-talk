@@ -161,10 +161,37 @@ function 미커밋검사(저장소경로, src) {
     + `   남의 편집이면 그대로 두고 그 세션이 커밋할 때까지 기다린다(F073).`);
 }
 
-function 동봉묶기(디렉터리) {
+/* 동봉 표를 읽는 **유일한 자리**.
+ *
+ * 🔴 같은 세 줄(`path.join`+`existsSync`+`JSON.parse`)이 `동봉묶기` 와 `마지막커밋` 에 따로
+ *   적혀 있었고, 2026-08-10 `post-commit` 신호(F313)가 **세 번째**가 될 참이었다. 표의 모양이
+ *   바뀌는 날 갈라지는데, 갈라지는 방향은 언제나 「빈 표 = 해당 없음 = 통과」다.
+ *   호출부마다 고치는 대신 잘못 쓸 수 없는 통로를 하나 둔다(CLAUDE.md 신뢰성). */
+function 동봉읽기(디렉터리) {
   const 표 = path.join(디렉터리, '동봉.json');
-  if (!fs.existsSync(표)) return {};
-  const 표내용 = JSON.parse(fs.readFileSync(표, 'utf8'));
+  if (!fs.existsSync(표)) return null;
+  return JSON.parse(fs.readFileSync(표, 'utf8'));
+}
+
+/** 저장소의 동봉 표 **전량** — `[{ slug, 디렉터리, 경로들 }]`(경로는 전부 저장소 상대·`/` 표기).
+ *  `동봉신호`(post-commit)가 「방금 커밋된 경로가 어느 함수에 실려 나가나」를 묻는 자리. */
+function 동봉목록(root = ROOT) {
+  const 방 = path.join(root, 'supabase', 'functions');
+  if (!fs.existsSync(방)) return [];
+  const out = [];
+  for (const slug of fs.readdirSync(방).sort()) {
+    const 디렉터리 = path.join(방, slug);
+    if (!fs.statSync(디렉터리).isDirectory()) continue;
+    const 표 = 동봉읽기(디렉터리);
+    if (!표) continue;
+    out.push({ slug, 디렉터리: `supabase/functions/${slug}`, 경로들: Object.values(표) });
+  }
+  return out;
+}
+
+function 동봉묶기(디렉터리) {
+  const 표내용 = 동봉읽기(디렉터리);
+  if (!표내용) return {};
   본체import검사(디렉터리, 표내용);
   const out = {};
   for (const [이름, 저장소경로] of Object.entries(표내용)) {
@@ -213,9 +240,7 @@ function 배포묶음(디렉터리, 파일검사 = 미커밋검사) {
  *  본체는 바이트로 대조할 수 없어서(배포 시 TS 가 벗겨진다) 시각 축이 대신 진다 · `배포대조.시각뒤처짐`. */
 function 마지막커밋(디렉터리) {
   const 상대 = path.relative(ROOT, 디렉터리).split(path.sep).join('/');
-  const 표 = path.join(디렉터리, '동봉.json');
-  const 경로들 = [상대];
-  if (fs.existsSync(표)) 경로들.push(...Object.values(JSON.parse(fs.readFileSync(표, 'utf8'))));
+  const 경로들 = [상대, ...Object.values(동봉읽기(디렉터리) || {})];
   try {
     const out = require('child_process')
       .execFileSync('git', ['log', '-1', '--format=%cI', '--', ...경로들], { cwd: ROOT, encoding: 'utf8' });
@@ -387,5 +412,5 @@ async function main() {
   console.log(`   URL https://${ref}.supabase.co/functions/v1/${f.slug}`);
 }
 
-module.exports = { 파일들, 동봉묶기, 배포묶음, 마지막커밋, 작업본다름, 저장소판, 판뒤처짐 };
+module.exports = { 파일들, 동봉읽기, 동봉목록, 동봉묶기, 배포묶음, 마지막커밋, 작업본다름, 저장소판, 판뒤처짐 };
 if (require.main === module) main().catch((err) => die(String(err && err.message || err)));
