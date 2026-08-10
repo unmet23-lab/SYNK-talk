@@ -111,7 +111,7 @@
       "due_at", "due_ver",
       "transcript", "transcript_verified", "capture_meta", "output_text",
       "attempt_no", "learner_response",
-      "options_shown", "position", "recommended_option", "selected_option", "changed_selection", "latency_ms", "skipped", "selection_reason", "rejected_all",
+      "choice_dimension", "options_shown", "position", "recommended_option", "selected_option", "changed_selection", "latency_ms", "skipped", "selection_reason", "rejected_all",
       "cited_refs", "intervention_id", "degraded", "policy_ver",
       "source_kind", "estimator_confidence", "evidence_refs", "estimator_version", "valid_from", "expires_at", "user_confirmed",
       "consent_ver",
