@@ -85,7 +85,11 @@ test('ⓑ 완화는 level_snapshot 한 칸뿐 — 나머지 공통 필수는 nul
   /* 🔴 걸러낼 이름을 `널허용` 에서 받으면 **그 집합이 넓어지는 변이를 이 검사가 못 본다**
    *   (가드가 자기 전처리에 눈이 먼다 — 변이 시험에서 실제로 통과해 버렸다).
    *   그래서 이름을 여기 박아 두고 집합 자체를 대조한다. */
-  assert.deepEqual([...널허용], ['level_snapshot'], '널허용이 번졌다 — 완화가 계약 밖으로 새고 있다');
+  /* 🔑 목록을 늘리려면 **사람이 여기 와서 이름을 적어야 한다** — 그게 이 검사의 설계다.
+   *   `payload.recommended_option` = 「아무것도 안 밀었다」(S1-5 고정 보기 2개 · 2026-08-10).
+   *   키는 여전히 필수라 앱 결손과는 갈린다(아래 「키를 빠뜨리면 거부한다」가 그 축을 잰다). */
+  assert.deepEqual([...널허용], ['level_snapshot', 'payload.recommended_option'],
+    '널허용이 번졌다 — 완화가 계약 밖으로 새고 있다');
   for (const k of 공통필수) {
     if (k === 'level_snapshot') continue;
     const e = { ...정상제출(), [k]: null };
@@ -465,7 +469,7 @@ test('엔진도달 래칫 — 도달 0 인 사건이 늘어나면 빨개진다',
   assert.ok(도달0.length <= 도달0상한,
     `엔진 도달이 없는 사건이 ${도달0상한} → ${도달0.length} 로 늘었다: ${도달0.join(', ')}\n` +
     '새 수집을 늘리려면 그것이 엔진 학습에 «어떻게» 닿는지를 같이 적어야 한다(유호 상시 지시 08-08).');
-  assert.equal(도달0상한, 6, '상한을 올렸다 — 래칫은 내리기만 한다(도달을 적으면 준다)');
+  assert.equal(도달0상한, 5, '상한을 올렸다 — 래칫은 내리기만 한다(도달을 적으면 준다)');
 });
 
 /** 생산자 장부가 «파일»을 지목했는데 엔진도달 장부는 아직 «사유»인 사건 — 설계 §4 교차 불변식①.
@@ -677,4 +681,68 @@ test('자기 처방 — 거부 메시지대로 고치면 통과한다', () => {
   e.submission.task_format = 계약.learning_events.값목록.task_format[0];
   const r2 = 검증(e, 계약);
   assert.equal(r2.ok, true, `처방대로 고쳤는데 아직 거부한다: ${r2.오류들.join(' / ')}`);
+});
+
+/* ── 널허용이 **경로**에도 걸린다 (2026-08-10 · S1-5 가 잡은 자리) ─────────────────
+ * 🔴 「안 밀었다」와 「앱이 그 칸을 빠뜨렸다」를 가르는 것이 이 목록의 뜻 전부다. 값으로만 재면
+ *   S1-5 의 사건은 한 건도 계약을 못 지나 성향 축 ⑤의 입구가 통째로 막히고, 키 존재를 안 재면
+ *   앱 결손이 「안 밀었다」로 위장해 들어온다. 두 방향을 다 잰다. */
+const 고름사건 = (덧) => ({
+  idempotency_key: '11111111-2222-4333-8444-555555555555',
+  event_type: 'choice.selected',
+  occurred_at: '2026-08-07T10:00:00Z',
+  correlation_id: '99999999-8888-4777-8666-555555555555',
+  level_snapshot: 1,
+  payload: {
+    ver: 1,
+    options_shown: [{ option_id: 'a', label: 'ㄱ' }, { option_id: 'b', label: 'ㄴ' }],
+    position: 1,
+    selected_option: 'a',
+    recommended_option: null,
+    skipped: false,
+    rejected_all: false,
+    ...덧,
+  },
+});
+
+test('🔴 밀지 않은 날이 계약을 지난다 — 안 그러면 S1-5 는 행이 0이다', () => {
+  const r = 검증(고름사건(), 계약);
+  assert.equal(r.ok, true, `「아무것도 안 밀었다」가 거부됐다: ${r.오류들.join(' / ')}`);
+});
+
+test('🔴 그래도 **키를 빠뜨리면** 거부한다 — 널허용은 값만 푸는 것이지 칸을 없애지 않는다', () => {
+  const e = 고름사건();
+  delete e.payload.recommended_option;
+  const r = 검증(e, 계약);
+  assert.equal(r.ok, false, '앱 결손이 「안 밀었다」로 위장해 들어왔다 — 그 어긋남은 아무 데도 안 남는다');
+  assert.ok(r.오류들.some((m) => m.includes('recommended_option')), `사유가 그 칸을 안 지목한다: ${r.오류들.join(' / ')}`);
+});
+
+test('밀어준 날도 그대로 지난다 — 널허용이 실값을 막지 않는다', () => {
+  assert.equal(검증(고름사건({ recommended_option: 'b' }), 계약).ok, true);
+});
+
+test('널허용은 빈 문자열을 「모른다」로 받지 않는다 — 두 모양을 다 받으면 셈이 갈린다', () => {
+  const r = 검증(고름사건({ recommended_option: '' }), 계약);
+  assert.equal(r.ok, false, '빈 문자열이 통과했다 — 「모른다」는 null 하나로만 적는다');
+});
+
+test('🔴 이웃 칸까지 같이 열리지 않았다 — 완화는 목록에 적힌 경로 하나뿐', () => {
+  /* `payload.position` 이 null 인 행(=「안 골랐다」)은 **여전히 거부된다.** 그것을 여는 것은
+   * 새 관측(무관심 vs 뚜렷한 거절)을 여는 계약 판정이라 이 트랙이 혼자 정하지 않는다
+   * (대기열 P1 · 조건부 필수 안). 🚫 「지금은 거부된다」를 못박는 회귀가 아니다 — 여기서 재는
+   * 것은 **완화가 목록 밖으로 번지지 않았다** 하나이고, 그 축은 계약이 열려도 그대로 유효하다.
+   * 그날 이 검사는 `position` 을 목록에 적는 것으로 같이 움직인다(위 집합 대조와 한 벌). */
+  /* ⚠ `selected_option` 은 여기 안 넣는다 — **택1**(`selected_option | skipped | rejected_all`)의
+   *   한 갈래라 단독 필수가 아니다. 그 축을 이 검사에 섞으면 완화가 번진 것과 택1이 접힌 것이
+   *   한 실패로 보인다.
+   * ➕ 그 자리에서 관찰한 별건(이 트랙이 고치지 않는다): 택1은 `있음()` 으로 재므로 **`false` 도
+   *   「있다」로 센다** — `skipped:false, rejected_all:false, selected_option:null` 인 행이
+   *   택1을 지나간다. 오늘은 `position` 필수가 그 조합을 막고 있어 새는 양이 0이지만, 위
+   *   조건부 필수 판정이 열리는 날 그 방어는 함께 사라진다. 택1의 «뜻»을 바꾸는 판정이라
+   *   여기서 정하지 않고 대기열에 남긴다. 🚫 지금 동작을 회귀로 못박지 않는다(고치는 날 빨개진다). */
+  for (const 칸 of ['position', 'options_shown']) {
+    const e = 고름사건({ [칸]: null });
+    assert.equal(검증(e, 계약).ok, false, `${칸} 이 null 인데 통과했다 — 완화가 이웃 칸으로 번졌다`);
+  }
 });

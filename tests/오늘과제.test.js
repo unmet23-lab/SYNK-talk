@@ -14,8 +14,10 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const 계약 = JSON.parse(fs.readFileSync(path.join(ROOT, '계약', '수집_교정_계약.json'), 'utf8'));
-const { 몽골날짜, 멱등키, 오늘과제, 따라말하기문장, 화면과제, 제출사건, 열람사건, 되듣기사건, 도입,
+const { 몽골날짜, 멱등키, 오늘과제, 따라말하기문장, 화면과제, 제출사건, 열람사건, 되듣기사건,
+  선택사건, 답하기선택지, 도입,
   학생판스냅샷, 학생공개키, 구제할까, 선택판, 판지문 } = require('../lib/오늘과제.js');
+const { 보기세우기, 선택payload } = require('../lib/선택로그.js');
 const { 검증 } = require('../lib/이벤트검증.js');
 
 const 날짜 = '2026-08-07';
@@ -150,8 +152,9 @@ test('급수 표기에서 숫자를 뽑는다 — `Lv3` 을 초급으로 접지 
 test('보기 하나는 `○○` 없이 통째로 말할 수 있다 — 빈칸조차 막히는 학생의 탈출구', () => {
   for (const 첫날 of [true, false]) {
     const 보기 = 호흡(오늘과제({ 날짜, 첫날, 급수: 'Lv1' }), 3).선택지;
-    assert.ok(보기.some((c) => !c.includes('○○')),
-      `${첫날 ? '첫날' : '평일'} 보기가 전부 빈칸 채우기다 — 그러면 다시 「아무것도 안 냄」이 된다: ${보기.join(' / ')}`);
+    // 🔑 학생이 보는 것은 `label` 이다 — `option_id` 는 조인 키라 이 판정의 재료가 아니다.
+    assert.ok(보기.some((c) => !c.label.includes('○○')),
+      `${첫날 ? '첫날' : '평일'} 보기가 전부 빈칸 채우기다 — 그러면 다시 「아무것도 안 냄」이 된다: ${보기.map((c) => c.label).join(' / ')}`);
   }
 });
 
@@ -813,7 +816,36 @@ test('②-20 걸러지지 않은 객체가 응답에 실려 나가지 않는다'
   });
   const 판 = 학생판스냅샷(오늘과제({ 날짜, 첫날: true }).task_snapshot);
   평평한가({ ...판, 호흡: undefined }, '최상위');
-  판.호흡.forEach((h, i) => 평평한가(h, `호흡[${i}]`));
+  판.호흡.forEach((h, i) => {
+    /* `선택지` 는 2026-08-10 부터 **걸러진 층**이다(`학생공개키.선택지`) — 그래서 그 안에 객체가
+     * 있는 것이 정상이고, 대신 그 «안쪽»을 같은 규칙으로 한 층 더 잰다. 예외로 두기만 하면
+     * 이 검사가 그 자리를 통째로 안 보게 되고, 그건 층을 낸 것이 아니라 눈을 감은 것이다. */
+    평평한가({ ...h, 선택지: undefined }, `호흡[${i}]`);
+    (h.선택지 || []).forEach((o, j) => { if (객체인가(o)) 평평한가(o, `호흡[${i}].선택지[${j}]`); });
+  });
+});
+
+test('②-20 보기 «안»의 정답은 벗겨진다 — 게임 모듈이 그 모양을 낼 예정이다', () => {
+  /* 탐지력을 픽스처로 못박는다(실저장소는 오늘 이 모양을 안 낸다 — 「버그가 아직 있을 것을
+   * 요구하는 회귀」를 만들지 않기 위해서다). `발주_게임모듈.md` §342 가 보기와 **정답**을
+   * 한 벌로 내기로 이미 정해 뒀으므로, 그날 이 검사가 아니라 **필터**가 먼저 막아야 한다. */
+  const snap = {
+    ver: 1, 날짜, 호흡: [{
+      차례: 3, 무엇: '답하기', task_format: '응답', 프롬프트: '질문',
+      선택지: [{ option_id: 'a', label: 'ㄱ', 정답: true, 오류태그: ['조사'] }, { option_id: 'b', label: 'ㄴ' }],
+    }],
+  };
+  assert.deepEqual(학생판스냅샷(snap).호흡[0].선택지,
+    [{ option_id: 'a', label: 'ㄱ' }, { option_id: 'b', label: 'ㄴ' }],
+    '보기 안의 정답·오류태그가 학생 응답에 그대로 실려 나갔다');
+  assert.equal(snap.호흡[0].선택지[0].정답, true, '입력을 파괴했다 — 배정 행에 쓸 원본이 함께 지워진다');
+});
+
+test('②-20 옛 판의 문자열 보기는 그대로 통과한다 — 조회가 옛 판을 고쳐 쓰지 않는다', () => {
+  /* 리허설 DB 에 `선택판 v1` 이 만든 배정 행이 그대로 있고 `task_snapshot` 은 불변이다.
+   * 여기서 문자열을 객체로 바꾸면 「그때 나간 판」을 조회가 되쓰는 셈이 된다. */
+  const snap = { ver: 1, 날짜, 호흡: [{ 차례: 3, 무엇: '답하기', task_format: '응답', 프롬프트: 'q', 선택지: ['ㄱ', 'ㄴ'] }] };
+  assert.deepEqual(학생판스냅샷(snap).호흡[0].선택지, ['ㄱ', 'ㄴ']);
 });
 
 test('②-20 목록이 비어 있지 않다 — 빈 목록은 무엇이든 통과처럼 보인다', () => {
@@ -1119,4 +1151,111 @@ test('policy_ver 는 서버칸이다 — 앱이 「내 개입은 v2 가 골랐�
   const 필드 = Object.values(계약.learning_events.필드).flat();
   assert.ok(필드.includes('policy_ver'),
     '계약 필드 목록에 없다 — 계약만 읽는 소비자(Apps Script·n8n·다음 세션)는 이 값이 실재하는 줄 모른다');
+});
+
+/* ── `choice.selected` 생산자 (S1-5 · 2026-08-10) ─────────────────────────────
+ * 🔑 **실계약 검증기를 직접 먹인다.** 조립기만 시험하면 「내가 낸 모양을 내가 읽는다」만
+ *   증명되고, 1단계에서 두 가지(0-based position · 「안 골랐다」 거부)가 그렇게 잡혔다. */
+const 고름항목 = (덧) => ({
+  id: '2026-08-07-답하기-1',
+  date: 날짜,
+  step: '답하기',
+  attempt: 1,
+  status: 'submitted',
+  created_at: '2026-08-07T10:00:00Z',
+  correlation_id: '11111111-2222-4333-8444-555555555555',
+  idempotency_key: '99999999-8888-4777-8666-555555555555',
+  task_meta: { task_ref: `task-${날짜}`, level_snapshot: 1 },
+  선택: 선택payload({
+    보기: 보기세우기([{ option_id: 'a', label: 'ㄱ' }, { option_id: 'b', label: 'ㄴ' }], null, (n) => Array.from({ length: n }, (_, i) => i)),
+    고른것: 'a',
+    시작: 0,
+    끝: 1200,
+  }),
+  선택때: '2026-08-07T09:59:00Z',
+  ...덧,
+});
+
+test('🔑 선택사건이 계약을 지나는 `choice.selected` 를 만든다', () => {
+  const 사건 = 선택사건(고름항목());
+  const v = 검증(사건, {});
+  assert.equal(v.ok, true, `계약을 못 지난다: ${(v.오류들 || []).join(' · ')}`);
+  assert.equal(사건.event_type, 'choice.selected');
+  assert.equal(사건.payload.position, 1, 'position 은 1부터 센다(L0 §140) — 0부터 세면 전 행이 한 칸 밀린다');
+  assert.equal(사건.payload.selected_option, 'a');
+  assert.equal(사건.payload.recommended_option, null, '밀지 않은 날을 정직하게 안 적었다');
+});
+
+test('🔴 고름의 시각은 **고른 그 순간**이다 — 제출 시각으로 대신하지 않는다', () => {
+  /* 그 사이 학생이 녹음을 몇 번 다시 하면 몇 분이 벌어지고, 그러면 「언제 마음을 정했나」가
+   * 통째로 밀린다. `latency_ms` 가 재는 것과 다른 값이라 둘 다 필요하다. */
+  assert.equal(선택사건(고름항목()).occurred_at, '2026-08-07T09:59:00Z');
+  assert.equal(선택사건(고름항목({ 선택때: null })).occurred_at, '2026-08-07T10:00:00Z',
+    '고른 때를 못 쥔 항목은 제출 시각으로 내려가야 한다 — 사건을 통째로 버리지 않는다');
+});
+
+test('🔴 멱등키는 항목에서 파고, 제출·되듣기 키와 겹치지 않는다', () => {
+  const 항목 = 고름항목();
+  const 키 = 선택사건(항목).idempotency_key;
+  assert.equal(키, `${항목.idempotency_key}:choice`);
+  assert.notEqual(키, 항목.idempotency_key, '제출과 같은 키면 서버가 둘 중 하나를 duplicate 로 접는다');
+  assert.notEqual(키, `${항목.idempotency_key}:replay`, '되듣기와 키가 겹친다');
+  // 같은 항목을 몇 번 조립해도 같은 값이라 재전송이 두 벌을 안 만든다.
+  assert.equal(선택사건(고름항목()).idempotency_key, 키);
+});
+
+test('고른 적이 없거나 재료가 모자라면 사건을 안 만든다 — 지어내지 않는다', () => {
+  assert.equal(선택사건(고름항목({ 선택: null })), null, '고른 적 없는 앉음에 사건을 지어냈다');
+  assert.equal(선택사건(고름항목({ correlation_id: null })), null, '앉음 키 없이 보내면 400 이고 큐가 영원히 재시도한다');
+  assert.equal(선택사건(고름항목({ idempotency_key: null })), null, '멱등키를 여기서 지으면 좌표 조립으로 되돌아간다');
+  assert.equal(선택사건(null), null);
+});
+
+test('🔴 고름은 **제출과 독립**이다 — 부모를 달지 않는다', () => {
+  /* 되듣기는 부모가 그 제출 사건이라 착지를 기다리지만(`되듣기사건`), 고름은 다르다.
+   * 부모를 달면 제출이 영영 못 나가는 날(회선·동의 막힘) 그날의 「무엇에 끌렸나」까지 죽는다. */
+  const 사건 = 선택사건(고름항목());
+  assert.equal(사건.parent_event_id, undefined, '부모를 달았다 — 제출의 운명에 고름이 묶인다');
+  assert.equal(검증(사건, {}).ok, true, '부모 없이는 계약을 못 지나는지 확인한다(지나야 맞다)');
+});
+
+test('급수는 그때 화면이 알던 값이다 — 사흘 밀려 올라가도 그날 값', () => {
+  assert.equal(선택사건(고름항목()).level_snapshot, 1);
+  assert.equal(선택사건(고름항목({ task_meta: null })).level_snapshot, null,
+    '급수를 모르는 앉음은 null 이 유일하게 정확한 값이다 — 키는 남는다(C0 §4-3 ① ⓑ)');
+});
+
+/* ── 스냅샷의 보기 → `{option_id, label}` 정규화 ────────────────────────────── */
+test('🔴 옛 판의 문자열 보기가 살아남는다 — 새 모양만 받으면 화면이 조용히 자유발화가 된다', () => {
+  const snap = (선택지) => ({ ver: 1, 날짜, 호흡: [{ 차례: 3, 무엇: '답하기', task_format: '응답', 프롬프트: 'q', 선택지 }] });
+  /* `선택판 v1` 이 만든 배정 행이 리허설 DB에 그대로 있고 `task_snapshot` 은 불변이다(L0 §3-3).
+   * 그때 존재한 유일한 식별자가 문구뿐이므로 id 를 문구로 둔다 — 없는 값을 지어내지 않는다. */
+  assert.deepEqual(답하기선택지(snap(['ㄱ', 'ㄴ'])), [{ option_id: 'ㄱ', label: 'ㄱ' }, { option_id: 'ㄴ', label: 'ㄴ' }]);
+  assert.deepEqual(답하기선택지(snap([{ option_id: 'a', label: 'ㄱ' }, { option_id: 'b', label: 'ㄴ' }])),
+    [{ option_id: 'a', label: 'ㄱ' }, { option_id: 'b', label: 'ㄴ' }]);
+});
+
+test('못 가리키는 보기는 버리고, id 가 겹치면 통째로 접는다', () => {
+  const snap = (선택지) => ({ ver: 1, 날짜, 호흡: [{ 차례: 3, 무엇: '답하기', task_format: '응답', 프롬프트: 'q', 선택지 }] });
+  /* id 가 겹치면 「무엇을 골랐나」가 두 곳을 가리킨다 — `lib/선택로그.보기세우기` 도 같은 판정으로
+   * 조립을 거부하는데, 거기서 막히면 화면은 이미 그린 뒤다(학생이 고른 것이 통째로 사라진다). */
+  assert.equal(답하기선택지(snap([{ option_id: 'a', label: 'ㄱ' }, { option_id: 'a', label: 'ㄴ' }])), null);
+  // 보기가 하나뿐이면 조립기가 어차피 거부한다(2개 미만) — 고를 수 있는데 기록이 안 남는 화면을 안 그린다.
+  assert.equal(답하기선택지(snap([{ option_id: 'a', label: 'ㄱ' }])), null);
+  assert.equal(답하기선택지(snap([{ label: 'id 없음' }, { option_id: 'b', label: 'ㄴ' }])), null,
+    'id 없는 보기를 버린 뒤 남은 하나로 화면을 그렸다');
+  assert.equal(답하기선택지(snap(null)), null);
+  assert.equal(답하기선택지(null), null);
+});
+
+test('🔴 도입 보기가 안정 id 를 든다 — 문구를 다듬어도 옛 행이 살아남는 유일한 이유', () => {
+  for (const [이름, 보기들] of [['답하기선택지', 도입.답하기선택지], ['첫날답하기선택지', 도입.첫날답하기선택지]]) {
+    assert.equal(보기들.length, 2, `${이름} 이 둘이 아니다`);
+    for (const o of 보기들) {
+      assert.equal(typeof o.option_id, 'string', `${이름}: id 가 문자열이 아니다`);
+      assert.ok(o.option_id && !o.option_id.includes('○'), `${이름}: id 에 문구를 넣었다 — 문구를 고치는 날 옛 행과 갈린다`);
+      assert.equal(typeof o.label, 'string');
+    }
+    assert.notEqual(보기들[0].option_id, 보기들[1].option_id, `${이름}: 두 보기의 id 가 같다`);
+  }
 });
