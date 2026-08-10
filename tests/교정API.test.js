@@ -157,6 +157,25 @@ test('교정 목록을 그대로 싣는다 — 빈 목록도 정상이다', asyn
   assert.equal(빈.다음커서, null);
 });
 
+/* 🔴 **막힘은 목록과 같은 응답에서 온다**(2026-08-10 · 전층감사 §2-5). 이 층이 값을 버리면
+ *   서버가 게이트를 걸어도 화면은 아무것도 모르고 사건을 보낸다 — 그 거절이 `send_final` 이
+ *   되어 답이 영영 죽는다. 서버 쪽은 `tests/동의게이트.test.js`, 화면 쪽은
+ *   `tests/교정로그.test.js` 가 지고, **그 사이 한 칸**이 여기다. */
+test('🔴 blocked 를 실어 낸다 — 목록이 비지 않아도 (「비었을 때만」이면 측정이 아니라 추측이다)', async () => {
+  const 막힌판 = 세운판({
+    ok: true, data: [{ correction_id: 'c1' }], next_cursor: null, contract_ver: 'c10',
+    blocked: { code: 'CONSENT_MISSING' },
+  });
+  const r = await 막힌판.모듈.교정목록받기('t');
+  assert.deepEqual(r.막힘, { code: 'CONSENT_MISSING' }, '막힘이 이 층에서 사라졌다');
+  assert.equal(r.목록.length, 1, '막혔다고 목록을 비웠다 — 화면이 안 떠 학생은 이유를 못 듣는다');
+
+  /* 🔑 **옛 서버(칸이 없음)는 `null` 이다** — `undefined` 를 그대로 흘리면 화면이 「모른다」와
+   *   「안 막힘」을 같은 값으로 받는다. 새는 방향은 이미 「보낸다」라 여기서 모양을 못박는다. */
+  const 옛판 = 세운판({ ok: true, data: [], next_cursor: null, contract_ver: 'c8' });
+  assert.equal((await 옛판.모듈.교정목록받기('t')).막힘, null);
+});
+
 test('🔴 목록 조회는 사건을 만들지 않는다 — 읽기가 쓰기를 겸하면 오염이다(C0 §4-3 ②)', async () => {
   const { 모듈, 요청들 } = 세운판({ ok: true, data: [{ correction_id: 'c1' }], next_cursor: null });
   await 모듈.교정목록받기('t');
