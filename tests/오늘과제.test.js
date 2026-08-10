@@ -709,7 +709,11 @@ test('🔴 실 화면 — 열람은 재생이 끝난 자리에만 붙어 있다 
  *   같은 것을 두 층에서 재면 한쪽만 낡는다. */
 const 되듣기배선 = (소스) => {
   const 카드 = 소스.search(/^function 녹음카드\(/m);
-  const 부름 = 소스.indexOf('되듣기사건(항목, r.event_id)');
+  /* 🔑 **호출 자체**를 세지 인자 모양을 세지 않는다. 부모를 `r.event_id` 로 직접 받든 항목에
+   *   실어 오든(§2-7 재전송 쓸이가 그렇게 부른다) ⓐⓑ 의 판정은 안 바뀐다 — 모양으로 재면
+   *   리팩터가 곧 거짓 적색이고, 그 적색은 남의 배포 게이트까지 막는다.
+   * ⚠ import 줄은 `되듣기사건` 뒤에 `(` 가 없어 안 걸린다(여는 괄호까지가 이 검사의 경계다). */
+  const 부름 = 소스.indexOf('되듣기사건(');
   // `= null` 은 다음 시도를 위해 비우는 자리다 — 관측을 **적는** 대입만 센다.
   const 기록줄 = 소스.split('\n').filter((l) => /되들은때\.current\s*=/.test(l) && !/=\s*null/.test(l));
   return {
@@ -724,13 +728,13 @@ const 되듣기배선 = (소스) => {
 test('탐지력 픽스처 — 되듣기가 안 나가거나 카드에서 바로 나가거나 누른 순간을 세면 잡는다', () => {
   const 판 = ({ 부른다 = true, 카드에서 = false, 완주 = true } = {}) => [
     'const 보내기 = async (항목) => {',
-    부른다 && !카드에서 ? '  const 되듣기 = 되듣기사건(항목, r.event_id);' : '',
+    부른다 && !카드에서 ? '  const 사건 = 되듣기사건(항목, 항목.event_id);' : '',
     '};',
     'function 녹음카드({ step }) {',
     완주 ? '  if (s.didJustFinish) 되들은때.current = new Date().toISOString();'
       : '  되들은때.current = new Date().toISOString();',
     '  되들은때.current = null;',
-    부른다 && 카드에서 ? '  const 되듣기 = 되듣기사건(항목, r.event_id);' : '',
+    부른다 && 카드에서 ? '  const 사건 = 되듣기사건(항목, 항목.event_id);' : '',
     '}',
   ].join('\n');
   assert.deepEqual(되듣기배선(판()), { 부른다: true, 화면직송: false, 완주만: true },
