@@ -347,21 +347,34 @@ test('⑤ 마음을 바꾼 것은 **여부**로 센다 — 횟수를 담을 칸�
   assert.equal(r.축.관심.바꿈률, 0.5);
 });
 
-/* ⚠ 오늘 이 값은 **원리상 0**이다 — 계약이 `payload.position` 을 무조건 필수로 걸어
- *   `skipped`·`rejected_all` 행은 검증을 못 지나 도착 자체를 못 한다(대기열 P1 의 계약 판정).
- *   그래도 칸을 재는 이유는 분모를 정직하게 두기 위해서다: 계약이 열리는 날 **코드 변경 없이**
- *   값이 차야 하고, 그러지 않으면 「무관심」과 「뚜렷한 거절」은 영영 안 갈린다.
- * 🚫 「지금은 거부된다」를 회귀로 못박지 않는다(버그가 있을 것을 요구하는 회귀 · 고쳐지는 날
- *   애먼 데가 빨개진다) — 여기서 재는 것은 **축이 그 행을 받을 수 있는가** 하나다. */
-test('⑤ 안 고른 행이 오면 분모에 선다 — 계약이 열리는 날 코드 변경 없이 값이 찬다', () => {
+/* 🔴 이 행은 2026-08-10 까지 **원리상 도착을 못 했다** — 계약이 `payload.position` 을 값으로
+ *   요구해 `skipped`·`rejected_all` 이 전건 거부됐다. 계약이 열린 지금 재는 것이 둘로 늘었다:
+ *   ①축이 그 행을 분모에 세우는가 ②**「무관심」과 「뚜렷한 거절」을 가르는가.** 둘은 성향
+ *   축에서 정반대 신호라, 한 칸에 담으면 행이 와도 그 사실은 영영 안 재진다. */
+const 안고른행 = (id, at, 덧) => ({
+  event_id: id, event_type: 'choice.selected', occurred_at: at,
+  payload: { options_shown: 보기둘, position: null, selected_option: null, skipped: true, rejected_all: false, ...덧 },
+});
+
+test('⑤ 안 고른 행이 분모에 서고, 무관심과 거절이 갈린다', () => {
   const r = 학습자상태([
-    { event_id: 'c1', event_type: 'choice.selected', occurred_at: '2026-08-08T01:00:00Z',
-      payload: { options_shown: 보기둘, position: null, selected_option: null, skipped: true, rejected_all: false } },
+    안고른행('c1', '2026-08-08T01:00:00Z'),
+    안고른행('c3', '2026-08-08T03:00:00Z', { skipped: false, rejected_all: true }),
     고름사건('c2', '2026-08-08T02:00:00Z', { 고른것: 'a' }),
   ], { as_of: 기준 });
-  assert.equal(r.축.관심.안고름, 1, '안 고른 행을 세지 않았다 — 그 행이 오는 날 조용히 사라진다');
+  assert.equal(r.축.관심.안고름, 2, '안 고른 행을 세지 않았다 — 그 행이 오는 날 조용히 사라진다');
+  assert.equal(r.축.관심.무관심, 1, '그냥 지나간 것과 거절한 것이 한 수로 뭉갰다');
+  assert.equal(r.축.관심.거절, 1, '「둘 다 아니에요」가 무관심으로 접혔다');
   assert.deepEqual(r.축.관심.고른것, { a: 1 }, '안 고른 것을 무언가 고른 것으로 셌다');
   assert.deepEqual(r.축.관심.자리별, { 1: 1 }, 'position 이 null 인 행을 자리 분포에 넣었다');
+});
+
+test('🔴 ⑤ 거절은 `true` 로만 센다 — `있음(false)` 로 재면 평범한 무관심이 전부 거절이 된다', () => {
+  /* 검증기 택1이 같은 함정(`있음(false)` === 참)에 빠져 있던 자리다. 여기서 같은 실수를 하면
+   * 「뚜렷한 거절」이 실제보다 부풀고, 그 수는 아무 데서도 안 빨개진다. */
+  const r = 학습자상태([안고른행('c1', '2026-08-08T01:00:00Z')], { as_of: 기준 });
+  assert.equal(r.축.관심.거절, 0, 'rejected_all:false 를 거절로 셌다');
+  assert.equal(r.축.관심.무관심, 1);
 });
 
 test('⑤ 질의가 이 축을 따라온다 — `쓰는사건` 에 등재돼 있다', () => {

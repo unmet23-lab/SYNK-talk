@@ -87,8 +87,13 @@ test('ⓑ 완화는 level_snapshot 한 칸뿐 — 나머지 공통 필수는 nul
    *   그래서 이름을 여기 박아 두고 집합 자체를 대조한다. */
   /* 🔑 목록을 늘리려면 **사람이 여기 와서 이름을 적어야 한다** — 그게 이 검사의 설계다.
    *   `payload.recommended_option` = 「아무것도 안 밀었다」(S1-5 고정 보기 2개 · 2026-08-10).
-   *   키는 여전히 필수라 앱 결손과는 갈린다(아래 「키를 빠뜨리면 거부한다」가 그 축을 잰다). */
-  assert.deepEqual([...널허용], ['level_snapshot', 'payload.recommended_option'],
+   *   키는 여전히 필수라 앱 결손과는 갈린다(아래 「키를 빠뜨리면 거부한다」가 그 축을 잰다).
+   *   `payload.position` = 「안 골랐다」(2026-08-10) — 계약이 `skipped`·`rejected_all` 을 택1로
+   *   허용해 놓고 같은 계약이 이 칸을 값으로 요구해 그 두 갈래를 **전건 거부**하고 있었다.
+   *   🔑 완화가 아니라 **이사**다: 「골랐다고 적었으면 자리도 맞아야 한다」는 ⑦ 이 더 세게 진다
+   *   (아래 「골랐으면 자리를 대조한다」 묶음). ⑦ 에 둔 이유는 그 검사가 사건이 아니라 **필드
+   *   이름**으로 걸려서 G2 의 `submission.created` 통로까지 덮기 때문이다. */
+  assert.deepEqual([...널허용], ['level_snapshot', 'payload.recommended_option', 'payload.position'],
     '널허용이 번졌다 — 완화가 계약 밖으로 새고 있다');
   for (const k of 공통필수) {
     if (k === 'level_snapshot') continue;
@@ -184,8 +189,11 @@ const 정상선택 = () => ({
   level_snapshot: 'Lv1',
   correlation_id: 'b6f1c0a2-0000-4000-8000-0000000000c2',
   payload: {
+    /* 🔴 자리는 **`o2` 가 실제로 선 자리**여야 한다(=2). 2026-08-10 까지 이 픽스처는 `position: 1`
+     *   이었다 — 「둘째를 골랐는데 첫째 자리라고 적은」 행이고, 그 거짓말을 아무도 안 봤다.
+     *   ⑦ 의 자리 대조를 세우자 이 픽스처가 그 자리에서 빨개졌다. */
     options_shown: [{ option_id: 'o1', label: '즉시 자세히 설명' }, { option_id: 'o2', label: '힌트만 제공' }],
-    position: 1,
+    position: 2,
     recommended_option: 'o1',
     selected_option: 'o2',
   },
@@ -206,8 +214,81 @@ test('선택 로그는 표시 순서·추천 여부까지 요구한다 — 없�
     const e = JSON.parse(JSON.stringify(고름));
     delete e.payload.selected_option;
     e.payload[대체] = true;
+    /* 🔴 **안 골랐으면 자리는 `null` 이다**(2026-08-10). 2026-08-10 까지 이 두 갈래는 여기서만
+     *   통과했다 — 픽스처가 `position` 에 값을 들고 있었기 때문이고, 실제 조립기(`lib/선택로그`)가
+     *   내는 모양(`position: null`)으로 태우면 **전건 거부**였다. 「시험은 초록인데 통로는 0」이
+     *   정확히 그 자리다. 이제 조립기 모양 그대로 잰다. */
+    e.payload.position = null;
     assert.equal(검증(e, 계약).ok, true, `${대체} 가 막혔다`);
   }
+});
+
+/* ── 「안 골랐다」와 「골랐다」의 자리 (2026-08-10 · S1-5 가 남긴 구멍 둘을 한 벌로 닫는다)
+ *
+ * 계약은 `selected_option`/`skipped`/`rejected_all` 을 **택1** 로 두고도 `payload.position` 을
+ * 값으로 요구해, 뒤의 두 갈래를 원리상 거부했다 — 「무관심」과 「뚜렷한 거절」은 성향 축에서
+ * **정반대 신호**인데 둘 다 통로가 0이었다. 그 필수를 널허용으로 옮기면 가드가 사라지므로,
+ * 가드를 ⑦(필드 이름 축)으로 옮겨 **더 세게** 다시 세운다. */
+
+test('🔑 「안 골랐다」 두 갈래가 조립기 모양 그대로 계약을 지난다 — 그전엔 원리상 0행이었다', () => {
+  for (const 대체 of ['skipped', 'rejected_all']) {
+    const e = 정상선택();
+    e.payload.selected_option = null;
+    e.payload.position = null;
+    e.payload[대체] = true;
+    const r = 검증(e, 계약);
+    assert.equal(r.ok, true, `${대체}: ${r.오류들.join(' / ')}`);
+  }
+});
+
+test('🔴 택1은 «실려 있나»가 아니라 «그렇다고 말했나»로 잰다 — `false` 는 주장이 아니다', () => {
+  /* `있음(false)` 이 참이라 아무것도 주장하지 않는 행이 택1을 그대로 지나갔다. 오늘까지
+   * 새는 양이 0이었던 것은 `position` 필수가 그 조합을 우연히 막아서고, 위 널허용이 그
+   * 우연을 없앤다 — 그래서 한 벌로 고친다. */
+  const e = 정상선택();
+  e.payload.selected_option = null;
+  e.payload.position = null;
+  e.payload.skipped = false;
+  e.payload.rejected_all = false;
+  const r = 검증(e, 계약);
+  assert.equal(r.ok, false, '아무것도 주장하지 않는 행이 택1을 지났다');
+  assert.ok(r.오류들.some((m) => m.includes('택1')), r.오류들.join(' / '));
+});
+
+test('🔴 골랐으면 자리를 대조한다 — 없거나·0이거나·딴 자리면 거부', () => {
+  for (const [무엇, 자리] of [['null', null], ['0', 0], ['-1', -1], ['딴 자리', 1], ['정수 아님', '2']]) {
+    const e = 정상선택();          // selected_option 'o2' = 둘째 자리
+    e.payload.position = 자리;
+    assert.equal(검증(e, 계약).ok, false, `골랐는데 position ${무엇} 이 통과했다`);
+  }
+  /* 키를 통째로 빼는 것도 그대로 막힌다 — 널허용은 **값**만 푸는 것이지 칸을 없애지 않는다. */
+  const 빠짐 = 정상선택();
+  delete 빠짐.payload.position;
+  assert.equal(검증(빠짐, 계약).ok, false, 'position 키가 없는데 통과했다');
+});
+
+test('🔴 반대 방향도 거짓이다 — 안 골랐는데 자리가 적힌 행', () => {
+  /* 소비자는 `selected_option` 이 없으면 자리 분포에 안 세므로 **증상이 0**이고, 그 값은
+   * 조용히 저장돼 나중에 없던 뜻으로 읽힌다. 「안 골랐다」의 정직한 자리는 `null` 하나다. */
+  const e = 정상선택();
+  e.payload.selected_option = null;
+  e.payload.skipped = true;
+  e.payload.position = 2;
+  assert.equal(검증(e, 계약).ok, false, '안 골랐는데 자리가 적힌 행이 통과했다');
+});
+
+test('🔴 이 가드는 `submission.created` 통로에도 걸린다 — G2 가 같은 필드를 거기로 보낸다', () => {
+  /* `이벤트별필수` 에 두면 `choice.selected` 에만 걸려 그 통로가 통째로 샌다(⑦ 머리말과 같은
+   * 근거 · `발주_게임모듈.md` §6-3). 새는 방향은 언제나 「통과」다. */
+  const e = 정상제출();
+  e.payload = {
+    options_shown: [{ option_id: 'o1', label: 'ㄱ' }, { option_id: 'o2', label: 'ㄴ' }],
+    selected_option: 'o2',
+    position: 1,               // 진짜 자리는 2
+  };
+  const r = 검증(e, 계약);
+  assert.equal(r.ok, false, 'G2 통로에서 자리 대조가 통째로 안 돈다');
+  assert.ok(r.오류들.some((m) => m.includes('자리와 다르다')), r.오류들.join(' / '));
 });
 
 /* 절단문서 ①-8 — 소급 불가. 문구를 값으로 저장하면 문구를 개정하는 날 판을 가로지르는
@@ -727,22 +808,17 @@ test('널허용은 빈 문자열을 「모른다」로 받지 않는다 — 두 
   assert.equal(r.ok, false, '빈 문자열이 통과했다 — 「모른다」는 null 하나로만 적는다');
 });
 
-test('🔴 이웃 칸까지 같이 열리지 않았다 — 완화는 목록에 적힌 경로 하나뿐', () => {
-  /* `payload.position` 이 null 인 행(=「안 골랐다」)은 **여전히 거부된다.** 그것을 여는 것은
-   * 새 관측(무관심 vs 뚜렷한 거절)을 여는 계약 판정이라 이 트랙이 혼자 정하지 않는다
-   * (대기열 P1 · 조건부 필수 안). 🚫 「지금은 거부된다」를 못박는 회귀가 아니다 — 여기서 재는
-   * 것은 **완화가 목록 밖으로 번지지 않았다** 하나이고, 그 축은 계약이 열려도 그대로 유효하다.
-   * 그날 이 검사는 `position` 을 목록에 적는 것으로 같이 움직인다(위 집합 대조와 한 벌). */
-  /* ⚠ `selected_option` 은 여기 안 넣는다 — **택1**(`selected_option | skipped | rejected_all`)의
-   *   한 갈래라 단독 필수가 아니다. 그 축을 이 검사에 섞으면 완화가 번진 것과 택1이 접힌 것이
-   *   한 실패로 보인다.
-   * ➕ 그 자리에서 관찰한 별건(이 트랙이 고치지 않는다): 택1은 `있음()` 으로 재므로 **`false` 도
-   *   「있다」로 센다** — `skipped:false, rejected_all:false, selected_option:null` 인 행이
-   *   택1을 지나간다. 오늘은 `position` 필수가 그 조합을 막고 있어 새는 양이 0이지만, 위
-   *   조건부 필수 판정이 열리는 날 그 방어는 함께 사라진다. 택1의 «뜻»을 바꾸는 판정이라
-   *   여기서 정하지 않고 대기열에 남긴다. 🚫 지금 동작을 회귀로 못박지 않는다(고치는 날 빨개진다). */
-  for (const 칸 of ['position', 'options_shown']) {
-    const e = 고름사건({ [칸]: null });
-    assert.equal(검증(e, 계약).ok, false, `${칸} 이 null 인데 통과했다 — 완화가 이웃 칸으로 번졌다`);
-  }
+test('🔴 이웃 칸까지 같이 열리지 않았다 — 완화는 목록에 적힌 경로뿐', () => {
+  /* `options_shown` 은 널허용이 아니다 — 「무엇을 보여줬나」가 없으면 나머지 여덟 칸이 전부
+   * 무엇에 대한 값인지 모르는 수가 된다. 여기서 재는 것은 **완화가 목록 밖으로 번지지 않았다**
+   * 하나다(위 집합 대조와 한 벌). */
+  assert.equal(검증(고름사건({ options_shown: null }), 계약).ok, false,
+    'options_shown 이 null 인데 통과했다 — 완화가 이웃 칸으로 번졌다');
+
+  /* 🔑 `position` 은 2026-08-10 에 목록에 들어갔다 — 그런데 **골랐다고 적은 이 픽스처에서는
+   *   여전히 거부된다.** 가드가 사라진 게 아니라 ⑦(필드 이름 축)으로 옮겨 갔다는 뜻이고,
+   *   그 자리는 「안 골랐다」 행만 통과시킨다(위 「안 골랐다 두 갈래」 묶음이 그 축을 잰다). */
+  const r = 검증(고름사건({ position: null }), 계약);
+  assert.equal(r.ok, false, '골랐다고 적은 행이 자리 없이 통과했다 — 손버릇과 선호가 영영 한 모양이 된다');
+  assert.ok(r.오류들.some((m) => m.includes('position')), r.오류들.join(' / '));
 });
