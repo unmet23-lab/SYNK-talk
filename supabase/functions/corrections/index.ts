@@ -26,9 +26,23 @@
  * ■ 읽기는 사건을 만들지 않는다 (C0 §4-3 ②)
  *   열람 표시(`correction.viewed`)는 앱이 `POST /v1/events` 로 **따로** 보낸다. 조회가 쓰기를
  *   겸하면 재시도 한 번이 곧 데이터 오염이다.
+ *
+ * ■ 🔴 `blocked` — 동의가 철회된 학생에게 **왜** 막혔는지를 같이 준다 (2026-08-10)
+ *   이 함수는 통로 규약(`tests/동의게이트.test.js`) 밖에 있던 **유일한 조회 함수**였다. 게이트가
+ *   없으면 철회한 학생에게도 카드가 그대로 떠서 앱이 `correction.viewed` 를 만들고, 그 사건은
+ *   `functions/events` 에서 `CONSENT_MISSING`(`retryable:false`)으로 접힌다 → 앱이 `send_final`
+ *   로 적어 **큐에서 영영 뺀다**(동의가 다시 서는 날 나갈 수 있었던 답이 죽는다 · append-only ·
+ *   소급 0). C0 §7 왕복 5 가 제출 큐에서 잡은 그 병이 **교정 큐에 그대로 남아 있었다.**
+ *   🔑 `tasks` 와 **같은 모양**이다 — 목록은 그대로 주고 막힘은 따로 싣는다. `data` 가 있어도
+ *     싣는 것이 규칙이다(「비었을 때만」 읽으면 `blocked: null` 이 측정이 아니라 추측이 된다).
+ *   🔑 **응답 필드를 늘리는 것은 판올림이 아니다**(계약 §4-3 ② — 앱은 모르는 칸을 지나친다).
+ *     계약 개정 0 · 마이그레이션 0.
+ *   🚫 막혔다고 목록을 비우지 않는다 — 그러면 「교정이 아직 없다」와 「막혔다」가 같은 모양이 되고,
+ *     C0 §4-3 ② 의 「빈 카드 금지」 때문에 화면 자체가 안 떠 학생은 이유를 영영 못 듣는다.
  */
 import postgres from 'npm:postgres@3.4.4';
 import 토큰모듈 from './토큰.mjs';
+import 동의모듈 from './동의게이트.mjs';
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
 
@@ -39,6 +53,13 @@ const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
 const { 발급시각, 살아있는학생 } = 토큰모듈 as {
   발급시각: (req: Request) => number | null;
   살아있는학생: (질의: typeof sql, 주체: string, iat: number | null) => ReturnType<typeof sql>;
+};
+
+/* 동의 게이트 — 술어를 이 파일에 다시 적지 않는다(`lib/동의게이트.js` 머리말의 「네 곳에 네 가지」).
+ * 뜻은 **`지금유효`** 다: 이 조회가 여는 것은 지금 벌어질 수집(열람·응답 사건)이라 시점은 「지금」이다. */
+const { 지금유효, 거절몸통 } = 동의모듈 as {
+  지금유효: (sql: unknown, learner_id: string) => Promise<Array<{ consent_ver: string }>>;
+  거절몸통: { code: string; field: string; retryable: boolean };
 };
 
 const 계약판 = /^c(\d+)$/;
@@ -120,6 +141,12 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    /* 🔴 **막힌 학생에게도 목록은 준다 — 막힘을 따로 싣는다**(`tasks` 와 같은 규칙).
+     *   앱이 이 값을 보고 사건 큐를 멈춘다(`lib/교정로그.보낼것`). 여기서 목록을 비우면
+     *   화면이 아예 안 떠(빈 카드 금지) 학생은 자기가 무엇을 하면 되는지 못 듣는다. */
+    const 동의 = await 지금유효(sql, 행.learner_id as string);
+    const blocked = 동의.length ? null : { code: 거절몸통.code };
+
     /* 🔑 **자기 것만** — 학생은 토큰에서 왔고 쿼리로 지정할 수 없다(C0 §4-3 공통).
      *   `service_role` 은 RLS 를 우회하므로 이 사슬이 유일한 방어선이다. 걷는 길은 RLS 정책
      *   `learner_self_corrections` 와 **같다**: corrections → submissions → learning_events.
@@ -166,7 +193,7 @@ Deno.serve(async (req: Request) => {
       ? `${new Date(끝.confirmed_at).toISOString()}|${끝.correction_id}`
       : null;
 
-    return 봉투(200, { ok: true, data, next_cursor }, ver);
+    return 봉투(200, { ok: true, data, next_cursor, blocked }, ver);
   } catch (e) {
     console.error('[corrections] 조회 실패', String((e as Error)?.message ?? e));
     return 실패(500, { code: 'SERVER_ERROR', message: '잠시 뒤 다시 시도해 주세요', retryable: true }, ver);

@@ -39,8 +39,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { 색, 폰트, 모노트래킹, 몽골어 } from './테마';
 import { 교정앉음, 열람사건, 응답사건, 교정사건보내기, 학생응답값 } from './교정API.js';
-import { 항목추가, 응답값, 전송기록, 밀린것 } from '../lib/교정로그.js';
+import { 항목추가, 응답값, 전송기록, 보낼것 } from '../lib/교정로그.js';
 import { 교정로그읽기, 교정로그쓰기 } from './저장.js';
+import 막힘카드 from './막힘카드.js';
 
 /** 누가 고쳤나 — `actor_kind` 그대로 말한다(계약이 이 칸을 준 이유다 · L0 §3-4). */
 const 고친이 = { teacher: '선생님이 고쳐 줬어요', ai: 'AI 가 고쳐 줬어요' };
@@ -53,9 +54,11 @@ const 답문구 = { 채택: '알겠어요', 수정: '다시 말해 볼래요' };
  * @param {string} props.토큰
  * @param {object|null} props.교정 `GET /v1/corrections` 의 `data[0]`. 없으면 **화면 자체가 안 뜬다**
  *   (App.js 가 링크를 안 그린다 · C0 §4-3 ② 「빈 카드 금지」).
+ * @param {{code: string}|null} props.막힘 같은 응답의 `blocked`. 있으면 **사건을 한 건도 안 보낸다**
+ *   (아래 `흘려보내기` — C0 §7 왕복 5 와 같은 처방). 카드는 그대로 보여준다.
  * @param {() => void} props.돌아가기
  */
-export default function 답장화면({ 토큰, 교정, 돌아가기 }) {
+export default function 답장화면({ 토큰, 교정, 막힘, 돌아가기 }) {
   const [로그, set로그] = useState([]);
   const [오류, set오류] = useState(null);
   const [도는중, set도는중] = useState(true);
@@ -70,10 +73,17 @@ export default function 답장화면({ 토큰, 교정, 돌아가기 }) {
    * 아직 안 닿은 항목을 **만들어진 순서대로** 보내고, 결과를 그 항목에 적는다.
    * 🔑 열람과 응답이 같은 통로를 지난다 — 판정(계약 위반·`duplicate`)이 두 곳에 적히면
    *   갈라지고, 갈라진 쪽은 조용히 영원히 재시도한다(`src/사건통로.js`).
+   *
+   * 🔴 **막힌 학생의 것은 한 건도 안 나간다**(`보낼것` · C0 §7 왕복 5 와 **같은 처방**).
+   *   보내면 서버가 `CONSENT_MISSING`(`retryable:false`)으로 접고 앱은 그것을 `send_final` 로
+   *   적어 큐에서 영영 뺀다 — 동의가 다시 서는 날 나갈 수 있었던 답이 죽는다(append-only ·
+   *   소급 0). **멈추는 것이지 기기에서 지우는 것이 아니다** — 항목은 그대로 남아 다음에 나간다.
+   * 🔑 전송 자리가 **여기 하나**라서 호출부(마운트·답하기)마다 막힘을 물을 필요가 없다.
+   *   말하기 화면이 두 자리(마운트·`AppState` 복귀)를 각각 고쳐야 했던 것과 다른 점이다.
    */
   const 흘려보내기 = async (시작로그) => {
     let 다음 = 시작로그;
-    for (const 항목 of 밀린것(시작로그)) {
+    for (const 항목 of 보낼것(시작로그, 막힘)) {
       const 결과 = await 교정사건보내기(토큰, 항목.사건);
       다음 = 전송기록(다음, 항목.id, 결과);
     }
@@ -162,7 +172,14 @@ export default function 답장화면({ 토큰, 교정, 돌아가기 }) {
         </View>
       ) : null}
 
-      {답한값 ? (
+      {/* 🔴 막힘이 **버튼보다 앞선다** — 누를 수 있게 두면 답이 로그에만 남고 화면은
+          「답했어요」라고 말한다. 그건 서버 도착을 함의하는 문구라 그 순간 거짓이 되고,
+          위 `흘려보내기` 가 큐를 멈춘 뒤로는 `send_final` 도 안 붙어 **경고조차 안 뜬다**
+          (F176 이 끝낸 「이유 없이 아무 일도 안 일어남」의 재발이다). 교정 카드 자체는
+          위에 그대로 남는다 — 읽는 것을 막을 이유는 없다. */}
+      {막힘 ? (
+        <막힘카드 막힘={막힘} />
+      ) : 답한값 ? (
         <Text style={s.답한줄}>{답문구[답한값] || 답한값} — 답했어요</Text>
       ) : (
         <View style={s.버튼줄}>

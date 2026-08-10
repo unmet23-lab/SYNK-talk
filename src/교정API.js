@@ -51,9 +51,12 @@ export const 학생응답값 = Object.freeze(['채택', '무시', '수정']);
  * 나에게 온 교정 목록 (C0 §4-3 ②).
  *
  * 🔴 빈 배열은 오류가 아니다 — 교정이 아직 없는 날이 정상이다(`src/과제API.js` 와 같은 규칙).
+ * 🔑 **`막힘` 을 함께 낸다**(2026-08-10 · `src/과제API.오늘과제받기` 와 같은 모양). 목록이
+ *   비어 있지 않아도 싣는다 — 교정을 받은 뒤 철회한 학생은 **카드를 보면서 사건만 막힌다.**
+ *   「비었을 때만」 읽으면 `막힘: null` 이 측정이 아니라 추측이 된다.
  * @param {string} 토큰
  * @param {string} [커서] 앞선 응답의 `next_cursor` 를 **그대로** 싣는다(서버가 모양을 본다).
- * @returns {Promise<{목록: object[], 다음커서: string|null, contract_ver: string|null}>}
+ * @returns {Promise<{목록: object[], 막힘: {code: string}|null, 다음커서: string|null, contract_ver: string|null}>}
  */
 export async function 교정목록받기(토큰, 커서) {
   const 질의 = 커서 ? `?since=${encodeURIComponent(커서)}` : '';
@@ -63,6 +66,7 @@ export async function 교정목록받기(토큰, 커서) {
   const 몸 = await 부르기(`corrections${질의}`, 토큰);
   return {
     목록: Array.isArray(몸.data) ? 몸.data : [],
+    막힘: 몸.blocked || null,
     다음커서: 몸.next_cursor || null,
     contract_ver: 몸.contract_ver || null,
   };
