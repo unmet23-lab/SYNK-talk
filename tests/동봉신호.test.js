@@ -170,6 +170,74 @@ test('🔑 커밋 경로에 네트워크가 없다 — `배포대조` 를 끌고
     '`배포대조.js` 가 끌려왔다 — 커밋마다 네트워크를 태우면 오프라인 세션에서 멈춰 선다');
 });
 
+/* ── 동봉 표의 «닫힘» — 동봉 파일이 require 하는 것도 표에 있어야 한다
+ *
+ * 발단(2026-08-10 실측): `lib/오늘과제.js` 에 `require('./선택로그.js')` 를 한 줄 추가했더니
+ *   `배포대조` 가 `deliver`·`progress`·`tasks` **셋을** 「⚠ 미측정 — 나갈 것을 못 모았다」로
+ *   냈다. 표에 `선택로그.mjs` 가 없어 재료를 못 모은 것이다.
+ * 🔴 **급소는 그 증상이 「다르다」가 아니라 「미측정」이라는 것**이다 — 다름 개수만 세면 0으로
+ *   보이고, 초록을 분모 없이 읽는 사람에게는 통과와 구별되지 않는다(CLAUDE.md F207).
+ *   그리고 이 자리는 배포를 **시도할 때**에만 드러난다: 커밋한 세션은 모르고, 미는 세션이 만난다.
+ * 🔑 그래서 여기서 잰다 — require 를 한 줄 늘린 사람이 **그 자리에서** 표를 닫게. */
+
+/** 표 하나를 검사한다. `읽기(경로)` 를 주입받아 픽스처와 실저장소에 같은 로직을 쓴다. */
+function 표의구멍(표, 읽기) {
+  const 구멍 = [];
+  let 잰것 = 0;
+  for (const [, 원본] of Object.entries(표)) {
+    if (!String(원본).endsWith('.js')) continue;   // 계약 JSON·프롬프트는 require 를 안 한다
+    const src = 읽기(원본);
+    if (src == null) continue;
+    for (const m of src.matchAll(/require\(\s*['"]\.\/([^'"]+)\.js['"]\s*\)/g)) {
+      잰것 += 1;
+      if (!Object.prototype.hasOwnProperty.call(표, `${m[1]}.mjs`)) {
+        구멍.push(`${원본} → ./${m[1]}.js`);
+      }
+    }
+  }
+  return { 구멍, 잰것 };
+}
+
+test('🔴 탐지력 — 표에 없는 `require` 를 한 줄 넣으면 잡는다 (픽스처)', () => {
+  const 표 = { '갑.mjs': 'lib/갑.js', '을.mjs': 'lib/을.js' };
+  const 파일 = {
+    'lib/갑.js': "const { 것 } = require('./을.js');\n",          // 표에 있다 — 통과
+    'lib/을.js': "const { 딴것 } = require('./병.js');\n",         // 표에 없다 — 구멍
+  };
+  const r = 표의구멍(표, (p) => 파일[p] ?? null);
+  assert.equal(r.잰것, 2, '분모가 안 맞다 — 정규식이 require 를 못 읽었다');
+  assert.deepEqual(r.구멍, ['lib/을.js → ./병.js']);
+
+  /* 자기 처방 — 사유가 시키는 대로 표에 넣으면 통과한다(따를 수 없는 처방은 우회를 만든다 · F103). */
+  const 고침 = 표의구멍({ ...표, '병.mjs': 'lib/병.js' }, (p) => 파일[p] ?? null);
+  assert.deepEqual(고침.구멍, []);
+});
+
+test('🔑 실저장소 — 모든 동봉 표가 닫혀 있다 (분모를 드러낸다)', () => {
+  const FN = path.join(ROOT, 'supabase', 'functions');
+  const 함수들 = fs.readdirSync(FN, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && fs.existsSync(path.join(FN, d.name, '동봉.json')))
+    .map((d) => d.name);
+  assert.ok(함수들.length >= 5, `동봉 표를 든 함수가 ${함수들.length}개뿐이다 — 표를 못 찾았다`);
+
+  const 읽기 = (p) => {
+    const 절대 = path.join(ROOT, p);
+    return fs.existsSync(절대) ? fs.readFileSync(절대, 'utf8') : null;
+  };
+  const 구멍들 = [];
+  let 잰것 = 0;
+  for (const 이름 of 함수들) {
+    const 표 = JSON.parse(fs.readFileSync(path.join(FN, 이름, '동봉.json'), 'utf8'));
+    const r = 표의구멍(표, 읽기);
+    잰것 += r.잰것;
+    for (const c of r.구멍) 구멍들.push(`${이름}: ${c}`);
+  }
+  /* 🔑 분모 0 은 통과가 아니다 — lib 간 `require` 가 하나도 안 잡혔다면 이 검사는 안 돈 것이다. */
+  assert.ok(잰것 >= 1, `함수 ${함수들.length}개를 훑었는데 동봉 파일의 require 가 0건이다 — 검사가 안 돌았다`);
+  assert.deepEqual(구멍들, [],
+    `동봉 표가 안 닫혔다 — 배포가 「미측정」이 되고, 그건 커밋한 세션이 아니라 미는 세션이 만난다`);
+});
+
 test('실패해도 조용히 끝난다 — 없는 커밋을 줘도 종료코드 0 (알림이지 가드가 아니다)', () => {
   // `띄우기` 는 **못 띄운 것**과 **0 아닌 종료**를 둘 다 던진다 — 미실행이 「조용히 통과」로
   // 번역되는 자리를 막는 공용 통로다(`tests/스폰통로.test.js` 가 옛 통로를 금지한다).
