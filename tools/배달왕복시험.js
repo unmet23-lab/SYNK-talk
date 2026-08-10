@@ -495,6 +495,30 @@ async function main() {
   확인('없는 뒷마디는 404 다 — 오타 경로가 「이미 돌던 것」이 되지 않는다',
     (await 조회('/아무거나', { 함수: 'corrections' })).status === 404);
 
+  /* 🔴 **동의 게이트가 이 통로에도 서 있는가** (2026-08-10 · 전층감사 §2-5 ⓐ).
+   *   이 함수는 동의 규약 **밖에 있던 유일한 조회 함수**였다 — 철회한 학생에게도 카드가 그대로
+   *   떠서 앱이 `correction.viewed` 를 만들고, 그 거절(`CONSENT_MISSING`·`retryable:false`)을
+   *   앱이 `send_final` 로 적으면 **동의가 다시 서는 날 나갈 수 있었던 답이 죽는다**(소급 0).
+   *   ⚠ 회귀(`tests/동의게이트.test.js`)는 **소스에 게이트가 적혀 있는지**까지만 본다 —
+   *     배포본이 옛 판이면 그 초록은 라이브에 대해 아무 말도 안 한다. 그 칸이 여기다.
+   *   A 는 위에서 이미 `blocked: null` 축을 못 박았으니(`data` 가 있는 채로) 여기선 B 만 잰다. */
+  확인('🔴 동의가 있는 A 는 blocked 가 null 이다 — 목록이 있어도 값으로 말한다',
+    c1.몸.blocked === null, c1.몸.blocked);
+  await sql(`update engine.learners set auth_user_id = null where auth_user_id = '${uid}'`);
+  await sql(`update engine.learners set auth_user_id = '${uid}' where learner_id = '${id.B}'::uuid`);
+  const 막힌교정 = await 조회('', { 함수: 'corrections' });
+  확인('🔴 동의 없는 B 는 200 + 이유(blocked)를 받는다 — 앱은 이 값으로 사건 큐를 멈춘다',
+    막힌교정.status === 200 && 막힌교정.몸.blocked
+      && 막힌교정.몸.blocked.code === 'CONSENT_MISSING', 막힌교정.몸);
+  /* ⚠ 남은 축 하나 — **막혔는데도 목록이 오는가** — 는 **A 를 철회해야** 잴 수 있는데(B 는
+   *   교정이 0건이라 「비었다」와 구별이 안 된다), **철회는 되돌릴 수 없다**: DB 트리거
+   *   `protect_consents` 가 「철회는 되돌리지 않는다 — 재동의는 새 행이다」(L0 §9-3)로 막는다.
+   *   A 는 아래 ⑩ 이 `지금유효id식(A)` 로 `consent_id` 를 채우며 계속 쓰므로 여기서 막으면
+   *   그쪽이 무너진다. → 그 칸은 **A 를 다 쓴 뒤인 ⑫** 로 옮겼다(이 파일 맨 끝).
+   *   A 로 되돌린다 — 아래 ⑩ 이 같은 토큰으로 A 를 읽는다. */
+  await sql(`update engine.learners set auth_user_id = null where auth_user_id = '${uid}'`);
+  await sql(`update engine.learners set auth_user_id = '${uid}' where learner_id = '${id.A}'::uuid`);
+
   /* ── ⑩ 어제의 나 (C0 §4-3 ③) ────────────────────────────────────
    * S1 조회 3종의 **마지막 칸**. 여기서 재는 것은 「숫자가 나온다」가 아니라 **어느 행을 세는가**다 —
    * `submissions` 에는 배정 행이 살아서(P0 §6-1), 그걸 세면 배정 1건이 제출 1건이 되고
@@ -633,6 +657,41 @@ async function main() {
   확인('🔴 해임되면 그 순간 못 본다 — 폐기 판정은 이 통로가 따로 안 적고 정본을 지난다',
     (await 조회(점검질의, { 함수: 'deliver', 방법: 'POST', 판: null, 토큰: 원장토큰 })).status === 401);
   await sql(`update engine.staff set active = true where auth_user_id = '${duid}'::uuid`);
+
+  /* ── ⑫ 철회한 학생의 교정 (C0 §4-3 ② `blocked` · 전층감사 §2-5 ⓐ) ──────────────
+   * 🔴 **맨 끝인 것이 설계다.** 이 칸은 A 의 동의를 **실제로 철회**해야 서는데, 철회는
+   *   되돌릴 수 없다(DB 트리거 `protect_consents` — 「재동의는 새 행이다」 L0 §9-3). 앞에 두면
+   *   ⑩·⑪ 이 A 의 유효 동의를 전제로 하다가 무너진다. 픽스처 학생은 실행마다 새로 서므로
+   *   (`표 = t{시각}`) 여기서 막고 그대로 두는 것이 정확하다 — 되돌리는 시늉이 오히려 거짓이다.
+   *
+   * 왜 재나: `corrections` 는 동의 규약 **밖에 있던 유일한 조회 함수**였다. 게이트가 없으면
+   *   철회한 학생에게도 카드가 떠서 앱이 `correction.viewed` 를 만들고, 그 거절
+   *   (`CONSENT_MISSING`·`retryable:false`)을 앱이 `send_final` 로 적으면 **동의가 다시 서는 날
+   *   나갈 수 있었던 답이 죽는다**(append-only · 소급 0).
+   * ⚠ 회귀(`tests/동의게이트.test.js`)는 **소스에 게이트가 적혀 있는지**까지만 본다 — 배포본이
+   *   옛 판이면 그 초록은 라이브에 대해 아무 말도 안 한다. 그 사이가 이 칸이다. */
+  console.log('\n■ ⑫ 철회한 학생의 교정 — GET /v1/corrections 의 blocked');
+
+  await sql(`update engine.learners set auth_user_id = null where auth_user_id = '${uid}'`);
+  await sql(`update engine.learners set auth_user_id = '${uid}' where learner_id = '${id.A}'::uuid`);
+  const 철회수 = (await sql(
+    `update engine.consents set revoked_at = now() - interval '1 minute'
+      where learner_id = '${id.A}'::uuid and revoked_at is null returning consent_id`)).length;
+  확인('준비 — A 의 동의를 실제로 철회했다(이게 0이면 아래 칸은 공허하다)', 철회수 > 0, 철회수);
+
+  const 막힌A = await 조회('', { 함수: 'corrections' });
+  확인('🔴 철회한 학생도 200 + 이유(blocked)를 받는다 — 앱은 이 값으로 사건 큐를 멈춘다',
+    막힌A.status === 200 && 막힌A.몸.blocked
+      && 막힌A.몸.blocked.code === 'CONSENT_MISSING', 막힌A.몸);
+  /* 🔴 **막혔다고 목록을 비우지 않는다.** 비우면 「교정이 아직 없다」와 「막혔다」가 같은 모양이
+   *   되고, 계약 §4-3 ② 의 빈 카드 금지 때문에 **화면 자체가 안 떠** 학생은 이유를 못 듣는다. */
+  확인('🔴 막혀도 교정 목록은 그대로 온다 — 비우면 「없다」와 「막혔다」가 한 모양이 된다',
+    (막힌A.몸.data || []).length === 20, (막힌A.몸.data || []).length);
+  /* 🔑 **`tasks` 와 같은 답을 내는가** — 두 조회가 같은 상태에 다른 말을 하면 앱은 한 화면에서
+   *   막히고 다른 화면에서 안 막힌다(이 게이트가 2026-08-07 에 고치려던 「네 곳에 네 가지」 그 병). */
+  const 막힌과제 = await 조회();
+  확인('🔴 같은 학생에게 tasks 도 같은 코드를 낸다 — 두 통로가 갈리면 화면마다 다르게 막힌다',
+    막힌과제.몸.blocked && 막힌과제.몸.blocked.code === (막힌A.몸.blocked || {}).code, 막힌과제.몸.blocked);
 
   보고();
 }
