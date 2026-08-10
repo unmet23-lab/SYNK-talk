@@ -98,6 +98,13 @@ export default function 도착확인({ 돌아가기, 가기 }) {
             style={({ pressed }) => [s.줄버튼, pressed && { opacity: 0.65 }]}>
             <Text style={s.줄버튼글}>발화 검수 (원장·검수자)</Text>
           </Pressable>
+          {/* 🔑 검수와 **다른 축**이다 — 검수자는 「무엇을 말했나」(전사), 강사는 「AI 교정이
+              교육적으로 맞나」(라벨)를 판정한다(M2 설계 §2). 그래서 문도 다르다(`teach` ·
+              `teacher`·`director`). 여기서도 숨기지 않는다 — 권한은 서버가 정한다. */}
+          <Pressable onPress={() => 가기('강사')} hitSlop={6}
+            style={({ pressed }) => [s.줄버튼, pressed && { opacity: 0.65 }]}>
+            <Text style={s.줄버튼글}>이번 주 골든 판정 (원장·강사)</Text>
+          </Pressable>
           {/* 🔴 이 통로가 없으면 한 기기는 **영원히 한 계정**이다 — 공용·형제 기기에서 다음
               학생의 발화가 앞 학생 행으로 저장되고, append-only 라 되돌릴 방법이 없다. */}
           <Pressable onPress={물어보기} hitSlop={6}

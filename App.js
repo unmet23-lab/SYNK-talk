@@ -9,6 +9,7 @@ import 도착확인 from './src/도착확인';
 import 인증화면, { 단계 } from './src/인증화면';
 import 원장초기화 from './src/원장초기화';
 import 검수화면 from './src/검수화면';
+import 강사화면 from './src/강사화면';
 import * as 인증 from './src/인증API';
 import { 교정목록받기 } from './src/교정API';
 import { 배치미달받기 } from './src/과제API';
@@ -192,6 +193,12 @@ export default function App() {
           아니라 자리 때문이다 — 말하기 화면의 동사는 하나다. */}
       {화면 === '검수' && (
         <검수화면 토큰={세션.access_token} 돌아가기={() => set화면('시스템')} />
+      )}
+      {/* 🔑 검수와 **다른 문**이다(`teach` · 허용 역할 `teacher`·`director`) — 강사가 검수
+          권한까지 얻으면 라벨 권위가 무너진다(M2 설계 §2 · `review` 는 teacher→403 을 실왕복
+          핀으로 박았다). 같은 규칙으로 여기서도 권한은 서버가 정한다. */}
+      {화면 === '강사' && (
+        <강사화면 토큰={세션.access_token} 돌아가기={() => set화면('시스템')} />
       )}
       {화면 === '어제' && <어제의나 값={견줌값} 돌아가기={() => set화면('말하기')} />}
       {화면 === '말하기' && (
