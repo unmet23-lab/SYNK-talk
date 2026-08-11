@@ -32,7 +32,15 @@ const SQL = fs.readFileSync(path.join(ROOT, 'supabase', 'L0_스키마.sql'), 'ut
 const 발주 = fs.readFileSync(path.join(ROOT, 'docs', '발주_수집파이프라인.md'), 'utf8');
 const 내부계약 = fs.readFileSync(path.join(ROOT, 'docs', '검수_내부계약.md'), 'utf8');
 
-const 제약이름 = 'pipeline_jobs_discard_reason_c10';
+/* 접미는 손으로 안 적는다(반박 c757278 경미 ⑫) — c11 이 CHECK 를 이름째 갈았는데 여기 c10 이
+ * 박혀 있으면 이 검사는 **옛 판 정의**를 정본이라 우기게 된다(합본엔 옛 조각의 add constraint
+ * 가 그대로 남아 앵커는 계속 잡힌다 — 증상 없이 낡는 자리). 합본에서 가장 높은 판을 고른다. */
+const 제약이름 = (() => {
+  const 판들 = [...SQL.matchAll(/add constraint (pipeline_jobs_discard_reason_c(\d+))/g)]
+    .map((m) => ({ 이름: m[1], 판: Number(m[2]) }));
+  if (!판들.length) throw new Error('합본에서 pipeline_jobs_discard_reason_c* 를 못 찾았다 — 앵커가 낡았다');
+  return 판들.sort((a, b) => b.판 - a.판)[0].이름;
+})();
 
 /* 정본 — CHECK 정의 안의 따옴표 값. `L0스키마.test.js` 의 `CHECK값목록_` 과 같은 수법이다
  * (판정을 두 곳에 적지 않으려면 합치는 게 맞지만, 그쪽은 `constraint <이름> check` 로

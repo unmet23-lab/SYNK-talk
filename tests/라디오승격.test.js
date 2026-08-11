@@ -8,8 +8,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const {
-  승격표, 명령과업, 결정적uuid, 승격계획,
+  승격표, 명령과업, 결정적uuid, 승격계획, 선호정서키,
 } = require('../lib/라디오승격.js');
+const { 라디오태스크종 } = require('../lib/라디오태스크.js');
 const { 명령표 } = require('../lib/라디오채팅파서.js');
 const { 검증 } = require('../lib/이벤트검증.js');
 const { 스킬표, 스킬판 } = require('../contents/토픽퀴즈문항.js');
@@ -183,17 +184,20 @@ test('비링크·해제 뒤·무동의·철회는 승격하지 않고 사유로 
 });
 
 test('선호 ⓐⓑ — 빗소리 인자는 이유, asmr 인자는 선택이고 안 물었으면 키가 없다', () => {
+  /* 같은 날 같은 차원은 하루 접기(반박 ⑥)에 걸리므로, 인자 유무 두 변형은 **다음 날**에 둔다 —
+   * 이 테스트의 과녁은 규격 4갈래 전부가 실계약을 지나는 것이다(접기 자체는 별도 테스트). */
   const r = 승격계획({
     ...기본재료(),
     메시지들: [
       채팅('m1', '빗소리', '집중이 잘돼서', '2026-08-12T12:01:00Z'),
-      채팅('m2', '빗소리', null, '2026-08-12T12:02:00Z'),
+      채팅('m2', '빗소리', null, '2026-08-13T12:02:00Z'),
       채팅('m3', 'asmr', '장작 소리', '2026-08-12T12:03:00Z'),
-      채팅('m4', 'asmr', null, '2026-08-12T12:04:00Z'),
+      채팅('m4', 'asmr', null, '2026-08-13T12:04:00Z'),
     ],
   });
   assert.equal(r.계획.length, 4, JSON.stringify(r.제외));
-  const [a, b, c, d] = r.계획.map((p) => p.payload);
+  const 정렬됨 = [...r.계획].sort((a, b) => a.idempotency_key < b.idempotency_key ? -1 : 1);
+  const [a, b, c, d] = 정렬됨.map((p) => p.payload);
   assert.equal(a.preference_dimension, 'study_environment');
   assert.equal(a.stated_option, '빗소리');
   assert.equal(a.selection_reason, '집중이 잘돼서');
@@ -207,7 +211,36 @@ test('선호 ⓐⓑ — 빗소리 인자는 이유, asmr 인자는 선택이고 
     const v = 검증(행, 계약, { 주체: 'server' });
     assert.ok(v.ok, `선호 행이 실계약에서 거절됐다: ${JSON.stringify(v.오류들)}`);
     assert.equal(행.payload.stated_via, 'radio_chat');
+    assert.equal(typeof 행.하루키, 'string', 'Fn 이 다음 배치의 접기 재료로 쓰는 하루키가 없다');
   }
+});
+
+test('선호·정서 하루 접기 — 같은 학생×몽골날짜×갈래는 첫 선언만 승격한다 (반박 ⑥)', () => {
+  const 슬럼프들 = Array.from({ length: 20 }, (_, i) =>
+    채팅(`s${i}`, '슬럼프', null, `2026-08-12T12:${String(10 + i).padStart(2, '0')}:00Z`));
+  const r = 승격계획({ ...기본재료(), 메시지들: 슬럼프들 });
+  assert.equal(r.계획.length, 1, '스무 번 친 !슬럼프 가 스무 행이 됐다 — 채팅 반복이 표본이 된다');
+  assert.equal(r.계획[0].idempotency_key, 's0', '첫 선언이 아니라 딴 것이 이겼다 — 재실행마다 갈린다');
+  assert.equal(r.제외.filter((x) => x.사유 === '하루접힘').length, 19);
+
+  /* 앞선 실행이 그날 갈래를 이미 승격했다(DB 재료) — 이번 묶음은 전부 접힌다. */
+  const r2 = 승격계획({
+    ...기본재료(),
+    이미하루키: new Set([선호정서키(L1, 'slump', '2026-08-12T09:00:00Z')]),
+    메시지들: [채팅('s9', '슬럼프', null, '2026-08-12T12:30:00Z')],
+  });
+  assert.deepEqual(r2.계획, []);
+  assert.deepEqual(r2.제외.map((x) => x.사유), ['하루접힘']);
+
+  /* 갈래가 다르면(빗소리 vs 슬럼프) 같은 날이어도 각자 선다 — 접기 키는 뜻 축이다. */
+  const r3 = 승격계획({
+    ...기본재료(),
+    메시지들: [
+      채팅('p1', '슬럼프', null, '2026-08-12T12:01:00Z'),
+      채팅('p2', '빗소리', null, '2026-08-12T12:02:00Z'),
+    ],
+  });
+  assert.equal(r3.계획.length, 2, JSON.stringify(r3.제외));
 });
 
 test('슬럼프 — affect_kind 만 싣고 자유 서술은 payload 에 안 올린다', () => {
@@ -258,23 +291,97 @@ test('멱등 — 이미 승격된 message_id 는 제외로 센다', () => {
   assert.deepEqual(사유들(r), ['이미승격']);
 });
 
-test('correlation_id — 같은 학생 같은 몽골 날짜는 같고, 학생·날짜가 갈리면 다르다(결정적)', () => {
+test('correlation_id — 몽골 날짜 경계(UTC 16:00)로 가른다: UTC 날짜와 판정이 갈리는 쌍이 갈라져야 한다', () => {
+  /* 반박 경미 ⑪ — 옛 픽스처는 셋 다 UTC 날짜로 잘라도 같은 판정이라 시간대 축을 못 쟀다.
+   * 경계쌍 둘을 박는다: ㉠같은 UTC 날짜인데 UB(+08) 날짜가 다른 쌍(15:59Z→16:01Z) —
+   * UTC 로 자르면 같다고 나와 죽는다 ㉡UTC 날짜가 다른데 UB 날짜가 같은 쌍(전날 16:01Z) —
+   * UTC 로 자르면 다르다고 나와 죽는다. 갈래를 갈라 하루 접기와 안 겹치게 한다. */
   const r = 승격계획({
     ...기본재료(),
     메시지들: [
-      채팅('m1', '슬럼프', null, '2026-08-12T12:01:00Z'),
-      채팅('m2', '빗소리', null, '2026-08-12T13:30:00Z'),
-      채팅('m3', '슬럼프', null, '2026-08-13T22:01:00Z'), // UB(+08) 기준 다음날
+      채팅('m0', 'asmr', null, '2026-08-11T16:01:00Z'),   // ㉡ UB 08-12 00:01 — UTC 는 전날
+      채팅('m1', '슬럼프', null, '2026-08-12T12:01:00Z'),  //    UB 08-12 20:01
+      채팅('m2', '빗소리', null, '2026-08-12T15:59:00Z'),  // ㉠ UB 08-12 23:59
+      채팅('m3', '출석', '경계 넘어 시작', '2026-08-12T16:01:00Z'), // ㉠ UB 08-13 00:01 — UTC 는 같은 날
     ],
   });
-  const [a, b, c] = r.계획.map((p) => p.correlation_id);
-  assert.equal(a, b, '같은 앉음(학생×날)이 두 앉음으로 갈라졌다');
-  assert.notEqual(a, c);
-  for (const id of [a, c]) {
-    assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+  assert.equal(r.계획.length, 4, JSON.stringify(r.제외));
+  const id = Object.fromEntries(r.계획.map((p) => [p.idempotency_key, p.correlation_id]));
+  assert.equal(id.m0, id.m1, '㉡ UB 같은 날(전날 16:01Z)이 두 앉음으로 갈라졌다 — UTC 날짜로 잘랐다');
+  assert.equal(id.m1, id.m2, '같은 앉음(학생×날)이 두 앉음으로 갈라졌다');
+  assert.notEqual(id.m2, id.m3, '㉠ 경계(16:00Z) 넘은 발화가 같은 앉음으로 붙었다 — UTC 날짜로 잘랐다');
+  for (const v of [id.m1, id.m3]) {
+    assert.match(v, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
       'uuid 모양이 아니다 — DB uuid 캐스트가 거절한다');
   }
   assert.equal(결정적uuid('radio:x:2026-08-12'), 결정적uuid('radio:x:2026-08-12'));
+});
+
+test('활성 링크가 겹치면 고르지 않고 「링크겹침」으로 센다 — 오귀속은 소급이 없다 (반박 ⑤)', () => {
+  const 재료 = 기본재료();
+  /* confirmed_at 백데이트 정정·해제 미래 예약이 만드는 겹침 — 부분 유일 인덱스는 못 막는다. */
+  재료.링크들 = [
+    { channel_id: 'ch-a', learner_id: L1, confirmed_at: '2026-08-01T00:00:00Z', unlinked_at: null },
+    { channel_id: 'ch-a', learner_id: L2, confirmed_at: '2026-08-02T00:00:00Z', unlinked_at: null },
+  ];
+  const 메시지들 = [채팅('m1', '슬럼프', null, '2026-08-12T12:01:00Z')];
+  const r = 승격계획({ ...재료, 메시지들 });
+  assert.deepEqual(r.계획, [], '겹친 링크에서 한 학생을 골랐다 — 절반은 남의 학생이다');
+  assert.deepEqual(r.제외.map((x) => x.사유), ['링크겹침']);
+  /* 입력 순서를 뒤집어도 판정이 같다 — Fn 질의에 order by 가 없는 것이 급소였다. */
+  const r2 = 승격계획({ ...재료, 링크들: [...재료.링크들].reverse(), 메시지들 });
+  assert.deepEqual(r2.제외.map((x) => x.사유), ['링크겹침']);
+});
+
+test('스냅샷 보기가 계약 모양이 아니면 「스냅샷불량」 — 문자열 배열·중복 id·label 누락 (반박 ③)', () => {
+  const 불량들 = [
+    ['이', '에', '를'],                                        // 문구 문자열 — selected 가 "undefined" 가 되던 재현
+    [{ option_id: 'o1', label: '이' }, { option_id: 'o1', label: '에' }], // 중복 id — 자리가 두 곳을 가리킨다
+    [{ option_id: 'o1' }, { option_id: 'o2' }],                 // label 누락 — 스냅샷이 아니다
+  ];
+  for (const 보기 of 불량들) {
+    const 재료 = 기본재료();
+    재료.라운드들 = [{ round_id: 71, task_ref: 'tq003', task_snapshot: { ...스냅, 보기 }, shown_at: '2026-08-12T12:00:00Z', closed_at: null, retry_of_round_id: null }];
+    const r = 승격계획({ ...재료, 메시지들: [채팅('m1', '답', '2', '2026-08-12T12:01:00Z')] });
+    assert.deepEqual(r.계획, [], `불량 보기가 승격됐다: ${JSON.stringify(보기)}`);
+    assert.deepEqual(r.제외.map((x) => x.사유), ['스냅샷불량'], JSON.stringify(보기));
+  }
+});
+
+test('승격이 내는 task_type 은 전부 라디오태스크종 안이다 — 리듬·끈기 제외 필터의 전제', () => {
+  for (const 통로 of Object.keys(명령과업)) {
+    assert.ok(라디오태스크종.includes(통로), `명령과업 통로가 라디오태스크종 밖이다: ${통로}`);
+  }
+  const r = 승격계획({
+    ...기본재료(),
+    메시지들: [
+      채팅('m1', '답', '2', '2026-08-12T12:01:00Z'),
+      채팅('m2', '출석', '시작', '2026-08-12T12:02:00Z'),
+      채팅('m3', '목표', '단어 20개', '2026-08-12T12:03:00Z'),
+      채팅('m4', '빗소리', null, '2026-08-12T12:04:00Z'),
+      채팅('m5', '슬럼프', null, '2026-08-12T12:05:00Z'),
+    ],
+  });
+  assert.equal(r.계획.length, 5, JSON.stringify(r.제외));
+  for (const 행 of r.계획) {
+    if (행.task_type != null) {
+      assert.ok(라디오태스크종.includes(행.task_type),
+        `계획 행의 task_type 이 목록 밖이다: ${행.task_type} — lib/라디오태스크.js 에 없이 내면 소비자 제외가 샌다`);
+    }
+  }
+});
+
+test('겹치는 자막 카드는 가장 최근에 뜬 것이 과업이다 — 입력 순서 무관 (반박 ⑤ 동축)', () => {
+  const 재료 = 기본재료();
+  const 카드들 = [
+    { content_ref: 'card-041', content_snapshot: { 표현: '~에 가다', 판: 'card.v1' }, shown_from: '2026-08-12T00:00:00Z', shown_to: null },
+    { content_ref: 'card-042', content_snapshot: { 표현: '~에서 왔다', 판: 'card.v1' }, shown_from: '2026-08-12T06:00:00Z', shown_to: null },
+  ];
+  for (const 순서 of [카드들, [...카드들].reverse()]) {
+    const r = 승격계획({ ...재료, 카드들: 순서, 메시지들: [채팅('m1', '출석', '시작', '2026-08-12T12:01:00Z')] });
+    assert.equal(r.계획[0].submission.task_ref, 'card-042',
+      '나중에 뜬 카드가 아니라 배열 순서가 이겼다 — 실행마다 과업이 갈린다');
+  }
 });
 
 test('승격 대상 밖 명령(질문·연동)과 자발 발화는 계획에도 제외에도 없다 — 원장 보존이 전부다', () => {

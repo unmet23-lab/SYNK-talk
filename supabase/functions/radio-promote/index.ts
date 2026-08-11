@@ -1,31 +1,47 @@
 /* 라디오 승격기 Fn — 원장(radio.*) → engine.learning_events 의 **문** (설계 §4-3 · c11 · Lane B)
  *
  * ■ 층 분리 (P0 ④와 같은 이유)
- *   판정(링크·동의·중복·마감·해석·규격)은 전부 `라디오승격.mjs`(= lib/라디오승격.js)다 —
+ *   판정(링크·동의·중복·마감·해석·규격·하루접기)은 전부 `라디오승격.mjs`(= lib/라디오승격.js)다 —
  *   여기는 조회·insert·재도전 고리 풀기만 한다. fetch 옆의 판정은 회귀가 원리상 못 닿는다.
  *
  * ■ 호출자
- *   `pg_cron` 이 `Authorization: Bearer <service_role>` 로 부른다(deliver 와 같은 자리).
+ *   `pg_cron` 이 `Authorization: Bearer <service_role>` 로 부른다(deliver 와 같은 자리 ·
+ *   등록 조각 = `migrations/20260812130000_cron_radio_c11.sql` — 반박 ⑦: 조각 없이는
+ *   배포해도 아무도 안 불러 「도달 0」과 「활동 0」이 같은 모양이 된다).
  *   학생 토큰은 여기 못 들어온다 — 승격 사건의 절반이 `이벤트검증` 앱사건이지만 이 문은
  *   앱 문(functions/events)이 아니라 내부 생산자다(intervention.delivered 를 deliver 가
  *   직접 넣는 것과 같은 자리 · 원장이 이미 관측을 들고 있다).
  *
  * ■ 원장은 안 고친다
- *   제외(비링크·무동의·마감후·중복·해석불가…)는 응답의 **분모**로 나간다. 별도 제외 표 없음 —
- *   링크·동의·라운드가 전부 이력이라 「그때 왜 제외됐나」는 언제든 재산출된다(설계 §4-3 주석).
+ *   제외(비링크·무동의·마감후·중복·해석불가·링크겹침·하루접힘…)는 응답의 **분모**로 나간다.
+ *   별도 제외 표 없음 — 링크·동의·라운드가 전부 이력이라 「그때 왜 제외됐나」는 언제든
+ *   재산출된다(설계 §4-3 주석).
+ *
+ * ■ 커서 진행 — 창이 차도 굶주리지 않는다 (반박 ④·⑭)
+ *   옛 판은 `order by sent_at asc limit 5000` 한 방이라, 7일 창의 명령이 5000건을 넘으면
+ *   매 실행이 가장 오래된 5000건만 집어 **새 메시지가 영원히 승격되지 않았다**(전부 이미승격 ·
+ *   잘림 신호도 없음). 지금은 (sent_at, message_id) 키셋 커서로 배치를 이어 걷고, 배치마다
+ *   자기 트랜잭션으로 닫는다 — 멱등이라 중간에 죽어도 다음 실행이 그 자리부터 따라잡는다
+ *   (배치 롤백 단위가 「전 실행」에서 「한 배치」로 줄었을 뿐, 반쯤 승격된 배치는 여전히 없다).
+ *   실행당 배치 상한을 넘기면 응답에 `잘림: true` 를 명시한다 — 조용한 절단이 이 문의 적이다.
  *
  * ■ 승격 행의 submissions 는 pipeline_jobs 트리거를 그대로 탄다
- *   배정 행(deliver)이 이미 같은 길을 간다 — 잡의 소비자(교정배치)가 형식으로 거른다.
- *   자습체크인·목표선언의 「한 문장」은 실제 교정 대상이기도 하다(매일 한 문장 철학).
+ *   자습체크인·목표선언의 「한 문장」은 실제 교정 대상이고(매일 한 문장 철학), 교정배치
+ *   (functions/correct)의 대기 술어가 `event_type = 'submission.created'` 로 걸러 **퀴즈 행
+ *   (quiz.answered)은 교정 큐에 들어가지 않는다** — 「형식으로 거른다」던 옛 주석은 거짓이었다
+ *   (반박 ⑨ · task_format 은 그 술어에 없다). ⚠ 남는 실물: 퀴즈 submissions 행에도 트리거가
+ *   pipeline_jobs 를 만들고 그 잡은 집는 소비자가 없어 queued 로 남는다 — 잡 생성 트리거와
+ *   폐기 어휘는 검수 계약 몫이라 이 문이 손대지 않는다(반박 처분 기록 참조).
  */
 import postgres from 'npm:postgres@3.4.4';
 import 승격모듈 from './라디오승격.mjs';
 import 출처모듈 from './사건출처.mjs';
 import 토큰모듈 from './토큰.mjs';
 
-const { 승격계획, 승격표, 승격판 } = 승격모듈 as {
+const { 승격계획, 승격표, 승격판, 선호정서키 } = 승격모듈 as {
   승격판: string;
   승격표: Record<string, string>;
+  선호정서키: (learner_id: string, 갈래: string, sent_at: unknown) => string;
   승격계획: (재료: Record<string, unknown>) => {
     계획: Array<Record<string, unknown>>;
     제외: Array<{ message_id: string; command_kind: string; 사유: string }>;
@@ -41,6 +57,14 @@ const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
  * 겹쳐 읽기는 공짜다. 창 밖 원장 행은 소급 승격 절차가 계약에 생긴 뒤에만(§4-3 「v1 없음」). */
 const 되돌아보기일 = 7;
 
+/* 한 배치 = 한 트랜잭션 = 한 키셋 페이지. 값이 아니라 **눈금**이다 — 작을수록 실패 시 다시
+ * 걷는 양이 줄고, 클수록 왕복이 준다. Edge 시간 예산 안에서 배치 상한이 총량을 봉인한다. */
+const 배치크기 = 1000;
+/* 실행당 배치 상한 — 폭주 시 Edge 시간 초과로 「매 실행 0건 고착」이 되는 것(반박 ⑭)을 막고,
+ * 못 다 걸은 사실을 `잘림` 으로 드러낸다. 다음 실행(매시)이 커서 없이도 이어 걷는다 —
+ * 앞부분은 이미승격으로 빠르게 지나가고 멈춘 자리부터 실제 승격이 이어진다. */
+const 최대배치 = 20;
+
 function 봉투(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 }
@@ -50,10 +74,12 @@ Deno.serve(async (req) => {
   if (!서비스역할(req)) return 봉투(403, { error: 'service_role_only' });
 
   /* 계약판은 DB 에게 묻는다(events·deliver·radio-ingest 와 같은 근거). 🔴 c11 게이트:
-   * c11 전 DB 에 '라디오퀴즈' 등을 넣으면 CHECK 가 거절한다 — 절반 승격보다 멈춤이 낫다. */
-  const [{ 최신조각 }] = await sql`
+   * c11 전 DB 에 '라디오퀴즈' 등을 넣으면 CHECK 가 거절한다 — 절반 승격보다 멈춤이 낫다.
+   * ⚠ 0행 가드(반박 ⑮) — 빈 이력에서 구조분해가 TypeError 로 죽으면 500 의 이유가 로그에
+   * 안 남는다. 못 읽은 것은 못 읽었다고 말한다. */
+  const 판행 = await sql`
     select name as 최신조각 from engine.schema_migrations order by version desc limit 1`;
-  const ver = String(최신조각 ?? '').match(/_(c\d+)\.sql$/)?.[1];
+  const ver = 판행.length ? String(판행[0].최신조각 ?? '').match(/_(c\d+)\.sql$/)?.[1] : undefined;
   if (!ver) {
     console.error('[radio-promote] schema_migrations 에서 계약판을 못 읽었다');
     return 봉투(500, { error: 'schema_ver_unreadable' });
@@ -62,147 +88,179 @@ Deno.serve(async (req) => {
 
   const 지금 = new Date().toISOString();
 
-  const 메시지들 = await sql`
-    select message_id, channel_id, body, sent_at, command_kind, command_arg
-      from radio.chat_message
-     where command_kind = any(${Object.keys(승격표)})
-       and sent_at > now() - make_interval(days => ${되돌아보기일})
-     order by sent_at asc
-     limit 5000`;
-  if (!메시지들.length) {
-    return 봉투(200, { ok: true, ver, 검토: 0, 승격: 0, 중복: 0, 제외: {}, 승격판 });
-  }
-
-  const 채널들 = [...new Set(메시지들.map((m) => String(m.channel_id)))];
-  const 링크들 = await sql`
-    select channel_id, learner_id, confirmed_at, unlinked_at
-      from radio.viewer_link where channel_id = any(${채널들})`;
-  const 학생ids = [...new Set(링크들.map((l) => String(l.learner_id)))];
-
+  /* 창 전체 공통 재료 — 배치와 무관하게 한 번만 걷는다. */
   const 라운드들 = await sql`
     select round_id, task_ref, task_snapshot, shown_at, closed_at, retry_of_round_id
       from radio.quiz_round where shown_at > now() - make_interval(days => ${되돌아보기일 + 1})`;
   const 카드들 = await sql`
     select content_ref, content_snapshot, shown_from, shown_to
       from radio.subtitle_card_log where shown_from > now() - make_interval(days => ${되돌아보기일 + 1})`;
-
-  const 학생행 = 학생ids.length ? await sql`
-    select learner_id, level_current, goal_track from engine.learners
-     where learner_id = any(${학생ids}::uuid[])` : [];
-  const 동의행 = 학생ids.length ? await sql`
-    select learner_id, consent_id, consent_ver, agreed_at, revoked_at from engine.consents
-     where learner_id = any(${학생ids}::uuid[])` : [];
-
-  const 키들 = 메시지들.map((m) => String(m.message_id));
-  const 이미행 = await sql`
-    select idempotency_key from engine.learning_events where idempotency_key = any(${키들})`;
   const 라운드짝 = await sql`
     select learner_id, payload->>'round_id' as round_id from engine.learning_events
      where event_type = 'quiz.answered' and task_type = '라디오퀴즈'
        and occurred_at > now() - make_interval(days => ${되돌아보기일 + 1})
        and payload ? 'round_id'`;
+  /* 선호·정서 하루 접기(반박 ⑥)의 「이미 승격된 날」 — 키 조립은 lib 의 `선호정서키` 하나다. */
+  const 하루행 = await sql`
+    select learner_id, occurred_at,
+           coalesce(payload->>'preference_dimension', payload->>'affect_kind') as 갈래
+      from engine.learning_events
+     where event_type in ('preference.stated', 'affect.reported')
+       and occurred_at > now() - make_interval(days => ${되돌아보기일 + 1})`;
 
-  const 동의들: Record<string, unknown[]> = {};
-  for (const c of 동의행) (동의들[String(c.learner_id)] ||= []).push(c);
-  const 학생들: Record<string, unknown> = {};
-  for (const l of 학생행) 학생들[String(l.learner_id)] = l;
+  const 이미승격라운드 = new Set(라운드짝.map((r) => `${r.learner_id}:${r.round_id}`));
+  const 이미하루키 = new Set(
+    하루행.filter((r) => r.갈래).map((r) => 선호정서키(String(r.learner_id), String(r.갈래), r.occurred_at)),
+  );
 
-  const { 계획, 제외 } = 승격계획({
-    메시지들, 라운드들, 링크들, 동의들, 학생들, 카드들,
-    이미승격키: new Set(이미행.map((r) => String(r.idempotency_key))),
-    이미승격라운드: new Set(라운드짝.map((r) => `${r.learner_id}:${r.round_id}`)),
-    지금,
-  });
-
-  /* skill 실재 대조 — 수집 문(functions/events)과 같은 근거. 시드 없는 skill 을 실은 행은
-   * 지어내지 않고 제외로 센다(시드는 c11 조각이 승격보다 먼저 심는다 — 여기 걸리면 그건
-   * 스냅샷과 팩이 갈린 날이고, 그 갈림이 분모로 드러나는 것이 이 검사의 몫이다). */
-  const 스킬합 = [...new Set(계획.flatMap((p) => (p.skill_ids as string[] | undefined) ?? []))];
-  const 있는스킬 = 스킬합.length ? new Set((await sql`
-    select skill_id from engine.skills where skill_id = any(${스킬합})`)
-    .map((r) => String(r.skill_id))) : new Set<string>();
-  const 확정 = [];
-  for (const p of 계획) {
-    const 없는것 = ((p.skill_ids as string[] | undefined) ?? []).filter((id) => !있는스킬.has(id));
-    if (없는것.length) 제외.push({ message_id: String(p.idempotency_key), command_kind: '답', 사유: 'skill미등재' });
-    else 확정.push(p);
-  }
-
+  let 검토 = 0;
   let 승격수 = 0;
   let 중복수 = 0;
-  const 방금 = new Map<string, string>(); // `${learner}:${round_id}` → event_id (재도전 고리)
+  let 배치수 = 0;
+  let 완주 = false;
+  const 제외셈: Record<string, number> = {};
+  const 세기 = (사유: string, n = 1) => { 제외셈[사유] = (제외셈[사유] || 0) + n; };
+  const 방금 = new Map<string, string>(); // `${learner}:${round_id}` → event_id (재도전 고리 · 실행 전체)
+  let 커서: { sent_at: unknown; message_id: string } | null = null;
 
-  try {
-    await sql.begin(async (tx) => {
-      for (const 행 of 확정) {
-        /* 60초 재도전 고리 — 1차 승격 행을 (learner, round) 로 푼다. 같은 묶음 안이면 방금 넣은
-         * 행, 앞선 실행분이면 DB. 1차가 승격 안 된 재도전은 고리 없이 넣는다(지어내지 않는다). */
-        let retry_of: string | null = null;
-        const 부모라운드 = 행.retry_parent_round_id as string | null;
-        if (부모라운드) {
-          retry_of = 방금.get(`${행.learner_id}:${부모라운드}`) ?? null;
-          if (!retry_of) {
-            const r = await tx`
-              select event_id from engine.learning_events
-               where learner_id = ${행.learner_id as string}::uuid
-                 and event_type = 'quiz.answered' and payload->>'round_id' = ${부모라운드}
-               limit 1`;
-            retry_of = r.length ? String(r[0].event_id) : null;
+  while (배치수 < 최대배치) {
+    const 메시지들 = await sql`
+      select message_id, channel_id, body, sent_at, command_kind, command_arg
+        from radio.chat_message
+       where command_kind = any(${Object.keys(승격표)})
+         and sent_at > now() - make_interval(days => ${되돌아보기일})
+         ${커서 ? sql`and (sent_at, message_id) > (${커서.sent_at}::timestamptz, ${커서.message_id})` : sql``}
+       order by sent_at asc, message_id asc
+       limit ${배치크기}`;
+    if (!메시지들.length) { 완주 = true; break; }
+    배치수 += 1;
+    검토 += 메시지들.length;
+    커서 = { sent_at: 메시지들[메시지들.length - 1].sent_at, message_id: String(메시지들[메시지들.length - 1].message_id) };
+
+    const 채널들 = [...new Set(메시지들.map((m) => String(m.channel_id)))];
+    const 링크들 = await sql`
+      select channel_id, learner_id, confirmed_at, unlinked_at
+        from radio.viewer_link where channel_id = any(${채널들})`;
+    const 학생ids = [...new Set(링크들.map((l) => String(l.learner_id)))];
+
+    const 학생행 = 학생ids.length ? await sql`
+      select learner_id, level_current, goal_track from engine.learners
+       where learner_id = any(${학생ids}::uuid[])` : [];
+    const 동의행 = 학생ids.length ? await sql`
+      select learner_id, consent_id, consent_ver, agreed_at, revoked_at from engine.consents
+       where learner_id = any(${학생ids}::uuid[])` : [];
+
+    const 키들 = 메시지들.map((m) => String(m.message_id));
+    const 이미행 = await sql`
+      select idempotency_key from engine.learning_events where idempotency_key = any(${키들})`;
+
+    const 동의들: Record<string, unknown[]> = {};
+    for (const c of 동의행) (동의들[String(c.learner_id)] ||= []).push(c);
+    const 학생들: Record<string, unknown> = {};
+    for (const l of 학생행) 학생들[String(l.learner_id)] = l;
+
+    const { 계획, 제외 } = 승격계획({
+      메시지들, 라운드들, 링크들, 동의들, 학생들, 카드들,
+      이미승격키: new Set(이미행.map((r) => String(r.idempotency_key))),
+      이미승격라운드, 이미하루키, 지금,
+    });
+    for (const x of 제외) 세기(x.사유);
+
+    /* skill 실재 대조 — 수집 문(functions/events)과 같은 근거. 시드 없는 skill 을 실은 행은
+     * 지어내지 않고 제외로 센다(시드는 c11 조각이 승격보다 먼저 심는다 — 여기 걸리면 그건
+     * 스냅샷과 팩이 갈린 날이고, 그 갈림이 분모로 드러나는 것이 이 검사의 몫이다). */
+    const 스킬합 = [...new Set(계획.flatMap((p) => (p.skill_ids as string[] | undefined) ?? []))];
+    const 있는스킬 = 스킬합.length ? new Set((await sql`
+      select skill_id from engine.skills where skill_id = any(${스킬합})`)
+      .map((r) => String(r.skill_id))) : new Set<string>();
+    const 확정 = [];
+    for (const p of 계획) {
+      const 없는것 = ((p.skill_ids as string[] | undefined) ?? []).filter((id) => !있는스킬.has(id));
+      /* 옛 판은 여기서 제외 행에 command_kind: '답' 을 **손값**으로 적었다(반박 ⑬) — 지금은
+       * 명령이 필요한 자리가 없고(분모는 사유별 합만 나간다), 필요해지면 계획 행이 든
+       * `command_kind`(승격계획이 싣는다)를 쓴다 — 손값을 다시 적지 않는다. */
+      if (없는것.length) 세기('skill미등재');
+      else 확정.push(p);
+    }
+
+    try {
+      await sql.begin(async (tx) => {
+        for (const 행 of 확정) {
+          /* 60초 재도전 고리 — 1차 승격 행을 (learner, round) 로 푼다. 같은 실행 안이면 방금
+           * 넣은 행, 앞선 실행분이면 DB. 1차가 승격 안 된 재도전은 고리 없이 넣는다. */
+          let retry_of: string | null = null;
+          const 부모라운드 = 행.retry_parent_round_id as string | null;
+          if (부모라운드) {
+            retry_of = 방금.get(`${행.learner_id}:${부모라운드}`) ?? null;
+            if (!retry_of) {
+              const r = await tx`
+                select event_id from engine.learning_events
+                 where learner_id = ${행.learner_id as string}::uuid
+                   and event_type = 'quiz.answered' and payload->>'round_id' = ${부모라운드}
+                 limit 1`;
+              retry_of = r.length ? String(r[0].event_id) : null;
+            }
+          }
+
+          const 넣기 = await tx`
+            insert into engine.learning_events (
+              learner_id, event_type, task_type, actor_kind, occurred_at, correlation_id,
+              idempotency_key, retry_of_event_id, skill_ids, skill_taxonomy_ver,
+              level_snapshot, goal_snapshot, consent_id, consent_ver, source_kind, payload, schema_ver
+            ) values (
+              ${행.learner_id as string}::uuid, ${행.event_type as string},
+              ${(행.task_type ?? null) as string | null}, 'learner',
+              ${행.occurred_at as string}::timestamptz, ${행.correlation_id as string}::uuid,
+              ${행.idempotency_key as string}, ${retry_of}::uuid,
+              ${((행.skill_ids as string[] | undefined) ?? []) as string[]},
+              ${(행.skill_taxonomy_ver ?? null) as string | null},
+              ${(행.level_snapshot ?? null) as string | null}, ${(행.goal_snapshot ?? null) as string | null},
+              ${행.consent_id as string}::uuid, ${행.consent_ver as string},
+              ${사건출처(String(행.event_type))}::engine.source_kind,
+              ${sql.json((행.payload ?? {}) as Record<string, unknown>)}, ${ver}
+            )
+            on conflict (learner_id, idempotency_key) do nothing
+            returning event_id`;
+          if (!넣기.length) { 중복수 += 1; continue; }
+          승격수 += 1;
+          const event_id = String(넣기[0].event_id);
+
+          const p = 행.payload as Record<string, unknown> | undefined;
+          if (p && p.round_id) {
+            방금.set(`${행.learner_id}:${p.round_id}`, event_id);
+            이미승격라운드.add(`${행.learner_id}:${p.round_id}`); // 다음 배치의 중복 판정 재료
+          }
+          if (행.하루키) 이미하루키.add(String(행.하루키));       // 다음 배치의 하루 접기 재료
+
+          const s = 행.submission as Record<string, unknown> | undefined;
+          if (s) {
+            await tx`
+              insert into engine.submissions (
+                event_id, task_type, task_format, task_ref, task_snapshot, task_schema_ver,
+                body_original, occurred_at, schema_ver
+              ) values (
+                ${event_id}::uuid, ${행.task_type as string}, ${s.task_format as string},
+                ${s.task_ref as string}, ${sql.json(s.task_snapshot as Record<string, unknown>)},
+                ${s.task_schema_ver as string}, ${(s.body_original ?? null) as string | null},
+                ${행.occurred_at as string}::timestamptz, ${ver}
+              )`;
           }
         }
+      });
+    } catch (e) {
+      /* 배치 롤백 — 반쯤 승격된 «배치»를 남기지 않는다. 앞 배치들은 이미 닫혔고 그게 맞다:
+       * 멱등이라 다음 실행이 이 배치부터 다시 간다(커서는 저장 안 한다 — 이미승격이 대신한다). */
+      console.error('[radio-promote] 승격 트랜잭션 실패(배치 ' + 배치수 + ')', String((e as Error)?.message ?? e));
+      return 봉투(500, { error: 'promote_failed', 배치: 배치수, 검토, 승격: 승격수 });
+    }
 
-        const 넣기 = await tx`
-          insert into engine.learning_events (
-            learner_id, event_type, task_type, actor_kind, occurred_at, correlation_id,
-            idempotency_key, retry_of_event_id, skill_ids, skill_taxonomy_ver,
-            level_snapshot, goal_snapshot, consent_id, consent_ver, source_kind, payload, schema_ver
-          ) values (
-            ${행.learner_id as string}::uuid, ${행.event_type as string},
-            ${(행.task_type ?? null) as string | null}, 'learner',
-            ${행.occurred_at as string}::timestamptz, ${행.correlation_id as string}::uuid,
-            ${행.idempotency_key as string}, ${retry_of}::uuid,
-            ${((행.skill_ids as string[] | undefined) ?? []) as string[]},
-            ${(행.skill_taxonomy_ver ?? null) as string | null},
-            ${(행.level_snapshot ?? null) as string | null}, ${(행.goal_snapshot ?? null) as string | null},
-            ${행.consent_id as string}::uuid, ${행.consent_ver as string},
-            ${사건출처(String(행.event_type))}::engine.source_kind,
-            ${sql.json((행.payload ?? {}) as Record<string, unknown>)}, ${ver}
-          )
-          on conflict (learner_id, idempotency_key) do nothing
-          returning event_id`;
-        if (!넣기.length) { 중복수 += 1; continue; }
-        승격수 += 1;
-        const event_id = String(넣기[0].event_id);
-
-        const p = 행.payload as Record<string, unknown> | undefined;
-        if (p && p.round_id) 방금.set(`${행.learner_id}:${p.round_id}`, event_id);
-
-        const s = 행.submission as Record<string, unknown> | undefined;
-        if (s) {
-          await tx`
-            insert into engine.submissions (
-              event_id, task_type, task_format, task_ref, task_snapshot, task_schema_ver,
-              body_original, occurred_at, schema_ver
-            ) values (
-              ${event_id}::uuid, ${행.task_type as string}, ${s.task_format as string},
-              ${s.task_ref as string}, ${sql.json(s.task_snapshot as Record<string, unknown>)},
-              ${s.task_schema_ver as string}, ${(s.body_original ?? null) as string | null},
-              ${행.occurred_at as string}::timestamptz, ${ver}
-            )`;
-        }
-      }
-    });
-  } catch (e) {
-    /* 전건 롤백 — 반쯤 승격된 묶음을 남기지 않는다. 다음 실행이 멱등으로 처음부터 다시 간다. */
-    console.error('[radio-promote] 승격 트랜잭션 실패', String((e as Error)?.message ?? e));
-    return 봉투(500, { error: 'promote_failed' });
+    if (메시지들.length < 배치크기) { 완주 = true; break; }
   }
 
-  const 제외셈: Record<string, number> = {};
-  for (const x of 제외) 제외셈[x.사유] = (제외셈[x.사유] || 0) + 1;
-
-  /* 분모 명시(§9) — 몇 건 보고 몇 건 넣고 몇 건 왜 뺐나. 「조용한 0」이 이 응답의 적이다. */
+  /* 분모 명시(§9) — 몇 건 보고 몇 건 넣고 몇 건 왜 뺐나. 「조용한 0」이 이 응답의 적이다.
+   * `잘림` 은 「이번 실행이 창을 다 못 걸었다」다 — true 가 이어지면 배치 상한이나 주기를 본다. */
   return 봉투(200, {
-    ok: true, ver, 검토: 메시지들.length, 승격: 승격수, 중복: 중복수, 제외: 제외셈, 승격판,
+    ok: true, ver, 검토, 승격: 승격수, 중복: 중복수, 제외: 제외셈,
+    배치: 배치수, 잘림: !완주, 승격판,
   });
 });

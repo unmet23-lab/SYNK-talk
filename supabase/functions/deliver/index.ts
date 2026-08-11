@@ -83,9 +83,12 @@ const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
  * 배정 행도 통로를 말해야 하고, 그날 학생이 낼 것이 실제로 그것이다. */
 const 통로 = '발화녹음';
 
-/* 학생 한 명에게서 걷는 원신호 상한. 창(기본 30일) 안에서 이 수를 넘는 학생은 없어야 정상이라
- * 값이 아니라 **방어**다 — 한 학생의 이상 행 수가 배치 전체의 메모리를 먹는 것을 막는다. */
-const 원신호상한 = 500;
+/* 학생 한 명에게서 걷는 원신호 상한 — **사건 종류별**이다(반박 c757278 치명 ⑥). 전체 500 으로
+ * 눌렀더니 하루 상한이 없는 라디오 명령(선호·정서)이 창을 채우면 오래된 task.assigned·제출이
+ * 잘려 **리듬 분모가 조용히 줄었다** — 한 종의 폭주가 다른 종의 신호를 밀어내는 방향만 막으면
+ * 되므로 칸을 종류로 가른다. 150 = 창 30일 × 하루 5건까지 전량(그 위는 최신 우선 — 값이 아니라
+ * 방어라는 성격은 그대로다. 총량은 종 수 × 이 값으로 유계). */
+const 종별상한 = 150;
 
 const 봉투 = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -261,25 +264,30 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
        * 상태 계산은 읽을 것이 없다(도달의 정의는 「읽힌 것」이지 보이는 것이 아니다 · 설계 §5).
        * · 목록·창은 lib 이 정본이라 여기에 다시 안 적는다 — 갈라지면 축이 조용히 죽는다.
        * · 마감(due_at)은 submissions 에 사니 같이 걷는다. 배정 행에만 있고 나머지는 null 이다.
-       * · limit 은 값이 아니라 **방어**다: 창 안에서 이 수를 넘는 학생은 없어야 정상이고,
-       *   넘으면 최신부터 남는다(옛 배정이 잘려 제출률 분모가 줄 수 있다 — 상한을 넉넉히 둔 이유).
+       * · task_type 을 싣는 것은 리듬·끈기축의 라디오 제외(lib v6 · 반박 ①)의 재료다.
+       * · 상한은 **사건 종류별**이다(반박 ⑥) — 전체 한 칸이면 하루 상한 없는 라디오 명령이
+       *   창을 채울 때 오래된 배정·제출이 잘려 리듬 분모가 조용히 준다. 종류마다 최신 우선.
        * ⚠ 이 주석은 SQL 템플릿 리터럴 «안»이다 — 백틱을 쓰면 문자열이 여기서 끝나고 함수가
        *   번들조차 안 된다(F180). 강조는 「」로 한다. */
       left join lateral (
         select coalesce(jsonb_agg(jsonb_build_object(
                  'event_id', x.event_id, 'event_type', x.event_type, 'occurred_at', x.occurred_at,
                  'retry_of_event_id', x.retry_of_event_id, 'correction_id', x.correction_id,
-                 'payload', x.payload, 'due_at', x.due_at)), '[]'::jsonb) as 행들
+                 'task_type', x.task_type, 'payload', x.payload, 'due_at', x.due_at)), '[]'::jsonb) as 행들
           from (
-            select e.event_id, e.event_type, e.occurred_at, e.retry_of_event_id,
-                   e.correction_id, e.payload, s.due_at
-              from engine.learning_events e
-              left join engine.submissions s on s.event_id = e.event_id
-             where e.learner_id = l.learner_id
-               and e.event_type = any(${쓰는사건}::text[])
-               and e.occurred_at >= now() - make_interval(days => ${창일수})
-             order by e.occurred_at desc
-             limit ${원신호상한}) x) 원신호 on true
+            select y.event_id, y.event_type, y.occurred_at, y.retry_of_event_id,
+                   y.correction_id, y.task_type, y.payload, y.due_at
+              from (
+                select e.event_id, e.event_type, e.occurred_at, e.retry_of_event_id,
+                       e.correction_id, e.task_type, e.payload, s.due_at,
+                       row_number() over (partition by e.event_type
+                                          order by e.occurred_at desc) as 몇째
+                  from engine.learning_events e
+                  left join engine.submissions s on s.event_id = e.event_id
+                 where e.learner_id = l.learner_id
+                   and e.event_type = any(${쓰는사건}::text[])
+                   and e.occurred_at >= now() - make_interval(days => ${창일수})) y
+             where y.몇째 <= ${종별상한}) x) 원신호 on true
       ${좁히기}`;
 
   /* 🔴 단건인데 0건 = 없는 learner_id 로 불렸다는 뜻이다. 200 으로 넘기면 「배정 0/재적 0」이라

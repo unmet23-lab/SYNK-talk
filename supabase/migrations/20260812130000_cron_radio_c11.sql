@@ -1,11 +1,91 @@
+/* 라디오 승격기 스케줄러 — pg_cron 등록 (설계 §4-3 · 반박 c757278 치명 ⑦ 수리)
+ *
+ * ■ 왜 이 조각인가 — **승격기를 부르는 것이 없었다.** Fn 머리말은 「pg_cron 이 부른다」인데
+ *   cron 조각(20260809070000)에는 잡 셋뿐이라, 다 배포해도 승격은 0행이고 그 0은 「라디오
+ *   활동 없음」과 같은 모양이었다(조용한 0). 등록과 그 발동 조건은 같은 커밋에 있어야 한다.
+ *
+ * 🔴 파일 이름의 _c11 은 장식이 아니다 — Edge Function 들이 계약판을 schema_migrations 의
+ *   최신 이름 _c<숫자>.sql 에서 읽는다(회귀 tests/마이그레이션이름.test.js). 판을 올리는 게
+ *   아니므로 c11 을 그대로 이어 쓴다.
+ *
+ * 🔑 시각은 UTC(DB TimeZone = UTC · 실측). 매시 21분 — 라운드는 하루 4~6회(설계 §6-1 J)라
+ *   시간 단위 승격이면 재도전 고리·당일 퀴즈가 그날 안에 닿는다. AI 호출 0원이라 비용 축 없음.
+ *   deliver(:05·:35)와 분을 가른 것은 습관이지 필요는 아니다(net.http_post 는 비동기 발사).
+ *
+ * 🔑 자격증명이 이 파일에 없다 — Vault 에서 읽는다(cron_c10 과 같은 두 항목:
+ *   service_role_key · functions_base_url). 없으면 잡은 걸리되 호출이 에러로 죽는다(의도).
+ *
+ * ⛔ 리허설엔 일부러 안 붓는다(cron_c10 정책 그대로) — 스케줄러가 돌면 옆 세션 §9 승격
+ *   왕복시험의 원장·엔진 상태를 흔든다. 리허설에 부을 일이 생기면 그 판단을 먼저 한다.
+ *
+ * 되돌림: select cron.unschedule('radio-promote-hourly'); +
+ *        delete from engine.schema_migrations where version='20260812130000'; */
+
+begin;
+
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
+
+do $migration$
+declare
+  migration_version constant text := '20260812130000';
+  migration_name constant text := '20260812130000_cron_radio_c11.sql';
+  expected_checksum constant text := 'e583a459f758692fe968c125a44bf52e9ebbd4800641d77915df56c3dee0d6ee'; -- migration-checksum
+  base_version constant text := '20260812120000';
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 c11 위에서만 돈다 — engine.schema_migrations가 없다(빈 DB면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      '이 조각은 기준선 % 위에서만 돈다 — 이력에 그 판이 없다(부분·혼합·불명이라 중단한다)',
+      base_version;
+  end if;
+
+  /* 멱등 — 같은 이름이 있으면 떼고 다시 건다(없으면 0행이라 조용하다). */
+  perform cron.unschedule(jobname)
+    from cron.job
+   where jobname = 'radio-promote-hourly';
+
+  /* 라디오 승격 — 매시. 원장(radio.*)의 명령 채팅을 engine.learning_events 로 판정 승격한다.
+   * 한 번에 걷는 양은 함수가 정한다(키셋 커서 배치 · 못 다 걸으면 응답 「잘림」으로 드러난다). */
+  perform cron.schedule('radio-promote-hourly', '21 * * * *', $job$
+    select net.http_post(
+      url     := (select decrypted_secret from vault.decrypted_secrets where name = 'functions_base_url') || '/radio-promote',
+      headers := jsonb_build_object(
+                   'Content-Type',  'application/json',
+                   'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'service_role_key')),
+      body    := '{}'::jsonb);
+  $job$);
+
+  insert into engine.schema_migrations(version, name, checksum)
+  values (migration_version, migration_name, expected_checksum);
+end
+$migration$;
+
+commit;
+
 -- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
---
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
 -- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -206,3 +286,26 @@ select case when 테이블수=11 and RLS켜짐=11 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
 from 셈;
+*/
+
+-- 확인
+-- ① 이 조각은 표·열·제약·트리거를 하나도 안 바꾼다 — 위 판정 블록의 카운터는 c11 조각과
+--    같은 기대값 그대로다(현재이력의 버전·checksum 만 이 조각을 가리킨다).
+-- ② 스케줄러 잡 실측 — 부은 뒤 한 줄로 (1 이어야 한다):
+--      select count(*) from cron.job where jobname = 'radio-promote-hourly';
+--    ⚠ 리허설은 머리말 ⛔ 정책대로 일부러 안 붓는다 — 확인 쿼리가 「현재버전=20260812120000」
+--      으로 ❌ 를 내면 고장이 아니라 그 정책이다(✅ 대상은 운영뿐).
+-- ③ 🔴 운영에 부었으면 **같은 확인 절차에서** supabase/DB착지판.json 을 'c11' 로,
+--    src/계약판.js 를 'c11' 로 한 커밋에 올린다 — 안 올리면 앱이 c10 을 선언할 뿐이라 서버는
+--    받지만(안전 방향), 올리기 전 앱 빌드가 c11 어휘를 못 쓴다. tests/계약.test.js 가 짝을 묶는다.
+-- ④ CHECK 제약은 현행 접미사만 남아야 한다(이 조각은 CHECK 를 한 개도 안 바꾼다 — c11 그대로).
+--    ⚠ 이 줄은 마지막 조각이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    기대: broadcast_segment_kind_c11 · corrections_promotion_intent_c11
+--         · corrections_supersedes_not_self_c11 · corrections_verdict_c11
+--         · learners_signup_attempts_nonneg_c11 · learners_temp_password_paired_c11
+--         · learning_events_correction_target_c11 · learning_events_event_type_c11
+--         · learning_events_task_type_c11 · pipeline_jobs_discard_reason_c11
+--         · staff_role_c11 · submissions_due_paired_c11 · submissions_task_format_c11
+--         · submissions_translation_source_c11

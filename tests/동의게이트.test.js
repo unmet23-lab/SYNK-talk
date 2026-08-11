@@ -158,3 +158,26 @@ test('픽스처 — 버튼이 되살아나면 잡는다 (통과와 미실행이 
   const 가짜 = '<Pressable onPress={동의하기}><Text>동의합니다</Text></Pressable>';
   assert.ok(/Pressable|TouchableOpacity|Button|onPress/.test(가짜), '탐지 규칙 자체가 죽었다');
 });
+
+/* ── 그때유효 «평가형» — 묶음 처리 자리(라디오 승격기)의 술어가 정본과 같은 뜻인지 ──────
+ * 반박 c757278 경미 ⑧ — 승격기의 메모리 필터가 다섯 번째 사본이 되던 자리를, 정본 파일의
+ * 평가형 함수 하나로 접었다. 아래 사례들이 머리말의 seam 을 그대로 잰다. */
+test('그때유효평가 — 사후 동의·기철회·미래 예약 철회의 세 seam 이 SQL 정본과 같은 뜻이다', () => {
+  const { 그때유효평가 } = require('../lib/동의게이트.js');
+  const t = Date.parse('2026-08-10T12:00:00Z');
+  const 지금 = Date.parse('2026-08-12T00:00:00Z');
+  const 판 = (동의) => 그때유효평가(동의, t, 지금);
+  // 정상 — 사건 전에 동의, 철회 없음
+  assert.equal(판({ agreed_at: '2026-08-01T00:00:00Z', revoked_at: null }), true);
+  // 사후 동의는 과거를 유효하게 만들지 못한다
+  assert.equal(판({ agreed_at: '2026-08-11T00:00:00Z', revoked_at: null }), false,
+    '사후 동의가 과거 발화를 살렸다');
+  // 철회 뒤에는 과거 시각을 주장해도 새 저장이 없다(revoked > now 조건)
+  assert.equal(판({ agreed_at: '2026-08-01T00:00:00Z', revoked_at: '2026-08-11T00:00:00Z' }), false,
+    '이미 철회된 동의로 새 승격이 만들어진다');
+  // 철회가 미래로 예약돼 있으면 그때까지는 산다(양쪽 조건 모두 통과)
+  assert.equal(판({ agreed_at: '2026-08-01T00:00:00Z', revoked_at: '2026-09-01T00:00:00Z' }), true,
+    '미래 예약 철회가 현재를 죽였다');
+  // 사건 시점에 이미 철회된 동의
+  assert.equal(판({ agreed_at: '2026-08-01T00:00:00Z', revoked_at: '2026-08-05T00:00:00Z' }), false);
+});
