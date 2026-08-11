@@ -30,7 +30,7 @@ do $migration$
 declare
   migration_version constant text := '20260812130000';
   migration_name constant text := '20260812130000_cron_radio_c11.sql';
-  expected_checksum constant text := 'e583a459f758692fe968c125a44bf52e9ebbd4800641d77915df56c3dee0d6ee'; -- migration-checksum
+  expected_checksum constant text := 'ff8a8b3f2874bf6c120dd7911ee22a1ffad8d323131bc74db0a8593aac356f04'; -- migration-checksum
   base_version constant text := '20260812120000';
   recorded_checksum text;
 begin
@@ -273,7 +273,7 @@ select case when 테이블수=11 and RLS켜짐=11 and 정책수=7
              and (select v from 빠진제약) is null
              and (select v from 빠진트리거) is null
              and (select version from 현재이력)='20260812130000'
-              and (select checksum from 현재이력)='e583a459f758692fe968c125a44bf52e9ebbd4800641d77915df56c3dee0d6ee' -- migration-checksum
+              and (select checksum from 현재이력)='ff8a8b3f2874bf6c120dd7911ee22a1ffad8d323131bc74db0a8593aac356f04' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·7·0·0·3·1·0·0·1·0·0·0·0·22·0·6·6·0·0·0·1·1·1·30 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
@@ -289,6 +289,10 @@ from 셈;
 */
 
 -- 확인
+-- ⓪ 🔴 순서 — 이 조각을 붓기 «전에» radio-promote 재배포(수리판 8f0e35f 이후)가 끝나 있어야
+--    한다. 잡은 부은 순간부터 매시 발화한다: Fn 미배포면 매시 404 가 쌓이고, 옛 판이 라이브면
+--    겹침 링크 오귀속·무검증 스냅샷이 불변 행으로 앉는다(반박 ⑤·③의 그 결함).
+--    배포 확인 = node tools/원격배포.js supabase/functions/radio-promote (다름 0 확인 뒤 붓는다).
 -- ① 이 조각은 표·열·제약·트리거를 하나도 안 바꾼다 — 위 판정 블록의 카운터는 c11 조각과
 --    같은 기대값 그대로다(현재이력의 버전·checksum 만 이 조각을 가리킨다).
 -- ② 스케줄러 잡 실측 — 부은 뒤 한 줄로 (1 이어야 한다):

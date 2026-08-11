@@ -31,6 +31,7 @@ import 출처모듈 from './사건출처.mjs';
 import 토큰모듈 from './토큰.mjs';
 import 상태모듈 from './학습자상태.mjs';
 import 게임모듈 from './게임배정.mjs';
+import 라디오태스크모듈 from './라디오태스크.mjs';
 
 /* 게임(G1) 갈래 — 판정은 전부 lib 이 지고(발주 §6-6 ⑩·⑪) 여기는 행만 만든다.
  * `재제출의사`·`게임챌린지` 는 H3 조인의 술어 값이다 — 리터럴을 여기 적으면 계약·팩과
@@ -50,6 +51,13 @@ const { 서비스역할, 토큰주체, 발급시각 } = 토큰모듈 as {
   발급시각: (req: Request) => number | null;
 };
 const { 사건출처 } = 출처모듈 as { 사건출처: (event_type: string) => string | null };
+/* 라디오 승격 제출을 **fetch 전에** 뺀다(재반박 새 치명 ① — 정본 lib/라디오태스크.js).
+ * lib v6 필터는 fetch «뒤»라, 라디오 제출이 같은 event_type 칸(submission.created)의 종별
+ * 상한을 먼저 채우면 앱 제출이 창에서 잘려 나간 «뒤에» 필터가 남은 라디오 행을 버린다 —
+ * 제출률이 반대로(과소) 거짓말한다(재현: 라디오 20건/일 → 1.00 이 0.23). 어떤 축도 라디오
+ * `submission.created` 를 안 쓰므로(리듬·끈기=앱만 · 작성과정=compose_meta 없음) 여기서
+ * 빼는 것은 신호 손실 0 이고, lib 필터는 다른 호출자(성과계기판)의 방어로 남는다. */
+const { 라디오태스크종 } = 라디오태스크모듈 as { 라디오태스크종: string[] };
 /* 사슬 ⑦칸(엔진이 배운다)의 첫 소비자. 🔴 상태를 **저장하지 않는다** — 계산해서 그 개입
  * 사건에 스탬프한다(엔진도달_설계 §3 경로 A · 제품방향 불변식 6 「🚫C·D 파생 테이블 지금 신설」).
  * `창일수`·`쓰는사건` 은 아래 질의가 **가져다 쓴다**: 여기 다시 적으면 축을 늘린 날 코드는
@@ -286,6 +294,8 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
                   left join engine.submissions s on s.event_id = e.event_id
                  where e.learner_id = l.learner_id
                    and e.event_type = any(${쓰는사건}::text[])
+                   and not (e.event_type = 'submission.created'
+                            and e.task_type = any(${라디오태스크종}::text[]))
                    and e.occurred_at >= now() - make_interval(days => ${창일수})) y
              where y.몇째 <= ${종별상한}) x) 원신호 on true
       ${좁히기}`;
@@ -297,12 +307,13 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
     return 봉투(404, { ok: false, date: 오늘, mode: '단건', error: { code: 'NOT_FOUND', message: '그 학생이 없습니다' } });
   }
 
-  const [{ 최신조각 }] = await sql`
+  /* 0행 가드(반박 ⑮ 동축) — 빈 이력에서 구조분해가 TypeError 로 죽으면 500 의 이유가 로그에 안 남는다. */
+  const 판행 = await sql`
     select name as 최신조각 from engine.schema_migrations order by version desc limit 1`;
-  const ver = String(최신조각 ?? '').match(/_(c\d+)\.sql$/)?.[1];
+  const ver = 판행.length ? String(판행[0].최신조각 ?? '').match(/_(c\d+)\.sql$/)?.[1] : undefined;
   if (!ver) {
     // events 와 같은 근거로 DB 에게 판을 묻는다 — 함수가 DB 보다 앞설 수 없게.
-    console.error('[deliver] DB 계약판을 못 읽었다', 최신조각);
+    console.error('[deliver] DB 계약판을 못 읽었다', 판행.length ? 판행[0].최신조각 : '(이력 0행)');
     return 봉투(500, { ok: false, date: 오늘, error: { code: 'SERVER_ERROR', message: '서버 설정 오류입니다' } });
   }
 

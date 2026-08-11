@@ -97,12 +97,13 @@ Deno.serve(async (req) => {
   const polled_at = typeof 몸.polled_at === 'string' && Number.isFinite(Date.parse(몸.polled_at))
     ? 몸.polled_at : new Date().toISOString();
 
-  /* 계약판은 DB 에게 묻는다 — 함수가 DB 보다 앞설 수 없게(`events`·`deliver` 와 같은 근거). */
-  const [{ 최신조각 }] = await sql`
+  /* 계약판은 DB 에게 묻는다 — 함수가 DB 보다 앞설 수 없게(`events`·`deliver` 와 같은 근거).
+   * 0행 가드(반박 ⑮ 동축) — 빈 이력에서 구조분해가 TypeError 로 죽으면 이유가 로그에 안 남는다. */
+  const 판행 = await sql`
     select name as 최신조각 from engine.schema_migrations order by version desc limit 1`;
-  const ver = String(최신조각 ?? '').match(/_(c\d+)\.sql$/)?.[1];
+  const ver = 판행.length ? String(판행[0].최신조각 ?? '').match(/_(c\d+)\.sql$/)?.[1] : undefined;
   if (!ver) {
-    console.error('[radio-ingest] DB 계약판을 못 읽었다', 최신조각);
+    console.error('[radio-ingest] DB 계약판을 못 읽었다', 판행.length ? 판행[0].최신조각 : '(이력 0행)');
     return 봉투(500, { error: 'server_error' });
   }
 

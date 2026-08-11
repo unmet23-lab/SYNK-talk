@@ -2,7 +2,7 @@
  *
  * ■ 무엇이 갈라지나
  *   `pipeline_jobs.discard_reason`(20260809090000)의 어휘 6개가 네 곳에 산다:
- *     ① `pipeline_jobs_discard_reason_c10` CHECK  ← **정본**
+ *     ① `pipeline_jobs_discard_reason_c*` CHECK(접미는 현행 판 — 아래가 합본 최고판을 파생)  ← **정본**
  *     ② `docs/발주_수집파이프라인.md` §3  (` · ` 로 나열)
  *     ③ `docs/검수_내부계약.md` 표        (`·` 로 나열)
  *     ④ `src/검수API.js` 의 `폐기사유`    (검수 화면이 버튼으로 그린다 · 2026-08-09 넷째가 됐다)

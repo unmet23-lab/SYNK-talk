@@ -193,7 +193,7 @@ select case when 테이블수=11 and RLS켜짐=11 and 정책수=7
              and (select v from 빠진제약) is null
              and (select v from 빠진트리거) is null
              and (select version from 현재이력)='20260812130000'
-              and (select checksum from 현재이력)='e583a459f758692fe968c125a44bf52e9ebbd4800641d77915df56c3dee0d6ee' -- migration-checksum
+              and (select checksum from 현재이력)='ff8a8b3f2874bf6c120dd7911ee22a1ffad8d323131bc74db0a8593aac356f04' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·7·0·0·3·1·0·0·1·0·0·0·0·22·0·6·6·0·0·0·1·1·1·30 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,

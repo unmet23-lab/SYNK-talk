@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const {
-  승격표, 명령과업, 결정적uuid, 승격계획, 선호정서키,
+  승격표, 명령과업, 결정적uuid, 승격계획, 선호정서키, 유효동의, 라운드찾기,
 } = require('../lib/라디오승격.js');
 const { 라디오태스크종 } = require('../lib/라디오태스크.js');
 const { 명령표 } = require('../lib/라디오채팅파서.js');
@@ -369,6 +369,20 @@ test('승격이 내는 task_type 은 전부 라디오태스크종 안이다 — 
         `계획 행의 task_type 이 목록 밖이다: ${행.task_type} — lib/라디오태스크.js 에 없이 내면 소비자 제외가 샌다`);
     }
   }
+});
+
+test('시점 조회의 동률도 입력 순서가 아니라 2차 키로 갈린다 — 불변 행에 박히는 값이라 소급이 없다 (재반박 ⑤ 잔여)', () => {
+  const t = '2026-08-12T12:00:00Z';
+  const 동의A = { consent_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', consent_ver: 'v18.10', agreed_at: '2026-08-01T00:00:00Z', revoked_at: null };
+  const 동의B = { consent_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', consent_ver: 'v18.11', agreed_at: '2026-08-01T00:00:00Z', revoked_at: null };
+  const 정 = 유효동의([동의A, 동의B], t, 지금);
+  const 역 = 유효동의([동의B, 동의A], t, 지금);
+  assert.equal(정.consent_id, 역.consent_id, '같은 agreed_at 동의 둘의 승자가 입력 순서에 갈렸다');
+
+  const r1 = { round_id: 1, shown_at: '2026-08-12T11:00:00Z', closed_at: null };
+  const r2 = { round_id: 2, shown_at: '2026-08-12T11:00:00Z', closed_at: null };
+  assert.equal(라운드찾기([r1, r2], t).round_id, 라운드찾기([r2, r1], t).round_id,
+    '같은 shown_at 라운드 둘의 승자가 입력 순서에 갈렸다');
 });
 
 test('겹치는 자막 카드는 가장 최근에 뜬 것이 과업이다 — 입력 순서 무관 (반박 ⑤ 동축)', () => {

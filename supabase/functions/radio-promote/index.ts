@@ -58,12 +58,16 @@ const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
 const 되돌아보기일 = 7;
 
 /* 한 배치 = 한 트랜잭션 = 한 키셋 페이지. 값이 아니라 **눈금**이다 — 작을수록 실패 시 다시
- * 걷는 양이 줄고, 클수록 왕복이 준다. Edge 시간 예산 안에서 배치 상한이 총량을 봉인한다. */
+ * 걷는 양이 줄고, 클수록 왕복이 준다. */
 const 배치크기 = 1000;
-/* 실행당 배치 상한 — 폭주 시 Edge 시간 초과로 「매 실행 0건 고착」이 되는 것(반박 ⑭)을 막고,
- * 못 다 걸은 사실을 `잘림` 으로 드러낸다. 다음 실행(매시)이 커서 없이도 이어 걷는다 —
- * 앞부분은 이미승격으로 빠르게 지나가고 멈춘 자리부터 실제 승격이 이어진다. */
-const 최대배치 = 20;
+/* 실행당 **시간 예산**(ms) — 재반박 ④가 잡았다: 배치 «개수» 상한은 커서를 저장하지 않는 이
+ * 설계에서 굶주림 문턱을 5,000→N×배치크기로 올릴 뿐 구조가 같다(매 실행이 창 머리부터 걷고,
+ * 이미승격 구간도 배치 수를 먹는다). 진짜 제약은 Edge 벽시계(실측 idle 150s)라 그것으로 자른다:
+ * 이미승격 구간은 fetch+제외 셈뿐이라 배치당 수십 ms — 예산 안에서 실제 진행이 항상 앞으로
+ * 나아가고, 예산이 끝나면 `잘림` 을 응답과 **로그 양쪽**에 낸다(새 치명 ② — cron 의
+ * net.http_post 는 응답 본문을 안 읽는다). 폭주 백스톱으로 배치 수 상한도 남긴다. */
+const 시간예산ms = 60_000;
+const 최대배치 = 200;
 
 function 봉투(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -100,12 +104,16 @@ Deno.serve(async (req) => {
      where event_type = 'quiz.answered' and task_type = '라디오퀴즈'
        and occurred_at > now() - make_interval(days => ${되돌아보기일 + 1})
        and payload ? 'round_id'`;
-  /* 선호·정서 하루 접기(반박 ⑥)의 「이미 승격된 날」 — 키 조립은 lib 의 `선호정서키` 하나다. */
+  /* 선호·정서 하루 접기(반박 ⑥)의 「이미 승격된 날」 — 키 조립은 lib 의 `선호정서키` 하나다.
+   * ⚠ stated_via 로 **라디오 표면만** 걷는다(재반박 경미 ⑧) — c11 이 affect.reported 를
+   * 앱사건으로도 열어 두어, 정의적 여과막 화면이 서는 날 앱 아침 신고가 저녁 `!슬럼프` 를
+   * 접어 버린다. 접기는 방송 채팅 반복을 죽이는 장치지 표면 간 장치가 아니다. */
   const 하루행 = await sql`
     select learner_id, occurred_at,
            coalesce(payload->>'preference_dimension', payload->>'affect_kind') as 갈래
       from engine.learning_events
      where event_type in ('preference.stated', 'affect.reported')
+       and payload->>'stated_via' = 'radio_chat'
        and occurred_at > now() - make_interval(days => ${되돌아보기일 + 1})`;
 
   const 이미승격라운드 = new Set(라운드짝.map((r) => `${r.learner_id}:${r.round_id}`));
@@ -121,21 +129,25 @@ Deno.serve(async (req) => {
   const 제외셈: Record<string, number> = {};
   const 세기 = (사유: string, n = 1) => { 제외셈[사유] = (제외셈[사유] || 0) + n; };
   const 방금 = new Map<string, string>(); // `${learner}:${round_id}` → event_id (재도전 고리 · 실행 전체)
-  let 커서: { sent_at: unknown; message_id: string } | null = null;
+  /* 커서의 sent_at 은 **text 로 받는다**(재반박 경미 ⑥) — 드라이버가 timestamptz 를 JS Date(ms)로
+   * 접으면 µs 가 잘려 경계 행을 매 배치 다시 읽고, 같은 ms 에 배치크기 이상이 몰리면 전진이
+   * 멈춘다. text 왕복은 µs 를 그대로 보존한다. */
+  let 커서: { sent_at글자: string; message_id: string } | null = null;
+  const 시작ms = Date.now();
 
-  while (배치수 < 최대배치) {
+  while (배치수 < 최대배치 && Date.now() - 시작ms < 시간예산ms) {
     const 메시지들 = await sql`
-      select message_id, channel_id, body, sent_at, command_kind, command_arg
+      select message_id, channel_id, body, sent_at, sent_at::text as sent_at글자, command_kind, command_arg
         from radio.chat_message
        where command_kind = any(${Object.keys(승격표)})
          and sent_at > now() - make_interval(days => ${되돌아보기일})
-         ${커서 ? sql`and (sent_at, message_id) > (${커서.sent_at}::timestamptz, ${커서.message_id})` : sql``}
+         ${커서 ? sql`and (sent_at, message_id) > (${커서.sent_at글자}::timestamptz, ${커서.message_id})` : sql``}
        order by sent_at asc, message_id asc
        limit ${배치크기}`;
     if (!메시지들.length) { 완주 = true; break; }
     배치수 += 1;
     검토 += 메시지들.length;
-    커서 = { sent_at: 메시지들[메시지들.length - 1].sent_at, message_id: String(메시지들[메시지들.length - 1].message_id) };
+    커서 = { sent_at글자: String(메시지들[메시지들.length - 1].sent_at글자), message_id: String(메시지들[메시지들.length - 1].message_id) };
 
     const 채널들 = [...new Set(메시지들.map((m) => String(m.channel_id)))];
     const 링크들 = await sql`
@@ -183,6 +195,11 @@ Deno.serve(async (req) => {
       else 확정.push(p);
     }
 
+    /* 카운터는 배치 지역값으로 세고 **커밋된 뒤에만** 누계에 더한다(재반박 경미 ⑤) — tx 안에서
+     * 전역을 올리면 롤백된 행이 500 응답에 「앉았다」로 나간다. 세트(방금·이미…)는 실패 시
+     * 즉시 return 이라 오염이 다음 배치에 닿지 않는다. */
+    let 배치승격 = 0;
+    let 배치중복 = 0;
     try {
       await sql.begin(async (tx) => {
         for (const 행 of 확정) {
@@ -221,8 +238,8 @@ Deno.serve(async (req) => {
             )
             on conflict (learner_id, idempotency_key) do nothing
             returning event_id`;
-          if (!넣기.length) { 중복수 += 1; continue; }
-          승격수 += 1;
+          if (!넣기.length) { 배치중복 += 1; continue; }
+          배치승격 += 1;
           const event_id = String(넣기[0].event_id);
 
           const p = 행.payload as Record<string, unknown> | undefined;
@@ -249,16 +266,24 @@ Deno.serve(async (req) => {
       });
     } catch (e) {
       /* 배치 롤백 — 반쯤 승격된 «배치»를 남기지 않는다. 앞 배치들은 이미 닫혔고 그게 맞다:
-       * 멱등이라 다음 실행이 이 배치부터 다시 간다(커서는 저장 안 한다 — 이미승격이 대신한다). */
+       * 멱등이라 다음 실행이 이 배치부터 다시 간다. `승격` 은 커밋된 수만 담는다(경미 ⑤). */
       console.error('[radio-promote] 승격 트랜잭션 실패(배치 ' + 배치수 + ')', String((e as Error)?.message ?? e));
       return 봉투(500, { error: 'promote_failed', 배치: 배치수, 검토, 승격: 승격수 });
     }
+    승격수 += 배치승격;
+    중복수 += 배치중복;
 
     if (메시지들.length < 배치크기) { 완주 = true; break; }
   }
 
-  /* 분모 명시(§9) — 몇 건 보고 몇 건 넣고 몇 건 왜 뺐나. 「조용한 0」이 이 응답의 적이다.
-   * `잘림` 은 「이번 실행이 창을 다 못 걸었다」다 — true 가 이어지면 배치 상한이나 주기를 본다. */
+  /* 잘림은 로그에도 낸다(새 치명 ② — cron 의 net.http_post 는 응답 본문을 소비하지 않는다.
+   * deliver 의 배치 미달 경고와 같은 자리·같은 채널이다). 응답 body 는 왕복시험 몫으로 그대로. */
+  if (!완주) {
+    console.error('[radio-promote] 🔴 잘림 — 시간 예산 안에 창을 다 못 걸었다(다음 실행이 잇는다)',
+      JSON.stringify({ 검토, 승격: 승격수, 배치: 배치수 }));
+  }
+
+  /* 분모 명시(§9) — 몇 건 보고 몇 건 넣고 몇 건 왜 뺐나. 「조용한 0」이 이 응답의 적이다. */
   return 봉투(200, {
     ok: true, ver, 검토, 승격: 승격수, 중복: 중복수, 제외: 제외셈,
     배치: 배치수, 잘림: !완주, 승격판,
