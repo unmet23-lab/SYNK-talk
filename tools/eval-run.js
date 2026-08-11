@@ -41,7 +41,9 @@ function 인자(이름, 기본 = null) {
   return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : 기본;
 }
 
-const 묶음크기 = 25;                       // Fn 즉시 통로 상한과 같은 이유(벽시계)
+/* 25로 잡았다가 실측에서 죽었다(08-12): 문항당 ~6초 순차라 25건이면 Edge Fn idle timeout
+ * 150초를 넘는다(HTTP 504 IDLE_TIMEOUT 실측). 12건 ≈ 72초 — 절반 여유. */
+const 묶음크기 = 12;
 const 대기들 = [5_000, 15_000, 45_000];    // 429·5xx — 잠시 뒤가 답이다
 const 잠깐 = (ms) => new Promise((r) => setTimeout(r, ms));
 
