@@ -14,6 +14,12 @@ const { 동봉묶기 } = require('../tools/원격배포.js');
 
 const 함수디렉터리 = path.join(__dirname, '..', 'supabase', 'functions', 'events');
 
+/* 번들 «기전»만 재는 검사는 미커밋검사를 끈다 — 켜 두면 결과가 내 코드가 아니라 **옆 세션의
+ * 작업본 상태**에 달린다(2026-08-12 실측: 남의 미커밋 lib 둘에 이 파일이 통째로 죽었다 —
+ * repo 밖 상태에 기대는 검사는 그 자리가 플레이크다). 검사 «자체»를 재는 테스트(F273·주입
+ * 관통)는 스파이를 따로 주입하므로 이 상수를 안 쓴다. */
+const 무검사 = () => {};
+
 /** 문자열을 .mjs 로 떨궈 실제 import 한다(Deno 가 할 일을 Node 로 미리 해 본다). */
 async function 임시import(이름, 내용) {
   const 방 = fs.mkdtempSync(path.join(os.tmpdir(), 'synk-동봉-'));
@@ -43,7 +49,7 @@ async function 임시import여럿(주인공, 묶음) {
  * `require` 가 없으므로 껍데기가 풀어 주지 않으면 **배포는 성공하고 첫 호출에서 죽는다.**
  * 그 실패는 여기서 잡지 않으면 라이브에서만 보인다. */
 test('동봉 — lib 끼리의 require 가 풀려 실제로 import 된다', async () => {
-  const 묶음 = 동봉묶기(path.join(__dirname, '..', 'supabase', 'functions', 'auth'));
+  const 묶음 = 동봉묶기(path.join(__dirname, '..', 'supabase', 'functions', 'auth'), 무검사);
   const m = await 임시import여럿('학생계정.mjs', 묶음);
   assert.strictEqual(typeof m.default.이메일, 'function', '이메일 함수가 default 로 나와야 한다');
   // 옆 모듈에서 온 값이 실제로 살아 있는지 — 껍데기만 통과하고 값이 undefined 면 여기서 죽는다.
@@ -54,7 +60,7 @@ test('동봉 — require 를 이름 있는 import 로 바꾸지 않는다 (껍�
   /* 🔴 실측 2026-08-06: `import { 정규형 } from './로그인코드.mjs'` 로 바꿨더니 껍데기가
    *   `export default` 하나만 내보내는 탓에 **import 시점 SyntaxError** 였다.
    *   배포는 성공하고 첫 호출에서 죽는 모양이라, 파일 텍스트로 못박는다. */
-  const 묶음 = 동봉묶기(path.join(__dirname, '..', 'supabase', 'functions', 'auth'));
+  const 묶음 = 동봉묶기(path.join(__dirname, '..', 'supabase', 'functions', 'auth'), 무검사);
   for (const [이름, src] of Object.entries(묶음)) {
     assert.ok(!/^\s*import\s*\{/m.test(src),
       `${이름}: 이름 있는 import 가 생겼다 — 껍데기는 default 만 내보내므로 import 에서 죽는다`);
@@ -69,7 +75,7 @@ test('동봉 — 표에 없는 파일을 require 하면 배포 전에 멈춘다'
   try {
     fs.writeFileSync(path.join(방, '동봉.json'),
       JSON.stringify({ '학생계정.mjs': 'lib/학생계정.js' }));   // 로그인코드를 일부러 뺐다
-    assert.throws(() => 동봉묶기(방), /동봉 표에 없다/,
+    assert.throws(() => 동봉묶기(방, 무검사), /동봉 표에 없다/,
       '옆 파일이 표에 없는데 통과했다 — 그러면 함수가 라이브에서 import 에 실패한다');
   } finally {
     fs.rmSync(방, { recursive: true, force: true });
@@ -84,7 +90,7 @@ test('동봉 — index.ts 가 import 하는데 표에 없으면 배포 전에 �
     fs.writeFileSync(path.join(방, '동봉.json'), JSON.stringify({ '오늘과제.mjs': 'lib/오늘과제.js' }));
     fs.writeFileSync(path.join(방, 'index.ts'),
       "import 과제 from './오늘과제.mjs';\nimport 토큰 from './토큰.mjs';\n");   // 토큰을 일부러 뺐다
-    assert.throws(() => 동봉묶기(방), /토큰\.mjs/,
+    assert.throws(() => 동봉묶기(방, 무검사), /토큰\.mjs/,
       '본체가 import 하는데 표에 없다 — 그러면 라이브가 첫 호출에서 죽는다');
   } finally {
     fs.rmSync(방, { recursive: true, force: true });
@@ -92,19 +98,19 @@ test('동봉 — index.ts 가 import 하는데 표에 없으면 배포 전에 �
 });
 
 test('동봉 — CJS 검증기가 ESM 으로 감싸여 실제로 import 된다', async () => {
-  const 묶음 = 동봉묶기(함수디렉터리);
+  const 묶음 = 동봉묶기(함수디렉터리, 무검사);
   const m = await 임시import('이벤트검증.mjs', 묶음['이벤트검증.mjs']);
   assert.strictEqual(typeof m.default.검증, 'function', '검증 함수가 default 로 나와야 한다');
 });
 
 test('동봉 — 계약 JSON 이 ESM 으로 감싸여 값목록을 그대로 낸다', async () => {
-  const 묶음 = 동봉묶기(함수디렉터리);
+  const 묶음 = 동봉묶기(함수디렉터리, 무검사);
   const m = await 임시import('계약.mjs', 묶음['계약.mjs']);
   assert.ok(Array.isArray(m.default.learning_events.값목록.event_type), 'event_type 값목록이 있어야 한다');
 });
 
 test('동봉 — 감싼 둘을 붙이면 계약 검증이 실제로 돈다(통과·거절 양쪽)', async () => {
-  const 묶음 = 동봉묶기(함수디렉터리);
+  const 묶음 = 동봉묶기(함수디렉터리, 무검사);
   const { default: 검증모듈 } = await 임시import('이벤트검증.mjs', 묶음['이벤트검증.mjs']);
   const { default: 계약 } = await 임시import('계약.mjs', 묶음['계약.mjs']);
 
@@ -131,7 +137,7 @@ test('동봉 — 감싼 둘을 붙이면 계약 검증이 실제로 돈다(통�
 });
 
 test('동봉 — 배포되는 것은 작업본이 아니라 HEAD 다', () => {
-  const 묶음 = 동봉묶기(함수디렉터리);
+  const 묶음 = 동봉묶기(함수디렉터리, 무검사);
   const head = require('child_process')
     .execFileSync('git', ['show', 'HEAD:계약/수집_교정_계약.json'], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
   assert.strictEqual(
@@ -194,6 +200,26 @@ test('나갈 것 — 본체가 묶음에 들고, 본체도 파일검사를 지�
     '배포묶음 의 기본 검사가 미커밋검사가 아니다 — 배포가 무검사로 돈다');
 });
 
+/* 🔴 2026-08-12 실측: 위 훅 주입이 **동봉에는 안 닿았다** — `동봉묶기` 가 `미커밋검사` 를 직접
+ * 불러 같은 판정이 두 곳에 살았고, 주입을 끈 읽기 대조(`배포대조.왕복전게이트`)가 남의 미커밋
+ * `lib/교정엔진.js` **하나**에 왕복시험 발화점 전부가 죽었다(230행 주석이 약속한 그 실패 — F073·F103).
+ * 검사 축: 훅이 동봉 경로 **전량**에 실제로 닿는가(실행) + 기본값은 여전히 막는가(소스 핀 —
+ * 깨끗한 작업본에선 no-op 과 미커밋검사가 같은 동작이라 실행으로는 그 상실을 못 본다). */
+test('나갈 것 — 동봉도 «주입된» 파일검사를 지난다 (남의 미커밋 lib 하나가 읽기 대조를 죽이던 자리)', () => {
+  const 동봉경로들 = Object.values(
+    JSON.parse(fs.readFileSync(path.join(함수디렉터리, '동봉.json'), 'utf8')));
+  assert.ok(동봉경로들.length > 0, '분모가 0이다 — 동봉 있는 함수를 골라야 이 검사가 성립한다(F207)');
+  const 검사한것 = [];
+  배포묶음(함수디렉터리, (경로) => 검사한것.push(경로));
+  for (const p of 동봉경로들) {
+    assert.ok(검사한것.includes(p),
+      `동봉 ${p} 이 주입 파일검사를 안 지났다 — 직접 미커밋검사로 되돌아가면 읽기 대조가 남의 작업본에 도로 죽는다`);
+  }
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'tools', '원격배포.js'), 'utf8'),
+    /function 동봉묶기\(디렉터리, 파일검사 = 미커밋검사\)/,
+    '동봉묶기 의 기본 검사가 미커밋검사가 아니다 — 배포 경로의 F273 보호를 잃었다');
+});
+
 /* ── DB 판 대조 (2026-08-08 실측 사고) ─────────────────────────────────────
  * 🔴 `deliver` 를 HEAD 에서 리허설에 올렸더니 **배포는 ✅**, 그 다음 배치가 전건 실패했다:
  *   `column "due_at" of relation "submissions" does not exist`. c10 커밋이 코드와
@@ -241,7 +267,7 @@ test('동봉 — .md 는 문자열 모듈이 되어 원문 그대로 import 된�
   try {
     fs.writeFileSync(path.join(방, '동봉.json'),
       JSON.stringify({ '교정프롬프트.mjs': 'prompts/교정.md' }));
-    const 묶음 = 동봉묶기(방);
+    const 묶음 = 동봉묶기(방, 무검사);
     const m = await 임시import('교정프롬프트.mjs', 묶음['교정프롬프트.mjs']);
     const 원문 = fs.readFileSync(path.join(__dirname, '..', 'prompts', '교정.md'), 'utf8');
     assert.equal(m.default, 원문, '동봉된 프롬프트가 원문과 다르다 — 베낀 것과 같아진다');
