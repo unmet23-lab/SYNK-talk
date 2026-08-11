@@ -244,8 +244,12 @@ const 배달본체 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'd
 test('배선 — deliver 가 상태를 계산해 개입 행에 스탬프한다', () => {
   assert.match(배달본체, /학습자상태\s*\(/, 'deliver 가 상태를 계산하지 않는다 — ⑦칸은 여전히 소비자 0 이다');
   /* 🔴 파일 어딘가에 이름이 있는지 보면 **안 된다**(변이로 실측): 주석과 타입 선언에도 같은
-   *   낱말이 있어서 INSERT 열 목록에서 통째로 빠져도 초록이었다. 첫 INSERT = 개입 행이다. */
-  const 열목록 = 배달본체.match(/insert into engine\.learning_events \(([\s\S]*?)\) values/);
+   *   낱말이 있어서 INSERT 열 목록에서 통째로 빠져도 초록이었다.
+   * 🔑 「첫 INSERT = 개입 행」 앵커도 죽었다 — ④가 게임 배정 INSERT 를 앞에 뒀다. 위치가
+   *   아니라 내용('intervention.delivered')으로 그 INSERT 를 집는다. */
+  const 개입조각 = 배달본체.split(/insert into engine\.learning_events/)
+    .find((s) => s.includes("'intervention.delivered'")) || '';
+  const 열목록 = 개입조각.match(/^\s*\(([\s\S]*?)\)\s*values/);
   assert.ok(열목록, '개입 INSERT 를 못 찾았다 — 질의 모양이 바뀌었으면 이 검사도 같이 옮긴다');
   for (const 열 of ['estimator_version', 'estimator_confidence', 'evidence_refs']) {
     assert.ok(열목록[1].includes(열), `개입 INSERT 열 목록에 ${열} 이 없다 — 셋이 함께 있어야 재계산 대조가 된다`);
@@ -260,8 +264,10 @@ test('배선 — 동봉 표에 있다(없으면 배포는 성공하고 함수가
 
 test('배선 — 사건 목록·창을 deliver 가 다시 적지 않았다(lib 에서 파생시킨다)', () => {
   const { 쓰는사건 } = require('../lib/학습자상태.js');
-  // deliver 가 자기 일로 쓰는 둘(task.assigned·submission.created)을 뺀 나머지는 나올 이유가 없다.
-  const 베낀것 = 쓰는사건.filter((t) => !['task.assigned', 'submission.created'].includes(t))
+  /* deliver 가 **자기 일로** 쓰는 셋을 뺀 나머지는 나올 이유가 없다 — 배정·제출 조인 둘에
+   * ④가 H3 재제출 조인(`correction.responded` · 발주 §6-6 ⑪)을 더했다. 원신호 목록의 사본이
+   * 아니라 자기 술어다 — 여기 더 늘어나면 정말 베낀 것인지부터 의심하라. */
+  const 베낀것 = 쓰는사건.filter((t) => !['task.assigned', 'submission.created', 'correction.responded'].includes(t))
     .filter((t) => 배달본체.includes(`'${t}'`));
   assert.deepEqual(베낀것, [], `질의가 사건 목록을 베꼈다(${베낀것}) — 축을 늘린 날 조용히 갈라진다`);
   assert.ok(배달본체.includes('창일수'), '창을 숫자로 박았다 — lib 과 갈라지면 축이 조용히 죽는다');

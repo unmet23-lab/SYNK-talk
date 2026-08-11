@@ -2,5 +2,7 @@
   "토큰.mjs": "lib/토큰.js",
   "오늘과제.mjs": "lib/오늘과제.js",
   "선택로그.mjs": "lib/선택로그.js",
-  "동의게이트.mjs": "lib/동의게이트.js"
+  "동의게이트.mjs": "lib/동의게이트.js",
+  "게임스냅샷.mjs": "lib/게임스냅샷.js",
+  "교수멘탈문항.mjs": "contents/교수멘탈문항.js"
 }

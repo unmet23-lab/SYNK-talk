@@ -30,6 +30,19 @@ import 과제모듈 from './오늘과제.mjs';
 import 출처모듈 from './사건출처.mjs';
 import 토큰모듈 from './토큰.mjs';
 import 상태모듈 from './학습자상태.mjs';
+import 게임모듈 from './게임배정.mjs';
+
+/* 게임(G1) 갈래 — 판정은 전부 lib 이 지고(발주 §6-6 ⑩·⑪) 여기는 행만 만든다.
+ * `재제출의사`·`게임챌린지` 는 H3 조인의 술어 값이다 — 리터럴을 여기 적으면 계약·팩과
+ * 두 곳에 살고, 갈라진 날 재제출 조인은 오류 없이 0건이 된다. */
+const { 게임배정, 재제출의사, 게임챌린지 } = 게임모듈 as {
+  재제출의사: string;
+  게임챌린지: string;
+  게임배정: (재료: Record<string, unknown>) => {
+    task_ref: string; task_type: string; task_snapshot: Record<string, unknown>;
+    task_schema_ver: string; retry_of_event_id: string | null; degraded: boolean; 출처: string;
+  } | null;
+};
 
 const { 서비스역할, 토큰주체, 발급시각 } = 토큰모듈 as {
   서비스역할: (req: Request) => boolean;
@@ -172,6 +185,7 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
     select l.learner_id, l.level_current, l.goal_track,
            배정.occurred_at as 마지막배정, 배정.task_snapshot as 마지막스냅샷,
            교정.corrected_text as 교정문, 교정.원사건, 동의.consent_ver, 동의.consent_id,
+           재제출.원제출사건, 재제출.원시드,
            원신호.행들 as 원신호
       from engine.learners l
       left join lateral (
@@ -200,8 +214,35 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
           join engine.learning_events e on e.event_id = s.event_id
          where e.learner_id = l.learner_id
            and c.corrected_text is not null
+           and s.task_type = ${통로}
            and c.created_at > coalesce(배정.occurred_at, '-infinity'::timestamptz)
          order by c.created_at desc limit 1) 교정 on true
+      /* H3(발주 §6-6 ⑩) — 「고쳐서 다시 보낼래요」가 눌린 게임(G1) 교정 중 **재배정이 아직
+       * 없는** 원 제출. 게임 교정은 위 ②슬롯을 안 탄다(바로 위 task_type 한정 — 메일 교정문을
+       * 낭독 문장으로 내보내는 사고를 막는다 · C3) — 배달 통로가 답장 화면(/corrections)이라
+       * 워터마크와 무관하고, 재제출 판은 다음 게임날 새 배정 행이 낸다.
+       * · 닻은 시각이 아니라 「retry_of_event_id 로 잇는 배정의 부재」다 — 날을 놓쳐도 안
+       *   사라진다(워터마크였다면 게임 미룬 날마다 증발했을 자리).
+       * · 원 제출의 시드를 함께 걷는다 — 재제출은 «같은 메일»을 다시 쓰는 것이라 새 문항을
+       *   지어내면 고리의 뜻이 죽는다.
+       * ⚠ 이 주석은 sql 템플릿 리터럴 «안»이다 — 백틱을 쓰면 리터럴이 여기서 끊긴다(F180). */
+      left join lateral (
+        select e2.event_id as 원제출사건, s2.task_snapshot->>'prompt_seed' as 원시드
+          from engine.learning_events r
+          join engine.corrections c2 on c2.correction_id = r.correction_id
+          join engine.submissions s2 on s2.submission_id = c2.submission_id
+          join engine.learning_events e2 on e2.event_id = s2.event_id
+         where r.learner_id = l.learner_id
+           and r.event_type = 'correction.responded'
+           and r.payload->>'learner_response' = ${재제출의사}
+           and e2.event_type = 'submission.created'
+           and s2.task_snapshot->>'challenge_id' = ${게임챌린지}
+           and not exists (
+             select 1 from engine.learning_events t
+              where t.learner_id = l.learner_id
+                and t.event_type = 'task.assigned'
+                and t.retry_of_event_id = e2.event_id)
+         order by r.occurred_at desc limit 1) 재제출 on true
       /* 🔴 동의 술어는 lib/동의게이트.js 의 「지금유효술어」와 **같아야 한다** — 2026-08-07 실측:
        *   여기만 agreed_at 조건이 없고 revoked_at is null 이라 **양쪽으로 어긋나 있었다.**
        *   · 미래 날짜 동의 → 배정은 되는데 uploads 는 403 (과제를 보고도 못 올린다)
@@ -282,6 +323,92 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
     return { learner_id, status: 'skipped', 사유: 'consent_missing' };
   }
 
+  const 지금 = new Date().toISOString();
+  const 공통 = {
+    actor_kind: 'ai' as const,   // 배치가 만드는 사건의 행위자(§10-A-1 — `system` 을 새로 만들지 않는다)
+    level_snapshot: (학생.level_current ?? null) as string | null,
+    goal_snapshot: (학생.goal_track ?? null) as string | null,
+    consent_ver: String(학생.consent_ver),
+    // 동의 귀속(20260807120000) — 위 consent_ver 게이트가 무동의를 걸렀으니 여기선 항상 있다.
+    consent_id: String(학생.consent_id),
+  };
+
+  /* ── 게임(G1) 갈래 — 배정 배선 ④ (발주 §6-6 ⑩·⑪) ──────────────────────────
+   * 판정은 전부 `lib/게임배정.js` 가 진다(검수확정 게이트 · 게임날 · 첫날 · C3 교정문 우선 ·
+   * 초급 제외 · H3 재제출). null 이면 아래 말하기 경로가 그대로 받는다 — 게임이 못 서는 날
+   * 학생이 빈손이 되는 갈래는 없다.
+   * 🔴 판정도 학생별로 삼킨다 — 한 학생의 깨진 재료(못 펴는 시드 등)가 던지면 배치 전체가
+   *   500 이 된다(C0 §4-1 head-of-line blocking · 배정 배선 기각 실측 W). 실패는 말하기로
+   *   내려간다: 게임은 다음 게임날이 있지만 그날의 말하기 발화는 소급이 없다. */
+  let 게임: ReturnType<typeof 게임배정> = null;
+  try {
+    게임 = 게임배정({
+      learner_id,
+      날짜: 오늘,
+      첫날: !학생.마지막배정,
+      교정문: 학생.교정문 ?? null,
+      급수: 학생.level_current ?? null,
+      재제출: 학생.원제출사건
+        ? { 원사건: String(학생.원제출사건), 원시드: (학생.원시드 ?? null) as string | null }
+        : null,
+    });
+  } catch (e) {
+    console.error('[deliver] 게임 판정 실패(말하기로 내려간다)', learner_id, String((e as Error)?.message ?? e));
+  }
+
+  if (게임) {
+    const g = 게임;
+    try {
+      return await sql.begin(async (tx) => {
+        /* 개입 행이 없다(발주 §8 — v1 답장은 대본이라 학습 신호 0 · 성과회수 닻 오염 방지).
+         * 멱등키는 말하기와 **같은 자리**(`task:{learner}:{날짜}`)다 — 그래서 「그날 배정 1건」
+         * (⑩ 전제)이 문서가 아니라 유일 제약으로 성립하고, 낮에 말하기가 먼저 섰던 날의
+         * 재실행도 여기서 duplicate 로 접힌다. */
+        const 배정 = await tx`
+          insert into engine.learning_events (
+            learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
+            level_snapshot, goal_snapshot, consent_ver, consent_id, degraded,
+            retry_of_event_id, source_kind, payload, schema_ver
+          ) values (
+            ${learner_id}::uuid, 'task.assigned', ${g.task_type}, ${공통.actor_kind},
+            ${지금}::timestamptz, ${멱등키('task', learner_id, 오늘)},
+            ${공통.level_snapshot}, ${공통.goal_snapshot},
+            ${공통.consent_ver}, ${공통.consent_id}::uuid, ${g.degraded},
+            ${g.retry_of_event_id}::uuid,
+            ${사건출처('task.assigned')}::engine.source_kind, ${sql.json({ ver: 1 })}, ${ver}
+          )
+          on conflict (learner_id, idempotency_key) do nothing
+          returning event_id`;
+
+        if (!배정.length) {
+          return { learner_id, status: 'duplicate', degraded: g.degraded, 출처: g.출처 };
+        }
+
+        /* 그날 학생이 볼 것 그대로 — 스냅샷은 배정·제출이 같은 조립(`G1스냅샷`)을 지난다
+         * (§6-8 규칙 4). `task_schema_ver` 도 그 조립의 판이다(말하기 task.v1 과 다른 축).
+         * due 규칙은 말하기와 같다 — 마감의 정의가 통로마다 갈리면 습관 축이 두 자로 재진다. */
+        await tx`
+          insert into engine.submissions (
+            event_id, task_type, task_ref, task_snapshot, task_schema_ver, occurred_at, schema_ver,
+            due_at, due_ver
+          ) values (
+            ${배정[0].event_id}::uuid, ${g.task_type}, ${g.task_ref},
+            ${sql.json(g.task_snapshot)}, ${g.task_schema_ver}, ${지금}::timestamptz, ${ver},
+            (${오늘}::date + 1)::timestamp at time zone ${시간대}::text, 'due.v1'
+          )`;
+
+        return {
+          learner_id, status: 'assigned', event_id: 배정[0].event_id,
+          intervention_id: null, degraded: g.degraded, 출처: g.출처,
+        };
+      });
+    } catch (e) {
+      const 글 = String((e as Error)?.message ?? e);
+      console.error('[deliver] 게임 배정 실패', learner_id, 글);
+      return { learner_id, status: 'failed', 사유: 글.slice(0, 200) };
+    }
+  }
+
   const 결정 = 오늘과제({
     날짜: 오늘,
     첫날: !학생.마지막배정,
@@ -308,7 +435,6 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
   /* 개입 하나에 붙는 식별자다 — `event_id`(사건 채번)와 축이 다르다. 두 행이 **같은 값**을
    * 들어야 나중에 성과가 「어느 개입에 대한 것인가」를 이 값 하나로 잇는다(C0 §4-1 계승). */
   const intervention_id = crypto.randomUUID();
-  const 지금 = new Date().toISOString();
 
   /* 🔴 **사슬 ⑦칸이 여기서 처음 돈다** — 쌓인 원신호를 읽어 그 시점의 상태를 파생하고, 그
    *   결과를 개입 행에 스탬프한다(엔진도달_설계 §3 경로 A).
@@ -328,15 +454,6 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
   } catch (e) {
     console.error('[deliver] 학습자 상태 계산 실패(배달은 계속한다)', learner_id, String((e as Error)?.message ?? e));
   }
-  const 공통 = {
-    actor_kind: 'ai' as const,   // 배치가 만드는 사건의 행위자(§10-A-1 — `system` 을 새로 만들지 않는다)
-    level_snapshot: (학생.level_current ?? null) as string | null,
-    goal_snapshot: (학생.goal_track ?? null) as string | null,
-    consent_ver: String(학생.consent_ver),
-    // 동의 귀속(20260807120000) — 위 consent_ver 게이트가 무동의를 걸렀으니 여기선 항상 있다.
-    consent_id: String(학생.consent_id),
-  };
-
   try {
     return await sql.begin(async (tx) => {
       // ① 무엇을 배달했나 — 강등이면 `ai` + `degraded` 조합이 「AI 자리인데 AI가 못 했다」를 담는다.

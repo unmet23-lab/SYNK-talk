@@ -1135,8 +1135,12 @@ test('③ 자기 처방 — 「판을 올리고 장부에 줄을 추가한다」
 test('🔴 배달이 그 판을 **행에 박는다** — 순수 함수만 서 있으면 칸은 여전히 빈다', () => {
   const 소스 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'deliver', 'index.ts'), 'utf8');
   /* 파일 어딘가에 낱말이 있는지가 아니라 **개입 insert 안**에 있는지를 본다 — 낱말 검사는
-   * 주석에 이름만 남겨도 초록이 된다(이 파일이 이미 변이로 겪은 자리). */
-  const 개입insert = (소스.match(/insert into engine\.learning_events[\s\S]*?returning event_id, intervention_id/) || [''])[0];
+   * 주석에 이름만 남겨도 초록이 된다(이 파일이 이미 변이로 겪은 자리).
+   * 🔑 「첫 insert」 로 집지 않는다 — ④가 게임 배정 insert 를 개입 insert 앞에 두면서 위치
+   *   앵커가 죽었다(엉뚱한 열 목록을 재고 빨개진다). 문서 위치가 아니라 내용으로 집는다. */
+  const 개입insert = 소스.split(/insert into engine\.learning_events/)
+    .filter((s) => s.includes("'intervention.delivered'"))
+    .map((s) => `insert into engine.learning_events${s}`)[0] || '';
   assert.ok(개입insert.length > 400, '개입 insert 를 못 떼어냈다 — 못 잰 것을 통과로 접지 않는다');
   const 열목록 = (개입insert.match(/\(([\s\S]*?)\)\s*values/) || ['', ''])[1];
   assert.ok(/\bpolicy_ver\b/.test(열목록),
