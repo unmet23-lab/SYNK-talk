@@ -42,3 +42,6 @@ supabase/.branches/
 .claude/settings.local.json
 .claude/worktrees/
 .orca/
+
+# BGM 생성물 — 정본은 tools/BGM빌드.js(결정적 렌더 · 1MB 가드) · postinstall 이 재생성
+assets/bgm/*.wav
