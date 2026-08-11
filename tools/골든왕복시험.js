@@ -224,6 +224,27 @@ async function main() {
 
   /* ── ④ judge 성공 — 원자성·감사 순서 ────────────────────────────── */
   console.log('\n■ ④ judge 성공 — 골든 행 + 감사가 한 벌 · target_ids 순서');
+  /* 계측기(성적표)는 죽어도 제품 단언은 계속 돈다 — 실패를 die 로 받으면 성적표 쪽 사고
+   * (API 429·stdout 오염) 하나가 ④⑤ 의 제품 단언 전부를 가리고 분모 없이 죽는다(F207).
+   * 실패 = 확인 1건(적색)으로 남기고 null 을 돌려, 분모 단언만 건너뛴다.
+   * `--지금` 앵커 = 세 측정이 같은 창을 본다(창이 미끄러지면 옳은데 off-by-one 적색). */
+  const 창앵커 = new Date().toISOString();
+  const 성적표돌리기 = (라벨) => {
+    const p = spawnSync(process.execPath,
+      [path.join(__dirname, '성적표.js'), '--json', '--지금', 창앵커],
+      { encoding: 'utf8', cwd: path.resolve(__dirname, '..') });
+    try {
+      if (p.error || p.status !== 0) throw new Error(String(p.error || p.stderr).slice(0, 300));
+      return JSON.parse(p.stdout);
+    } catch (e) {
+      확인(`성적표를 잴 수 있었다(계측기 · ${라벨})`, false, String(e.message || e));
+      return null;
+    }
+  };
+  /* 🔴 기준선은 판정 **앞**에서 잰다 — 「내 판정이 세어지는가」(④)와 「오염이 안 세어지는가」(⑤)는
+   * 다른 축이라 따로 문다. 초판은 판정 뒤에 잰 값에 `+ 성공수` 를 기대해 두 축을 한 단언에 뭉쳤고,
+   * 그 단언은 이미 세어진 것을 두 번 세라는 뜻이라 **제품이 옳아도 영원히 빨갛다**(08-11 실측). */
+  const 기준선 = 성적표돌리기('기준선');
   const 판정감사전 = await 감사수('teach.gold.judge');
   const 고친문장 = `${대상.transcript} — 강사 손질`;
   r = await 부르기('gold/judge', {
@@ -269,15 +290,16 @@ async function main() {
     if (r2.status === 200) 성공수 += 1;
   }
 
+  /* ④ 축 마감 — 오염을 심기 전에 잰다(⑤ 헤더 아래 찍히면 오염 축 결함으로 오독된다). */
+  const 전 = 성적표돌리기('판정 후');
+  if (기준선 && 전) {
+    확인(`④ 내 판정이 분모에 세어졌다 (${기준선.분모}→${전.분모} · 판정 ${성공수}건)`,
+      전.분모 === 기준선.분모 + 성공수,
+      { 기준선: 기준선.분모, 전: 전.분모, 성공수, 층델타: { 기준선: 기준선.층, 전: 전.층 }, 참고: '어긋나면 같은 리허설 DB 의 병행 판정 의심' });
+  }
+
   /* ── ⑤ 인수 ⓑ — 검수 확정 모양을 심어도 성적표는 0으로 센다 ───────── */
   console.log('\n■ ⑤ 인수 ⓑ — 오염 시험(골든 소속의 정본이 감사 원장인가)');
-  const 성적표돌리기 = () => {
-    const p = spawnSync(process.execPath, [path.join(__dirname, '성적표.js'), '--json'],
-      { encoding: 'utf8', cwd: path.resolve(__dirname, '..') });
-    if (p.error || p.status !== 0) die(`성적표 실행 실패: ${p.error || p.stderr}`);
-    return JSON.parse(p.stdout);
-  };
-  const 전 = 성적표돌리기();
   const [오염] = await sql(`
     insert into engine.corrections
       (submission_id, reviewed_correction_id, actor_kind, verdict, verdict_reason,
@@ -286,11 +308,16 @@ async function main() {
             ${따옴(VERDICT.AI)}, ${따옴('오염 픽스처 — 검수 확정 모양(teach 감사 없음)')},
             ${따옴(강사.uid)}, ${따옴('전사')}, ${따옴(판)})
     returning correction_id`);
-  const 후 = 성적표돌리기();
-  확인(`🔴 인수 ⓑ — 분모가 내 판정(${성공수}건)만큼만 늘고 오염 행은 0으로 계수 (${전.분모}→${후.분모})`,
-    후.분모 === 전.분모 + 성공수, { 전: 전.분모, 후: 후.분모, 성공수 });
-  확인('오염 행 id 가 성적표 산출물 어디에도 없다',
-    !JSON.stringify(후).includes(String(오염.correction_id)));
+  const 후 = 성적표돌리기('오염 후');
+  if (전 && 후) {
+    확인(`🔴 인수 ⓑ — 오염 행은 0으로 계수, 분모 불변 (${전.분모}→${후.분모})`,
+      후.분모 === 전.분모, { 전: 전.분모, 후: 후.분모 });
+  }
+  /* 후 가 null 이면 계측기 확인이 이미 적색이다 — null 위에서 돌리면 「미실행=통과」가 된다. */
+  if (후) {
+    확인('오염 행 id 가 성적표 산출물 어디에도 없다',
+      !JSON.stringify(후).includes(String(오염.correction_id)));
+  }
 
   보고(`주 ${주키} · 풀 ${풀.length} · 표본 ${지역표본.length} · 판정 ${성공수}건 · 오염 픽스처 ${String(오염.correction_id).slice(0, 8)}`);
 }
