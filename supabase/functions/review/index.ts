@@ -543,8 +543,10 @@ async function 승인(본문: unknown, staff_id: string, ver: string) {
       };
     }
 
-    /* 게이트 ① — 청취. ⚠ 오늘 `문턱.재료` 는 **항상 false** 다(`stt_segments` 생산자 0 ·
-     *   `lib/검수확정.js` 머리말). 그 사실을 응답에 실어 화면·로그가 「게이트가 세다」로
+    /* 게이트 ① — 청취. ⚠ `문턱.재료` 는 행에 `stt_segments` 가 있을 때만 true 다.
+     *   생산자는 섰지만(`functions/transcribe` · 08-09) 행은 합성 발화 2건뿐이라(08-11)
+     *   옛 행 전부에서 여전히 false 고, 재료가 와도 30초 윈도우 해상도 문제가 남는다
+     *   (`lib/검수확정.js` 머리말). 그 사실을 응답에 실어 화면·로그가 「게이트가 세다」로
      *   읽지 않게 한다 — 미측정을 통과로 두지 않는다. */
     const 문턱 = 청취문턱(재료.stt_segments);
     if (q.review_listened_ms < 문턱.ms) {
