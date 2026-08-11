@@ -92,6 +92,7 @@
     "라이브_대응": {
       "occurred_at": ["제출일"],
       "ingested_at": ["created_at"],
+      "schema_ver": ["schema_ver"],
       "learner_id": ["student_id"],
       "level_snapshot": ["급수"],
       "task_ref": ["숙제ID"],
@@ -105,7 +106,7 @@
       "audio_ref": ["audio_ref"]
     },
     "미구현": [
-      "event_id", "correlation_id", "idempotency_key", "schema_ver",
+      "event_id", "correlation_id", "idempotency_key",
       "skill_ids", "skill_taxonomy_ver", "task_type", "task_format", "event_type",
       "retry_of_event_id", "parent_event_id", "turn_no", "goal_snapshot", "correction_id",
       "due_at", "due_ver",
@@ -141,7 +142,6 @@
       "transcript_verified": "c5 신설 — 사람이 **들린 대로** 되돌린 전사. 🔴Whisper는 오발음을 정타로 「고쳐 듣기」 한다(학생이 발음한 「작다」를 「적다」로 정규화). 한 칸이면 파인튜닝 **입력쪽이 소실**된다. 🚫두 칸의 차이를 `오류태그`의 mishearing 으로 만들지 않는다 — 학생 오류가 아니라 기계 오류일 수 있어 라벨이 거짓이 된다.",
       "estimator_confidence": "A-10 ③의 추정 신뢰도다. **라벨 축의 `confidence`(학생이 스스로 매긴 확신도 · 라이브 quiz_log에 이미 있다)와 다른 것이라 이름을 갈랐다** — 둘 다 `confidence`로 두면 「AI가 얼마나 확신하나」와 「학생이 얼마나 확신하나」가 한 칸에서 섞인다(2026-08-05 L0 대조에서 잡힘).",
       "consent_ver": "이벤트 행에는 없다. 라이브의 행 단위 스탬프(`음성동의버전`·엔진_폼리포트.js 동의버전스탬프_)는 상담데이터입력의 **학생 행**에 찍히고 **첫 판만** 기록한다(스탬프 불변). 그래서 학생이 나중에 다른 판에 동의해도 그 뒤 이벤트가 어느 판 아래 수집됐는지 조인으로 복원되지 않는다 — 소급 불가.",
-      "schema_ver": "이 파일의 `버전`을 행이 스스로 들고 있게 하는 열(부록 A-8 · 유호님 확정 「넣어」). 과거 행은 영원히 빈칸이라 늦을수록 빈칸이 늘어난다.",
       "selection_reason": "왜 그것을 골랐나. **선택 자체(무엇)는 c3가 이미 잡지만 이유는 그 순간에만 있다** — 나중에 물으면 다른 답이 나온다(회상 편향). 학생에게 매번 묻지 않는다(질문 총량 상한 · §9 능동 학습 조건). 물었을 때만 채우고, 안 물었으면 빈칸이지 0이 아니다. 운영 판단(상담 3안 중 선택)도 같은 필드다.",
       "rejected_all": "제시된 후보를 **전부 거절**했다(=우리 안이 다 틀렸다). `skipped`(무반응·건너뜀)와 다른 사건인데 c3는 둘을 구분할 수단이 없었다 — 합치면 「관심 없었다」와 「전부 아니었다」가 한 칸에서 섞여 개인화가 잘못 배운다. 전량 기각일 때 `selected_option`은 null이고 `selection_reason`이 가장 값지다.",
       "cited_refs": "그 답에 실제로 실린 지식 노트 참조 목록(§9 ⑤ 호출·인용 로그). `evidence_refs`(추정메타 — 추정의 근거)와 다르다: 이쪽은 **생성에 들어간 입력**이다. 없으면 지식 노트가 틀린 것을 알아도 **이미 나간 답**을 못 찾아 미래분만 고친다(A-5 회수의 전제). 자리만 지금 내고, 채우는 것은 RAG 도입일부터 첫날 강제 — 나중에 붙이면 그 사이 답들은 영원히 출처 미상이다.",
