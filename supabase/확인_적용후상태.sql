@@ -67,6 +67,9 @@ with 기대열(t, c) as (values
   select tablename from pg_tables where schemaname='engine'
   union all
   select viewname from pg_views where schemaname='engine'
+), 라디오테이블(t) as (
+  -- radio 는 아직 뷰가 0이다 — 첫 뷰(구간 귀속·「그날」)가 서는 조각이 여기에 union 을 더한다.
+  select tablename from pg_tables where schemaname='radio'
 ), 빠진열 as (
   select string_agg(t||'.'||c, ', ' order by t, c) v from 기대열 e
    where not exists (
@@ -163,7 +166,27 @@ with 기대열(t, c) as (values
   -- ②-17 이 지목한 세 열이 판에 실렸나 — 0이어야 한다(L0 §4-5 ②-1 「안 연다」의 실측).
   (select count(*) from information_schema.columns
     where table_schema='engine' and table_name='review_queue'
-      and column_name in ('body_original','task_snapshot','redaction_result')) as 검수판원문
+      and column_name in ('body_original','task_snapshot','redaction_result')) as 검수판원문,
+  -- ── 라디오 원장(20260811160000 · radio 스키마 — engine 칸을 안 건드린다) ──
+  -- 표 6 · RLS 6 · 정책 0(전면 거부가 정상 — 정책이 생기는 순간 노출 설계가 필요하다).
+  (select count(*) from pg_tables where schemaname='radio') as 라디오표수,
+  (select count(*) from pg_tables where schemaname='radio' and rowsecurity) as 라디오RLS수,
+  (select count(*) from pg_policies where schemaname='radio') as 라디오정책수,
+  (select count(*) from 대상역할 r cross join 라디오테이블 t cross join 대상권한 p
+    where has_table_privilege(r.r, format('%I.%I','radio',t.t), p.p)) as 라디오새는권한,
+  (select count(*) from 대상역할 r
+    where has_schema_privilege(r.r, to_regnamespace('radio'), 'USAGE')) as 라디오새는스키마,
+  (select count(*) from pg_constraint
+    where connamespace=to_regnamespace('radio')
+      and conname='broadcast_segment_kind_c10') as 라디오kind제약,
+  -- 링크 보호 트리거 — 존재가 아니라 **켜짐**을 센다(engine 트리거상태와 같은 이유).
+  (select count(*) from pg_trigger g
+     join pg_class c2 on c2.oid=g.tgrelid
+    where c2.relnamespace=to_regnamespace('radio')
+      and g.tgname='viewer_link_protect' and g.tgenabled in ('O','A')) as 연동보호트리거,
+  -- 활성 링크는 채널당 1개 — 부분 유일 인덱스가 서 있어야 §3 의 유일성이 물리다.
+  (select count(*) from pg_indexes
+    where schemaname='radio' and indexname='viewer_link_active') as 연동활성유일
 )
 select case when 테이블수=11 and RLS켜짐=11 and 정책수=7
              and 새는테이블권한=0 and 새는스키마권한=0
@@ -171,13 +194,16 @@ select case when 테이블수=11 and RLS켜짐=11 and 정책수=7
              and 잡없는제출=0 and 검수뷰=1 and 옛검수정책=0
              and 마감없는배정=0 and 분모칸오염=0 and 폐기사유없는폐기=0
              and 검수판열=22 and 검수판원문=0
+             and 라디오표수=6 and 라디오RLS수=6 and 라디오정책수=0
+             and 라디오새는권한=0 and 라디오새는스키마=0
+             and 라디오kind제약=1 and 연동보호트리거=1 and 연동활성유일=1
              and (select v from 빠진열) is null
              and (select v from 빠진제약) is null
              and (select v from 빠진트리거) is null
-             and (select version from 현재이력)='20260809090000'
-              and (select checksum from 현재이력)='069f79efa1604a7f15e5c570e001b2318fc8699f320c9e7cd65ec49b1d2bf6b3' -- migration-checksum
+             and (select version from 현재이력)='20260811160000'
+              and (select checksum from 현재이력)='26add75082845c81c60e696bf9e3943eb74bb321a47bd4cc1c1e71e126d03d59' -- migration-checksum
             then '✅ 전부 통과'
-            else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·7·0·0·3·1·0·0·1·0·0·0·0·22·0 · 빠진 칸은 전부 비어 있어야 합니다)'
+            else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·7·0·0·3·1·0·0·1·0·0·0·0·22·0·6·6·0·0·0·1·1·1 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
        (select version from 현재이력) as 현재버전,
        (select checksum from 현재이력) as checksum,
