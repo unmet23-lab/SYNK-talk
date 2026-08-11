@@ -74,6 +74,9 @@ function 봉투(status: number, body: Record<string, unknown>) {
 }
 
 Deno.serve(async (req) => {
+  /* 예산 시계는 핸들러 첫 줄에서 돈다(3차 반박) — 프리페치 뒤에서 시작하면 실제 벽시계가
+   * 「프리페치 + 예산」이 되어 Edge 한도(실측 idle 150s)를 예산이 못 지킨다. */
+  const 시작ms = Date.now();
   if (req.method !== 'POST') return 봉투(405, { error: 'method_not_allowed' });
   if (!서비스역할(req)) return 봉투(403, { error: 'service_role_only' });
 
@@ -133,11 +136,15 @@ Deno.serve(async (req) => {
    * 접으면 µs 가 잘려 경계 행을 매 배치 다시 읽고, 같은 ms 에 배치크기 이상이 몰리면 전진이
    * 멈춘다. text 왕복은 µs 를 그대로 보존한다. */
   let 커서: { sent_at글자: string; message_id: string } | null = null;
-  const 시작ms = Date.now();
 
   while (배치수 < 최대배치 && Date.now() - 시작ms < 시간예산ms) {
+    /* 커서 직렬화는 to_char 로 형식을 못박는다(3차 반박) — `::text` 는 세션 DateStyle GUC 를
+     * 타서 롤 설정이 갈리는 날 커서가 조용히 어긋난다. 이 형식은 어느 DateStyle 에서도
+     * 같은 값으로 되읽힌다(TimeZone=UTC 실측 · µs 보존). */
     const 메시지들 = await sql`
-      select message_id, channel_id, body, sent_at, sent_at::text as sent_at글자, command_kind, command_arg
+      select message_id, channel_id, body, sent_at,
+             to_char(sent_at at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS.US') || '+00' as sent_at글자,
+             command_kind, command_arg
         from radio.chat_message
        where command_kind = any(${Object.keys(승격표)})
          and sent_at > now() - make_interval(days => ${되돌아보기일})

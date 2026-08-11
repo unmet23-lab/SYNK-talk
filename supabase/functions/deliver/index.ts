@@ -56,7 +56,11 @@ const { 사건출처 } = 출처모듈 as { 사건출처: (event_type: string) =>
  * 상한을 먼저 채우면 앱 제출이 창에서 잘려 나간 «뒤에» 필터가 남은 라디오 행을 버린다 —
  * 제출률이 반대로(과소) 거짓말한다(재현: 라디오 20건/일 → 1.00 이 0.23). 어떤 축도 라디오
  * `submission.created` 를 안 쓰므로(리듬·끈기=앱만 · 작성과정=compose_meta 없음) 여기서
- * 빼는 것은 신호 손실 0 이고, lib 필터는 다른 호출자(성과계기판)의 방어로 남는다. */
+ * 빼는 것은 신호 손실 0 이고, lib 필터는 다른 호출자(성과계기판)의 방어로 남는다.
+ * ⚠ where 절의 `task_type is not null` 은 장식이 아니다(3차 반박) — SQL 3값논리에서
+ * `null = any(...)` 는 NULL 이고 `not (true and null)` 도 NULL 이라, 그 줄이 없으면
+ * **task_type 없는 옛 앱 제출이 통째로 버려진다**(lib 필터의 `includes(null)=false` 와
+ * 같은 뜻을 SQL 로 못박는 줄이다 — 회귀 v6 「옛 행은 그대로 센다」의 SQL 층 짝). */
 const { 라디오태스크종 } = 라디오태스크모듈 as { 라디오태스크종: string[] };
 /* 사슬 ⑦칸(엔진이 배운다)의 첫 소비자. 🔴 상태를 **저장하지 않는다** — 계산해서 그 개입
  * 사건에 스탬프한다(엔진도달_설계 §3 경로 A · 제품방향 불변식 6 「🚫C·D 파생 테이블 지금 신설」).
@@ -295,6 +299,7 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
                  where e.learner_id = l.learner_id
                    and e.event_type = any(${쓰는사건}::text[])
                    and not (e.event_type = 'submission.created'
+                            and e.task_type is not null
                             and e.task_type = any(${라디오태스크종}::text[]))
                    and e.occurred_at >= now() - make_interval(days => ${창일수})) y
              where y.몇째 <= ${종별상한}) x) 원신호 on true
