@@ -23,7 +23,11 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 
 const 붓는곳 = {
-  '명부 통로(실학생)': ['tools/명부등록.js'],
+  /* 문은 둘, 규칙은 한 벌 — 두 자리 다 판정을 `lib/명부규칙.js` 하나에서 가져온다(E² 명부 스윕 ·
+   * 철학정합 §3-E-2 · 유호 채택 08-11). `roster-ingest` 는 앱이 닿는 문이 아니다 — 좁은 시크릿
+   * (`x-roster-ingest-key`)이 잠그고 호출자는 appsscript 아침 스윕 하나다. 계정은 여전히
+   * 아무도 만들지 않는다(F269 의 급소는 계정이지 명부 행이 아니다). */
+  '명부 통로(실학생)': ['tools/명부등록.js', 'supabase/functions/roster-ingest/index.ts'],
   '시험 시딩(리허설 픽스처)': [
     'tools/왕복시험.js', 'tools/인증왕복시험.js', 'tools/교정왕복시험.js', 'tools/배달왕복시험.js',
     'tools/검증_마이그레이션.sh',
@@ -39,12 +43,21 @@ test('탐지력 픽스처 — 붓는 문장을 표기가 흔들려도 잡는다'
   assert.ok(!붓는패턴.test('insert into engine.learning_events(x)'), '다른 표를 명부로 센다');
 });
 
-test('🔴 실학생 명부를 붓는 자리는 **하나**다', () => {
-  assert.deepEqual(붓는곳['명부 통로(실학생)'], ['tools/명부등록.js'],
-    '통로가 둘이 되면 검증 규칙이 갈라지고, 갈라진 것을 아무도 못 본다(F269)');
+test('🔴 실학생 명부를 붓는 문은 **선언된 둘**뿐이고, 둘 다 같은 규칙 lib 을 문다', () => {
+  assert.deepEqual(붓는곳['명부 통로(실학생)'],
+    ['tools/명부등록.js', 'supabase/functions/roster-ingest/index.ts'],
+    '문이 늘면 검증 규칙이 갈라질 자리부터 는다(F269) — 늘릴 거면 lib/명부규칙.js 를 먹는지부터 증명해라');
+  /* 선언만으로는 못 믿는다 — 소스가 규칙 lib 을 실제로 물고 있는지를 본다.
+   * 이게 풀리는 순간이 「규칙 두 벌」의 시작이고, 증상은 「앱에서 안 된다」뿐이다. */
+  const cli = fs.readFileSync(path.join(ROOT, 'tools', '명부등록.js'), 'utf8');
+  assert.match(cli, /require\('\.\.\/lib\/명부규칙\.js'\)/,
+    'CLI 가 규칙 lib 을 안 먹는다 — 판정이 두 벌로 갈라졌다');
+  const fn = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'roster-ingest', 'index.ts'), 'utf8');
+  assert.match(fn, /import\s+명부규칙\s+from\s+'\.\/명부규칙\.mjs'/,
+    '함수가 규칙 lib 동봉을 안 먹는다 — 판정이 두 벌로 갈라졌다');
 });
 
-test('🔴 실저장소 — 선언 안 된 곳에서 명부를 붓지 않는다 (서버 함수는 하나도 없다)', () => {
+test('🔴 실저장소 — 선언 안 된 곳에서 명부를 붓지 않는다 (서버 문은 roster-ingest 하나뿐)', () => {
   const 허용 = new Set(Object.values(붓는곳).flat());
   const 볼곳 = ['tools', 'lib', 'src', 'supabase/functions', 'supabase/migrations'];
 
@@ -68,9 +81,12 @@ test('🔴 실저장소 — 선언 안 된 곳에서 명부를 붓지 않는다 
   assert.ok(잰것.length > 40, `잰 파일이 ${잰것.length}개뿐이다 — 목록을 못 읽었을 수 있다`);
   assert.deepEqual(선언밖, [],
     `선언 안 된 곳이 명부를 붓는다 — 통로를 늘릴 생각이면 이 파일의 허용목록에 **역할과 함께** 적어라: ${선언밖.join(', ')}`);
-  /* 🔴 앱이 닿는 서버 함수가 명부 행을 만들면 그게 F269 가 막은 「계정 생성 두 번째 통로」다.
-   *   첫 등록은 이미 있는 행에 `auth_user_id` 를 **잇는** 일이지 행을 만드는 일이 아니다. */
-  assert.deepEqual(서버, [], `서버 함수가 명부 행을 만든다: ${서버.join(', ')}`);
+  /* 🔴 서버에서 명부 행을 만들 수 있는 것은 **좁은 시크릿 문 하나**(roster-ingest)뿐이다.
+   *   F269 가 막은 것은 「앱이 닿는 계정 생성 통로」다 — roster-ingest 는 앱이 못 닿고(시크릿),
+   *   계정이 아니라 명부 행만 만들며, 판정은 CLI 와 같은 lib 에서 온다(위 검사가 못박는다).
+   *   첫 등록(`auth`)은 여전히 이미 있는 행에 `auth_user_id` 를 **잇는** 일이지 행을 만드는 일이 아니다. */
+  assert.deepEqual(서버, ['supabase/functions/roster-ingest/index.ts'],
+    `서버 함수의 명부 붓기가 선언과 다르다: [${서버.join(', ')}]`);
 });
 
 test('허용목록에 적힌 파일이 실제로 있다 — 이름이 낡으면 검사가 조용히 헐거워진다', () => {
