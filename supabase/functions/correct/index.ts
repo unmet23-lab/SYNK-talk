@@ -53,7 +53,7 @@ type 교정칸 = {
 };
 
 const {
-  모델, 왕복제한밀리, 메시지경로, 배치경로, 벤더판,
+  모델, 왕복제한밀리, 메시지경로, 배치경로, 벤더헤더,
   프롬프트판, 태그어긋남, 요청몸통, 응답글, 교정값, 재시도가능,
   배치몸통, 배치줄해석, 캐시성적, 성적합,
 } = 교정모듈 as {
@@ -61,10 +61,10 @@ const {
   왕복제한밀리: number;
   메시지경로: string;
   배치경로: string;
-  벤더판: string;
+  벤더헤더: (키: string) => Record<string, string>;
   프롬프트판: (지시문: string) => string | null;
   태그어긋남: (지시문: string, 태그목록: string[]) => { 프롬프트에없음: string[]; 계약에없음: string[] };
-  요청몸통: (a: { 지시문: string; 문장: string; 급수: string | null }) => Record<string, unknown>;
+  요청몸통: (a: { 지시문: string; 문장: string; 급수: string | null; 맥락?: string }) => Record<string, unknown>;
   응답글: (본문: unknown) => string | null;
   교정값: (글: string, 태그목록: string[]) => 교정칸;
   재시도가능: (status: number) => boolean;
@@ -103,10 +103,6 @@ const 계약판 = /^c(\d+)$/;
 
 function 봉투(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
-}
-
-function 벤더헤더(키: string) {
-  return { 'x-api-key': 키, 'anthropic-version': 벤더판, 'Content-Type': 'application/json' };
 }
 
 function 센다(칸: Record<string, number>, 이름: string) {
@@ -169,6 +165,63 @@ Deno.serve(async (req: Request) => {
 
   const 키 = Deno.env.get('ANTHROPIC_API_KEY') ?? '';
   const url = new URL(req.url);
+
+  /* ── 평가 통로 (`?평가=1`) — **DB 무접촉** · eval 실행기 전용 ─────────────────────
+   * 픽스처를 DB 에 넣지 않고(리허설도 append-only 라 지울 수 없는 행이 된다) **같은 동봉·같은
+   * 조립기**로 벤더만 왕복한다. `evals/결과.md` 가 「실제 엔진 경로가 아니다」로 남겨 둔 구멍을
+   * 닫는 자리 — 로컬에 벤더 키를 두지 않는다(키는 여기 있고, Management API 는 값 대신
+   * 다이제스트만 준다 · 08-12 실측 401). 해석·채점은 부르는 쪽(tools/eval-run.js)이 같은
+   * `lib/교정엔진.js` 로 한다 — 이 갈래는 원자재(글·usage·model)만 돌려준다.
+   * 🔑 상한은 즉시 통로와 같다(벽시계) — 102문항은 부르는 쪽이 잘라 여러 번 온다. */
+  if (url.searchParams.get('평가') === '1') {
+    /* 설정 실패는 **5xx + error 칸**이다 — 배치 경로가 200+`이유` 로 넘어가는 것은 「행을 안
+     * 건드리고 다음 회차가 다시 집는」 cron 의 사정이고, 평가는 도구가 그 자리에서 부르는
+     * 왕복이라 실패를 실패로 받아야 한다(200 으로 주면 부르는 쪽 재시도·중단 판단이 못 선다).
+     * `이유` 칸을 안 쓰므로 배치 응답 회귀(분모·회수 동반)가 이 갈래를 집지 않는다. */
+    if (!키) return 봉투(503, { error: 'eval_no_api_key' });
+    const 판 = 프롬프트판(지시문 as string);
+    if (!판) return 봉투(503, { error: 'eval_no_prompt_ver' });
+    let 몸: { 항목?: { id?: string; 문장?: string; 급수?: string | null; 맥락?: string }[] };
+    try { 몸 = await req.json(); } catch { return 봉투(400, { error: 'body 가 JSON 이 아니다' }); }
+    const 항목들 = Array.isArray(몸.항목) ? 몸.항목 : [];
+    if (!항목들.length || 항목들.length > 최대배치) {
+      return 봉투(400, { error: `항목은 1~${최대배치}건이어야 한다`, 받음: 항목들.length });
+    }
+    const 결과: Record<string, unknown>[] = [];
+    const 평가성적: 성적[] = [];
+    for (const 항 of 항목들) {
+      if (!항 || typeof 항.문장 !== 'string' || !항.문장.trim()) {
+        결과.push({ id: 항?.id ?? null, 사유: '문장없음' }); continue;
+      }
+      try {
+        const r = await fetch(메시지경로, {
+          method: 'POST',
+          headers: 벤더헤더(키),
+          body: JSON.stringify(요청몸통({
+            지시문: 지시문 as string, 문장: 항.문장, 급수: 항.급수 ?? null, 맥락: 항.맥락,
+          })),
+          signal: AbortSignal.timeout(왕복제한밀리),
+        });
+        if (!r.ok) {
+          결과.push({ id: 항.id, 사유: `벤더:${r.status}`, 재시도가능: 재시도가능(r.status) });
+          continue;
+        }
+        const 본문 = await r.json();
+        평가성적.push(캐시성적((본문 as { usage?: unknown }).usage));
+        const 글 = 응답글(본문);
+        if (!글) { 결과.push({ id: 항.id, 사유: '응답형식밖' }); continue; }
+        결과.push({
+          id: 항.id, 글,
+          model: (본문 as { model?: string }).model ?? null,
+          usage: (본문 as { usage?: unknown }).usage ?? null,
+        });
+      } catch (e) {
+        결과.push({ id: 항.id, 사유: `예외:${String((e as Error)?.name ?? e).slice(0, 40)}` });
+      }
+    }
+    return 봉투(200, { prompt_ver: 판, 모델, 결과, 캐시: 성적합(평가성적) });
+  }
+
   const 즉시 = url.searchParams.get('즉시') === '1';
   const 상한 = 즉시 ? 최대배치 : 배치최대;
   const 기본 = 즉시 ? 기본배치 : 배치기본;
