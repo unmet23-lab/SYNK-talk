@@ -27,12 +27,23 @@ const { 계측시작, 타건, 계측payload, 칸들 } = require('../lib/작성�
 const { 차원들 } = require('../lib/선택로그.js');
 
 const fetch금지 = () => { throw new Error('게임제출은 fetch 를 부르지 않는다'); };
+const 조립기경로 = path.join(ROOT, 'lib', '게임제출.js');
+const 팩경로 = path.join(ROOT, 'contents', '교수멘탈문항.js');
+
+/* 실팩(검수확정=false) 인스턴스 — fail-closed 게이트(H4)를 **현재 상태 그대로** 잰다. */
+const 실판 = 세우기(조립기경로, fetch금지, { 캐시: new Map() });
+
+/* 확정팩 픽스처 — 몽골어 검수가 확정된 날의 팩. 조립·전송 경로는 이 인스턴스로 잰다
+ * (실팩으로는 게이트가 전부 null 을 내서 조립 경로가 한 줄도 안 돈다). */
+const 팩원문 = fs.readFileSync(팩경로, 'utf8');
+const 확정팩소스 = 팩원문.replace('export const 검수확정 = false;', 'export const 검수확정 = true;');
 const 캐시 = new Map();
+const 바꾼소스 = new Map([[팩경로, 확정팩소스]]);
 const {
   게임과제인가, 게임재료, 사과전략, 오늘추천, 보기세우기,
   메일제출사건, 전략선택사건, 이탈사건, 스냅샷모양판,
-} = 세우기(path.join(ROOT, 'lib', '게임제출.js'), fetch금지, { 캐시 });
-const { 스냅샷키들 } = 세우기(path.join(ROOT, 'lib', '게임스냅샷.js'), fetch금지, { 캐시 });
+} = 세우기(조립기경로, fetch금지, { 캐시, 바꾼소스 });
+const { 스냅샷키들 } = 세우기(path.join(ROOT, 'lib', '게임스냅샷.js'), fetch금지, { 캐시, 바꾼소스 });
 
 /* ── 공용 픽스처 — 서버 배정 항목의 모양(`GET /v1/tasks` data[0] 상당) ── */
 const 항등 = (n) => Array.from({ length: n }, (_, i) => i);
@@ -66,6 +77,26 @@ const 메일사건 = (덧입력 = {}, 항목덧 = {}) => 메일제출사건(게�
   idempotency_key: 'c0ffee00-0000-4000-8000-000000000002',
   attempt_no: 1,
   ...덧입력,
+});
+
+/* ─────────────────── ⓪ 검수확정 게이트 — fail-closed (H4·H5) ─────────────────── */
+
+test('🔴 검수확정=false(실팩)면 게임재료가 null — 미검수 판은 학생에게 안 열린다', () => {
+  assert.notEqual(확정팩소스, 팩원문, '픽스처 치환이 실제로 일어났다 — 팩의 검수확정 줄이 바뀌었으면 이 치환도 따라가야 한다');
+  const 항목 = G1항목();
+  assert.equal(실판.게임과제인가(항목), true, '모듈 판정 자체는 참이어야 한다 — 게이트는 재료 층이다');
+  assert.equal(실판.게임재료(항목), null,
+    '미검수 판이 재료로 나왔다 — 배정 통로 게이트가 0줄인 지금, 이것을 막는 층은 여기 하나다');
+  // 라우팅(H5)은 게임재료 !== null 로 가르므로, null = 조용한 말하기 폴백이다(화면 쪽 검사는 교수멘탈화면.test.js ⑨).
+});
+
+test('검수확정=true(확정팩)면 재료가 서고, 모양이 화면 픽스처와 한 벌이다', () => {
+  const 재료 = 게임재료(G1항목());
+  assert.ok(재료, '확정 팩인데도 재료가 null 이다 — 게이트가 팩 export 를 안 읽고 값을 박았다');
+  /* 🔑 이 키 목록이 화면 테스트(교수멘탈화면.test.js)의 재료 픽스처 모양을 못박는다 —
+   * 여기서 키가 바뀌면 그 픽스처도 같이 고쳐야 한다(사본이 갈라지는 자리를 회귀가 쥔다). */
+  assert.deepEqual(Object.keys(재료).sort(),
+    ['prompt_seed', '문항', 'task_ref', 'level_snapshot', 'goal_snapshot', 'retry_of_event_id'].sort());
 });
 
 /* ─────────────────── ① submission.created — 실계약 통과 ─────────────────── */

@@ -12,7 +12,7 @@
  */
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { 직렬화, 역직렬화 } from '../lib/제출로그.js';
+import { 직렬화, 역직렬화, 밀린것 } from '../lib/제출로그.js';
 import { 세션남기기세움, 세션잊기 } from './인증API.js';
 
 const 웹 = Platform.OS === 'web';
@@ -103,6 +103,21 @@ export async function 게임로그쓰기(로그) {
   }
   const f = new FS.File(FS.Paths.document, 'game_log.jsonl');
   f.write(직렬화(로그));
+}
+
+/**
+ * 아직 서버에 닿지 않은 것의 수 — **모든 큐를 합산한다**(나가기 게이트의 유일한 근거 · B1).
+ *
+ * 🔴 한 큐만 세면 나머지 큐의 미전송분이 「보낸 것은 서버에 그대로 있어요」로 읽히고
+ *   `기기비우기` 가 지운다 — 그 소실은 소급이 없다. 새 큐 파일이 생기면 **여기에 더하는 것**이
+ *   그 큐의 착수 조건이다(게이트가 모르는 큐는 전부 그 사고 모양이다).
+ * 🔴 못 읽으면 던진다 — 「모른다」를 0 으로 접는 짐작의 대가가 발화 소멸이다(도착확인이 받아
+ *   「나갈 수 없어요」로 세운다).
+ */
+export async function 못보낸수() {
+  const 제출 = await 로그읽기();
+  const 게임 = await 게임로그읽기();
+  return 밀린것(제출.로그).length + 밀린것(게임.로그).length;
 }
 
 /**

@@ -474,3 +474,30 @@ test('⑥ 반쪽 compose_meta 는 값에 안 섞이고 「불완전」으로 드
   assert.equal(축.불완전, 1);
   assert.equal(축.미룸_중앙, null, '반쪽 값이 중앙값에 섞였다');
 });
+
+test('⑥ M2 — 불완전 행의 주소가 축과 evidence_refs 양쪽에 남는다(되짚을 수 있어야 눈이다)', () => {
+  const 반쪽행 = 사건('submission.created', '2026-08-08T01:00:00Z',
+    { payload: { ver: 1, compose_meta: { total_compose_ms: 9 } } });
+  const r = 학습자상태([반쪽행], { as_of: 기준 });
+  assert.equal(r.축.작성과정.불완전, 1);
+  /* 🔑 축이 직접 주소를 든다 — evidence_refs 는 축 구분 없는 한 자루라(끈기축도 같은 제출을
+   * 담는다) 그것만으로는 「이 축이 이 행을 반쪽으로 봤다」를 못 되짚는다(변이 실측: 담아를
+   * 지워도 저 자루는 초록이었다 — 우연의 겹침이 탐지력을 먹은 자리). */
+  assert.deepEqual(r.축.작성과정.불완전사건, [반쪽행.event_id],
+    '반쪽 행의 주소가 축에 없다 — 결함 행을 찾으러 전 행을 다시 뒤지게 된다');
+  assert.ok(r.evidence_refs.사건.includes(반쪽행.event_id));
+});
+
+test('⑥ M1 — 같은 제출이 신뢰도 표본에 두 번 안 센다(작성과정 n 은 표본 밖)', () => {
+  const m = 실compose_meta();
+  const r = 학습자상태([
+    사건('submission.created', '2026-08-08T01:00:00Z', { payload: { ver: 1, attempt_no: 1, compose_meta: m } }),
+  ], { as_of: 기준 });
+  /* 축은 둘이 잡지만(끈기 1 · 작성과정 1) **사건은 하나다** — 표본이 2가 되면 「몇 건 위에
+   * 세웠나」가 거짓이 되어 신뢰도가 공짜로 오른다. */
+  assert.equal(r.축.끈기.n, 1);
+  assert.equal(r.축.작성과정.n, 1);
+  const 한건 = Math.round((1 / (1 + 완충)) * 100) / 100;
+  assert.equal(r.estimator_confidence, 한건,
+    `표본이 이중 계상됐다 — 한 사건의 신뢰도는 ${한건} 이어야 한다(실제 ${r.estimator_confidence})`);
+});
