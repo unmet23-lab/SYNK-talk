@@ -126,7 +126,7 @@ async function main() {
 
   /* 지역 재현 — 서버와 **같은 lib** 로 표본을 계산한다(두 소비자 정합의 기준값). */
   const 풀 = await sql(`
-    select c.correction_id
+    select c.correction_id, c.submission_id
       from engine.corrections c
      where ${풀술어}
        and c.created_at >= ${따옴(범위.시작)}::timestamptz
@@ -200,7 +200,11 @@ async function main() {
   const 대상 = 열린[0];
   r = await 부르기('gold/judge', { 메서드: 'POST', 본문: { reviewed_correction_id: '00000000-0000-4000-8000-000000000000', verdict: VERDICT.AI } });
   확인('없는 행은 404 NOT_FOUND', r.status === 404 && 코드(r) === 'NOT_FOUND', r);
-  const 표본밖 = 풀.map((x) => String(x.correction_id)).find((id) => !지역표본.includes(id));
+  /* 행째로 잡는다 — ⑤ 오염 픽스처가 이 행의 **자기 submission_id** 를 써야 하기 때문이다.
+   * id 만 들고 다니면 남의 제출에 붙이게 되고 FK `corrections_reviewed_same_submission` 이
+   * 거절한다(실측 08-11: ⑤가 여기서 죽어 인수 ⓑ 가 한 번도 안 돌았다). */
+  const 표본밖행 = 풀.find((x) => !지역표본.includes(String(x.correction_id)));
+  const 표본밖 = 표본밖행 && String(표본밖행.correction_id);
   치명확인('표본 밖 풀 행이 있다(풀 > 표본)', !!표본밖);
   r = await 부르기('gold/judge', { 메서드: 'POST', 본문: { reviewed_correction_id: 표본밖, verdict: VERDICT.AI } });
   확인('풀엔 있지만 표본 밖이면 409 NOT_IN_SAMPLE — 강사가 골라 판정 못 한다(무작위의 심장)',
@@ -278,7 +282,7 @@ async function main() {
     insert into engine.corrections
       (submission_id, reviewed_correction_id, actor_kind, verdict, verdict_reason,
        reviewer, transcript_at_review, schema_ver)
-    values (${따옴(대상.submission_id)}::uuid, ${따옴(표본밖)}::uuid, 'teacher'::engine.actor_kind,
+    values (${따옴(표본밖행.submission_id)}::uuid, ${따옴(표본밖)}::uuid, 'teacher'::engine.actor_kind,
             ${따옴(VERDICT.AI)}, ${따옴('오염 픽스처 — 검수 확정 모양(teach 감사 없음)')},
             ${따옴(강사.uid)}, ${따옴('전사')}, ${따옴(판)})
     returning correction_id`);
