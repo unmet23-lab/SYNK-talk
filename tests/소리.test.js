@@ -23,8 +23,7 @@ const { 만들기, 효과음이름 } = require('../lib/소리게이트.js');
 
 /* BGM WAV 는 git 밖 생성물이다(1MB 가드 · postinstall 이 굽는다) — 신선한 트리에서도
  * 아래 자산 검사가 서도록, 없을 때만 여기서 한 번 굽는다(결정적 렌더라 몇 초·부작용 0). */
-if (!fs.existsSync(path.join(뿌리, 'assets', 'bgm', 'synk-bgm-candidate-c.wav'))
-  && !fs.existsSync(path.join(뿌리, 'assets', 'bgm', 'synk-bgm-measure.wav'))) {
+if (!fs.existsSync(path.join(뿌리, 'assets', 'bgm', 'synk-bgm-measure.wav'))) {
   띄우기([path.join(뿌리, 'tools', 'BGM빌드.js')], { cwd: 뿌리 });
 }
 

@@ -5,8 +5,8 @@
  *     (따로 잡으면 「녹음 중 0」 이 프로즈로 돌아간다 · §3-1 ⚠ 전역 게이트 한 곳).
  *   · 녹음을 여는 코드(G3·말하기)는 반드시 녹음시작()/녹음끝() 으로 게이트에 알린다.
  *   · 효과음 볼륨 재조정 금지(밸런스는 파일에) · 햅틱은 상태 전이(도장)에만 · 타이핑 무햅틱.
- *   · 🔴 BGM 재생(bgm재생)은 **유호님 시청 확정 후** 선정 트랙으로만 부른다 — 후보 단계에선
- *     게임 화면이 이 함수를 부르지 않는다(§3-2 ⓑ 순서 밖 금지).
+ *   · BGM = **선정 완료**(유호 08-11 「23번으로」) — 기본 트랙이 `synk-bgm-measure.wav` 다.
+ *     게임 화면은 인자 없이 bgm재생() 을 부른다(다른 트랙을 끼우는 날 = 새 시청 확정 선행).
  *
  * ■ expo 모듈은 전부 지연 require — node 테스트가 이 파일을 그대로 읽을 수 있어야 한다.
  */
@@ -44,12 +44,12 @@ export function 도장햅틱() {
   return true;
 }
 
-/** BGM — 선정 확정 트랙 모듈을 받아 무한 루프 재생. 녹음 중이면 음소거로 시작한다. */
+/** BGM — 무한 루프 재생(기본 = 유호 선정 측정 트랙). 녹음 중이면 음소거로 시작한다. */
 export function bgm재생(트랙모듈) {
   const 답 = 게이트.판정('bgm시작');
   const { createAudioPlayer } = 오디오();
   if (bgm플레이어) { bgm플레이어.remove(); bgm플레이어 = null; }
-  bgm플레이어 = createAudioPlayer(트랙모듈);
+  bgm플레이어 = createAudioPlayer(트랙모듈 ?? require('../assets/bgm/synk-bgm-measure.wav'));
   bgm플레이어.loop = true;
   if (답.조치 === '음소거로시작') bgm플레이어.muted = true;
   bgm플레이어.play();

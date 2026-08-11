@@ -149,10 +149,14 @@ function WAV(L, R) {
 }
 
 /* ── 실행 ─────────────────────────────────────────────────── */
+// ✅ 선정 완료(유호 08-11 「너무 마음에 들어. 23번으로 커밋할게」) — 깔림판이 정식 측정 트랙이다.
 const 산출 = [
-  { 파일: 'synk-bgm-candidate-c.wav', 이름: '깔림 — 패드+맥동만(유호 08-11 「튀는 소리 빼자」 반영판)' },
+  { 파일: 'synk-bgm-measure.wav', 이름: '측정 스테이지 정식 트랙 — 깔림(패드+맥동 · 유호 선정 08-11)' },
 ];
-const 은퇴한후보 = ['synk-bgm-candidate-a.wav', 'synk-bgm-candidate-b.wav'];  // 종 층이 있던 판 — 재생성 금지
+const 은퇴한후보 = [
+  'synk-bgm-candidate-a.wav', 'synk-bgm-candidate-b.wav',  // 종 층이 있던 판(유호 「튀는 소리 빼자」)
+  'synk-bgm-candidate-c.wav',                              // 선정되어 measure 로 승격 — 후보명 은퇴
+];
 
 function main() {
   const 검사 = process.argv.includes('--check');
@@ -177,6 +181,5 @@ function main() {
     if (fs.existsSync(경로)) { fs.unlinkSync(경로); console.log(`🗑 ${옛} (은퇴판 정리)`); }
   }
   if (검사 && 실패) process.exit(1);
-  if (!검사) console.log(`⚠ 후보다 — 라이브 편입은 유호님 시청 확정 후(§3-2 ⓑ). 선정되면 synk-bgm-measure.wav 로 남긴다.`);
 }
 main();
