@@ -135,6 +135,28 @@ test('밀기는 항목마다 결과를 즉시 적는다 — 도중에 실패해�
 
 /* ── 배선(B2) + 통로 유일성(B3 등록층) — 소스로 잰다 ─────────────────────────── */
 
+test('수거 — 죽은 배정이 이탈 항목으로 서고, 두 번 걷어도 한 번만 · 걷은 것은 다음 밀기로 나간다 (H2)', async () => {
+  const { 판, 읽기, 쓰기 } = 가짜저장(0);
+  const 보낸 = [];
+  const 큐 = 게임큐만들기({
+    읽기, 쓰기,
+    보내기: async (t, 사건) => { 보낸.push(사건.event_type); return { event_id: `E-${보낸.length}` }; },
+  });
+  await 큐.담기(고름사건, { task_ref: 'task-2026-08-10', level_snapshot: null, goal_snapshot: null });
+  const 조립 = (죽은) => ({
+    idempotency_key: `k-수거-${죽은.correlation_id}`, event_type: 'session.abandoned',
+    correlation_id: 죽은.correlation_id,
+    submission: { task_ref: 죽은.task_meta.task_ref, task_format: '쓰기첨삭' }, payload: { ver: 1 },
+  });
+  const 첫 = await 큐.수거('task-2026-08-11', 조립);
+  assert.equal(첫.수거수, 1, '죽은 배정이 안 걷혔다 — 이탈 신호가 도로 0이 된다');
+  assert.ok(판.로그.find((e) => e.id === 'abandon:s1'), '걷은 이탈이 파일에 안 남았다');
+  const 둘 = await 큐.수거('task-2026-08-11', 조립);
+  assert.equal(둘.수거수, 0, '두 번째 수거가 또 걷었다 — 항목 id 접기가 죽었다');
+  await 큐.밀기('토큰', null);
+  assert.deepEqual(보낸.sort(), ['choice.selected', 'session.abandoned'].sort(), '걷은 이탈이 안 나갔다');
+});
+
 test('말하기화면의 공용 배출구(밀린것보내기)가 게임 큐를 실값 막힘으로 민다 (B2)', () => {
   assert.equal(코드만(코드만픽스처.입력), 코드만픽스처.기대, '주석 제거기가 죽었다');
   const 소스 = 코드만(fs.readFileSync(path.join(ROOT, 'src', '말하기화면.js'), 'utf8'));
@@ -143,6 +165,18 @@ test('말하기화면의 공용 배출구(밀린것보내기)가 게임 큐를 �
   assert.ok(자리 > -1, '밀린것보내기가 없다 — 이름이 바뀌었으면 이 검사도 따라가야 한다');
   assert.match(몸, /게임큐밀기\(토큰,\s*막힘참조\.current\)/,
     '게임 큐 배출구가 빠졌다(또는 막힘을 실값으로 안 넘긴다) — 비-G1 날의 밀린 게임 사건이 영영 안 나간다');
+});
+
+test('수거 배선 — 두 화면이 걷고, 실 조립은 게임제출 조립기 하나다 (C5·H2 · 발주 §6-6 ⑩)', () => {
+  const 읽어 = (...p) => 코드만(fs.readFileSync(path.join(ROOT, ...p), 'utf8'));
+  assert.match(읽어('src', '말하기화면.js'), /게임이탈수거\(게임수거참조\.current\)/,
+    '말하기화면 배출구에 수거가 없다 — 비-G1 날의 죽은 앉음이 영영 이탈로 안 선다');
+  const 겜 = 읽어('src', '교수멘탈화면.js');
+  assert.match(겜, /게임이탈수거\(/, '게임 화면 마운트에 수거가 없다 — 어제의 죽은 앉음이 게임날에도 안 걷힌다');
+  assert.match(겜, /게임사건담기\(사건,\s*이탈닻\(재료\)\)/,
+    '고름 항목에 닻이 안 붙는다 — 앱이 죽은 날의 이탈을 어느 배정 것인지 못 가린다(C5)');
+  assert.match(읽어('src', '게임큐.js'), /이탈사건\(죽은\.task_meta/,
+    '수거의 실 조립이 게임제출 조립기를 안 지난다 — 계약 밖 이탈이 큐에 선다');
 });
 
 test('게임 로그 저장을 직접 잡는 곳은 게임큐·저장뿐이다 — 통로 밖 쓰기는 파일을 덮는다 (B3 등록층)', () => {

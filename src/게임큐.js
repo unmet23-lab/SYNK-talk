@@ -16,9 +16,16 @@
 import { 게임큐만들기 } from '../lib/게임큐.js';
 import { 게임로그읽기, 게임로그쓰기 } from './저장.js';
 import { 사건보내기 } from './사건통로.js';
+/* 수거의 실 조립 — 죽은 앉음의 이탈은 화면 cleanup 과 **같은 조립기**를 지난다(계약 밖 이탈이
+ * 큐에 서는 길을 조립기 하나가 막는다). 키는 담는 순간 판다 — 중복은 항목 id 가 접는다. */
+import { 이탈사건 } from '../lib/게임제출.js';
+import { 흐름id } from '../lib/제출로그.js';
 
 const 큐 = 게임큐만들기({ 읽기: 게임로그읽기, 쓰기: 게임로그쓰기, 보내기: 사건보내기 });
 
 export const 게임큐읽기 = 큐.읽기;
 export const 게임사건담기 = 큐.담기;
 export const 게임큐밀기 = 큐.밀기;
+/* H2 「다음 마운트 발견」 — 오늘 배정의 서버 task_ref 를 모르면 걷지 않는다(오귀속보다 0건). */
+export const 게임이탈수거 = (오늘task_ref) => 큐.수거(오늘task_ref, (죽은) =>
+  이탈사건(죽은.task_meta, { correlation_id: 죽은.correlation_id, idempotency_key: 흐름id() }));

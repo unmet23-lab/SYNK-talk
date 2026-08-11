@@ -42,7 +42,7 @@ const 캐시 = new Map();
 const 바꾼소스 = new Map([[팩경로, 확정팩소스]]);
 const {
   게임과제인가, 게임재료, 사과전략, 오늘추천, 보기세우기,
-  메일제출사건, 전략선택사건, 이탈사건, 스냅샷모양판,
+  메일제출사건, 전략선택사건, 이탈사건, 이탈닻, 스냅샷모양판,
 } = 세우기(조립기경로, fetch금지, { 캐시, 바꾼소스 });
 const { 스냅샷키들 } = 세우기(path.join(ROOT, 'lib', '게임스냅샷.js'), fetch금지, { 캐시, 바꾼소스 });
 
@@ -256,6 +256,23 @@ test('이탈 사건이 실계약 검증을 지난다 — 어디서 막혔는지(
   assert.deepEqual(Object.keys(사건.submission).sort(), ['task_format', 'task_ref'].sort(),
     '이탈에 body_original 을 실으면 「낸 답이 없다」는 뜻이 깨진다');
   assert.equal(사건.submission.task_format, '쓰기첨삭');
+});
+
+test('이탈닻 — 수거(H2)가 이탈사건을 지을 세 칸이고, 닻으로 지은 이탈이 실계약을 지난다', () => {
+  const 재료 = 게임재료(G1항목());
+  const 닻 = 이탈닻(재료);
+  /* 렘이 달라 deepEqual 은 프로토타입에서 갈린다(세우기 로더) — 키·값을 따로 잰다. */
+  assert.deepEqual(Object.keys(닻).sort(), ['goal_snapshot', 'level_snapshot', 'task_ref'].sort(),
+    '닻 칸이 이탈사건의 요구와 갈라졌다 — 수거가 지은 이탈이 화면 cleanup 것과 다른 모양이 된다');
+  assert.equal(닻.task_ref, 재료.task_ref);
+  assert.equal(닻.level_snapshot, 재료.level_snapshot);
+  assert.equal(닻.goal_snapshot, 재료.goal_snapshot);
+  const 사건 = 이탈사건(닻, {
+    correlation_id: 'c0ffee00-0000-4000-8000-000000000001',
+    idempotency_key: '11111111-1111-4111-8111-111111111111',
+  });
+  assert.equal(검증(사건, 계약).ok, true, '닻으로 지은 이탈이 계약을 못 지난다 — 수거가 400 을 쌓는다');
+  assert.equal(이탈닻(null), null, '재료 없이 닻을 지어냈다');
 });
 
 /* ─────────────────── ⑤ 라우팅 판정 ─────────────────── */
