@@ -20,15 +20,14 @@ with 기대열(t, c) as (values
   ('submissions','capture_meta'), ('skills','superseded_by'), ('daily_activity','expected'),
   -- 마감 시각·마감 판본(20260808010000 · 소급 불가 · 유호님 승인 2026-08-08)
   ('submissions','due_at'), ('submissions','due_ver'),
-  -- 검수 확정이 담길 칸 넷(20260809090000 · 소급 불가 · 발주 §3 「c11 선행」)
+  -- 검수 확정이 담길 칸 넷(20260809090000 · 검수_내부계약 §5 — c10 으로 섰다)
   ('corrections','supersedes'), ('corrections','promotion_intent'),
   ('corrections','transcript_at_review'), ('pipeline_jobs','discard_reason'),
   ('schema_migrations','version'), ('schema_migrations','name'),
   ('schema_migrations','checksum'), ('schema_migrations','applied_at'),
-  -- ⚠ 아래 세 묶음은 c7 **뒤에 붙은 조각들**이 낸 열이다. 이 확인 블록은 앞 조각에서
-  --   베끼는 것이 아니라 **바로 앞 조각**에서 이어야 한다 — c8 초안이 20260806210000 의
-  --   블록을 베껴 이 13열을 통째로 떨어뜨렸고, 그 상태의 확인은 「빠진열 없음」으로 초록이
-  --   나온다(검사가 사라진 것이 통과와 같은 모양이 되는 자리 · 생성기 diff 가 잡았다).
+  -- ⚠ 아래 세 묶음은 c7 뒤에 붙은 조각들이 낸 열이다. 이 확인 블록은 앞 조각에서
+  --   베끼는 것이 아니라 바로 앞 조각에서 이어야 한다 — c8 초안이 20260806210000 의
+  --   블록을 베껴 13열을 통째로 떨어뜨린 실측이 있다(빠진 검사 = 통과와 같은 모양).
   -- 학생 로그인(L0 §4-1·§4-2 · 20260806233000_auth_c7)
   ('learners','recovery_email'), ('learners','recovery_phone'),
   ('learners','temp_password_expires_at'), ('learners','signup_attempts'),
@@ -39,19 +38,19 @@ with 기대열(t, c) as (values
   -- 임시번호를 해시로 든다(L0 §4-2-2 · 20260807024500_temp_password_c7)
   ('learners','temp_password_hash')
 ), 기대제약(n) as (values
-  ('learning_events_event_type_c10'), ('learning_events_task_type_c10'),
-  ('submissions_task_format_c10'), ('submissions_translation_source_c10'),
-  ('submissions_due_paired_c10'), ('corrections_verdict_c10'),
+  ('learning_events_event_type_c11'), ('learning_events_task_type_c11'),
+  ('submissions_task_format_c11'), ('submissions_translation_source_c11'),
+  ('submissions_due_paired_c11'), ('corrections_verdict_c11'),
   ('learning_events_retry_same_learner'), ('learning_events_parent_same_learner'),
   ('corrections_reviewed_same_submission'), ('schema_migrations_pkey'),
-  ('learners_signup_attempts_nonneg_c10'), ('staff_role_c10'),
-  ('learners_temp_password_paired_c10'),
-  ('learning_events_correction_target_c10'), ('learning_events_correction_id_fkey'),
+  ('learners_signup_attempts_nonneg_c11'), ('staff_role_c11'),
+  ('learners_temp_password_paired_c11'),
+  ('learning_events_correction_target_c11'), ('learning_events_correction_id_fkey'),
   -- 동의 귀속(20260807120000)
   ('learning_events_consent_id_fkey'),
   -- 검수 확정 칸 넷(20260809090000) — FK 도 함께 센다(열만 서고 고리가 없으면 계보가 거짓이다)
-  ('corrections_supersedes_not_self_c10'), ('corrections_promotion_intent_c10'),
-  ('corrections_supersedes_fkey'), ('pipeline_jobs_discard_reason_c10')
+  ('corrections_supersedes_not_self_c11'), ('corrections_promotion_intent_c11'),
+  ('corrections_supersedes_fkey'), ('pipeline_jobs_discard_reason_c11')
 ), 기대트리거(n) as (values
   ('learning_events_immutable'), ('corrections_immutable'), ('submissions_original_immutable'),
   ('staff_access_log_immutable'), ('learning_events_correction_same_learner'),
@@ -83,9 +82,8 @@ with 기대열(t, c) as (values
       where connamespace=to_regnamespace('engine') and conname=e.n
    )
 ), 트리거상태 as (
-  -- 🔴 존재만 묻지 않는다. 꺼진 트리거는 pg_trigger 에 **행이 그대로 남고** tgenabled 만
-  --    'D'(꺼짐)·'R'(복제본에서만)이 된다 — 2026-08-07 리허설 실측: 트리거를 끈 채로 이
-  --    쿼리가 「✅ 전부 통과」를 냈다. 안 잰 것을 통과로 내면 그건 확인이 아니다.
+  -- 🔴 존재만 묻지 않는다. 꺼진 트리거는 pg_trigger 에 행이 그대로 남고 tgenabled 만
+  --    'D'(꺼짐)·'R'(복제본에서만)이 된다 — 안 잰 것을 통과로 내면 그건 확인이 아니다.
   select e.n,
          (select g.tgenabled from pg_trigger g
             join pg_class r on r.oid=g.tgrelid
@@ -93,8 +91,8 @@ with 기대열(t, c) as (values
     from 기대트리거 e
 ), 빠진트리거 as (
   -- 상태를 이름 옆에 붙인다 — 「없음」은 판을 부어야 하고 「꺼짐」은 enable 한 줄이라 처방이 갈린다.
-  -- ⚠ `상태::text` 캐스트가 필수다. tgenabled 는 `"char"`(1바이트) 타입이라 `||` 후보가 갈려
-  --    `operator is not unique` 로 **쿼리 전체가 안 돈다** — 파일 층 검사는 이걸 못 본다(2026-08-07 실측).
+  -- ⚠ 상태::text 캐스트가 필수다. tgenabled 는 "char"(1바이트) 타입이라 || 후보가 갈려
+  --    operator is not unique 로 쿼리 전체가 안 돈다 — 파일 층 검사는 이걸 못 본다(2026-08-07 실측).
   select string_agg(n || case when 상태 is null then '' else ' (꺼짐:' || 상태::text || ')' end,
                     ', ' order by n) v
     from 트리거상태 where 상태 is null or 상태 not in ('O', 'A')
@@ -129,8 +127,7 @@ with 기대열(t, c) as (values
       and t.typname='job_status' and e.enumlabel='failed') as 실패상태,
   (select count(*) from pg_policies
     where schemaname='engine' and tablename='schema_migrations') as 이력정책,
-  -- 검수자 판(20260807190000 · 절단문서 ②-17): 뷰가 있고 옛 정책이 없어야 **둘 다** 맞다.
-  --   뷰만 세고 정책을 안 세면 「옛 통로가 남았다」가 통과로 보인다.
+  -- 검수자 판(20260807190000 · 절단문서 ②-17): 뷰가 있고 옛 정책이 없어야 둘 다 맞다.
   (select count(*) from pg_views
     where schemaname='engine' and viewname='review_queue') as 검수뷰,
   (select count(*) from pg_policies
@@ -139,36 +136,27 @@ with 기대열(t, c) as (values
   (select count(*) from engine.submissions s
     where not exists (select 1 from engine.pipeline_jobs j
                        where j.submission_id = s.submission_id)) as 잡없는제출,
-  -- 마감(20260808010000): 열만 서고 **아무도 안 채우는** 상태가 이 저장소에서 네 번째다
-  --   (`daily_activity.expected`·`model`·`prompt_ver` 가 그렇게 서 있다). 배정에 마감이
-  --   없으면 「마감 대비 여유」가 그 학생에게 영영 없다 — 조용히 빈칸으로 남지 않게 센다.
-  --   ⚠ **c10 이 선 뒤에 만들어진 배정만** 센다. 옛 행의 마감은 아무도 모르고, 지어내
-  --      채우는 것은 복원이 아니라 날조다(머리말 ⛔).
+  -- 마감(20260808010000): c10 이 선 뒤에 만들어진 배정만 센다 — 옛 행의 마감은 아무도 모른다.
   (select count(*) from engine.submissions s
      join engine.learning_events e on e.event_id = s.event_id
     where e.event_type = 'task.assigned' and s.due_at is null
       and s.occurred_at >= (select applied_at from engine.schema_migrations
                              where version = '20260808010000')) as 마감없는배정,
-  -- 분모의 정본은 `task.assigned` 사건 하나다(머리말). `daily_activity.expected` 는 파생
-  --   캐시 자리로 남겨 뒀고, 여기 값이 들어오면 분모가 둘이 된 것이다 — 그 순간 빨개진다.
+  -- 분모의 정본은 task.assigned 사건 하나다 — daily_activity.expected 에 값이 들어오면 빨개진다.
   (select count(*) from engine.daily_activity where expected is not null) as 분모칸오염,
-  -- 폐기 사유(20260809090000): CHECK 는 「사유가 있으면 폐기」만 걸고 역방향은 일부러 안 건다
-  --   (조각 이전 행이 있으면 부어지지 않는다 · F103). 그 자리를 이 카운터가 진다 —
-  --   **이 조각이 선 뒤에 갱신된 job 만** 센다. 옛 폐기의 사유는 아무도 모른다.
+  -- 폐기 사유(20260809090000): 그 조각이 선 뒤에 갱신된 job 만 센다.
   (select count(*) from engine.pipeline_jobs j
     where j.status = 'discarded' and j.discard_reason is null
       and j.updated_at >= (select applied_at from engine.schema_migrations
                             where version = '20260809090000')) as 폐기사유없는폐기,
-  -- 검수 판이 **올라간 판인지**(20260809050000): `검수뷰=1` 은 뷰의 존재만 말한다.
-  --   c8 의 12열 판이 그대로 서 있어도 그 칸은 1이라 초록이다 — 열 수로 재야 갈린다.
+  -- 검수 판이 올라간 판인지(20260809050000): 열 수로 재야 갈린다.
   (select count(*) from information_schema.columns
     where table_schema='engine' and table_name='review_queue') as 검수판열,
   -- ②-17 이 지목한 세 열이 판에 실렸나 — 0이어야 한다(L0 §4-5 ②-1 「안 연다」의 실측).
   (select count(*) from information_schema.columns
     where table_schema='engine' and table_name='review_queue'
       and column_name in ('body_original','task_snapshot','redaction_result')) as 검수판원문,
-  -- ── 라디오 원장(20260811160000 · radio 스키마 — engine 칸을 안 건드린다) ──
-  -- 표 6 · RLS 6 · 정책 0(전면 거부가 정상 — 정책이 생기는 순간 노출 설계가 필요하다).
+  -- ── 라디오 원장(20260811160000 · radio 스키마) ──
   (select count(*) from pg_tables where schemaname='radio') as 라디오표수,
   (select count(*) from pg_tables where schemaname='radio' and rowsecurity) as 라디오RLS수,
   (select count(*) from pg_policies where schemaname='radio') as 라디오정책수,
@@ -176,17 +164,20 @@ with 기대열(t, c) as (values
     where has_table_privilege(r.r, format('%I.%I','radio',t.t), p.p)) as 라디오새는권한,
   (select count(*) from 대상역할 r
     where has_schema_privilege(r.r, to_regnamespace('radio'), 'USAGE')) as 라디오새는스키마,
+  -- c11 이 접미를 갈았다 — 옛 이름을 세면 「적용 전」과 「적용 후」가 같은 0 으로 보인다.
   (select count(*) from pg_constraint
     where connamespace=to_regnamespace('radio')
-      and conname='broadcast_segment_kind_c10') as 라디오kind제약,
-  -- 링크 보호 트리거 — 존재가 아니라 **켜짐**을 센다(engine 트리거상태와 같은 이유).
+      and conname='broadcast_segment_kind_c11') as 라디오kind제약,
+  -- 링크 보호 트리거 — 존재가 아니라 켜짐을 센다(engine 트리거상태와 같은 이유).
   (select count(*) from pg_trigger g
      join pg_class c2 on c2.oid=g.tgrelid
     where c2.relnamespace=to_regnamespace('radio')
       and g.tgname='viewer_link_protect' and g.tgenabled in ('O','A')) as 연동보호트리거,
   -- 활성 링크는 채널당 1개 — 부분 유일 인덱스가 서 있어야 §3 의 유일성이 물리다.
   (select count(*) from pg_indexes
-    where schemaname='radio' and indexname='viewer_link_active') as 연동활성유일
+    where schemaname='radio' and indexname='viewer_link_active') as 연동활성유일,
+  -- ── c11: engine.skills 첫 시드(문항 팩 스킬표 30 · skills.v1) — 0이면 승격이 전건 거절된다.
+  (select count(*) from engine.skills) as 스킬시드수
 )
 select case when 테이블수=11 and RLS켜짐=11 and 정책수=7
              and 새는테이블권한=0 and 새는스키마권한=0
@@ -197,13 +188,14 @@ select case when 테이블수=11 and RLS켜짐=11 and 정책수=7
              and 라디오표수=6 and 라디오RLS수=6 and 라디오정책수=0
              and 라디오새는권한=0 and 라디오새는스키마=0
              and 라디오kind제약=1 and 연동보호트리거=1 and 연동활성유일=1
+             and 스킬시드수=30
              and (select v from 빠진열) is null
              and (select v from 빠진제약) is null
              and (select v from 빠진트리거) is null
-             and (select version from 현재이력)='20260811160000'
-              and (select checksum from 현재이력)='26add75082845c81c60e696bf9e3943eb74bb321a47bd4cc1c1e71e126d03d59' -- migration-checksum
+             and (select version from 현재이력)='20260812120000'
+              and (select checksum from 현재이력)='1bbc172d6a4ef642abedb9cfdac768a0ffab12eb8ed592fa0cc40e6e63230134' -- migration-checksum
             then '✅ 전부 통과'
-            else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·7·0·0·3·1·0·0·1·0·0·0·0·22·0·6·6·0·0·0·1·1·1 · 빠진 칸은 전부 비어 있어야 합니다)'
+            else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·7·0·0·3·1·0·0·1·0·0·0·0·22·0·6·6·0·0·0·1·1·1·30 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
        (select version from 현재이력) as 현재버전,
        (select checksum from 현재이력) as checksum,
