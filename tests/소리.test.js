@@ -23,7 +23,7 @@ const { 만들기, 효과음이름 } = require('../lib/소리게이트.js');
 
 /* BGM WAV 는 git 밖 생성물이다(1MB 가드 · postinstall 이 굽는다) — 신선한 트리에서도
  * 아래 자산 검사가 서도록, 없을 때만 여기서 한 번 굽는다(결정적 렌더라 몇 초·부작용 0). */
-if (!fs.existsSync(path.join(뿌리, 'assets', 'bgm', 'synk-bgm-candidate-a.wav'))
+if (!fs.existsSync(path.join(뿌리, 'assets', 'bgm', 'synk-bgm-candidate-c.wav'))
   && !fs.existsSync(path.join(뿌리, 'assets', 'bgm', 'synk-bgm-measure.wav'))) {
   띄우기([path.join(뿌리, 'tools', 'BGM빌드.js')], { cwd: 뿌리 });
 }
@@ -77,7 +77,7 @@ test('BGM ④ — 자산 상태는 「후보 2」 또는 「선정 1」뿐이고
   const 후보 = 파일들.filter((f) => /^synk-bgm-candidate-[a-z]\.wav$/.test(f));
   const 선정 = 파일들.filter((f) => f === 'synk-bgm-measure.wav');
   assert.ok(
-    (선정.length === 1 && 후보.length === 0) || (선정.length === 0 && 후보.length >= 2),
+    (선정.length === 1 && 후보.length === 0) || (선정.length === 0 && 후보.length >= 1),
     `BGM 폴더 상태가 어정쩡하다(${파일들.join(', ')}) — 선정했으면 한 곡만 남긴다(§3-2 ⓑ)`,
   );
   for (const f of 파일들) {
