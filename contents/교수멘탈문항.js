@@ -31,6 +31,11 @@
  *
  * ■ 학생 접점 문구 규칙 (synk-brand) — 금칙어 0 을 회귀가 틀·조각과 **펴진 45벌 전량**에서
  *   기계로 센다. NPC(교수님) 대사·성격·이름은 여기 0 — ㉮ 유호님 판정 대기(게임층 설계 §4).
+ *
+ * ■ 🔴 이 파일은 CJS 다 (배정 배선 ①단계 · 2026-08-11)
+ *   서버 새벽 배치(deliver)가 이 팩을 동봉으로 실어야 하는데, 동봉 기전(`tools/원격배포.js`)의
+ *   껍데기·require풀기는 **CJS 전용**이다 — ESM 을 실으면 배포는 초록이고 함수는 부팅 import
+ *   에서 죽는다(적대 반박 C2 실측). 동봉 대상 전량 CJS 는 `tests/동봉CJS.test.js` 가 잡는다.
  */
 
 /** 재귀 동결 — 배열·중첩 객체까지. 얕은 freeze 는 결정성을 못 지킨다(반박 C1). */
@@ -43,18 +48,18 @@ function 깊이얼리기(값) {
 }
 
 /** §6-8 표가 못박은 모듈 상수 — 조립기는 이 값을 베끼지 말고 여기서 가져간다. */
-export const 모듈상수 = 깊이얼리기({
+const 모듈상수 = 깊이얼리기({
   challenge_id: 'g1-교수멘탈',
   addressee_level: '합쇼체',
 });
 
 /** 문항판 — 문항 «자체»의 판(스냅샷 모양의 판 `task_schema_ver` 와 별개 · §6-8).
  *  문항 문자열을 고치면 이 판이 함께 오른다 — 회귀가 내용 지문으로 결속을 잡는다. */
-export const 문항판 = 'g1문항.v1';
+const 문항판 = 'g1문항.v1';
 
 /** 몽골어 원어민 검수 확정 여부 — 확정 커밋에서만 true 로 바뀐다(그 커밋이 `mn` 병기·판 인상과
  *  한 벌). 배정 통로는 이 값이 true 인 판만 받는다(발주_게임콘텐츠팩.md §3). */
-export const 검수확정 = false;
+const 검수확정 = false;
 
 /**
  * 요구 문형 — 멘탈 게이지 5칸(인사·사과·이유·요청·맺음)과 1:1 (발주서 G1 §3-①).
@@ -81,7 +86,7 @@ const 공통문형 = 깊이얼리기({
  * 난도: 초판은 단일 난도다. 급수 분화(첫편지 3종 선례)는 검수 계수 실측(첫 20건 · §6-2) 뒤
  * 콘텐츠 판 개정으로 한다 — 지금 가르면 검수 레인만 쪼개진다.
  */
-export const 문항들 = 깊이얼리기([
+const 문항들 = 깊이얼리기([
   {
     문항id: 'g1t01',
     이름: '과제 기한 부탁',
@@ -145,7 +150,7 @@ const 시드꼴 = /^(g1t\d{2})\.s(\d+)d(\d+)$/;
  * 시드를 만든다 — 배정하는 쪽(서버 배치)이 부른다.
  * @returns {string|null} `g1t01.s0d1` 꼴. 문항·변주가 없으면 null(지어내지 않는다).
  */
-export function 시드만들기(문항id, 사유번호, 세부번호) {
+function 시드만들기(문항id, 사유번호, 세부번호) {
   const 문항 = 색인.get(문항id);
   if (!문항) return null;
   if (!Number.isInteger(사유번호) || 사유번호 < 0 || 사유번호 >= 문항.사유.length) return null;
@@ -164,7 +169,7 @@ export function 시드만들기(문항id, 사유번호, 세부번호) {
  * @returns {Readonly<{문항id:string, 이름:string, 지시문:string, 질문:string, 문항판:string,
  *            핵심어휘:readonly string[], 요구문형:object}>|null} 못 펴는 시드는 null.
  */
-export function 펴기(prompt_seed) {
+function 펴기(prompt_seed) {
   const 짝 = 시드꼴.exec(String(prompt_seed || ''));
   if (!짝) return null;
   const 문항 = 색인.get(짝[1]);
@@ -183,3 +188,5 @@ export function 펴기(prompt_seed) {
     요구문형: 문항.요구문형,
   });
 }
+
+module.exports = { 모듈상수, 문항판, 검수확정, 문항들, 시드만들기, 펴기 };

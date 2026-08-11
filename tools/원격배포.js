@@ -72,7 +72,13 @@ function 판뒤처짐(저장소, db최신, 읽기실패) {
  *   같은 함수 하나를 쓰라고 못박은 이유). 그래서 **정적 import 로 바꿔 준다** — 그러려면
  *   그 옆 파일도 동봉 표에 있어야 하고, 없으면 **여기서 멈춘다**(런타임까지 미루지 않는다).
  */
-const REQUIRE문 = /(?:const|let|var)\s+(\{[^}]*\}|[\w$]+)\s*=\s*require\(\s*'\.\/([^']+?)\.js'\s*\)\s*;?/g;
+/* 상대 경로 전부를 받는다 — `./옆.js` 만 보던 초판은 `../contents/팩.js` 를 **조용히 통과**시켰고,
+ * 안 풀린 require 는 배포 초록 뒤 부팅 import 에서 죽는다(적대 반박 C2 · 2026-08-11).
+ * 묶음은 평평해서(같은 디렉터리에 <이름>.mjs) 경로는 버리고 **파일명(basename)**으로 잇는다 —
+ * 표의 .mjs 이름이 JSON 키라 같은 파일명 두 벌은 표 층에서 원리상 못 선다.
+ * ⚠ 식별자는 `[\w$]` 가 아니라 유니코드 문자 클래스다 — 이 저장소는 한글 이름이 표준이라
+ *   `const 팩 = require(…)` 꼴을 `\w` 가 조용히 통과시켰다(같은 날 실측 · 새는 방향은 통과). */
+const REQUIRE문 = /(?:const|let|var)\s+(\{[^}]*\}|[\p{L}\p{N}_$]+)\s*=\s*require\(\s*'(\.\.?\/(?:[^']*\/)?)([^'/]+?)\.js'\s*\)\s*;?/gu;
 
 function require풀기(src, 이름, 표내용) {
   const 있는mjs = new Map(
@@ -81,14 +87,14 @@ function require풀기(src, 이름, 표내용) {
       .map(([n, p]) => [String(p).replace(/^.*\//, '').replace(/\.js$/, ''), n]),
   );
   let 번호 = 0;
-  return src.replace(REQUIRE문, (전체, 묶음, 파일명) => {
+  return src.replace(REQUIRE문, (전체, 묶음, 경로, 파일명) => {
     const 대상 = 있는mjs.get(파일명);
     /* ⚠ `die`(=process.exit) 가 아니라 **던진다.** exit 하는 가드는 회귀로 탐지력을 잴 수 없고
      *   (테스트 프로세스가 통째로 죽는다), 못 재는 가드는 다음 개정에서 조용히 죽는다.
      *   CLI 동작은 같다 — `main().catch(die)` 가 같은 문구로 받는다. */
     if (!대상) {
-      throw new Error(`동봉 ${이름}: \`require('./${파일명}.js')\` 를 풀 수 없다 — 그 파일이 동봉 표에 없다.\n`
-        + `       표에 "${파일명}.mjs": "lib/${파일명}.js" 를 더해라. 안 그러면 배포는 성공하고 함수가 import 에서 죽는다.`);
+      throw new Error(`동봉 ${이름}: \`require('${경로}${파일명}.js')\` 를 풀 수 없다 — 그 파일이 동봉 표에 없다.\n`
+        + `       표에 "${파일명}.mjs": "<저장소 상대 경로>/${파일명}.js" 를 더해라. 안 그러면 배포는 성공하고 함수가 import 에서 죽는다.`);
     }
     /* 🔴 **이름 있는 import 로 바꾸면 안 된다.** 껍데기가 내는 것은 `export default` 하나뿐이라
      *   `import { a } from './x.mjs'` 는 **import 시점에 SyntaxError** 로 죽는다 —
@@ -412,5 +418,7 @@ async function main() {
   console.log(`   URL https://${ref}.supabase.co/functions/v1/${f.slug}`);
 }
 
-module.exports = { 파일들, 동봉읽기, 동봉목록, 동봉묶기, 배포묶음, 마지막커밋, 작업본다름, 저장소판, 판뒤처짐 };
+/* `require풀기` 는 회귀 이음매다 — `동봉묶기` 는 HEAD 에서 읽어(git show) 픽스처 소스를 못
+ * 먹이므로, 재작성 규칙(상위 경로 포함)의 탐지력은 이 함수를 직접 태워 잰다. */
+module.exports = { 파일들, 동봉읽기, 동봉목록, 동봉묶기, 배포묶음, 마지막커밋, 작업본다름, 저장소판, 판뒤처짐, require풀기 };
 if (require.main === module) main().catch((err) => die(String(err && err.message || err)));

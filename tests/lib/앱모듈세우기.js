@@ -46,7 +46,13 @@ function 세우기(파일, fetch가짜, 옵션 = {}) {
   if (캐시.has(abs)) return 캐시.get(abs);
 
   const 원문 = (바꾼소스 && 바꾼소스.get(abs)) || fs.readFileSync(abs, 'utf8');
-  if (!/^\s*(import|export)\s/m.test(원문)) {
+  /* 🔴 지름길(그냥 require)은 **바꾼소스가 없는 호출에서만** 탄다 — 2026-08-11 실측.
+   *   require 로 세운 CJS 모듈의 내부 require 는 Node 가 직접 해석해 이 함수의 재귀를
+   *   안 지나므로, 사슬 어딘가의 바꾼소스(탐지력 픽스처)가 **조용히 무시된다** — 픽스처가
+   *   실파일을 재면서 초록/적색이 뒤집히는데 증상이 없다(게임 lib CJS 전환이 드러냈다).
+   *   바꾼소스가 있으면 CJS 도 vm 경로로 세워 require 가로채기를 유지한다(babel 은 CJS 를
+   *   그대로 통과시킨다). */
+  if (!바꾼소스 && !/^\s*(import|export)\s/m.test(원문)) {
     const m = require(abs); // CJS(`lib/*.js`)는 그대로 — 바꿀 것이 없다
     캐시.set(abs, m);
     return m;

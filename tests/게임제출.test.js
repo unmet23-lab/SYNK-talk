@@ -36,7 +36,8 @@ const 실판 = 세우기(조립기경로, fetch금지, { 캐시: new Map() });
 /* 확정팩 픽스처 — 몽골어 검수가 확정된 날의 팩. 조립·전송 경로는 이 인스턴스로 잰다
  * (실팩으로는 게이트가 전부 null 을 내서 조립 경로가 한 줄도 안 돈다). */
 const 팩원문 = fs.readFileSync(팩경로, 'utf8');
-const 확정팩소스 = 팩원문.replace('export const 검수확정 = false;', 'export const 검수확정 = true;');
+const 확정팩소스 = 팩원문.replace('const 검수확정 = false;', 'const 검수확정 = true;');
+assert.notEqual(확정팩소스, 팩원문, '픽스처 치환이 실제로 일어났다 — 팩의 검수확정 선언 표기가 바뀌었으면 이 치환부터 고쳐라');
 const 캐시 = new Map();
 const 바꾼소스 = new Map([[팩경로, 확정팩소스]]);
 const {
