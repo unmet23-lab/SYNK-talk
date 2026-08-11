@@ -1,0 +1,414 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { 색, 폰트, 모노트래킹 } from './테마';
+import {
+  게임재료, 사과전략, 오늘추천, 보기세우기, 전략선택사건, 메일제출사건, 이탈사건,
+} from '../lib/게임제출.js';
+import { 판정, 같은판정 } from '../lib/멘탈게이지.js';
+import { 계측시작, 타건, 계측payload } from '../lib/작성과정.js';
+import { 항목추가, 다음시도번호, 제출항목, 전송기록, 보낼것 } from '../lib/게임로그.js';
+import { 흐름id } from '../lib/제출로그.js';
+import { 몽골날짜 } from '../lib/오늘과제.js';
+import { 사건보내기 } from './사건통로.js';
+import { 게임로그읽기, 게임로그쓰기 } from './저장.js';
+/* 소리는 전역 게이트 한 문으로만 — expo-audio 를 직접 잡으면 「녹음 중 0」 규칙(게임층 §3-1)이
+ * 프로즈로 돌아간다. 이 화면의 소리는 발송 성취음 1회뿐이다(실패음 없음 — 킷 규칙 ②). */
+import { 효과음 } from './소리.js';
+
+/**
+ * G1 「교수님 멘탈 구하기」 — 격식 메일 쓰기 게임 (발주_게임모듈.md G1 · 게임층 설계).
+ * 흐름: 상황 카드 + 사과 전략 3장 → 메일 쓰기(멘탈 게이지) → 「교수님이 읽고 있어요」.
+ *
+ * ■ 🔴 controlled TextInput 금지 (발주 G1 §4-5 ⚙)
+ *   값은 `defaultValue` + `onChangeText` 로 **ref 에만** 담는다 — 매 글자 state 로 되돌려 넣으면
+ *   한글 조합이 깨진다(「안녕」이 「ㅇㅏㄴㄴㅕㅇ」으로 흩어진다). 리렌더는 5칸 판정이 **바뀔 때만**
+ *   건다(`멘탈게이지.같은판정`) — 게이지가 곧 그 리렌더의 유일한 이유다.
+ *
+ * ■ 🔴 숨은 시계 (유호 확정 · 발주 G1 §6)
+ *   화면에 시계·초·숫자·퍼센트 0. 작성 과정은 `작성과정` 조립기가 **경과 시계**로 몰래 잰다 —
+ *   시계를 보여주면 학생이 문장을 짧게 잘라 재려던 구조 자체가 안 재진다.
+ *
+ * ■ 🔴 즉답 금지 (발주 G1 §4-8 · §8)
+ *   제출 후 화면은 「교수님이 읽고 있어요」뿐이다. 답장 = 교정 화면(S1-8 `답장화면`)이고
+ *   며칠 걸린다 — 즉답처럼 보이게 하면 첫 주에 기대가 깨진다. 실패음 0 · 성취음은 킷 오디오
+ *   자산이 앱에 실리는 날 붙는다(지금 talk 에 오디오 자산 0 — 게임층 §3-1 ⚠ 반입은 별건).
+ *
+ * ■ 몽골어 병기 0 — 팩 `검수확정=false` 라 `mn` 이 없다(발주_게임콘텐츠팩 §3). 한국어 정본만
+ *   그린다 — 지어내지 않는다.
+ *
+ * ■ 신호 1점 = **보내기 버튼**(코랄 면 · `테마.신호자리.교수멘탈`) — 말하기 화면의 녹음 버튼과
+ *   같은 규칙이다: 이 화면의 유일한 주행동 한 점. 코랄은 다른 어디에도 없다.
+ */
+
+/* 경과 시계 — `src/말하기화면.js` 와 같은 판정(벽시계 금지 · 없으면 null = 「안 쟀다」).
+ * ⚠ 두 번째 사본이다 — 세 번째가 생기는 날 공용 통로로 뗀다(CLAUDE.md 신뢰성 규칙). */
+const 경과시계 = () =>
+  (typeof performance !== 'undefined' && performance && typeof performance.now === 'function'
+    ? performance.now() : null);
+
+export default function 교수멘탈화면({ 항목, 토큰, 학생번호 = null, 막힘 = null, 시작단계 = '전략' }) {
+  /* 재료는 배정 항목에서 한 번 편다 — 화면이 그리는 지시문·상황문과 제출 스냅샷이 같은
+   * 조립(`펴기`→`G1스냅샷`)을 지나므로 「그날 본 것」과 행이 같은 모양이다(§6-8 규칙 4). */
+  const 재료 = useMemo(() => 게임재료(항목), [항목]);
+
+  /* 표시 순서를 마운트 때 한 번 확정한다(`말하기화면` 녹음카드와 같은 규칙) — 매 렌더 섞으면
+   * 행에 적힌 자리와 학생이 본 자리가 갈리고, 그 갈림은 증상이 없다. 추천은 시드에서 결정적. */
+  const [보기] = useState(() => (재료 ? 보기세우기(사과전략.보기들, 오늘추천(재료.prompt_seed)) : null));
+  const 보기뜬때 = useRef(경과시계());
+
+  const [단계, set단계] = useState(시작단계); // 전략 | 쓰기 | 대기
+  const [로그, set로그] = useState([]);
+  const 로그참조 = useRef([]);
+  const [오류, set오류] = useState(null);
+  const [게이지, set게이지] = useState(null);
+  const 게이지참조 = useRef(null);
+  const [본문있음, set본문있음] = useState(false);
+  const 본문있음참조 = useRef(false);
+  const [보낸메일, set보낸메일] = useState(null);
+
+  /* 한 앉음 = 한 correlation_id (P0 §3-1 ④). 재제출은 새 마운트 = 새 앉음이라 **새 키**다 —
+   * 원 제출과의 고리는 `retry_of_event_id`(서버 배정 행이 낸 값)가 잇는다(발주 G1 §6). */
+  const 앉음 = useRef(흐름id()).current;
+  const 시작날짜 = useRef(몽골날짜());
+
+  /* 입력의 최신본은 ref 가 쥔다 — state 로 쥐면 controlled 가 된다(머리말 ⚙). */
+  const 제목참조 = useRef('');
+  const 본문참조 = useRef('');
+  const 계측참조 = useRef(null);
+  /* 이탈 판정 재료 — cleanup 은 낡은 state 를 보므로 ref 하나가 최신을 쥔다. */
+  const 상태참조 = useRef({ 단계: 시작단계, 글: '', 제출됨: false });
+
+  const 메일전문 = () => {
+    const 제목 = 제목참조.current.trim();
+    const 본문 = 본문참조.current;
+    /* 제목 줄도 학생이 쓴 메일의 일부다 — 떼어 버리면 산출물 절반이 행에서 사라진다.
+     * 「제목: 」 표기는 메일의 글 표현이지 내용 조작이 아니다(회귀가 이 모양을 못박는다). */
+    return 제목 ? `제목: ${제목}\n${본문}` : 본문;
+  };
+
+  /** 아직 안 닿은 항목을 순서대로 보낸다 — `답장화면.흘려보내기` 와 같은 문 하나. */
+  const 흘려보내기 = async () => {
+    let 다음 = 로그참조.current;
+    for (const e of 보낼것(다음, 막힘)) {
+      let r;
+      try {
+        r = await 사건보내기(토큰, e.사건);
+      } catch (err) {
+        r = { 오류: String((err && err.message) || err), 끝: false };
+      }
+      다음 = 전송기록(다음, e.id, r);
+    }
+    로그참조.current = 다음;
+    set로그(다음);
+    await 게임로그쓰기(다음).catch(() => {});
+  };
+
+  /* 마운트: 큐를 읽고 — 이미 이 배정을 보냈으면 대기 화면으로 간다(두 번 내지 않는다) —
+   * 밀린 것을 민다(몽골 회선에서 제출 순간 실패는 상시다 · 말하기화면과 같은 자리). */
+  useEffect(() => {
+    let 살아있음 = true;
+    (async () => {
+      try {
+        const { 로그: 저장된, 깨진줄 } = await 게임로그읽기();
+        if (!살아있음) return;
+        로그참조.current = 저장된;
+        set로그(저장된);
+        if (깨진줄 > 0) set오류(`저장된 기록 중 ${깨진줄}줄을 읽지 못했다`);
+        if (재료) {
+          const 이미 = 제출항목(저장된, 재료.task_ref);
+          if (이미) {
+            set보낸메일(이미.사건.submission.body_original);
+            상태참조.current = { ...상태참조.current, 단계: '대기', 제출됨: true };
+            set단계('대기');
+          }
+        }
+        await 흘려보내기();
+      } catch (e) {
+        if (살아있음) set오류(String((e && e.message) || e));
+      }
+    })();
+    return () => { 살아있음 = false; };
+  }, []);
+
+  /* 계측은 **입력이 가능해진 순간** 시작한다 — 카드를 읽는 시간은 안 센다(`작성과정.계측시작`). */
+  useEffect(() => {
+    if (단계 === '쓰기' && !계측참조.current) 계측참조.current = 계측시작(경과시계());
+  }, [단계]);
+
+  /* 🔴 쓰다 나감 = `session.abandoned` — **날을 건넌 되세움에서만** 낸다(발주 §5 이탈 행).
+   *   같은 날의 이동(사전·답장 화면)은 이탈이 아니다 — 말하기화면이 「끊긴 것을 막혔다로 말하지
+   *   않는다」로 지킨 그 신호 순도다. 앱이 통째로 죽은 경우는 cleanup 이 안 돌아 못 잰다(천장 —
+   *   그날의 부재는 배정 사건이 분모로 남는다). */
+  useEffect(() => () => {
+    const s = 상태참조.current;
+    if (s.제출됨 || s.단계 !== '쓰기' || !s.글.trim()) return;
+    if (몽골날짜() === 시작날짜.current) return;
+    const 사건 = 이탈사건(재료, { correlation_id: 앉음, idempotency_key: 흐름id() });
+    if (!사건) return;
+    (async () => {
+      try {
+        const { 로그: 지금 } = await 게임로그읽기();
+        const { 로그: 더한, 새것 } = 항목추가(지금, 사건);
+        if (새것) await 게임로그쓰기(더한); // 전송은 다음 마운트의 밀린것 쓸이가 진다
+      } catch { /* 기록 실패 — 관측을 지어내지 않는다 */ }
+    })();
+  }, []);
+
+  const 고르기 = async (option_id) => {
+    상태참조.current = { ...상태참조.current, 단계: '쓰기' };
+    set단계('쓰기');
+    const 사건 = 전략선택사건(재료, {
+      보기, 고른것: option_id, 시작: 보기뜬때.current, 끝: 경과시계(),
+      correlation_id: 앉음, idempotency_key: 흐름id(),
+    });
+    if (!사건) return; // 조립이 계약을 못 지키면 안 보낸다 — 흐름은 막지 않는다(고름은 잰 것이다)
+    const { 로그: 더한, 새것 } = 항목추가(로그참조.current, 사건);
+    if (!새것) return; // 이 앉음의 고름은 이미 실렸다 — 두 벌 내지 않는다
+    로그참조.current = 더한;
+    set로그(더한);
+    await 게임로그쓰기(더한).catch(() => {});
+    흘려보내기(); // 기다리지 않는다 — 기기 저장은 끝났다
+  };
+
+  const 입력됨 = () => {
+    const 글 = 메일전문();
+    계측참조.current = 타건(계측참조.current, 글, 경과시계());
+    상태참조.current = { ...상태참조.current, 글 };
+    const 새 = 판정(글, 재료.문항.요구문형);
+    if (!같은판정(게이지참조.current, 새)) {
+      게이지참조.current = 새;
+      set게이지(새);
+    }
+    const 있음 = 본문참조.current.trim() !== '';
+    if (있음 !== 본문있음참조.current) {
+      본문있음참조.current = 있음;
+      set본문있음(있음);
+    }
+  };
+
+  const 보내기 = async () => {
+    const 본문 = 메일전문();
+    if (!본문.trim() || !재료) return;
+    const 사건 = 메일제출사건(재료, {
+      본문,
+      correlation_id: 앉음,
+      idempotency_key: 흐름id(),
+      attempt_no: 다음시도번호(로그참조.current, 재료.task_ref),
+      /* 한 칸이라도 못 쟀으면 null — 그러면 조립기가 키를 아예 안 싣는다(§6-6 ⑨ 한 벌 규칙). */
+      compose_meta: 계측payload(계측참조.current, 경과시계()),
+    });
+    if (!사건) {
+      set오류('메일을 담지 못했어요 — 잠시 뒤 다시 눌러 주세요');
+      return;
+    }
+    const { 로그: 더한, 새것 } = 항목추가(로그참조.current, 사건);
+    if (새것) {
+      로그참조.current = 더한;
+      set로그(더한);
+      await 게임로그쓰기(더한).catch(() => {});
+    }
+    상태참조.current = { ...상태참조.current, 단계: '대기', 제출됨: true };
+    set보낸메일(본문);
+    set단계('대기');
+    /* 발송 성취음 1회(게임층 §3-1 — achieve 자리 「G1 발송」). 게이트 거부·자산 없음은
+     * 조용히 무음이다 — 소리가 흐름을 막지 않는다. 다시 열어 대기로 점프한 날은 안 난다. */
+    try { 효과음('achieve'); } catch { /* 무음 — 실패음도 오류도 내지 않는다 */ }
+    흘려보내기(); // 화면은 안 기다린다 — 도착 여부는 대기 카드가 정직하게 말한다
+  };
+
+  /* ── 렌더 ── */
+
+  if (!재료) {
+    return (
+      <ScrollView style={s.wrap} contentContainerStyle={s.inner}>
+        <머리 />
+        {/* 못 읽은 것을 고정 과제로 둔갑시키지 않는다 — 말하기 폴백은 말하기의 것이다. */}
+        <View style={s.카드}>
+          <Text style={s.본문글}>오늘의 미션을 읽지 못했어요 — 잠시 뒤 앱을 다시 열어 주세요.</Text>
+          {학생번호 ? <Text style={s.메모}>계속 그러면 선생님께 학생번호 {학생번호}를 보여 주세요.</Text> : null}
+        </View>
+      </ScrollView>
+    );
+  }
+
+  const { 문항 } = 재료;
+  const 칸이름들 = Object.keys(문항.요구문형);
+  const 빠진칸 = 게이지 ? 게이지.빠진칸 : 칸이름들;
+  /* 메일 항목의 배달 상태 — 「닿았다」는 서버가 받은 것만이다(완료카드와 같은 축). */
+  const 메일항목 = 제출항목(로그, 재료.task_ref);
+
+  return (
+    <ScrollView style={s.wrap} contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
+      <머리 />
+      {오류 && <Text style={s.오류}>{오류}</Text>}
+
+      {단계 === '전략' && (
+        <>
+          <View style={s.카드}>
+            <Text style={s.카드라벨}>오늘의 미션</Text>
+            <Text style={s.상황글}>{문항.질문}</Text>
+            <Text style={s.본문글}>{문항.지시문}</Text>
+          </View>
+          {보기 && (
+            <View style={s.카드}>
+              <Text style={s.카드라벨}>어떻게 다가갈까요? — 한 장을 골라요</Text>
+              {/* 🔴 `options_shown` 순서 그대로 그린다 — 행에 적힌 자리와 학생이 본 자리가
+                  같아야 한다(말하기화면 선택지와 같은 규칙). */}
+              {보기.options_shown.map((o) => (
+                <Pressable
+                  key={o.option_id}
+                  onPress={() => 고르기(o.option_id)}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [s.전략카드, pressed && s.눌림]}
+                >
+                  <Text style={s.전략글}>{o.label}</Text>
+                  {보기.recommended_option === o.option_id && (
+                    <Text style={s.추천표시}>오늘의 추천</Text>
+                  )}
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </>
+      )}
+
+      {단계 === '쓰기' && (
+        <View style={s.카드}>
+          <Text style={s.카드라벨}>받는 사람 · 교수님</Text>
+          <Text style={s.메모}>{문항.지시문}</Text>
+          <TextInput
+            style={s.제목입력}
+            placeholder="제목"
+            placeholderTextColor={색.잉크_메타}
+            defaultValue=""
+            onChangeText={(t) => { 제목참조.current = t; 입력됨(); }}
+          />
+          <TextInput
+            style={s.본문입력}
+            placeholder="교수님께 보낼 메일을 써요"
+            placeholderTextColor={색.잉크_메타}
+            defaultValue=""
+            onChangeText={(t) => { 본문참조.current = t; 입력됨(); }}
+            multiline
+            textAlignVertical="top"
+          />
+
+          {/* 멘탈 게이지 — 5칸 진행 연출. 채점이 아니고 숫자·퍼센트도 없다(발주 G1 §4-5).
+              칸 채움 체크는 게이지 상승의 원인 표시 — 한 장치의 두 표면이다(게임층 §2). */}
+          <View>
+            <Text style={s.게이지라벨}>교수님 기분 — 문법 점수가 아니라 빠진 부분 안내예요</Text>
+            <View style={s.게이지줄}>
+              {칸이름들.map((이름) => {
+                const 찼다 = !!(게이지 && 게이지.칸별[이름]);
+                return (
+                  <View key={이름} style={s.게이지칸}>
+                    <View style={[s.게이지면, 찼다 && s.게이지면_참]} />
+                    <Text style={[s.게이지이름, 찼다 && s.게이지이름_참]}>{이름}</Text>
+                  </View>
+                );
+              })}
+            </View>
+            {/* 힌트는 빠진 칸의 **이름까지**다 — 모범 문형은 화면에 내지 않는다(팩 §2). */}
+            <Text style={s.게이지힌트}>
+              {빠진칸.length ? `아직 비어 있는 칸: ${빠진칸.join(' · ')}` : '다섯 칸이 다 찼어요 — 이제 보내 볼까요?'}
+            </Text>
+          </View>
+
+          <Pressable
+            onPress={보내기}
+            disabled={!본문있음}
+            accessibilityRole="button"
+            style={({ pressed }) => [s.보내기버튼, !본문있음 && s.보내기_대기, pressed && s.눌림]}
+          >
+            <Text style={s.보내기글}>보내기</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {단계 === '대기' && (
+        <>
+          <View style={s.카드}>
+            <Text style={s.카드라벨}>보냈어요</Text>
+            <Text style={s.대기제목}>교수님이 읽고 있어요</Text>
+            {/* 즉답처럼 보이게 하지 않는다 — 답장은 사람이 확인한 뒤에 온다(며칠). */}
+            <Text style={s.본문글}>답장은 며칠 걸릴 수 있어요. 답장이 오면 「답장」에서 볼 수 있어요.</Text>
+            {메일항목 && !메일항목.event_id && !메일항목.send_final && (
+              <Text style={s.메모}>메일은 보내는 중이에요 — 앱을 다시 열면 이어서 보내요.</Text>
+            )}
+            {메일항목 && !메일항목.event_id && 메일항목.send_final && (
+              <Text style={s.오류}>메일을 보내지 못했어요. 선생님께 알려 주세요.</Text>
+            )}
+          </View>
+          {/* 산출물 렌더 — 「보냈다」의 기록이지 「맞았다」의 전시가 아니다(게임층 §2 한 수 더). */}
+          {보낸메일 ? (
+            <View style={s.카드}>
+              <Text style={s.카드라벨}>내가 보낸 편지</Text>
+              <Text style={s.편지글} selectable>{보낸메일}</Text>
+            </View>
+          ) : null}
+        </>
+      )}
+    </ScrollView>
+  );
+}
+
+function 머리() {
+  return (
+    <View style={s.머리}>
+      <Text style={s.브랜드}>SYNK TALK</Text>
+      <Text style={s.제목}>교수님 멘탈 구하기</Text>
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
+  wrap: { flex: 1, backgroundColor: 색.바탕 },
+  inner: { padding: 24, paddingTop: 68, paddingBottom: 48, gap: 20 },
+
+  머리: { gap: 6 },
+  브랜드: { fontFamily: 폰트.모노, fontSize: 11, letterSpacing: 모노트래킹.라벨, color: 색.잉크_태그 },
+  제목: { fontFamily: 폰트.헤드, fontSize: 27, color: 색.잉크 },
+
+  오류: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크, lineHeight: 19 },
+  메모: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조, lineHeight: 18 },
+
+  카드: { backgroundColor: 색.바탕띄움, borderRadius: 20, padding: 22, gap: 16 },
+  카드라벨: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_태그 },
+  상황글: { fontFamily: 폰트.헤드, fontSize: 21, lineHeight: 32, color: 색.잉크 },
+  본문글: { fontFamily: 폰트.본문, fontSize: 15, lineHeight: 24, color: 색.잉크_서브 },
+
+  전략카드: {
+    borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12,
+    paddingVertical: 14, paddingHorizontal: 16, gap: 4,
+  },
+  전략글: { fontFamily: 폰트.본문, fontSize: 16, color: 색.잉크 },
+  /* 추천 표시 — 색을 새로 안 쓴다(신호 1점은 보내기 버튼) · 글자 층으로만 선다. */
+  추천표시: { fontFamily: 폰트.강조, fontSize: 12, color: 색.잉크_태그 },
+
+  제목입력: {
+    fontFamily: 폰트.본문, fontSize: 16, color: 색.잉크,
+    borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12, padding: 12,
+  },
+  본문입력: {
+    fontFamily: 폰트.본문, fontSize: 16, lineHeight: 26, color: 색.잉크,
+    borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12, padding: 12, minHeight: 180,
+  },
+
+  게이지라벨: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_메타, marginBottom: 8 },
+  게이지줄: { flexDirection: 'row', gap: 8 },
+  게이지칸: { flex: 1, alignItems: 'center', gap: 5 },
+  게이지면: { alignSelf: 'stretch', height: 8, borderRadius: 4, backgroundColor: 색.잉크_희미 },
+  게이지면_참: { backgroundColor: 색.잉크 },
+  게이지이름: { fontFamily: 폰트.캡션, fontSize: 11, color: 색.잉크_메타 },
+  게이지이름_참: { fontFamily: 폰트.강조, color: 색.잉크 },
+  게이지힌트: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조, lineHeight: 18, marginTop: 8 },
+
+  /* 신호 1점 — 코랄 면 위 글자는 Navy 2(색.바탕)만 쓴다(테마 규칙 그대로). */
+  보내기버튼: { backgroundColor: 색.신호, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
+  보내기_대기: { opacity: 0.35 },
+  보내기글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.바탕 },
+  눌림: { opacity: 0.75 },
+
+  대기제목: { fontFamily: 폰트.헤드, fontSize: 24, color: 색.잉크 },
+  편지글: { fontFamily: 폰트.본문, fontSize: 16, lineHeight: 27, color: 색.잉크 },
+});

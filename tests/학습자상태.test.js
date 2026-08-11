@@ -426,3 +426,51 @@ test('⑤ 차원이 없던 옛 행은 「미상」으로 따로 센다 — 아�
   assert.equal(d[차원들.도입평일].n, 1);
   assert.equal(r.축.관심.n, 2, '전체 표본은 그대로여야 한다 — 「모름」을 버리면 분모가 준다');
 });
+
+/* ── ⑥ 작성과정 — 쓰기 3종의 «어떻게 썼나» (v4 · G1 생산자와 한 벌 · 발주 §6-6 ⑨) ── */
+
+/* 입력은 실제 조립기(`작성과정`)가 낸 모양이다(맹점 ① — 칸 이름을 손으로 적으면
+ * 조립기가 이름을 바꾼 날 이 축이 조용히 0 이 되고 검사는 초록이다). */
+const { 계측시작, 타건, 계측payload } = require('../lib/작성과정.js');
+function 실compose_meta() {
+  let s = 계측시작(0);
+  s = 타건(s, '교수님께', 4000);
+  s = 타건(s, '교수님', 5000); // 지움 — 되돌림 1
+  s = 타건(s, '교수님, 안녕하십니까', 7000);
+  return 계측payload(s, 30000);
+}
+
+test('⑥ compose_meta 가 온전한 제출만 분모다 — 음성 제출은 미측정이 아니라 잴 것이 없던 행이다', () => {
+  const m = 실compose_meta();
+  assert.ok(m, '조립기 픽스처가 한 벌을 못 냈다');
+  const r = 학습자상태([
+    사건('submission.created', '2026-08-08T01:00:00Z', { payload: { ver: 1, attempt_no: 1, compose_meta: m } }),
+    사건('submission.created', '2026-08-08T02:00:00Z', { payload: { ver: 1, attempt_no: 1 } }), // 음성 — 키 없음
+  ], { as_of: 기준 });
+  const 축 = r.축.작성과정;
+  assert.ok(축, '작성과정 축이 안 섰다 — 생산자만 있고 소비자가 없다(수집은 엔진 도달까지 한 벌)');
+  assert.equal(축.n, 1);
+  assert.equal(축.불완전, 0);
+  assert.equal(축.미룸_중앙, m.first_keystroke_ms);
+  assert.equal(축.붙듦_중앙, m.total_compose_ms);
+  assert.equal(축.되돌림_중앙, m.revision_count);
+  assert.equal(축.최대덩어리_최대, m.input_burst_max);
+});
+
+test('⑥ 쓰기 제출이 없으면 축은 null — 0 으로 채우지 않는다', () => {
+  const r = 학습자상태([
+    사건('submission.created', '2026-08-08T01:00:00Z', { payload: { ver: 1, attempt_no: 1 } }),
+  ], { as_of: 기준 });
+  assert.equal(r.축.작성과정, null);
+});
+
+test('⑥ 반쪽 compose_meta 는 값에 안 섞이고 「불완전」으로 드러난다 — 조립기 규율이 새면 여기가 유일한 눈이다', () => {
+  const r = 학습자상태([
+    사건('submission.created', '2026-08-08T01:00:00Z', { payload: { ver: 1, compose_meta: { total_compose_ms: 9 } } }),
+  ], { as_of: 기준 });
+  const 축 = r.축.작성과정;
+  assert.ok(축, '반쪽만 온 날 축이 null 이면 결함이 조용히 사라진다');
+  assert.equal(축.n, 0);
+  assert.equal(축.불완전, 1);
+  assert.equal(축.미룸_중앙, null, '반쪽 값이 중앙값에 섞였다');
+});

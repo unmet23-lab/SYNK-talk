@@ -79,6 +79,32 @@ export async function 교정로그쓰기(로그) {
   f.write(직렬화(로그));
 }
 
+/* ── 게임 사건 로그 (G1 · `lib/게임로그.js`) ─────────────────────────────────
+ * 🔴 제출 로그와 같은 파일에 섞지 않는다 — `학습출석`·`배달상태` 가 `talk_log.jsonl` 의 모든
+ *   항목을 발화로 세므로, 메일 한 통이 발화 수를 늘린다(교정 로그와 같은 이유·같은 형태). */
+let 메모리게임로그 = [];
+
+export async function 게임로그읽기() {
+  if (웹) return { 로그: 메모리게임로그, 깨진줄: 0 };
+  try {
+    const f = new FS.File(FS.Paths.document, 'game_log.jsonl');
+    if (!f.exists) return { 로그: [], 깨진줄: 0 };
+    return 역직렬화(f.textSync());
+  } catch (e) {
+    // 읽기 실패를 빈 로그로 둔갑시키지 않는다 — 빈 로그로 보면 같은 앉음의 사건이 두 벌 나간다
+    throw new Error('게임 기록을 읽지 못했어요: ' + (e && e.message));
+  }
+}
+
+export async function 게임로그쓰기(로그) {
+  if (웹) {
+    메모리게임로그 = 로그;
+    return;
+  }
+  const f = new FS.File(FS.Paths.document, 'game_log.jsonl');
+  f.write(직렬화(로그));
+}
+
 /**
  * 조립된 WAV 바이트를 기기에 쓴다(배선① — 앱이 컨테이너를 직접 만든다 · `lib/wav조립.js`).
  *
@@ -196,6 +222,9 @@ export async function 세션지우기() {
 export async function 기기비우기() {
   await 로그쓰기([]);
   await 교정로그쓰기([]);
+  /* 게임 로그도 귀속이다 — 남기면 다음 학생의 G1 화면이 앞 학생의 「이미 보냈다」를 읽고,
+   * `밀린것` 재전송이 앞 학생의 메일을 다음 학생 토큰으로 올린다(제출 로그와 같은 사고). */
+  await 게임로그쓰기([]);
   await 세션지우기();
   /* 🔴 **키체인만 지우면 절반이다** — 만료 갱신이 세션을 메모리에도 쥐고 있고(`인증API`),
    *   안 비우면 다음 학생의 첫 401 이 **앞 학생의 refresh_token 으로** 되살아난다. 그 뒤 발화는
