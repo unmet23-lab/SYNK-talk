@@ -141,7 +141,12 @@ async function 적기(
  * ⚠ 조각을 **상수가 아니라 함수로** 둔다 — 같은 조각 인스턴스를 두 질의에 끼우는 것이
  *   드라이버에서 안전한지는 여기서 확인할 방법이 없고(DB 가 필요하다), 확인 못 하는 것을
  *   전제로 쓰면 증상은 「한쪽 질의만 이상하다」로 온다. 부를 때마다 새로 짓는다.
- * ⚠ 동의 술어의 정본 = `lib/동의게이트.js 지금유효술어`(`tests/동의게이트.test.js` 가 묶는다). */
+ * ⚠ 동의 술어의 정본 = `lib/동의게이트.js 지금유효술어`(`tests/동의게이트.test.js` 가 묶는다).
+ * ⚠ 마지막 `not (…)` 의 정본 = `lib/보고서교정.js 맞음술어`(`tests/보고서교정.test.js` 가 묶는다).
+ *   G2 에서 **정답대로 고쳐 낸 제출**을 벤더에 안 보낸다 — 보내면 벤더가 무언가를 만들어 내고,
+ *   그 행이 골든 풀에 들어 **과교정률이 G2 정답 문장 때문에 나빠진 것처럼 보인다**(설계 §7).
+ *   여기 세우는 이유: 검수 큐의 AI 조인이 inner 라 **AI 행이 안 생기면 큐가 알아서 뺀다**
+ *   (새 표 0 · 새 열 0 · 새 상태값 0). 🚫 이 텍스트를 손으로 고치지 않는다 — 정본은 lib 이다. */
 const 대기조건 = () => sql`
       from engine.submissions s
       join engine.learning_events e
@@ -157,7 +162,12 @@ const 대기조건 = () => sql`
                 and (revoked_at is null or revoked_at > now()))
        and not exists (
              select 1 from engine.corrections c
-              where c.submission_id = s.submission_id and c.actor_kind = 'ai')`;
+              where c.submission_id = s.submission_id and c.actor_kind = 'ai')
+       and not (
+             s.task_snapshot -> '정답' ->> '교정문' is not null
+       and e.payload ->> 'selected_option' = s.task_snapshot -> '정답' ->> '오류자리'
+       and btrim(regexp_replace(regexp_replace(btrim(s.body_original), '[[:space:]]+', ' ', 'g'), '[.]$', ''))
+         = btrim(regexp_replace(regexp_replace(btrim(s.task_snapshot -> '정답' ->> '교정문'), '[[:space:]]+', ' ', 'g'), '[.]$', '')))`;
 
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return 봉투(405, { error: 'method_not_allowed' });
