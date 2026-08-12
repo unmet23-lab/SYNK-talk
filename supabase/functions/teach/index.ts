@@ -47,6 +47,9 @@ import 확정모듈 from './검수확정.mjs';
 import 표본모듈 from './골든표본.mjs';
 import 동의모듈 from './동의게이트.mjs';
 import 나침반모듈 from './나침반문항.mjs';
+import 회고모듈 from './회고.mjs';
+import 상태모듈 from './학습자상태.mjs';
+import 라디오태스크모듈 from './라디오태스크.mjs';
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
 
@@ -84,6 +87,32 @@ const { 종류: 회차종류, 물을것, 답검사 } = 나침반모듈 as {
   답검사: (회차: string, 답: unknown, 바꿨나: unknown) => { 필드: string; 사유: string } | null;
 };
 
+/* 회고 — 판정 어휘·구간 가르기·굳히기의 정본은 `lib/회고.js` 하나다. 이 파일은 3갈래 값도
+ * 「어디를 반으로 가르나」도 모른다(사본이 없으면 갈릴 일도 없다). */
+type 판정표시 = {
+  코드: string; 라벨: string; 라벨_학생: string;
+  라벨_mn: string | null; 라벨_mn_학생: string | null;
+};
+const { 판정검사, 자기판정검사, 굳히기, 집계정리, 판정보기, 사유상한 } = 회고모듈 as {
+  판정검사: (판정: unknown, 사유: unknown) => { 필드: string; 사유: string } | null;
+  자기판정검사: (판정: unknown) => { 필드: string; 사유: string } | null;
+  굳히기: (사건들: unknown[], 시즌: unknown, 집계: unknown, 지금: Date) => Record<string, unknown>;
+  집계정리: (행: unknown) => Record<string, unknown>;
+  판정보기: 판정표시[];
+  사유상한: number;
+};
+
+/* 원신호 목록·라디오 제외는 **축 모듈이 정본**이다(`deliver` 와 같은 사슬 · 여기 다시 안 적는다 —
+ * 갈라지면 회고가 굳힌 근거와 매일 도는 상태가 다른 사건을 보게 된다). */
+const { 쓰는사건 } = 상태모듈 as { 쓰는사건: string[] };
+const { 라디오태스크종 } = 라디오태스크모듈 as { 라디오태스크종: string[] };
+
+/* 회고가 걷는 원신호 상한 — **사건 종류별**이다(`deliver` 종별상한 150 과 같은 사유: 한 종의
+ * 폭주가 다른 종의 신호를 밀어내는 방향만 막는다). 창이 30일이 아니라 **시즌 2달**이라 그
+ * 비례로 올려 잡는다(2달 × 하루 5건 = 300 을 덮는다). 잘림은 최신 우선이고, 잘렸다는 사실은
+ * `evidence_refs.잘림` 에 그대로 남는다(굳힌 근거가 스스로 그 한계를 말한다). */
+const 회고종별상한 = 400;
+
 const { 지금유효, 그때유효, 거절몸통 } = 동의모듈 as {
   지금유효: (질의: unknown, learner_id: string) => Promise<Array<{ consent_id: string }>>;
   그때유효: (질의: unknown, learner_id: string, occurred_at: string) => Promise<Array<{ consent_id: string }>>;
@@ -104,6 +133,12 @@ const 경로표 = {
   'gold/judge': 'POST',
   'compass/open': 'GET',
   'compass/save': 'POST',
+  /* 회고 — 세 경로다. 하나로 합치면 「학생 먼저」가 **화면 규약**으로만 남는다(설계 §7):
+   *   `retro/open` 이 굳히고 · `retro/self` 를 학생이 누르고 · `retro/judge` 를 강사가 누른다.
+   * 🔴 순서가 규격인 이유 — 강사 판정을 보고 학생이 고르면 그 칸은 대조군이 아니라 메아리다. */
+  'retro/open': 'GET',
+  'retro/self': 'POST',
+  'retro/judge': 'POST',
 } as const;
 type 아는경로 = keyof typeof 경로표;
 const 안내 = Object.entries(경로표).map(([p, m]) => `${m} /v1/teach/${p}`).join(' · ');
@@ -128,6 +163,13 @@ const 거절상태 = {
    * `SEASON_ROLLED`  = 화면이 든 시즌과 오늘의 시즌이 다르다(여는 사이에 경계가 넘어갔다). */
   SEASON_NOT_OPEN: 409,
   SEASON_ROLLED: 409,
+  /* 회고 — 셋 다 「지금은 안 된다」이지 「틀렸다」가 아니라 409 다.
+   * `RETRO_NOT_DUE`     = 회고할 시즌이 없다(나침반 행이 없거나 전부 확정됐다).
+   * `RETRO_NOT_OPENED`  = 열지 않고 판정하려 한다(굳힌 근거가 없는 라벨은 라벨이 아니다).
+   * `SELF_AFTER_JUDGE`  = 강사 판정 «뒤»에 학생 칸을 쓰려 한다(메아리 차단 · 설계 §7). */
+  RETRO_NOT_DUE: 409,
+  RETRO_NOT_OPENED: 409,
+  SELF_AFTER_JUDGE: 409,
   CONSENT_MISSING: 403,
   INTERNAL: 500,
 } as const;
@@ -204,11 +246,14 @@ Deno.serve(async (req: Request) => {
   try {
     if (경로 === 'gold/queue') return await 큐읽기(url, staff_id, ver);
     if (경로 === 'compass/open') return await 나침반열기(url, staff_id, ver);
+    if (경로 === 'retro/open') return await 회고열기(url, staff_id, ver);
     const 본문 = await 본문읽기(req);
     if (본문 === undefined) {
       return 실패(400, { code: 'CONTRACT_VIOLATION', message: 'JSON 이 아닙니다', retryable: false }, ver);
     }
     if (경로 === 'compass/save') return await 나침반저장(본문, staff_id, ver);
+    if (경로 === 'retro/self') return await 자기판정(본문, staff_id, ver);
+    if (경로 === 'retro/judge') return await 회고판정(본문, staff_id, ver);
     return await 판정하기(본문, staff_id, ver);
   } catch (e) {
     console.error(`[teach/${경로}] 실패`, String((e as Error)?.message ?? e));
@@ -677,6 +722,357 @@ async function 나침반저장(본문: unknown, staff_id: string, ver: string) {
       season_id: String(시즌.season_id),
       round: 회차,
       recorded_at: 행.recorded_at,
+    };
+  });
+
+  if ('거절' in 결과) return 거절응답(결과, ver);
+  return 봉투(200, { ok: true, ...결과 }, ver);
+}
+
+/* ── 시즌 회고 ③④ ─────────────────────────────────────────────────────
+ *
+ * 정본 = appsscript `docs/시즌회고_설계.md` v3 §3-2·§4·§6·§7.
+ *
+ * 🔴 **여는 그 순간에 굳힌다.** 판정할 때 다시 계산하면 창(30일)이 밀려 다른 숫자가 나오고,
+ *   그러면 「가까워졌다」 옆에 붙은 숫자는 그 판정을 낸 사람이 **본 적 없는 숫자**가 된다.
+ *   그래서 retro/open 이 행을 만들며 record_snapshot 을 쓰고, 그 뒤로는 DB 트리거가 그 칸을
+ *   못 바꾸게 막는다. 다시 열면 **굳힌 것을 그대로** 돌려준다(재계산 0).
+ *
+ * 🔴 **굳힌 근거를 앱에서 받지 않는다.** 앱이 보낸 근거는 근거가 아니다 — 조립도 저장도
+ *   서버가 한다(lib/회고.js 하나가 구간을 가르고 두 번 부른다).
+ *
+ * 🔑 **어느 시즌을 회고하나도 서버가 정한다** — 「그 학생의 나침반이 있는데 회고가 아직 확정
+ *   안 된, 가장 오래된 시즌」이다. 앱이 고르게 하면 강사가 지난 시즌을 골라 소급 판정할 수
+ *   있고, 그 순간 「그 시점의 판정」이라는 전제가 죽는다(나침반 season_id 와 같은 축).
+ *   ⚠ 그래서 밀린 회고는 **오래된 것부터** 열린다(건너뛰기 없음 — 건너뛴 시즌은 영영 라벨 0이고,
+ *     라벨 0인 시즌은 엔진에서 존재하지 않는 것과 같다).
+ *
+ * 🚫 회고 화면에서 8축 실시간 조회(설계 §10) · 🚫 판정 눈금 5단계·점수화 ·
+ * 🚫 답·판정 자동 채점(「목표 런타임 자동 판정 🚫」 유호님 확정 승계) ·
+ * 🚫 새 event_type 신설(시즌당 1회·사람이 읽는 자료라 사건 층에 넣으면 엔진이 못 센다).
+ */
+
+/** 회고할 시즌 한 행 + 이미 열려 있으면 그 행까지. **한 번의 조회**로 둘 다 가져온다 —
+ *  나눠 읽으면 그 틈에 다른 강사가 열어 두 세션이 서로 다른 굳힘을 본다. */
+function 회고대상(tx: unknown, learner_id: string) {
+  const q = tx as typeof sql;
+  return q`
+    select s.season_id, s.code, s.textbook, s.starts_on, s.ends_on,
+           c.answers, c.self_in_5y_changed, c.goal_track_at_open, c.recorded_at,
+           r.review_id, r.record_snapshot, r.verdict, r.verdict_by_self, r.note,
+           r.decided_by, r.decided_at, r.opened_at
+      from engine.season_compass c
+      join engine.season s on s.season_id = c.season_id
+      left join engine.season_review r
+        on r.learner_id = c.learner_id and r.season_id = c.season_id
+     where c.learner_id = ${learner_id}::uuid
+       and s.starts_on <= current_date
+       and (r.review_id is null or r.verdict is null)
+     order by s.starts_on
+     limit 1
+       for update of c`;
+}
+
+/* ── GET /v1/teach/retro/open ────────────────────────────────────────── */
+
+async function 회고열기(url: URL, staff_id: string, ver: string) {
+  /* 나침반과 **같은 문**으로 연다 — 강사 손에 있는 것은 uuid 가 아니라 SYNK-001 이다. */
+  const 넘긴id = (url.searchParams.get('learner_id') || '').trim();
+  const 학생번호 = (url.searchParams.get('student_code') || '').trim();
+  if (!/^[0-9a-f-]{36}$/i.test(넘긴id) && !학생번호) {
+    return 실패(400, {
+      code: 'CONTRACT_VIOLATION', field: 'learner_id', retryable: false,
+      message: 'learner_id 또는 student_code 가 필요합니다',
+    }, ver);
+  }
+
+  const 결과 = await sql.begin(async (tx) => {
+    const [학생] = /^[0-9a-f-]{36}$/i.test(넘긴id)
+      ? await tx`
+          select learner_id, student_code, display_name, goal_track
+            from engine.learners where learner_id = ${넘긴id}::uuid`
+      : await tx`
+          select learner_id, student_code, display_name, goal_track
+            from engine.learners where student_code = ${학생번호}`;
+    if (!학생) return { 거절: 'NOT_FOUND' as const, 칸: 'learner_id', 문구: '없는 학생입니다' };
+    const learner_id = String(학생.learner_id);
+
+    const [대상] = await 회고대상(tx, learner_id);
+    if (!대상) {
+      /* 처방을 **그대로 실행할 수 있게** 적는다 — 「없다」만 내면 강사는 앱을 의심한다.
+       * 이 자리는 둘 중 하나다: 나침반을 아직 안 적었거나, 밀린 회고가 없거나. */
+      return { 거절: 'RETRO_NOT_DUE' as const,
+        문구: '회고할 시즌이 없습니다 — 이 학생의 나침반이 아직 없거나, 지난 시즌 회고가 모두 확정됐습니다' };
+    }
+
+    let 굳힌것 = 대상.record_snapshot as Record<string, unknown> | null;
+    /* 🔴 **이미 굳혔으면 다시 계산하지 않는다.** 다시 계산하면 창이 밀려 어제 본 숫자와 오늘
+     *   본 숫자가 갈리고, 학생이 이미 자기 칸을 누른 뒤라면 그 판정은 **다른 근거**를 보고
+     *   누른 것이 된다. 이어서 여는 자리가 곧 이 보장을 지키는 자리다. */
+    if (!굳힌것) {
+      const [원신호] = await tx`
+        select coalesce(jsonb_agg(jsonb_build_object(
+                 'event_id', x.event_id, 'event_type', x.event_type, 'occurred_at', x.occurred_at,
+                 'retry_of_event_id', x.retry_of_event_id, 'correction_id', x.correction_id,
+                 'task_type', x.task_type, 'payload', x.payload, 'due_at', x.due_at)), '[]'::jsonb) as 행들
+          from (
+            select y.event_id, y.event_type, y.occurred_at, y.retry_of_event_id,
+                   y.correction_id, y.task_type, y.payload, y.due_at
+              from (
+                select e.event_id, e.event_type, e.occurred_at, e.retry_of_event_id,
+                       e.correction_id, e.task_type, e.payload, s.due_at,
+                       row_number() over (partition by e.event_type
+                                          order by e.occurred_at desc) as 몇째
+                  from engine.learning_events e
+                  left join engine.submissions s on s.event_id = e.event_id
+                 where e.learner_id = ${learner_id}::uuid
+                   and e.event_type = any(${쓰는사건}::text[])
+                   and not (e.event_type = 'submission.created'
+                            and e.task_type is not null
+                            and e.task_type = any(${라디오태스크종}::text[]))
+                   and e.occurred_at >= ${대상.starts_on}::date
+                   and e.occurred_at < coalesce(${대상.ends_on}::date + 1, now())) y
+             where y.몇째 <= ${회고종별상한}) x`;
+
+      /* 시즌 구간 «전체» 집계 — 8축이 못 보는 자리다(축은 창 안만 본다).
+       * ⚠ 교정열람률의 분모는 그 시즌에 «난» 교정이라, 끝자락 교정을 다음 시즌에 보면 비율이
+       *   실제보다 낮게 나온다. 분자·분모를 둘 다 굳혀 나중에 다시 잴 수 있게 둔다. */
+      const [집계] = await tx`
+        with 범위 as (
+          select ${대상.starts_on}::date as 시작,
+                 coalesce(${대상.ends_on}::date + 1, now()) as 끝)
+        select
+          (select count(*) from engine.learning_events e, 범위 b
+            where e.learner_id = ${learner_id}::uuid and e.event_type = 'submission.created'
+              and (e.task_type is null or not (e.task_type = any(${라디오태스크종}::text[])))
+              and e.occurred_at >= b.시작 and e.occurred_at < b.끝) as 제출수,
+          (select count(*) from engine.learning_events e, 범위 b
+            where e.learner_id = ${learner_id}::uuid and e.event_type = 'task.assigned'
+              and e.occurred_at >= b.시작 and e.occurred_at < b.끝) as 배정수,
+          (select count(*) from engine.corrections co
+             join engine.submissions su on su.submission_id = co.submission_id
+             join engine.learning_events ev on ev.event_id = su.event_id, 범위 b
+            where ev.learner_id = ${learner_id}::uuid and co.actor_kind = 'ai'
+              and co.created_at >= b.시작 and co.created_at < b.끝) as 교정수,
+          (select count(*) from engine.learning_events e, 범위 b
+            where e.learner_id = ${learner_id}::uuid and e.event_type = 'correction.viewed'
+              and e.occurred_at >= b.시작 and e.occurred_at < b.끝) as 열람수,
+          (select e.level_snapshot from engine.learning_events e, 범위 b
+            where e.learner_id = ${learner_id}::uuid and e.level_snapshot is not null
+              and e.occurred_at >= b.시작 and e.occurred_at < b.끝
+            order by e.occurred_at asc limit 1) as 급수_시작,
+          (select e.level_snapshot from engine.learning_events e, 범위 b
+            where e.learner_id = ${learner_id}::uuid and e.level_snapshot is not null
+              and e.occurred_at >= b.시작 and e.occurred_at < b.끝
+            order by e.occurred_at desc limit 1) as 급수_끝,
+          (select jsonb_build_object('occurred_at', e.occurred_at, 'payload', e.payload)
+             from engine.learning_events e, 범위 b
+            where e.learner_id = ${learner_id}::uuid and e.event_type = 'exam.result'
+              and e.occurred_at >= b.시작 and e.occurred_at < b.끝
+            order by e.occurred_at desc limit 1) as 시험_최신`;
+
+      굳힌것 = 굳히기(
+        (원신호?.행들 ?? []) as unknown[],
+        {
+          season_id: String(대상.season_id), code: 대상.code, textbook: 대상.textbook,
+          starts_on: 대상.starts_on, ends_on: 대상.ends_on,
+        },
+        집계정리(집계),
+        new Date(),
+      );
+
+      /* 🔑 위 `for update of c` 가 같은 학생의 두 세션을 직렬화하므로 여기 도달한 쪽이
+       *   유일하게 굳히는 쪽이다. `do nothing` 은 그 위의 안전벨트다(경합이 나도 먼저 굳힌
+       *   것이 이긴다 — 나중 것이 덮으면 판정과 근거가 갈린다). */
+      await tx`
+        insert into engine.season_review
+          (learner_id, season_id, record_snapshot, opened_by, schema_ver)
+        values (${learner_id}::uuid, ${대상.season_id}::uuid, ${tx.json(굳힌것)},
+                ${staff_id}, ${ver})
+        on conflict (learner_id, season_id) do nothing`;
+    }
+
+    /* ⚠ 0건도 감사 1행 남긴다 — 회고는 학생 한 명의 기록 전부를 여는 자리라 「누가 언제
+     *   열었나」가 그 자체로 재료다(compass/open 과 같은 판정). */
+    await tx`
+      insert into engine.staff_access_log (staff_id, action, target_ids)
+      values (${staff_id}::uuid, 'teach.retro.open', array[${learner_id}::uuid])`;
+
+    return {
+      learner_id,
+      student_code: 학생.student_code ?? null,
+      display_name: 학생.display_name ?? null,
+      season: {
+        season_id: String(대상.season_id), code: 대상.code, textbook: 대상.textbook,
+        starts_on: 대상.starts_on, ends_on: 대상.ends_on,
+      },
+      /* 왼쪽 — 그 시즌 «시작»에 학생이 스스로 선언한 것. 병치의 반쪽이다(설계 §1).
+       * 🔑 문구도 **서버가** 준다. 답은 문항키→서술이라 그것만 보내면 화면이 키→라벨 표를
+       *   손으로 들게 되고, 그 순간 정본이 둘이 된다(나침반 화면이 피한 바로 그 사본).
+       * 🔑 **그날의 목적**(`goal_track_at_open`)으로 문구를 고른다 — 오늘의 목적으로 고르면
+       *   목적을 바꾼 학생의 회고에 그 시즌에 없던 질문이 뜬다(`culture` 갈래 · 설계 §9-2 ㉦-1). */
+      compass: {
+        answers: 대상.answers, self_in_5y_changed: 대상.self_in_5y_changed,
+        goal_track_at_open: 대상.goal_track_at_open, recorded_at: 대상.recorded_at,
+        questions: 물을것(
+          대상.self_in_5y_changed == null ? 회차종류.입학 : 회차종류.시즌,
+          (대상.goal_track_at_open as string | null) ?? null,
+        ),
+      },
+      /* 오른쪽 — 굳힌 것 그대로(화면이 다시 계산할 여지를 안 남긴다). 근거 ID 만 벗긴다. */
+      record_snapshot: 근거벗기기(굳힌것),
+      verdict_by_self: 대상.verdict_by_self ?? null,
+      /* 🔑 여기서 verdict 는 **항상 null** 이다(위 조회가 확정된 행을 안 고른다) — 그래도 칸을
+       *   내보낸다: 화면이 「강사 칸이 열렸나」를 이 값으로만 판단하게 해 두면, 확정 행을 여는
+       *   통로가 나중에 생겨도 화면이 안 갈린다. */
+      verdict: 대상.verdict ?? null,
+      note: 대상.note ?? null,
+      /* 어휘는 서버가 준다 — 화면에 코드값·문구 사본이 0개다(나침반화면 과 같은 규칙). */
+      verdict_options: 판정보기,
+      note_max: 사유상한,
+    };
+  });
+
+  if ('거절' in 결과) return 거절응답(결과, ver);
+  return 봉투(200, { ok: true, ...결과 }, ver);
+}
+
+/**
+ * 굳힌 것에서 **근거 ID 를 벗겨** 내보낸다 — 저장된 행에는 그대로 남는다.
+ *
+ * 🔴 `evidence_refs.사건` 은 `event_id` 목록이다. 굳혀 두는 이유는 나중에 **같은 근거로 다시
+ *   계산해 대조**하기 위해서고(설계 §4), 그건 서버·감사의 일이지 화면의 일이 아니다.
+ *   화면이 그리는 것은 축과 집계뿐이라 이 값은 나가도 쓸 데가 없고, 나가면 식별자만 샌다
+ *   (`gold/queue` 가 `event_id` 를 안 내보내는 것과 같은 축 · `tests/강사통로.test.js` ⑦).
+ * 🔑 창 경계(`as_of`·`창일수`)는 **남긴다** — 화면이 「어느 구간을 잰 값인가」를 말해야 한다.
+ */
+function 근거벗기기(굳힌것: Record<string, unknown>) {
+  const 층벗기기 = (v: unknown) => {
+    if (!v || typeof v !== 'object') return v;
+    const { evidence_refs: _버림, ...나머지 } = v as Record<string, unknown>;
+    return 나머지;
+  };
+  return { ...굳힌것, axes_전반: 층벗기기(굳힌것.axes_전반), axes_후반: 층벗기기(굳힌것.axes_후반) };
+}
+
+/** 회고 행 하나를 잠그고 집는다 — self·judge 가 같은 사슬을 쓴다(두 곳에 적으면 갈린다). */
+async function 회고행(tx: unknown, learner_id: string, season_id: string) {
+  const q = tx as typeof sql;
+  const [행] = await q`
+    select review_id, verdict, verdict_by_self
+      from engine.season_review
+     where learner_id = ${learner_id}::uuid and season_id = ${season_id}::uuid
+       for update`;
+  return 행 ?? null;
+}
+
+/** 두 판정 통로가 같이 쓰는 입구 검사 — 형식이 다르면 여기서 끝난다. */
+function 대상읽기(본문: unknown) {
+  const b = (본문 && typeof 본문 === 'object' ? 본문 : {}) as Record<string, unknown>;
+  const learner_id = typeof b.learner_id === 'string' ? b.learner_id.trim() : '';
+  const season_id = typeof b.season_id === 'string' ? b.season_id.trim() : '';
+  const 맞나 = /^[0-9a-f-]{36}$/i.test(learner_id) && /^[0-9a-f-]{36}$/i.test(season_id);
+  return { b, learner_id, season_id, 맞나 };
+}
+
+/* ── POST /v1/teach/retro/self ───────────────────────────────────────── */
+
+/**
+ * 학생 자기 판정 — **클릭 하나**(사유 없음).
+ *
+ * 🔴 이 통로가 강사 통로와 갈라져 있는 것이 곧 설계 §7 의 「학생이 먼저」다. 하나로 합치면
+ *   순서가 화면 규약으로만 남고, 화면은 언젠가 갈린다. DB 트리거가 같은 판정을 한 번 더 진다.
+ * 🔑 개서는 허용한다(강사 판정 «전»까지) — 학생이 눌렀다 생각을 바꾸는 것은 정상이고, 막으면
+ *   남는 통로가 「행을 지우고 다시 열기」인데 삭제는 금지라 아예 길이 없다(F103).
+ */
+async function 자기판정(본문: unknown, staff_id: string, ver: string) {
+  const { b, learner_id, season_id, 맞나 } = 대상읽기(본문);
+  if (!맞나) {
+    return 실패(400, {
+      code: 'CONTRACT_VIOLATION', retryable: false,
+      message: 'learner_id · season_id 가 필요합니다',
+    }, ver);
+  }
+  const 흠 = 자기판정검사(b.verdict_by_self);
+  if (흠) return 거절응답({ 거절: 'CONTRACT_VIOLATION', 칸: 흠.필드, 문구: 흠.사유 }, ver);
+
+  const 결과 = await sql.begin(async (tx) => {
+    const 행 = await 회고행(tx, learner_id, season_id);
+    if (!행) {
+      return { 거절: 'RETRO_NOT_OPENED' as const, 칸: 'season_id',
+        문구: '회고를 먼저 열어야 합니다 — 굳힌 근거 없이 판정만 적지 않습니다' };
+    }
+    if (행.verdict != null) {
+      return { 거절: 'SELF_AFTER_JUDGE' as const, 칸: 'verdict_by_self',
+        문구: '강사 판정이 이미 끝났습니다 — 학생 판정은 그 전에만 적습니다(뒤에 적으면 메아리입니다)' };
+    }
+
+    const [갱신] = await tx`
+      update engine.season_review
+         set verdict_by_self = ${String(b.verdict_by_self)}
+       where review_id = ${행.review_id}
+      returning review_id, verdict_by_self`;
+
+    await tx`
+      insert into engine.staff_access_log (staff_id, action, target_ids)
+      values (${staff_id}::uuid, 'teach.retro.self', array[${learner_id}::uuid])`;
+
+    return { review_id: String(갱신.review_id), verdict_by_self: 갱신.verdict_by_self };
+  });
+
+  if ('거절' in 결과) return 거절응답(결과, ver);
+  return 봉투(200, { ok: true, ...결과 }, ver);
+}
+
+/* ── POST /v1/teach/retro/judge ──────────────────────────────────────── */
+
+/**
+ * 강사 판정 — **클릭 하나 + 한 줄**. 이 한 행이 엔진의 유일한 「부호」 라벨이다(설계 §7).
+ *
+ * 🔑 개서를 허용한다(마이그레이션 머리말 ③) — 잘못 누른 강사에게 남는 통로가 「지우고 다시」
+ *   뿐이면 그 우회가 정상 통로가 되는데, 삭제는 트리거가 막으므로 길이 아예 없다.
+ *   고친 사실은 decided_at 갱신과 감사 한 줄로 남는다.
+ * 🔴 verdict_by_self 는 **여기서 안 건드린다** — 같은 요청으로 둘 다 쓸 수 있게 두면 강사가
+ *   학생 칸까지 대신 눌러 대조군이 그 자리에서 죽는다(설계 §7 도전안의 값 전부).
+ */
+async function 회고판정(본문: unknown, staff_id: string, ver: string) {
+  const { b, learner_id, season_id, 맞나 } = 대상읽기(본문);
+  if (!맞나) {
+    return 실패(400, {
+      code: 'CONTRACT_VIOLATION', retryable: false,
+      message: 'learner_id · season_id 가 필요합니다',
+    }, ver);
+  }
+  const 흠 = 판정검사(b.verdict, b.note);
+  if (흠) return 거절응답({ 거절: 'CONTRACT_VIOLATION', 칸: 흠.필드, 문구: 흠.사유 }, ver);
+
+  const 결과 = await sql.begin(async (tx) => {
+    const 행 = await 회고행(tx, learner_id, season_id);
+    if (!행) {
+      return { 거절: 'RETRO_NOT_OPENED' as const, 칸: 'season_id',
+        문구: '회고를 먼저 열어야 합니다 — 굳힌 근거 없이 판정만 적지 않습니다' };
+    }
+
+    const [갱신] = await tx`
+      update engine.season_review
+         set verdict     = ${String(b.verdict)},
+             note        = ${String(b.note).trim()},
+             decided_by  = ${staff_id},
+             decided_at  = now()
+       where review_id = ${행.review_id}
+      returning review_id, verdict, verdict_by_self, decided_at`;
+
+    await tx`
+      insert into engine.staff_access_log (staff_id, action, target_ids)
+      values (${staff_id}::uuid, 'teach.retro.judge', array[${learner_id}::uuid])`;
+
+    return {
+      review_id: String(갱신.review_id),
+      verdict: 갱신.verdict,
+      /* 🔑 둘을 함께 돌려준다 — 「갈렸나」는 이 그릇의 가장 값진 신호라(설계 §7 도전안) 화면이
+       *   그 자리에서 보여 줄 수 있어야 한다(다시 조회하면 그 순간이 지나간다). */
+      verdict_by_self: 갱신.verdict_by_self ?? null,
+      decided_at: 갱신.decided_at,
     };
   });
 

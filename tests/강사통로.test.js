@@ -212,10 +212,23 @@ test('⑦ `event_id` 가 응답으로 안 나간다(review ③ 와 같은 축)',
    *   막을 것은 그 값이 «브라우저로 나가는 것»이다. 소스 전체를 글자로 훑으면 조인까지 걸려
    *   거짓양성이 나고, 거짓 경보를 내는 가드는 곧 꺼진다. 그래서 두 자리만 좁혀 본다:
    *     ⓐ select 목록이 그 열을 «뽑는가»(`as` 별칭 포함) ⓑ 응답 객체가 그 칸을 «싣는가». */
-  for (const m of 소스.matchAll(/select\s([\s\S]*?)\sfrom\s/g)) {
+  /* ⚠ [2026-08-12] ⓐ 를 **응답을 만드는 질의에만** 건다. 회고 통로는 원신호를 «읽어» 축을
+   *   굳히는 것이 일이라 그 질의는 원리상 `event_id` 를 뽑는다(근거 없는 근거는 근거가 아니다).
+   *   옛 판은 소스 전체를 훑어 그 자리를 빨갛게 냈는데, 그 처방은 「근거를 빼라」가 되어
+   *   설계 §4 를 거스른다 — 거짓 경보를 내는 가드는 곧 꺼진다(맹점 ③).
+   *   대신 **나가는 자리**를 아래에서 둘 다 못박는다: ⓑ 골든 카드 · ⓒ 회고 응답. */
+  const 회고시작 = 소스.indexOf('async function 회고열기');
+  const 회고끝 = 회고시작 < 0 ? -1 : 소스.indexOf('\nasync function ', 회고시작 + 1);
+  const 응답질의 = 회고시작 < 0 ? 소스
+    : 소스.slice(0, 회고시작) + 소스.slice(회고끝 > 회고시작 ? 회고끝 : 소스.length);
+  for (const m of 응답질의.matchAll(/select\s([\s\S]*?)\sfrom\s/g)) {
     const 목록 = m[1];
     assert.ok(!/\bevent_id\b/.test(목록), `select 목록이 event_id 를 뽑는다:\n${목록.trim().slice(0, 200)}`);
   }
+  /* ⓒ 회고 응답 — 굳힌 것에는 근거 ID 가 남지만(재현 대조의 재료 · 설계 §4), **나갈 땐 벗긴다.** */
+  assert.ok(회고시작 > 0, '회고열기를 못 찾았다 — ⓒ 가 미실행이다');
+  assert.ok(소스.slice(회고시작, 회고끝 > 회고시작 ? 회고끝 : undefined).includes('근거벗기기('),
+    '회고 응답이 evidence_refs 를 그대로 내보낸다 — event_id 가 브라우저로 나간다');
   /* ⚠ 끝 앵커는 **시작 뒤에서** 찾는다 — 0건 조기 반환(`return { 항목들: [], … }`)이 앞에 있어
    *   앞에서부터 찾으면 구간이 음수 길이가 되고, 그러면 이 검사는 «빈 문자열을 훑어» 영원히
    *   초록이 된다(미실행이 통과와 같은 모양이 되는 자리다). */
@@ -236,9 +249,22 @@ test('⑦ 승격 의사를 강사 문이 건드리지 않는다 — 승격은 �
 test('⑧ 동봉이 실제 lib 파일을 가리킨다(손 사본 0)', () => {
   assert.ok(fs.existsSync(동봉경로), '동봉.json 이 없다 — 배포되면 import 가 죽는다');
   const 동봉 = JSON.parse(fs.readFileSync(동봉경로, 'utf8'));
+  /* ⚠ [2026-08-12] 「동봉했는데 안 쓴다」를 **본체 import 만으로 재지 않는다.** 표에는 본체가
+   *   안 부르는 것도 정당하게 든다 — 동봉 lib 이 또 `require` 하는 사슬이 그것이고(회고 →
+   *   학습자상태 → 작성과정·라디오태스크), 빠지면 `동봉묶기` 가 배포 «전»에 멈춘다.
+   *   옛 판은 그 사슬을 「목록이 낡았다」로 읽어 거짓 적색을 냈고, 그 처방은 사슬을 끊는
+   *   것이라 더 나쁘다. 그래서 **본체 import ∪ 동봉끼리의 require** 로 잰다. */
+  const 쓰임 = new Set([...원문.matchAll(/from '\.\/([^']+\.mjs)'/g)].map((m) => m[1]));
+  for (const 경로 of Object.values(동봉)) {
+    const 파일 = path.join(뿌리, 경로);
+    if (!fs.existsSync(파일)) continue;
+    for (const m of fs.readFileSync(파일, 'utf8').matchAll(/require\('\.\/([^']+)\.js'\)/g)) {
+      쓰임.add(`${m[1]}.mjs`);
+    }
+  }
   for (const [별칭, 경로] of Object.entries(동봉)) {
     assert.ok(fs.existsSync(path.join(뿌리, 경로)), `${경로} 가 없다(${별칭})`);
-    assert.ok(원문.includes(`'./${별칭}'`), `${별칭} 을 동봉했는데 안 쓴다 — 목록이 낡았다`);
+    assert.ok(쓰임.has(별칭), `${별칭} 을 동봉했는데 본체도 다른 동봉도 안 쓴다 — 목록이 낡았다`);
   }
   /* 반대 방향 — import 하는데 동봉에 없으면 배포본에서 죽는다(로컬은 초록이다). */
   for (const m of 원문.matchAll(/from '\.\/([^']+\.mjs)'/g)) {
@@ -260,6 +286,9 @@ test('⑧ 경로를 «두 마디»로 가른다 — /v1/teach/아무거나/queue
     'gold/judge': 'POST',
     'compass/open': 'GET',
     'compass/save': 'POST',
+    'retro/open': 'GET',
+    'retro/self': 'POST',
+    'retro/judge': 'POST',
   });
   // 안내문을 손으로 적으면 경로가 늘 때 낡는다 — 표에서 파생하는지 본다.
   assert.match(소스, /Object\.entries\(경로표\)/);
@@ -298,8 +327,13 @@ test('🔴 나침반 어휘 사본이 0개다 — 문항키는 `lib/나침반문
 });
 
 test('🚫 나침반 답을 사건으로 흘리지 않는다 — 새 event_type 0(설계 §10)', () => {
+  /* ⚠ [2026-08-12] 끝을 **다음 함수로 못박는다.** 옛 판은 파일 끝까지 잘라, 뒤에 붙은 회고
+   *   통로(그 통로는 `learning_events` 를 «읽는» 것이 일이다)를 「나침반이 쓴다」로 읽고
+   *   거짓 적색을 냈다 — ①② 커밋이 같은 자리에서 이미 두 번 겪은 실패다(F287 계열). */
   const i = 소스.indexOf('async function 나침반저장');
-  const 본문 = 소스.slice(i);
+  assert.ok(i > 0, '나침반저장 함수를 못 찾았다 — 이 검사가 통째로 미실행이다');
+  const 다음 = 소스.indexOf('\nasync function ', i + 1);
+  const 본문 = 소스.slice(i, 다음 > i ? 다음 : undefined);
   assert.ok(!본문.includes('learning_events'), '나침반이 learning_events 에 쓴다');
   assert.ok(!본문.includes('preference.stated'), 'c11 ⑦ 가드를 깎는 자리다');
 });

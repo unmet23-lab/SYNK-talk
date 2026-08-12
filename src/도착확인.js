@@ -114,6 +114,14 @@ export default function 도착확인({ 돌아가기, 가기 }) {
             style={({ pressed }) => [s.줄버튼, pressed && { opacity: 0.65 }]}>
             <Text style={s.줄버튼글}>나침반 세션 (원장·강사)</Text>
           </Pressable>
+          {/* 🔴 나침반의 **짝**이다 — 시즌 끝에 그 선언 옆에 실기록을 놓고 사람이 부호를 찍는다.
+              성향 8축은 「지금 어떤가」만 알고 그게 좋은 방향이었는지는 모르므로, 이 화면이
+              엔진의 **유일한 라벨 생산자**다(시즌회고_설계 §7). 밀리면 그 시즌은 라벨 0이고
+              라벨 0인 시즌은 엔진에서 존재하지 않는 것과 같다. */}
+          <Pressable onPress={() => 가기('회고')} hitSlop={6}
+            style={({ pressed }) => [s.줄버튼, pressed && { opacity: 0.65 }]}>
+            <Text style={s.줄버튼글}>시즌 회고 (원장·강사)</Text>
+          </Pressable>
           {/* 🔴 이 통로가 없으면 한 기기는 **영원히 한 계정**이다 — 공용·형제 기기에서 다음
               학생의 발화가 앞 학생 행으로 저장되고, append-only 라 되돌릴 방법이 없다. */}
           <Pressable onPress={물어보기} hitSlop={6}

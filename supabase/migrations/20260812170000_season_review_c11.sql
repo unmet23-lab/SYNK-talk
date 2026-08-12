@@ -1,11 +1,199 @@
+/* 시즌 회고 ③④ — 사람이 판정한 것이 앉을 자리 + **굳힌 근거**
+ *
+ * 정본 = appsscript `docs/시즌회고_설계.md` v3 §3-2·§4·§5·§6 (유호님 확정 6건 · 2026-08-12).
+ * ①②(`20260812140000_season_c11.sql`)가 왼쪽(나침반)을 세웠고, 이 조각이 오른쪽과 라벨을 세운다.
+ *
+ * 🔴 **③④는 한 커밋이다**(설계 §8 인수 조건) — 나누면 첫 회고 행이 **근거 없는 판정**이 된다.
+ *   그래서 이 조각·통로·화면·회귀가 같은 커밋에 있다. 표만 먼저 파 두는 것을 ①② 조각이
+ *   일부러 안 한 이유도 그것이다(자리가 있으면 「이미 있다」가 되어 나누는 문이 열린다).
+ *
+ * 🔴 **파일 이름의 `_c11` 은 장식이 아니다** — Edge Function 넷이 계약판을 최신 조각 이름에서
+ *   읽는다(`tests/마이그레이션이름.test.js`). 이 조각은 **계약을 안 바꾼다**: 새 값목록 0 ·
+ *   `learning_events` 0 · 새 `event_type` 0 · 기존 engine 표 변경 0.
+ *   그래서 `radio_c10`·`season_c11` 선례대로 c11 을 이어 쓴다(판을 올리면 구앱이 426 이 된다).
+ *
+ * ■ 왜 근거를 «굳히나» — 창 30일이 판정을 배신한다 (설계 §4)
+ *   `학습자상태.v6` 은 창 30일이고 시즌은 2달이다. 회고 시점에 그냥 조회하면 8축이 덮는 것은
+ *   시즌의 **뒤 절반**뿐이고, 한 달 뒤 다시 조회하면 창이 밀려 **다른 숫자**가 나온다.
+ *   「가까워졌다」고 적힌 행 옆에 나중에 조회한 숫자를 붙이면 그 숫자는 **그 판정을 낸 사람이
+ *   본 적 없는 숫자**다 — 판정과 근거가 갈리면 판정이 근거를 잃는다.
+ *   → `record_snapshot` 은 회고를 **연 그 순간**에 한 번 쓰이고 그 뒤로 **절대 안 바뀐다**
+ *     (아래 `season_review_freeze` 트리거가 물리로 막는다).
+ *
+ * ■ 왜 라벨과 근거가 «같은 행»인가 (설계 §7)
+ *   성향 8축은 「지금 어떤가」만 알고 **부호(sign)를 모른다** — 「그게 이 학생에게 좋은
+ *   방향이었나」를 아는 것은 사람뿐이고, 사람이 그걸 말하는 자리는 회고 하나뿐이다.
+ *   특징(`record_snapshot`)과 라벨(`verdict`)이 갈라져 있으면 나중에 짝을 못 맞추고
+ *   (창이 밀리므로 **원리상** 못 맞춘다), 그러면 이 그릇은 예쁜 화면으로 끝나고
+ *   엔진에는 한 방울도 안 닿는다. 그게 이 설계의 실패 모드다.
+ *
+ * ■ 판정이 «3갈래»인 이유 (설계 §5)
+ *   2갈래면 목적 변경이 「멀어짐」으로 접히고 엔진이 **「학생이 목적을 바꾸는 것 = 나쁜 신호」**
+ *   를 배운다 — 철학 Ⅱ-4(목적 변경은 정상 경로)를 정면으로 뒤집는 학습이 조용히 일어난다.
+ *
+ * ■ 판정칸이 «둘»인 이유 — 학생 먼저, 강사 다음 (설계 §7 도전안 · ✅유호님 채택 08-12)
+ *   강사만 판정하면 회고는 성적표가 되고, 학생만 판정하면 근거가 없다. **둘이 갈리는 행이
+ *   가장 값진 신호**다(`자기인식축`의 유일한 대조군).
+ *   🔴 순서가 규격이다 — 강사 판정을 보고 학생이 고르면 그 칸은 대조군이 아니라 **메아리**가
+ *      된다. 화면 순서로만 두면 언젠가 갈리므로 **DB 가 막는다**: `verdict` 가 이미 있는 행에
+ *      `verdict_by_self` 를 새로 쓰거나 고치는 것을 트리거가 거절한다.
+ *   🔑 `verdict_by_self` 는 **null 허용**이다 — 학생이 안 눌러도 강사 판정은 진행된다
+ *      (필수로 걸면 한 명이 안 눌러 그 시즌 라벨이 통째로 안 생기고, **회고는 밀리는 순간
+ *      라벨 0**이다). 그리고 null(안 눌렀다)과 「눌렀는데 강사와 같다」는 **다른 값**이다.
+ *
+ * ■ 개서·삭제 판정 — ①② 조각이 이 조각의 몫으로 남긴 자리
+ *   ① `record_snapshot`·`learner_id`·`season_id`·`opened_at` = **불변**(위 §4).
+ *   ② `verdict_by_self` = 강사 판정 «전»에만 쓴다(위 메아리).
+ *   ③ `verdict`·`note` = **개서 허용**. 강사가 버튼을 잘못 눌렀을 때 남는 통로가 「행을 지우고
+ *      다시 넣기」밖에 없으면 그 우회가 정상 통로가 된다(F103). 삭제는 막으므로 그 우회는
+ *      애초에 없다 — 그래서 고치는 문을 열어 둔다. 고친 사실은 `decided_at` 이 갱신되고
+ *      `staff_access_log` 에 매번 한 줄 남는다.
+ *   ④ 삭제 = 전면 금지(나침반과 같다 — 라벨은 사람 손에서만 나오므로 소급이 안 된다).
+ *
+ * ■ 채우는 코드는 이 조각에 0줄이다 — 정직 표기
+ *   생산자 = `functions/teach` 의 `retro/*` 세 경로이고 이 조각과 **같은 커밋**에 선다.
+ *   「표가 섰다」를 「라벨이 쌓인다」로 읽지 않는다(엔진도달 §5 확인 ③).
+ *   ⑤라벨→엔진 배선은 **시즌 2 이후**다(설계 §8) — 행이 몇 개 쌓인 뒤에 한다.
+ *
+ * 되돌림: drop table if exists engine.season_review;
+ *        delete from engine.schema_migrations where version = '20260812170000'; */
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260812170000';
+  migration_name constant text := '20260812170000_season_review_c11.sql';
+  expected_checksum constant text := '36472be667bfecc8f02b4964b84839509ecc167ac90acede34a4eff5fa72b0ff'; -- migration-checksum
+  base_version constant text := '20260812140000';
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 c11 위에서만 돈다 — engine.schema_migrations가 없다(빈 DB면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      '이 조각은 기준선 % 위에서만 돈다 — 이력에 그 판이 없다(부분·혼합·불명이라 중단한다)',
+      base_version;
+  end if;
+
+  /* 시즌 «끝»에 사람이 판정한 것 + 그 판정이 본 근거. 학생×시즌 1행.
+   *
+   * `record_snapshot` = `axes_전반`·`axes_후반`·`season_totals` 세 층 + `추정판` + 창 경계
+   *   (설계 §4-1·§4-2 · 조립은 `lib/회고.js` 하나가 진다).
+   *   🔑 not null 이다 — 「근거 없이 먼저 판정만 적어 두기」를 원리상 못 하게 한다.
+   * `opened_by`/`decided_by` 는 **text** 다(uuid 아님). 나침반 `recorded_by` 와 같은 사유 —
+   *   v1 의 통로는 강사뿐이라 값은 `staff_id` 문자열이고, 학생 본인 통로가 서는 날 'self' 가
+   *   같은 칸에 들어온다(그날 열을 새로 파면 옛 행과 새 행이 다른 칸을 쓰게 된다).
+   * ⚠ `verdict_by_self` 에 「누가·언제」를 안 둔다 — v1 은 촉진 세션 한 화면에서 학생이
+   *   그 자리에 누르는 것이라 주체가 학생 본인 하나뿐이고, 시각은 `opened_at`~`decided_at`
+   *   사이로 이미 좁다. 통로가 갈리는 날(학생 앱에서 따로 누르는 날) 열을 더한다. */
+  create table if not exists engine.season_review (
+    review_id       bigint generated always as identity primary key,
+    learner_id      uuid not null references engine.learners(learner_id) on delete restrict,
+    season_id       uuid not null references engine.season(season_id),
+    record_snapshot jsonb not null,
+    verdict         text,                    -- null = 아직 강사가 안 눌렀다
+    verdict_by_self text,                    -- null = 학생이 안 눌렀다(건너뛰어도 진행한다)
+    note            text,
+    opened_by       text not null,
+    opened_at       timestamptz not null default now(),
+    decided_by      text,
+    decided_at      timestamptz,
+    schema_ver      text not null,
+    constraint season_review_once_c11 unique (learner_id, season_id),
+    /* 🔴 세 값의 정본은 `lib/회고.js` 의 `판정목록` 이다. 두 층이 같은 파일을 못 쓰므로
+     *   (하나는 JS·하나는 DDL) 사본을 피할 수 없고, 없앨 수 없는 사본은 기계에 물린다 —
+     *   `tests/회고.test.js` 가 이 CHECK 의 리터럴과 lib 을 대조한다. */
+    constraint season_review_verdict_c11
+      check (verdict is null or verdict in ('closer', 'same', 'redirected')),
+    constraint season_review_self_c11
+      check (verdict_by_self is null or verdict_by_self in ('closer', 'same', 'redirected')),
+    /* 판정·사유·주체·시각은 **한 벌로** 선다. 갈라 두면 「판정은 있는데 언제 누가 했는지
+     *   모르는 행」이 서고, 그 행은 라벨로 못 쓴다(오염을 가려낼 방법이 없다). */
+    constraint season_review_decided_c11 check (
+      (verdict is null and note is null and decided_by is null and decided_at is null)
+      or (verdict is not null and decided_by is not null and decided_at is not null
+          and note is not null and btrim(note) <> '')
+    )
+  );
+  comment on table engine.season_review is
+    '시즌 회고 — 사람이 판정한 라벨 + 그 판정이 본 근거를 굳힌 것(시즌회고_설계 §3-2·§4). 엔진의 유일한 「부호」 생산자. record_snapshot 은 연 순간 고정(🚫재계산).';
+  create index if not exists season_review_season_decided
+    on engine.season_review (season_id, decided_at);
+
+  /* 🔴 **굳힌 것은 안 바뀐다** — 이 트리거가 없으면 위 §4 의 보장이 프로즈로만 남는다.
+   *   프로즈보다 기계 강제로 막을 수 있는 규칙은 기계로 옮긴다.
+   *   🔑 `verdict_by_self` 를 **강사 판정 뒤에** 못 쓰게 하는 것도 여기다 — 화면 순서로만
+   *     두면 통로가 하나 더 서는 날 조용히 갈리고, 갈린 쪽은 「값이 있다」로 보인다. */
+  create or replace function engine.season_review_freeze() returns trigger
+    language plpgsql as $freeze$
+  begin
+    if new.record_snapshot is distinct from old.record_snapshot then
+      raise exception '굳힌 근거는 바뀌지 않는다 — 판정과 근거가 갈리면 판정이 근거를 잃는다(시즌회고_설계 §4)';
+    end if;
+    if new.learner_id is distinct from old.learner_id
+       or new.season_id is distinct from old.season_id
+       or new.opened_at is distinct from old.opened_at
+       or new.opened_by is distinct from old.opened_by then
+      raise exception '회고 행의 대상·연 시각은 바뀌지 않는다 — 굳힌 근거가 다른 시즌의 것이 된다';
+    end if;
+    if old.verdict is not null and new.verdict_by_self is distinct from old.verdict_by_self then
+      raise exception '학생 판정은 강사 판정 «전»에만 적는다 — 뒤에 적으면 대조군이 아니라 메아리다(시즌회고_설계 §7)';
+    end if;
+    return new;
+  end
+  $freeze$;
+
+  drop trigger if exists season_review_freeze on engine.season_review;
+  create trigger season_review_freeze
+    before update on engine.season_review
+    for each row execute function engine.season_review_freeze();
+
+  /* 삭제 금지 — 나침반과 같다. 라벨은 사람 손에서만 나오므로 사라지면 소급이 안 된다.
+   * ⚠ 개서를 «같이» 막지 않는 이유는 머리말 ③ 참조(막으면 우회가 정상 통로가 된다 · F103). */
+  create or replace function engine.season_review_protect() returns trigger
+    language plpgsql as $protect$
+  begin
+    raise exception '회고 행은 삭제하지 않는다 — 사람이 낸 라벨은 소급이 안 된다(시즌회고_설계 §7)';
+  end
+  $protect$;
+
+  drop trigger if exists season_review_protect on engine.season_review;
+  create trigger season_review_protect
+    before delete on engine.season_review
+    for each row execute function engine.season_review_protect();
+
+  /* engine 취급 그대로 — RLS 켜고 정책 0(전면 거부) · service_role 만 쓰기 · PostgREST 비노출. */
+  alter table engine.season_review enable row level security;
+
+  insert into engine.schema_migrations(version, name, checksum)
+  values (migration_version, migration_name, expected_checksum);
+end
+$migration$;
+
+commit;
+
 -- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
---
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
 -- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -236,3 +424,29 @@ select case when 테이블수=14 and RLS켜짐=14 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
 from 셈;
+*/
+
+-- 확인
+-- ⓪ 🔴 **순서** — 이 조각은 `20260812140000_season_c11.sql` «뒤»에만 선다(base_version).
+--    그 조각과 c11 두 조각이 아직 유호님 승인 대기라, 이 조각도 **같은 승인에 얹혀** 부어진다.
+--    먼저 부으면 base_version 검사가 「이력에 그 판이 없다」로 중단시킨다(안전 방향).
+-- ① 표 1 · RLS 1 · 정책 0 — `테이블수`·`RLS켜짐` 이 13 → **14** 로 오른다.
+--    정책은 안 늘린다: engine 취급 그대로 전면 거부이고, 쓰기는 `functions/teach` 하나를 지난다.
+-- ② `삭제차단` 이 4 → **5** 다 — `season_review.learner_id` 의 restrict 하나가 늘었다.
+-- ③ 트리거 둘이 늘었다 — `season_review_freeze`(굳힌 근거 불변 + 학생 판정 순서)와
+--    `season_review_protect`(삭제 금지). **켜짐**까지 센다(꺼진 트리거는 행이 그대로 남는다).
+-- ④ 첫 회고는 나침반 행이 있어야 열린다 — 통로가 그 학생의 «나침반이 있는데 회고가 아직
+--    확정 안 된 가장 오래된 시즌»을 고른다. 없으면 409 `RETRO_NOT_DUE` 로 정직하게 멈춘다.
+-- ⑤ CHECK 제약은 현행 접미사만 남아야 한다(이 조각이 c11 CHECK 셋을 더한다).
+--    ⚠ 이 줄은 **마지막 조각**이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    기대: broadcast_segment_kind_c11 · corrections_promotion_intent_c11
+--         · corrections_supersedes_not_self_c11 · corrections_verdict_c11
+--         · learners_signup_attempts_nonneg_c11 · learners_temp_password_paired_c11
+--         · learning_events_correction_target_c11 · learning_events_event_type_c11
+--         · learning_events_task_type_c11 · pipeline_jobs_discard_reason_c11
+--         · season_compass_answers_c11 · season_dates_c11
+--         · season_review_decided_c11 · season_review_self_c11 · season_review_verdict_c11
+--         · staff_role_c11 · submissions_due_paired_c11 · submissions_task_format_c11
+--         · submissions_translation_source_c11
