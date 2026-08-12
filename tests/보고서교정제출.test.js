@@ -46,7 +46,7 @@ assert.notEqual(확정팩소스, 팩원문,
 const 캐시 = new Map();
 const 바꾼소스 = new Map([[팩경로, 확정팩소스]]);
 const {
-  게임과제인가, 게임재료, 짚음제출사건, 무산출사건, 이탈사건, 스냅샷모양판,
+  게임과제인가, 게임재료, 앉음재료, 짚음제출사건, 무산출사건, 이탈사건, 스냅샷모양판,
 } = 세우기(조립기경로, fetch금지, { 캐시, 바꾼소스 });
 
 /* 실팩에서 오류 문항·대조 문항 id 를 «골라 온다» — 여기 리터럴을 박으면 팩이 문항을 갈아치운
@@ -313,4 +313,47 @@ test('한 앉음(3문항)이 같은 correlation_id 를 지고 나간다 — 그 
     태우기(e, `앉음 사건 ${e.event_type}`);
   }
   assert.equal(new Set(사건들.map((e) => e.idempotency_key)).size, 3, '멱등키는 사건마다 달라야 한다');
+});
+
+/* ─────────────────── ⑦ 앉음재료 — 화면이 그릴 3벌 (3단계 ②화면) ─────────────────── */
+
+test('⑦ 앉음재료 — 앵커 하나에서 3벌이 «편성 순서 그대로» 펴진다', () => {
+  const 앵커 = 재료of(오류id);
+  const 벌 = 앉음재료(앵커);
+  assert.ok(Array.isArray(벌) && 벌.length === 3, '3턴이 아니다');
+  /* ⚠ 문자열로 견준다 — 조립기는 vm 격리(`앱모듈세우기`) 안이라 배열의 prototype 이 이쪽과
+   * 다른 realm 것이고, `deepStrictEqual` 은 값이 같아도 그것으로 운다(실측). */
+  assert.equal(벌.map((b) => b.문항id).join(','), [...팩.앉음편성(오류id)].join(','),
+    '화면이 볼 순서가 편성과 갈렸다 — 행에 적힌 자리와 학생이 본 자리가 달라진다');
+  for (const 하나 of 벌) {
+    assert.equal(하나.스냅샷.prompt_seed, 하나.문항id, '자기 스냅샷을 안 진다');
+    assert.equal(하나.보기, 하나.스냅샷.보기, '보기는 스냅샷 것 하나다(사본 금지 · §6-8 규칙 4)');
+    assert.equal(하나.task_ref, 앵커.task_ref, '배정은 하나다 — 3턴이 같은 행을 가리킨다');
+    assert.equal(하나.level_snapshot, 앵커.level_snapshot);
+  }
+  assert.equal(벌.filter((b) => 팩.대조문항인가(b.문항id)).length, 1,
+    '대조 문항이 앉음마다 정확히 하나여야 §9-③ 눈금이 날마다 같다');
+});
+
+test('⑦ 앉음재료 — `retry_of_event_id` 는 **앵커 턴만** 진다', () => {
+  const 앵커 = 재료of(오류id, { retry_of_event_id: 'E-원본' });
+  assert.equal(앵커.retry_of_event_id, 'E-원본', '픽스처 전제가 깨졌다');
+  const 벌 = 앉음재료(앵커);
+  for (const 하나 of 벌) {
+    const 기대 = 하나.문항id === 오류id ? 'E-원본' : null;
+    assert.equal(하나.retry_of_event_id, 기대,
+      '남의 사건의 재제출로 적히면 설계 전체에서 유일한 결과 변수가 거짓이 된다');
+  }
+});
+
+test('⑦ 앉음재료 — 못 펴는 앵커·재료 아님은 null(두 문항짜리 앉음을 내지 않는다)', () => {
+  assert.equal(앉음재료(null), null);
+  assert.equal(앉음재료({ 문항id: 'g2t99', task_ref: 'task-x' }), null, '모르는 문항');
+  const 대조앵커 = 재료of(대조id);
+  assert.equal(앉음재료(대조앵커), null, '대조 문항이 앵커면 오류 2를 못 채운다');
+});
+
+test('⑦ 앉음재료 — 실팩(검수확정=false)에서는 언제나 null(fail-closed · 게이트는 통로마다)', () => {
+  assert.equal(실판.앉음재료({ 문항id: 오류id, task_ref: 'task-x' }), null,
+    '미검수 판이 화면에 열렸다 — 몽골어 검수가 이 게임의 게이트다');
 });

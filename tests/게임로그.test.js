@@ -12,8 +12,11 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
-  항목id, 항목추가, 다음시도번호, 제출항목, 죽은배정들, 전송기록, 밀린것, 보낼것,
+  항목id, 항목추가, 다음시도번호, 제출항목, 턴항목, 죽은배정들, 전송기록, 밀린것, 보낼것,
 } = require('../lib/게임로그.js');
+/* G2 표기는 **팩에서 가져온다** — 여기 challenge_id 를 손으로 적으면 팩이 이름을 바꾼 날
+ * 이 회귀가 「없는 모듈」을 재고, 그때 통과는 미실행이다(세 맹점 ①). */
+const { 모듈상수: G2모듈상수 } = require('../contents/보고서교정문항.js');
 
 const 고름사건 = (correlation_id = 'sit-1') => ({
   idempotency_key: 'k-choice-1',
@@ -130,4 +133,97 @@ test('전송기록 — 도착·거절이 그 항목에만 적힌다(재수출이
   assert.equal(로그.find((e) => e.id === 'mail:sit-1').event_id, 'E-1');
   assert.equal(로그.find((e) => e.id === 'choice:sit-1').event_id, null);
   assert.equal(보낼것(로그, null).length, 1, '닿은 것이 다시 나간다');
+});
+
+/* ─────────── ⑦ 한 앉음에 턴이 여럿인 모듈(G2 · 3문장) ───────────
+ * 🔴 이 절이 없던 동안 실측은 이랬다: 3턴 앉음을 담으면 큐에 **1건**이 섰다.
+ *    ①`quiz.answered` 가 접두 표 밖이라 「고칠 곳 없음」이 통째로 사라지고(§9-③ 과잉 교정
+ *    성향의 유일한 재료) ②2·3턴 제출이 1턴과 같은 항목 id 를 받아 접혔다. 둘 다 오류가 아니라
+ *    **정상 반환값**이라 화면도 큐도 멀쩡했다 — 사건만 없었다. */
+
+const G2턴사건 = (문항id, {
+  correlation_id = 'sit-g2', task_ref = 'task-2026-08-12', event_type = 'submission.created',
+} = {}) => ({
+  idempotency_key: `k-${문항id}-${event_type}`,
+  event_type,
+  correlation_id,
+  submission: {
+    task_ref,
+    task_format: '쓰기첨삭',
+    task_snapshot: { challenge_id: G2모듈상수.challenge_id, prompt_seed: 문항id },
+    ...(event_type === 'submission.created' ? { body_original: `${문항id} 고친 문장입니다.` } : {}),
+  },
+  payload: { ver: 1, attempt_no: 1 },
+});
+
+test('⑦ 3턴 앉음이 큐에 **3건**으로 선다 — 같은 앉음이어도 문항이 다르면 다른 항목이다', () => {
+  let 로그 = [];
+  for (const 사건 of [
+    G2턴사건('g2t01'),
+    G2턴사건('g2t48', { event_type: 'quiz.answered' }), // 대조 문항 「고칠 곳 없음」
+    G2턴사건('g2t06'),
+  ]) ({ 로그 } = 항목추가(로그, 사건));
+  assert.equal(로그.length, 3, '한 앉음의 턴이 접혔다 — 사건이 오류 없이 사라지는 그 자리다');
+  assert.deepEqual(로그.map((e) => e.id), [
+    'mail:sit-g2#g2t01', 'quiz:sit-g2#g2t48', 'mail:sit-g2#g2t06',
+  ]);
+});
+
+test('⑦ 「고칠 곳 없음」(`quiz.answered`)이 이 큐에 든다 — 접두 표 밖이면 담기가 조용히 버린다', () => {
+  const 사건 = G2턴사건('g2t48', { event_type: 'quiz.answered' });
+  assert.notEqual(항목id(사건), null, 'quiz.answered 가 큐 소속 밖이다');
+  const { 항목, 새것 } = 항목추가([], 사건);
+  assert.ok(항목 && 새것, '담기가 사건을 버렸다(반환값은 성공의 모양이다)');
+});
+
+test('⑦ 같은 턴을 두 번 담으면 접힌다 — 턴 칸이 접기를 깨지 않는다', () => {
+  let { 로그, 새것 } = 항목추가([], G2턴사건('g2t01'));
+  assert.equal(새것, true);
+  ({ 로그, 새것 } = 항목추가(로그, { ...G2턴사건('g2t01'), idempotency_key: 'k-다시' }));
+  assert.equal(새것, false, '같은 턴이 두 벌 섰다 — 같은 제출이 두 번 나간다');
+  assert.equal(로그.length, 1);
+  assert.equal(로그[0].사건.idempotency_key, G2턴사건('g2t01').idempotency_key,
+    '첫 사건 객체가 바뀌었다 — 멱등키는 한 번 정하고 안 바꾼다(재전송이 같은 객체를 쓴다)');
+});
+
+test('⑦ 턴 열쇠가 없는 사건은 id 가 **한 글자도** 안 바뀐다(G1·이탈·옛 항목)', () => {
+  assert.equal(항목id(메일사건('s')), 'mail:s', '기기에 남은 미전송 항목이 새 id 로 두 벌이 된다');
+  assert.equal(항목id(고름사건('s')), 'choice:s');
+  assert.equal(항목id({ event_type: 'session.abandoned', correlation_id: 's', submission: { task_ref: 't' } }),
+    'abandon:s', '이탈은 앉음 하나에 하나다 — 턴 칸이 붙으면 안 된다');
+  /* 등록 안 된 challenge 의 스냅샷은 턴을 안 가른다 — 모르는 모듈에 규칙을 지어내지 않는다. */
+  assert.equal(항목id({
+    event_type: 'submission.created',
+    correlation_id: 's',
+    submission: { task_ref: 't', task_snapshot: { challenge_id: 'g9-없는것', prompt_seed: 'x' } },
+  }), 'mail:s');
+});
+
+test('⑦ 다음시도번호 — 문항을 주면 **그 문항 안의** 재시도만 센다', () => {
+  let 로그 = [];
+  for (const 사건 of [G2턴사건('g2t01'), G2턴사건('g2t48', { event_type: 'quiz.answered' })]) {
+    ({ 로그 } = 항목추가(로그, 사건));
+  }
+  assert.equal(다음시도번호(로그, 'task-2026-08-12', 'g2t06'), 1,
+    '다른 문항의 제출이 이 문항의 재시도로 세어졌다 — 「자기 교정 루프」 축이 통째로 거짓이 된다');
+  assert.equal(다음시도번호(로그, 'task-2026-08-12', 'g2t01'), 2, '같은 문항 다시 짚기는 2다');
+  assert.equal(다음시도번호(로그, 'task-2026-08-12'), 2, '문항을 안 주면 뜻은 배정 단위 그대로다(G1)');
+});
+
+test('⑦ 턴항목 — 짚음·무산출 **둘 다** 「이 턴은 냈다」로 본다', () => {
+  let 로그 = [];
+  for (const 사건 of [G2턴사건('g2t01'), G2턴사건('g2t48', { event_type: 'quiz.answered' })]) {
+    ({ 로그 } = 항목추가(로그, 사건));
+  }
+  assert.ok(턴항목(로그, 'task-2026-08-12', 'g2t01'), '짚음 턴을 못 찾았다');
+  assert.ok(턴항목(로그, 'task-2026-08-12', 'g2t48'),
+    '「고칠 곳 없음」으로 끝낸 턴이 안 끝난 것으로 보인다 — 화면이 그 턴을 다시 연다');
+  assert.equal(턴항목(로그, 'task-2026-08-12', 'g2t06'), null, '안 낸 턴');
+  assert.equal(턴항목(로그, 'task-2026-08-12', null), null, '턴을 모르면 판정하지 않는다');
+  assert.equal(턴항목(로그, 'task-다른날', 'g2t01'), null, '배정이 다르면 남의 턴이다');
+});
+
+test('⑦ 제출항목(배정 단위)은 G1 뜻 그대로다 — 두 축을 한 이름에 얹지 않았다', () => {
+  const { 로그 } = 항목추가([], 메일사건('s', 'task-x'));
+  assert.ok(제출항목(로그, 'task-x'), 'G1 판정이 바뀌었다');
 });

@@ -32,7 +32,7 @@ const 캐시 = new Map();
 const 조립기 = 세우기(조립기경로, fetch금지, { 캐시 });
 const {
   G1스냅샷, 스냅샷키들, G1스냅샷인가, 게임스냅샷인가, 학생판게임스냅샷, 등록challenge들,
-  G2스냅샷, G2스냅샷키들, G2필수키들, G2스냅샷모양판, G2과제유형, G2학생공개키,
+  G2스냅샷, G2스냅샷키들, G2필수키들, G2스냅샷모양판, G2과제유형, G2학생공개키, 턴열쇠값,
 } = 조립기;
 const 팩 = 세우기(팩경로, fetch금지, { 캐시 }); // 같은 캐시 = 조립기가 쓴 그 팩 인스턴스
 const G2팩 = 세우기(G2팩경로, fetch금지, { 캐시 });
@@ -276,4 +276,26 @@ test('⑥ 등록부는 «의식적으로» 늘린다 — 새 모듈은 이 줄�
   assert.deepEqual([...등록challenge들], ['g1-교수멘탈', 'g2-보고서교정']);
   assert.equal(G2학생공개키.length, 6, '`정답` 하나만 빼고 여섯 — 빼는 것은 정답 «뿐»이다');
   assert.equal(G2학생공개키.includes('정답'), false, '🔴 정답이 기기에 실리면 이 게임은 탐지 능력이 아니라 「정답을 봤나」를 잰다');
+});
+
+/* ⑦ 턴 열쇠 — 「이 모듈은 한 앉음에 턴이 여럿인가」의 **유일한 표**.
+ *   큐(`lib/게임로그.항목id`)가 이것을 읽어 한 앉음의 3턴을 가른다. 여기가 비면 그 세 사건이
+ *   같은 항목 id 를 받아 **정상 반환값으로 접힌다**(오류 0 · 실측 3건 → 1건). */
+test('⑦ 턴 열쇠 — G2 는 문항으로 턴을 가르고, G1·모르는 모듈은 안 가른다', () => {
+  const G2 = G2스냅샷(G2팩.문항목록()[0]);
+  assert.equal(턴열쇠값(G2), G2.prompt_seed, 'G2 는 한 앉음이 3턴이다 — 턴을 가르는 값은 문항 열쇠다');
+  assert.equal(턴열쇠값(G1스냅샷('g1t01.s0d0')), null, 'G1 은 한 앉음 = 메일 하나다');
+  assert.equal(턴열쇠값({ challenge_id: 'g9-없는것', prompt_seed: 'x' }), null, '모르는 모듈에 규칙을 지어내지 않는다');
+  assert.equal(턴열쇠값(null), null);
+  assert.equal(턴열쇠값({ challenge_id: G2.challenge_id }), null, '값이 없으면 null — 빈 문자열로 접지 않는다');
+});
+
+test('⑦ 등록된 모듈은 **전부** 턴 열쇠 칸을 명시한다 — 안 적은 모듈은 조용히 접힌다', () => {
+  /* 🔴 새 모듈이 이 칸을 빠뜨리면 `undefined` 라 「안 가른다」로 읽히고, 그 모듈이 3턴이면
+   *   2·3턴이 사라진다. 기대값은 **소스에서** 온다 — 등록부가 목록의 정본이다. */
+  const 소스 = fs.readFileSync(path.join(뿌리, 'lib', '게임스냅샷.js'), 'utf8');
+  const 등록블록 = 소스.slice(소스.indexOf('const 등록부 = new Map('), 소스.indexOf('const 등록challenge들'));
+  const 턴칸수 = (등록블록.match(/턴열쇠\s*:/g) || []).length;
+  assert.equal(턴칸수, 등록challenge들.length,
+    `등록 모듈 ${등록challenge들.length}개 중 턴열쇠를 적은 것이 ${턴칸수}개다 — 안 적은 모듈은 큐에서 턴이 접힌다`);
 });
