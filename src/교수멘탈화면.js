@@ -6,6 +6,10 @@ import {
 } from '../lib/게임제출.js';
 import { 판정, 같은판정 } from '../lib/멘탈게이지.js';
 import { 계측시작, 타건, 계측payload } from '../lib/작성과정.js';
+/* 잰 것을 **그 자리에서** 학생에게 돌려준다(철학 Ⅱ-8 셋째 실물). 판정·문구는 전부 저 조립기가
+ * 지고 여기는 그릴 자리만 준다 — 화면이 문구를 손으로 적으면 「비교하지 않는다」가 화면마다
+ * 다시 지켜져야 하고, 한 화면이 잊으면 그 자리에서만 조용히 깨진다. */
+import { 관찰한줄 } from '../lib/돌려주기.js';
 import { 다음시도번호, 제출항목 } from '../lib/게임로그.js';
 import { 흐름id } from '../lib/제출로그.js';
 import { 몽골날짜 } from '../lib/오늘과제.js';
@@ -224,6 +228,10 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
   const 빠진칸 = 게이지 ? 게이지.빠진칸 : 칸이름들;
   /* 메일 항목의 배달 상태 — 「닿았다」는 서버가 받은 것만이다(완료카드와 같은 축). */
   const 메일항목 = 제출항목(로그, 재료.task_ref);
+  /* 🔑 앉음 키는 **제출 사건의 것**이지 이 마운트의 `앉음` 이 아니다 — 다시 열어 대기로 점프한
+   * 날은 새 `흐름id` 라 아무것도 안 맞고, 학생은 어제 본 줄을 오늘 못 보게 된다.
+   * 🔴 도착과 무관하다 — 관찰은 «기기가 잰 것»이라 서버가 아직 못 받은 날에도 참이다. */
+  const 관찰 = 메일항목 && 메일항목.사건 ? 관찰한줄(로그, 메일항목.사건.correlation_id) : null;
 
   return (
     <ScrollView style={s.wrap} contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
@@ -320,6 +328,10 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
               <Text style={s.오류}>메일을 보내지 못했어요. 선생님께 알려 주세요.</Text>
             )}
           </View>
+          {/* 🔑 관찰 한 줄 — 화면을 늘리지 않고 이미 보는 자리에 얹는다(철학 Ⅱ-8 「형태 규칙」).
+              점수도 채점도 아니라 카드 밖 한 줄로 조용히 둔다. **없으면 안 그린다** — 빈 자리를
+              남기면 「관찰이 없다」와 「관찰을 못 잰다」가 같은 모양이 된다. */}
+          {관찰 ? <Text style={s.관찰}>{관찰.글}</Text> : null}
           {/* 산출물 렌더 — 「보냈다」의 기록이지 「맞았다」의 전시가 아니다(게임층 §2 한 수 더). */}
           {보낸메일 ? (
             <View style={s.카드}>
@@ -387,5 +399,8 @@ const s = StyleSheet.create({
   눌림: { opacity: 0.75 },
 
   대기제목: { fontFamily: 폰트.헤드, fontSize: 24, color: 색.잉크 },
+  /* 관찰 한 줄 — 카드 밖 · 신호(코랄) 없음. 이 화면의 코랄은 게이지 자리라 여기 쓰면 그 뜻이
+   * 흐려지고, 관찰이 «성적»으로 읽힌다. 위계는 색이 아니라 밀도로 준다(`어제의나` 와 같은 규칙). */
+  관찰: { fontFamily: 폰트.캡션, fontSize: 14, lineHeight: 22, color: 색.잉크_보조, paddingHorizontal: 4 },
   편지글: { fontFamily: 폰트.본문, fontSize: 16, lineHeight: 27, color: 색.잉크 },
 });
