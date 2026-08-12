@@ -205,15 +205,55 @@ function scoreOne(fx, out) {
   return r;
 }
 
+/* 한 출력 파일을 픽스처에 대고 채점한다 — main 과 `--대조` 가 **같은 통로**를 쓴다.
+ * 대조 쪽이 이 조립을 베끼면 채점 판정이 두 벌이 되고, 갈라진 쪽 증상은
+ * 「대조표만 조용히 틀린다」 = 통과와 같은 모양이다(가드 맹점 ④). */
+function 채점하기(fixture, outputs) {
+  const byId = new Map(outputs.항목.map((o) => [o.id, o]));
+  return fixture.항목.map((fx) => scoreOne(fx, byId.get(fx.id)));
+}
+
+/* 두 채점 결과의 «항목 이동»을 가른다 — 분류만 하고 출력은 안 한다(회귀가 이 자리를 직접 잰다.
+ * main 안에 인라인으로 두면 재려면 콘솔을 가로채야 하고, 그러면 문구를 다듬을 때마다 깨진다). */
+function 판대조(이전rows, 지금rows) {
+  const 이전 = new Map(이전rows.map((r) => [r.id, r]));
+  const 이동 = { 개선: [], 회귀: [], 그대로실패: [], 판정축: [] };
+  for (const r of 지금rows) {
+    const p = 이전.get(r.id);
+    if (!p) continue;
+    /* 판정불가(null)는 «움직였다»로 세지 않는다 — 안 돌린 판과 견주면 **전부 개선으로 보인다**.
+     * 대신 따로 세어 「시험지가 다르다」는 신호로 낸다(0으로 감추면 분모 차이가 점수 차이로 읽힌다). */
+    if (p.통과 === null || r.통과 === null) {
+      if (p.통과 !== r.통과) 이동.판정축.push(r);
+      continue;
+    }
+    if (!p.통과 && r.통과) 이동.개선.push(r);
+    else if (p.통과 && !r.통과) 이동.회귀.push(r);
+    else if (!p.통과 && !r.통과) 이동.그대로실패.push(r);
+  }
+  return 이동;
+}
+
 function main(argv) {
   /* 픽스처를 골라 쓴다 — 합성(evals/픽스처.json)과 실학생(수집층이 올리는 것)은 **다른 질문에 답한다**:
    * 합성은 「23개 오류 유형을 다 잡는가」(유형 커버리지), 실학생은 「우리 학생이 실제로 무너지는 곳을
    * 잡는가」(분포). 하나로 덮으면 덮인 쪽 질문을 영영 못 묻는다. 그래서 기본값은 합성 그대로 두고
    * 수집층은 다른 경로에 올린다. */
-  const fi = argv.indexOf('--fixture');
-  const fixturePath = fi !== -1 && argv[fi + 1] ? path.resolve(ROOT, argv[fi + 1]) : FIXTURE;
-  // fi === -1 이면 fi+1 === 0 이라, 조건을 그냥 `i !== fi + 1`로 쓰면 **출력 경로 자신이 걸러진다**
-  const outPath = argv.filter((a, i) => !a.startsWith('--') && !(fi !== -1 && i === fi + 1))[0];
+  /* 손잡이의 «값 자리»는 한 목록에서 파생시킨다 — 손잡이마다 조건을 따로 적으면 갈라지고,
+   * 원래 함정이 정확히 그 모양이었다: `fi === -1` 이면 `fi + 1 === 0` 이라 조건을 그냥
+   * `i !== fi + 1` 로 쓰면 **출력 경로 자신이 걸러진다**. 값 자리를 모아 두면 손잡이가
+   * 늘어도 그 함정이 다시 열리지 않는다(호출부마다 고치는 대신 잘못 쓸 수 없는 통로). */
+  const 값자리 = new Set();
+  const 인자값 = (이름) => {
+    const i = argv.indexOf(이름);
+    if (i === -1 || !argv[i + 1]) return null;
+    값자리.add(i + 1);
+    return argv[i + 1];
+  };
+  const fixtureArg = 인자값('--fixture');
+  const 대조Arg = 인자값('--대조');
+  const fixturePath = fixtureArg ? path.resolve(ROOT, fixtureArg) : FIXTURE;
+  const outPath = argv.filter((a, i) => !a.startsWith('--') && !값자리.has(i))[0];
   if (!outPath) {
     console.error('사용: node tools/eval-score.js evals/출력_v0.json [--json] [--fixture evals/픽스처_실학생.json]');
     return 2;
@@ -225,9 +265,7 @@ function main(argv) {
   }
   const fixture = load(fixturePath);
   const outputs = load(path.resolve(ROOT, outPath));
-  const byId = new Map(outputs.항목.map((o) => [o.id, o]));
-
-  const rows = fixture.항목.map((fx) => scoreOne(fx, byId.get(fx.id)));
+  const rows = 채점하기(fixture, outputs);
   const 판정불가 = rows.filter((r) => r.판정불가);
   const 채점대상 = rows.filter((r) => !r.판정불가);
   /* 무응답은 **채점대상 안**이다(전체통과 분모에 실패로 남는다) — 세 축에서만 뺀다.
@@ -361,8 +399,40 @@ function main(argv) {
   }
   console.log('');
 
+  /* ── 판 대조 ── 두 출력을 «같은 픽스처·같은 채점기»로 채점해 **항목 단위 이동**을 낸다.
+   * 🔑 이 시험에서 총점은 읽을 수 없다 — 잡음 바닥이 13%라 판을 안 바꿔도 총점이 그만큼 흔들린다.
+   *   읽을 수 있는 것은 「어느 항목이 뒤집혔나」뿐인데 그걸 사람이 두 결과를 눈으로 훑어 찾고
+   *   있었다(v3↔v4 절의 회귀 1건이 그렇게 나왔다). 눈으로 찾을 때 놓치는 쪽은 늘 **회귀**다 —
+   *   기대한 개선은 찾아보지만, 기대하지 않은 회귀는 찾을 이유가 없어서 안 본다.
+   * ⚠ 이 표는 「무엇이 원인인가」를 말하지 않는다. 원인을 말하려면 **한 변수만 다른 A/B** 여야
+   *   하는데 그건 기계가 못 보장한다 — 프롬프트 두 줄을 같이 고치고 이 표를 봐도 숫자는 똑같이
+   *   나온다. 그 보장은 사람 몫이라 이 도구는 그 사실을 꼬리에 적는다(F281). */
+  if (대조Arg) {
+    const 이전출력 = load(path.resolve(ROOT, 대조Arg));
+    const 이동 = 판대조(채점하기(fixture, 이전출력), rows);
+    const 판 = (o) => o.prompt_ver || '판 모름';
+    const 줄 = (r) => `     ${r.id}  ${r.입력}`;
+    console.log('── 판 대조 ─────────────────────────');
+    console.log(`${path.basename(대조Arg)} (${판(이전출력)})  →  ${path.basename(outPath)} (${판(outputs)})`);
+    if (판(이전출력) === 판(outputs)) {
+      console.log('⚠ 두 출력의 prompt_ver 가 **같다** — A/B 가 아니라 «같은 판 두 회차»(잡음 재측정)다.');
+    }
+    console.log(`  ✅ 개선       ${이동.개선.length}건  (앞 판 ✖ → 이 판 ✔)`);
+    이동.개선.forEach((r) => console.log(줄(r)));
+    console.log(`  🔴 회귀       ${이동.회귀.length}건  (앞 판 ✔ → 이 판 ✖ — 0이 아니면 판을 올리기 전에 이유를 대야 한다)`);
+    이동.회귀.forEach((r) => console.log(줄(r)));
+    console.log(`  ·  그대로 실패 ${이동.그대로실패.length}건`);
+    if (이동.판정축.length) {
+      console.log(`  ⚠ 판정불가 자리가 ${이동.판정축.length}건 움직였다 — 두 판의 «시험지가 다르다»는 뜻이라 위 숫자는 그만큼 덜 믿는다.`);
+      이동.판정축.forEach((r) => console.log(줄(r)));
+    }
+    console.log('  ⚠ 이 표는 «어느 항목이 움직였나»이지 «무엇이 원인인가»가 아니다 — 원인을 말하려면');
+    console.log('     두 판이 한 변수만 달라야 하고, 그 보장은 기계가 못 한다(사람이 이력에 적는다).');
+    console.log('');
+  }
+
   return 초록 ? 0 : 1;
 }
 
 if (require.main === module) process.exit(main(process.argv.slice(2)));
-module.exports = { scoreOne, main, 문자판정 };
+module.exports = { scoreOne, main, 채점하기, 판대조, 문자판정 };
