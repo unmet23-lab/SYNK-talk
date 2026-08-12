@@ -303,10 +303,15 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
       //    일이라 지금(now()) 기준으로도 살아 있어야 한다(동의문 「철회 시 중단」 · 왕복 ⑫).
       //    `consent_id` 까지 읽는 이유: 행이 「어느 동의 문서 판」이 아니라 **정확히 어느 동의 행**에
       //    근거했는지를 남긴다(20260807120000 · 서버 파생이라 앱 payload 는 그대로다).
+      /* ⚠ `+ make_interval(mins => 5)` = **시계 여유**. 정본은 `lib/동의게이트.js 시계여유_분` 이고
+       *   이 파일은 그 통로를 동봉하지 않아 글자로 적는다 — `tests/동의게이트.test.js` 가 두 숫자를
+       *   기계로 대조한다(갈라지면 빨개진다). 왜 필요한지: `occurred_at` 은 **기기** 시계,
+       *   `agreed_at` 은 **서버** 시계다. 실측 2026-08-12 에 5초 차로 방금 동의한 학생이 거절됐다.
+       *   여유는 앞 조건에만 붙는다 — 철회 쪽에 붙이면 철회 뒤 5분이 열린다. */
       const 동의 = await tx`
         select consent_id, consent_ver from engine.consents
          where learner_id = ${learner_id}::uuid
-           and agreed_at <= ${occurred_at}::timestamptz
+           and agreed_at <= ${occurred_at}::timestamptz + make_interval(mins => 5)
            and (revoked_at is null or (revoked_at > ${occurred_at}::timestamptz and revoked_at > now()))
          order by agreed_at desc limit 1`;
       if (!동의.length) {
