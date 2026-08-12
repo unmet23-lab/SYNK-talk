@@ -255,4 +255,10 @@ async function main() {
   console.log(`  채점: node tools/eval-score.js ${출력경로}`);
 }
 
-main().catch((e) => die(String((e && e.stack) || e)));
+/* 🔑 **직접 실행일 때만 돈다.** 이 파일은 벤더 비용을 쓰므로 `require` 가 곧 과금이었고,
+ *   그래서 회귀가 「소스 텍스트로 재는」 우회를 썼다(이 파일 머리 · `tests/eval실행.test.js`).
+ *   텍스트 검사는 배선의 **모양**만 보고 **동작**은 못 본다 — `항목만들기` 가 실제로 어떤
+ *   항목을 내는지는 그 방식으로 영원히 못 잰다. 문을 하나 열어 그 한 함수만 재게 한다. */
+if (require.main === module) main().catch((e) => die(String((e && e.stack) || e)));
+
+module.exports = { 항목만들기 };
