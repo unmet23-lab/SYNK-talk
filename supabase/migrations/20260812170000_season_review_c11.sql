@@ -51,7 +51,10 @@
  *   ④ 삭제 = 전면 금지(나침반과 같다 — 라벨은 사람 손에서만 나오므로 소급이 안 된다).
  *
  * ■ 채우는 코드는 이 조각에 0줄이다 — 정직 표기
- *   생산자 = `functions/teach` 의 `retro/*` 세 경로이고 이 조각과 **같은 커밋**에 선다.
+ *   생산자 = `functions/teach` 의 `retro/…` 세 경로이고 이 조각과 **같은 커밋**에 선다.
+ *   (⚠ 그 꼬리를 **슬래시+별표**로 적으면 이 파일은 DB 에서 파싱조차 안 된다 —
+ *    위 `season_c11` 과 같은 자리에서 같은 두 글자로 죽었다.
+ *    회귀 = `tests/마이그레이션주석.test.js`.)
  *   「표가 섰다」를 「라벨이 쌓인다」로 읽지 않는다(엔진도달 §5 확인 ③).
  *   ⑤라벨→엔진 배선은 **시즌 2 이후**다(설계 §8) — 행이 몇 개 쌓인 뒤에 한다.
  *
@@ -64,7 +67,7 @@ do $migration$
 declare
   migration_version constant text := '20260812170000';
   migration_name constant text := '20260812170000_season_review_c11.sql';
-  expected_checksum constant text := '36472be667bfecc8f02b4964b84839509ecc167ac90acede34a4eff5fa72b0ff'; -- migration-checksum
+  expected_checksum constant text := '45f4077f4d125937364f1bf71ceae72ab826e2851a065e51af9925f8f6b16a26'; -- migration-checksum
   base_version constant text := '20260812140000';
   recorded_checksum text;
 begin
@@ -411,7 +414,7 @@ select case when 테이블수=14 and RLS켜짐=14 and 정책수=7
               and (select v from 빠진제약) is null
               and (select v from 빠진트리거) is null
               and (select version from 현재이력)='20260812170000'
-              and (select checksum from 현재이력)='36472be667bfecc8f02b4964b84839509ecc167ac90acede34a4eff5fa72b0ff' -- migration-checksum
+              and (select checksum from 현재이력)='45f4077f4d125937364f1bf71ceae72ab826e2851a065e51af9925f8f6b16a26' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 14·14·7·0·0·5·1·0·0·1·0·0·0·0·22·0·0·6·6·0·0·0·1·1·1·30 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
