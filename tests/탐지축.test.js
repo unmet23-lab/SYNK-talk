@@ -54,8 +54,11 @@ const 앱이보낸것 = (저장행) => { const { event_id, ...앱사건 } = 저�
 let 일련 = 0;
 const 항목 = (문항id) => ({
   task_ref: `task-${문항id}`,
-  prompt_seed: 문항id,
-  task_snapshot: { challenge_id: 'g2-보고서교정', 지시문: 'x', 질문: 'x', 문항판: 'x', 보기: [] },
+  /* 🔑 문항 열쇠는 **스냅샷 안**이다(`prompt_seed` · G1 과 같은 칸 · 3단계 실측으로 되돌린 자리).
+   *   봉투 «밖» 칸으로 두면 배정 통로 어디도 그 칸을 안 실어 `게임재료()` 가 영원히 null 이다. */
+  task_snapshot: {
+    challenge_id: 'g2-보고서교정', prompt_seed: 문항id, 지시문: 'x', 질문: 'x', 문항판: 'x', 보기: [],
+  },
   level_snapshot: 'Lv2',
   goal_snapshot: '대학 진학',
 });

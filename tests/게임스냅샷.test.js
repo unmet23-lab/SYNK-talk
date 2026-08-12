@@ -93,15 +93,20 @@ test('① G2 오류 문항 = §6-8 6키 정확히 — 구명 `문항`·`문항�
   const snap = G2스냅샷('g2t01');
   assert.deepEqual(Object.keys(snap).sort(), [...G2스냅샷키들].sort());
   assert.deepEqual([...G2스냅샷키들].sort(),
-    ['challenge_id', '문항판', '지시문', '질문', '보기', '정답'].sort(),
-    '§6-8 공통층 4 + 조건층 2(보기·정답). addressee_level·prompt_seed 는 G2 키가 아니다');
+    ['challenge_id', 'prompt_seed', '문항판', '지시문', '질문', '보기', '정답'].sort(),
+    '§6-8 공통층 4 + `prompt_seed` + 조건층 2(보기·정답). addressee_level 은 G2 키가 아니다');
+  /* 🔴 `prompt_seed` 가 여기 «있어야» 한다 — 3단계 실측(lib/게임스냅샷.js 머리말): 이 키가
+   *   스냅샷 밖이면 앱이 문항을 되짚을 열쇠가 통로 어디에도 없고(deliver 는 task_snapshot 만
+   *   싣는다 · tasks 는 허용 목록만 되돌린다) `게임재료()` 가 영원히 null 이다. 증상은 오류가
+   *   아니라 조용한 말하기 폴백이라, 이 한 줄이 그 침묵의 유일한 파수꾼이다. */
+  assert.equal(snap.prompt_seed, 'g2t01', '행에 남는 문항 열쇠 — 팩이 편 `문항id` 그대로');
   assert.equal('문항' in snap, false, '구명 `문항` 은 폐기 — 오류문은 공통층 `질문` 이다');
   assert.equal('문항버전' in snap, false, '구명 `문항버전` 은 폐기 — 판은 `문항판` 이다');
   assert.equal(snap.challenge_id, 'g2-보고서교정');
   assert.equal(snap.질문, G2팩.문항들[0].오류문, '값 사본 0');
   assert.equal(snap.지시문, G2팩.지시문);
   assert.equal(snap.문항판, G2팩.문항판);
-  assert.equal(G2스냅샷모양판, 'g2스냅샷.v1', '스냅샷 «모양»의 판 — G1 g1스냅샷.v1 과 다른 축');
+  assert.equal(G2스냅샷모양판, 'g2스냅샷.v2', '스냅샷 «모양»의 판 — G1 g1스냅샷.v1 과 다른 축');
   assert.ok(Object.isFrozen(snap) && Object.isFrozen(snap.보기) && Object.isFrozen(snap.정답));
 });
 
@@ -269,5 +274,6 @@ test('⑥ 등록부는 «의식적으로» 늘린다 — 새 모듈은 이 줄�
    *   사람이 오고, 그 자리에서 「이 키를 학생이 봐도 되나」를 정한다(②-20 허용 목록의 설계).
    *   그래서 목록을 여기 못박아 둔다 — 등록만 하고 공개 키를 안 정하는 길을 막는다. */
   assert.deepEqual([...등록challenge들], ['g1-교수멘탈', 'g2-보고서교정']);
-  assert.equal(G2학생공개키.length, 5, '정답을 빼고 다섯');
+  assert.equal(G2학생공개키.length, 6, '`정답` 하나만 빼고 여섯 — 빼는 것은 정답 «뿐»이다');
+  assert.equal(G2학생공개키.includes('정답'), false, '🔴 정답이 기기에 실리면 이 게임은 탐지 능력이 아니라 「정답을 봤나」를 잰다');
 });
