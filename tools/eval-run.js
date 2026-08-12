@@ -41,9 +41,13 @@ function 인자(이름, 기본 = null) {
   return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : 기본;
 }
 
-/* 25로 잡았다가 실측에서 죽었다(08-12): 문항당 ~6초 순차라 25건이면 Edge Fn idle timeout
- * 150초를 넘는다(HTTP 504 IDLE_TIMEOUT 실측). 12건 ≈ 72초 — 절반 여유. */
-const 묶음크기 = 12;
+/* 25로 잡았다가 죽었고(08-12 아침), 「12건 ≈ 72초 — 절반 여유」로 줄인 것도 같은 날 다시
+ * 죽었다(49~60번째 묶음 504 실측). 평균(~6초)으로 고른 숫자는 **분산**에 진다 — 항목 하나가
+ * 왕복제한(60초)까지 걸리는 것이 합법이라 묶음 12의 최악은 720초다. 손튜닝을 접고 최악으로
+ * 증명되는 크기를 한계에서 **파생**시킨다: 묶음크기 × 왕복제한 ≤ 유휴한계 − 여유.
+ * 60초 기준 2건 = 최악 120초 < 150초 — 왕복제한을 늘리면 묶음이 저절로 준다(회귀가 못박는다). */
+const 엣지유휴한계밀리 = 150_000;   // Supabase Edge Fn IDLE_TIMEOUT — 08-12 하루 두 번 실측
+const 묶음크기 = Math.max(1, Math.floor((엣지유휴한계밀리 - 20_000) / 왕복제한밀리));
 const 대기들 = [5_000, 15_000, 45_000];    // 429·5xx — 잠시 뒤가 답이다
 const 잠깐 = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -136,7 +140,9 @@ async function main() {
         body: JSON.stringify({
           항목: 조각.map((fx) => ({ id: fx.id, 문장: fx.입력, 급수: null, 맥락: 맥락표[fx.id] })),
         }),
-        signal: AbortSignal.timeout(왕복제한밀리 * 묶음크기 / 2),
+        /* 서버 최악(묶음 전체가 왕복제한까지)보다 **길게** 기다린다 — 짧으면 서버가 답을
+         * 만들고 있는데 클라이언트가 먼저 끊어 그 묶음의 벤더 비용이 통째로 증발한다. */
+        signal: AbortSignal.timeout(왕복제한밀리 * 묶음크기 + 30_000),
       });
       if (!r.ok) throw new Error(`평가 통로 HTTP ${r.status} — ${(await r.text()).slice(0, 200)}`);
       const 본 = await r.json();
