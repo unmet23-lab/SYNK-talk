@@ -52,9 +52,15 @@
  *   것은 «정답이 정말 하나뿐인가·문장이 자연스러운가»의 사람 확정이다. 수집봇(④)의 라운드
  *   개설 통로가 이 플래그를 게이트로 삼는 것이 그 커밋의 인수 조건이다(G1 §3 선례).
  *
+ * ■ 급수 — **가리키기만 한다**(2026-08-12 · 「실측 뒤 판 개정으로」의 그 개정)
+ *   `문법대응` 이 skill → 문법 뱅크 ID 를 잇고, 급수 해석은 `lib/문법급수.js` 가 계약으로 한다.
+ *   급수 «숫자»는 이 파일 어디에도 없다 — 정본이 저쪽 저장소(GRAMMAR_BANK)라 베끼면 낡는다.
+ *   🔴 그래서 드러난 실측: 이 팩은 **1급 41 · 2급 29 · 미상 30** 이고 **Lv4~6 밴드안 0**이다
+ *   (3급 이상 문항이 0). 4~5급 문항은 이 판이 못 내는 것이 아니라 «아직 없는» 것이다.
+ *
  * ■ 일부러 뺀 것
- *   🚫 난도·급수 태그 — TOPIK 급수 대응을 지어내지 않는다(교재·급수 담당 몫 · G1 §4 같은
- *      축). 급수 분화는 실측 뒤 판 개정으로. 🚫 해설 — 정답 공개 문안은 오버레이/봇 몫이고
+ *   🚫 난도 태그 — 급수와 난도는 다른 축이고, 난도는 실제 정답률이 쌓이기 전엔 저작자 감이다
+ *      (G1 §4 같은 축). 🚫 해설 — 정답 공개 문안은 오버레이/봇 몫이고
  *      몽골어 검수 의존을 팩에 들이지 않는다. 🚫 듣기·긴 지문 유형 — 오버레이 한 화면에
  *      못 싣는다(§2-J 운영 규칙의 화면 전제).
  *
@@ -114,6 +120,60 @@ const 스킬표 = 깊이얼리기([
   { skill_id: 'skill-ko-vocab-counter', label_ko: '어휘 — 단위 명사', domain: 'vocab' },
   { skill_id: 'skill-ko-vocab-adverb', label_ko: '어휘 — 부사·호응', domain: 'vocab' },
 ]);
+
+/* skill → 문법 뱅크 ID — **급수는 여기 안 적는다**(2026-08-12 · 팩 머리말 「급수 분화는 실측 뒤 판 개정으로」의 그 개정).
+ *
+ * ■ 왜 ID 만인가
+ *   급수 정본은 SYNK-appsscript `엔진_콘텐츠AI.js` 의 `GRAMMAR_BANK` 칸 4·5·6 하나다.
+ *   여기 「2급」이라고 적는 순간 급수가 두 곳에 살고, **낡은 쪽은 화면에 아무 표시도 안 낸다**
+ *   (「Lv3 학생에게 1급 문항만 나가는」 상태). 그래서 이 팩은 **가리키기만** 하고 급수 해석은
+ *   `lib/문법급수.js` 가 계약(`계약/문법급수_계약.json` — 저쪽이 기계로 뽑아 넣는다)으로 한다.
+ *
+ * ■ 왜 `스킬표` 안이 아니라 옆인가
+ *   `스킬표` 는 `engine.skills` 시드의 거울이고 글자 대조 회귀가 걸려 있다(c11 시드 30행).
+ *   문법 대응은 시드에 안 들어가는 **서빙 쪽 주석**이라 수명이 다르다 — 섞으면 대응을 한 번
+ *   고칠 때마다 시드 커밋이 따라붙는다. 같은 이유로 **`스킬판` 은 안 오른다**: 분류 체계
+ *   (skill_id·label·domain)가 그대로라 이미 쌓인 행의 `skill_taxonomy_ver` 가 안 낡는다.
+ *
+ * ■ 🔴 빈 배열은 「아직 안 붙였다」가 아니라 **「뱅크에 그 축이 없다」**이다
+ *   어휘 7종(동사 짝·반대말·장소·시간·가족·단위·부사)은 문법 뱅크의 축이 아니다 — 어휘 급수는
+ *   국제통용 어휘 사다리(커리큘럼 §2) 소관이고 코드에 없다. 조사 둘(`부터·까지·마다` ·
+ *   `만·도·밖에`)은 요목엔 있는데 뱅크 72종에 자리가 없다(뱅크는 진화 게이트 「12중 9」로
+ *   개수가 묶여 있다 — 늘리는 것이 유호님 판정 대기다). **지어내서 채우지 않는다.**
+ * ⚠ `honorific` → `G211`(-(으)세요 · 1급)은 **바닥값**이다: 어휘 높임(주무시다·계시다·드시다)은
+ *   뱅크에 없어 그만큼 낮게 잡힌다. 뱅크에 높임 심화가 서는 날 이 줄부터 다시 본다. */
+const 문법대응 = 깊이얼리기({
+  'skill-ko-grammar-particle-topic': ['G201', 'G202'],
+  'skill-ko-grammar-particle-object': ['G203'],
+  'skill-ko-grammar-particle-place': ['G206', 'G207'],
+  'skill-ko-grammar-particle-range': [],           // 부터·까지·마다 — 뱅크 자리 없음
+  'skill-ko-grammar-particle-instrument': ['G309'],
+  'skill-ko-grammar-particle-companion': ['G210'],
+  'skill-ko-grammar-particle-dative': ['G310'],
+  'skill-ko-grammar-particle-focus': [],           // 만·도·밖에 — 뱅크 자리 없음
+  'skill-ko-grammar-connective-reason': ['G308', 'G410'],
+  'skill-ko-grammar-connective-contrast': ['G307'],
+  'skill-ko-grammar-connective-condition': ['G401'],
+  'skill-ko-grammar-connective-purpose': ['G303', 'G405'],
+  'skill-ko-grammar-connective-sequence': ['G406'],
+  'skill-ko-grammar-tense-past': ['G208'],
+  'skill-ko-grammar-tense-future': ['G302'],
+  'skill-ko-grammar-tense-progressive': ['G409'],
+  'skill-ko-grammar-honorific': ['G211'],          // ⚠ 바닥값 — 머리말 참조
+  'skill-ko-grammar-negation': ['G209', 'G304', 'G305'],
+  'skill-ko-expression-ability': ['G402'],
+  'skill-ko-expression-experience': ['G408', 'G509'],
+  'skill-ko-expression-desire': ['G301'],
+  'skill-ko-expression-obligation': ['G403'],
+  'skill-ko-expression-permission': ['G505', 'G506'],
+  'skill-ko-vocab-verb-collocation': [],           // ↓ 어휘 7종 — 문법 뱅크의 축이 아니다
+  'skill-ko-vocab-antonym': [],
+  'skill-ko-vocab-place': [],
+  'skill-ko-vocab-time': [],
+  'skill-ko-vocab-family': [],
+  'skill-ko-vocab-counter': [],
+  'skill-ko-vocab-adverb': [],
+});
 
 /** 지시문 정본 — 유형 셋뿐. 빈칸형은 질문에 `(___)` 하나, 반대말형은 «» 인용, 뜻형은 빈칸 없음. */
 const 지시문표 = 깊이얼리기({
@@ -282,6 +342,23 @@ function 자리섞기(문항id) {
 
 /* 조립 — 원시 튜플을 정본 모양으로 편다. 모양이 어긋나면 로드에서 죽는다(조용한 결손 금지). */
 const 스킬id들 = new Set(스킬표.map((s) => s.skill_id));
+
+/* 문법 대응은 스킬표와 **1:1이어야** 한다 — 로드에서 죽인다(조용한 결손 금지 · 아래 조립과 같은 축).
+ * 빠진 스킬이 있으면 그 스킬의 문항이 통째로 「급수 미상」으로 접히는데, 미상은 정상값이라
+ * 어느 화면에도 안 보인다. ID 꼴만 보고 실재는 안 본다 — 뱅크는 저쪽 저장소라 여기서 못 연다
+ * (실재 대조는 `tests/문법급수.test.js` 가 계약 파일로 진다). */
+(() => {
+  const 대응키 = Object.keys(문법대응);
+  for (const id of 스킬id들) {
+    if (!Array.isArray(문법대응[id])) throw new Error(`문법대응에 스킬이 없다: ${id}`);
+  }
+  for (const id of 대응키) {
+    if (!스킬id들.has(id)) throw new Error(`문법대응에 스킬표 밖 항목: ${id}`);
+    for (const gid of 문법대응[id]) {
+      if (!/^G[2-7]\d{2}$/.test(gid)) throw new Error(`문법 ID 꼴이 아니다: ${id} → ${gid}`);
+    }
+  }
+})();
 const 문항들 = 깊이얼리기(원시.map(([문항id, 지시문키, 질문, 라벨들, 정답자리, skill_ids]) => {
   const 지시문 = 지시문표[지시문키];
   if (!지시문) throw new Error(`지시문키 모름: ${문항id} ${지시문키}`);
@@ -321,4 +398,4 @@ function 같은스킬다른문항(문항id) {
     .map((q) => q.문항id));
 }
 
-module.exports = { 문항판, 스킬판, 검수확정, 스킬표, 지시문표, 문항들, 찾기, 같은스킬다른문항 };
+module.exports = { 문항판, 스킬판, 검수확정, 스킬표, 문법대응, 지시문표, 문항들, 찾기, 같은스킬다른문항 };
