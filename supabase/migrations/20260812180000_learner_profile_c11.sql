@@ -1,11 +1,164 @@
+/* 가입 1회 문항 세 칸의 값목록을 **DB 로 내린다** — 코드에만 살아 있던 규칙의 마지막 구멍
+ *
+ * 정본 = `lib/가입문항.js`(값목록) · L0 §9-2 `learners` 줄 · appsscript 메모리
+ *        `collection-axes-recheck-0812`(유호님 지시 2026-08-12 「지역별 출신 칸 … 앞으로도
+ *        이런 방향으로 디테일하게 단단하게」).
+ *
+ * ■ 무엇이 열려 있었나 (2026-08-12 실측)
+ *   `learners.home_aimag`·`gender`·`goal_track` 은 c6(`20260806150000`)에서 **`text` 로만** 섰다.
+ *   값목록은 `lib/가입문항.js` 한 곳에 있고, 그 파일 머리말이 자유 입력을 이렇게 금지한다:
+ *       「같은 아이막이 열 가지 표기로 쌓이면 이 칸의 존재 이유(「지역 억양 편차의 유일한
+ *         축」)가 그 자리에서 죽는다」
+ *   그런데 그 금지가 **앱 화면에만** 살아 있었다. 앱이 아닌 통로 — SQL 콘솔·리허설 도구·
+ *   명부 적재·앞으로 설 다른 클라이언트 — 로 들어오는 값은 아무도 안 막는다. `text` 는
+ *   'ulaanbaatar' 도 'Ulaanbaatar' 도 'УБ' 도 'ub' 도 똑같이 받는다.
+ *   🔴 **섞이면 소급 복원이 안 된다** — 어느 표기가 어느 아이막이었는지는 나중에 아무도
+ *   못 정한다(사람이 손으로 매핑하는 순간 그건 복원이 아니라 추정이다).
+ *
+ * ■ 왜 CHECK 인가 — 프로즈로 막을 수 있는 규칙은 기계로 옮긴다
+ *   화면 검사(`답검사`)는 **그 화면을 지나는 값만** 본다. 이 칸들이 지켜야 할 것은 「학생이
+ *   무엇을 눌렀나」가 아니라 「이 열에 무엇이 앉는가」라, 지키는 자리도 열이어야 맞다.
+ *   화면 검사를 없애는 것이 아니라 **밑에 한 겹 더** 까는 것이다(앱은 어느 칸이 틀렸는지
+ *   말해 줘야 하고, DB 는 그게 뚫려도 안 앉게 해야 한다).
+ *
+ * ■ 왜 null 을 허용하나 — null 은 값이 아니라 **뜻**이다
+ *   ① c6 이전 등록분과 명부 적재분은 세 칸이 영원히 null 이다. not null 로 걸면 이 판이
+ *      그 행들 때문에 아예 적용되지 않는다(적용 안 된 판은 아무것도 안 지킨다).
+ *   ② null = 「안 물어봤다」다. 「물었는데 안 밝혔다」는 `gender` 의 `undisclosed` 가 따로
+ *      든다 — 가입문항 머리말이 그 둘을 일부러 가른 자리라, 여기서 접으면 그 판단이 죽는다.
+ *
+ * ■ 값목록이 두 곳에 적히는 대가와 그 처방
+ *   정본은 `lib/가입문항.js` **하나**다. 이 파일은 그 사본이고, 사본은 갈라진다 — 갈라지는
+ *   방향은 언제나 「통과」다(코드는 새 아이막을 알고 DB 는 모르면, 그 학생의 가입만 조용히
+ *   거절된다). 그래서 회귀 `tests/가입문항.test.js` 가 **이 파일을 읽어** 세 목록을 글자
+ *   단위로 대조한다. 한쪽만 고치면 CI 가 빨개진다(L0스키마 회귀가 계약 JSON ↔ DDL 에 쓰는
+ *   것과 같은 형태 — 「목록은 하나에서 파생시키거나, 갈라지면 빨개지게 만든다」).
+ *
+ * ■ 계약을 안 바꾼다 — 그래서 `_c11` 을 이어 쓴다
+ *   새 값목록 0 · 새 열 0 · 새 표 0 · `learning_events` 0. **이미 있는 값목록을 물리로
+ *   내리는 것**뿐이라 앱이 보내는 것도 받는 것도 한 글자도 안 바뀐다. 판을 올리면 구앱이
+ *   426 이 된다(`radio_c10`·`season_c11` 선례와 같은 판단).
+ *
+ * 되돌림: alter table engine.learners
+ *           drop constraint if exists learners_home_aimag_c11,
+ *           drop constraint if exists learners_gender_c11,
+ *           drop constraint if exists learners_goal_track_c11;
+ *        delete from engine.schema_migrations where version = '20260812180000'; */
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260812180000';
+  migration_name constant text := '20260812180000_learner_profile_c11.sql';
+  expected_checksum constant text := '049957bcecd4d42b63f9301e880e7c7bccad7dc711b6ae368c2b27ac140b0b06'; -- migration-checksum
+  base_version constant text := '20260812170000';
+  recorded_checksum text;
+  어긋난행 text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 c11 위에서만 돈다 — engine.schema_migrations가 없다(빈 DB면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      '이 조각은 기준선 % 위에서만 돈다 — 이력에 그 판이 없다(부분·혼합·불명이라 중단한다)',
+      base_version;
+  end if;
+
+  /* 🔴 **먼저 이미 앉아 있는 값을 본다.** CHECK 는 목록 밖 행이 하나라도 있으면 판 전체를
+   *   중단시키는데, 그때 postgres 가 주는 말은 「제약 위반」뿐이라 **어느 학생의 어느 칸이
+   *   무슨 값인지**를 안 알려준다. 그 상태에서 할 수 있는 일은 손으로 찾는 것뿐이고, 그건
+   *   운영에서 유호님 앞이 막히는 자리다. 그래서 우리가 먼저 세어 이름을 대고 멈춘다.
+   *   ⚠ 정정 SQL 을 여기서 자동으로 돌리지 않는다 — 목록 밖 표기를 어느 아이막으로 옮길지는
+   *     **추정**이고, 추정으로 원본을 덮으면 그 학생의 값은 영원히 복원 불가가 된다. */
+  select string_agg(format('%s=%L', 칸, 값), ', ' order by 칸, 값) into 어긋난행
+    from (
+      select 'home_aimag' as 칸, home_aimag as 값 from engine.learners
+       where home_aimag is not null and home_aimag not in (
+         'ulaanbaatar', 'arkhangai', 'bayan-olgii', 'bayankhongor', 'bulgan', 'darkhan-uul',
+         'dornod', 'dornogovi', 'dundgovi', 'govi-altai', 'govisumber', 'khentii',
+         'khovd', 'khovsgol', 'omnogovi', 'orkhon', 'ovorkhangai', 'selenge',
+         'sukhbaatar', 'tov', 'uvs', 'zavkhan')
+      union all
+      select 'gender', gender from engine.learners
+       where gender is not null and gender not in ('female', 'male', 'undisclosed')
+      union all
+      select 'goal_track', goal_track from engine.learners
+       where goal_track is not null and goal_track not in ('study', 'work', 'culture')
+    ) 밖;
+
+  if 어긋난행 is not null then
+    raise exception
+      '목록 밖 값이 이미 앉아 있다: % — 무엇으로 옮길지는 추정이라 이 판이 대신 정하지 않는다(사람이 정한 뒤 다시 부어라)',
+      어긋난행;
+  end if;
+
+  /* 아이막 22 = 21 아이막 + 울란바토르. 정본 = `lib/가입문항.js` `아이막`.
+   * 🔑 묻는 것은 **「성장한 곳」**이지 지금 사는 곳이 아니다 — 억양이 굳는 자리라 그렇다.
+   *   그래서 이 칸은 이사로 바뀌지 않고, 스냅샷이 아니라 `learners` 열로 서는 것이 맞다
+   *   (`goal_track` 이 `goal_snapshot` 을 따로 필요로 한 것과 다른 성질이다). */
+  /* ⚠ `drop constraint if exists` 로 열지 않는다 — 두 이유가 겹친다.
+   *   ① 살아 있는 표에서 잠깐 제약이 없는 창이 생긴다(그 창에 들어온 값은 아무도 안 막는다).
+   *   ② `tests/L0스키마.test.js` 는 「뒤 조각이 drop 한 이름은 최종 상태에 없다」로 세므로,
+   *      drop 을 적으면 방금 세운 제약이 **없는 것으로 세어져** 회귀가 빨개진다(실측 08-12).
+   *   재실행 안전은 위 checksum 조기 반환 + 아래 존재 검사 두 겹으로 든다. */
+  if not exists (select 1 from pg_constraint
+                  where connamespace = to_regnamespace('engine')
+                    and conname = 'learners_home_aimag_c11') then
+    alter table engine.learners add constraint learners_home_aimag_c11
+      check (home_aimag is null or home_aimag in (
+        'ulaanbaatar', 'arkhangai', 'bayan-olgii', 'bayankhongor', 'bulgan', 'darkhan-uul',
+        'dornod', 'dornogovi', 'dundgovi', 'govi-altai', 'govisumber', 'khentii',
+        'khovd', 'khovsgol', 'omnogovi', 'orkhon', 'ovorkhangai', 'selenge',
+        'sukhbaatar', 'tov', 'uvs', 'zavkhan'));
+  end if;
+
+  /* 성별 — **분포 점검 전용**이고 학습 라벨이 아니다(L0 §9-2). 「이 엔진이 남학생 목소리에만
+   * 강한가」를 묻는 계기판이라, `undisclosed` 가 한 무리로 세어져도 목적은 달성된다. */
+  if not exists (select 1 from pg_constraint
+                  where connamespace = to_regnamespace('engine')
+                    and conname = 'learners_gender_c11') then
+    alter table engine.learners add constraint learners_gender_c11
+      check (gender is null or gender in ('female', 'male', 'undisclosed'));
+  end if;
+
+  /* 목적 — 같은 오류도 목적에 따라 처방이 다르다(발주_수집파이프라인 [CHK-4]).
+   * ⚠ 이 칸은 덮어쓰기 열이라 과거를 못 든다 — 그 자리는 `learning_events.goal_snapshot` 이
+   *   진다(c6). 여기서 막는 것은 「오늘의 목적이 목록 안인가」까지다. */
+  if not exists (select 1 from pg_constraint
+                  where connamespace = to_regnamespace('engine')
+                    and conname = 'learners_goal_track_c11') then
+    alter table engine.learners add constraint learners_goal_track_c11
+      check (goal_track is null or goal_track in ('study', 'work', 'culture'));
+  end if;
+
+  insert into engine.schema_migrations (version, name, checksum, applied_at)
+  values (migration_version, migration_name, expected_checksum, now());
+end
+$migration$;
+
+commit;
+
 -- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
---
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
 -- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -257,3 +410,31 @@ select case when 테이블수=14 and RLS켜짐=14 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
 from 셈;
+*/
+
+-- 확인
+-- ⓪ 🔴 **순서** — 이 조각은 `20260812170000_season_review_c11.sql` «뒤»에만 선다(base_version).
+--    그 앞의 c11 조각들이 아직 유호님 승인 대기라, 이 조각도 **같은 승인에 얹혀** 부어진다.
+--    먼저 부으면 base_version 검사가 「이력에 그 판이 없다」로 중단시킨다(안전 방향).
+-- ① 표 0 · RLS 0 · 정책 0 · 트리거 0 · 열 0 — **이 조각이 새로 만드는 것은 CHECK 셋뿐**이다.
+--    `테이블수`·`RLS켜짐`(14)·`삭제차단`(5)은 앞 조각 그대로다.
+-- ② 새 칸 `목록밖프로필` = **0** — 목록 밖 값이 앉은 학생 행 수다. CHECK 가 섰으면 앞으로
+--    0 이 유지되고, 이 수가 오르는 날은 제약이 빠진 날이다(그날이 표기가 섞이기 시작한 날).
+-- ③ 부을 때 목록 밖 값이 이미 있으면 판이 **이름을 대고 멈춘다**(`어긋난행`). 자동 정정은
+--    하지 않는다 — 어느 아이막으로 옮길지는 추정이고, 추정으로 원본을 덮으면 복원이 안 된다.
+-- ④ 코드 쪽 정본은 `lib/가입문항.js` 하나다. 이 파일은 사본이라 `tests/가입문항.test.js` 가
+--    **이 파일을 읽어** 세 목록을 글자 단위로 대조한다 — 한쪽만 고치면 CI 가 빨개진다.
+-- ⑤ CHECK 제약은 현행 접미사만 남아야 한다(이 조각이 c11 CHECK 셋을 더한다).
+--    ⚠ 이 줄은 **마지막 조각**이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    기대: broadcast_segment_kind_c11 · corrections_promotion_intent_c11
+--         · corrections_supersedes_not_self_c11 · corrections_verdict_c11
+--         · learners_gender_c11 · learners_goal_track_c11 · learners_home_aimag_c11
+--         · learners_signup_attempts_nonneg_c11 · learners_temp_password_paired_c11
+--         · learning_events_correction_target_c11 · learning_events_event_type_c11
+--         · learning_events_task_type_c11 · pipeline_jobs_discard_reason_c11
+--         · season_compass_answers_c11 · season_dates_c11
+--         · season_review_decided_c11 · season_review_self_c11 · season_review_verdict_c11
+--         · staff_role_c11 · submissions_due_paired_c11 · submissions_task_format_c11
+--         · submissions_translation_source_c11

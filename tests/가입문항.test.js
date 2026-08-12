@@ -134,3 +134,48 @@ test('🔴 왕복시험 두 도구가 세 값을 싣는다 — 안 실으면 첫
     assert.ok(/home_aimag:/.test(src) && /goal_track:/.test(src), `🔴 ${도구} 가 가입 문항을 안 싣는다`);
   }
 });
+
+// ── DB 가 같은 목록을 든다 (20260812180000_learner_profile_c11) ─────────────
+/* 왜 여기서 대조하나 — **정본은 `lib/가입문항.js` 하나이고 SQL 은 사본**이다.
+ * 사본은 갈라진다. 그리고 갈라지는 방향은 언제나 「통과」다: 코드가 새 아이막을 알고 DB 가
+ * 모르면 CI 는 초록인데 **그 학생의 가입만** 조용히 거절되고, 반대면 화면을 안 지나는 통로
+ * (SQL 콘솔·명부 적재·앞으로 설 다른 클라이언트)로 목록 밖 값이 그대로 앉는다.
+ * 앉는 순간이 이 칸이 죽는 순간이다 — 'ulaanbaatar' 와 'УБ' 가 한 열에 섞이면 어느 표기가
+ * 어느 아이막이었는지는 **나중에 아무도 못 정한다**(사람이 매핑하면 그건 복원이 아니라 추정).
+ * 그래서 목록을 하나로 합치지 못하는 이 자리는 「갈라지면 빨개지게」로 막는다
+ * (tests/L0스키마.test.js 가 계약 JSON ↔ DDL 에 쓰는 것과 같은 형태). */
+const 조각 = 읽기(path.join('supabase', 'migrations', '20260812180000_learner_profile_c11.sql'))
+  .replace(/\/\*[\s\S]*?\*\//g, '')   // 머리말·확인 블록의 예시 목록이 검사에 걸리면 자리가 흐려진다
+  .replace(/^\s*--.*$/gm, '');
+
+/** 그 CHECK 제약이 실제로 허용하는 값들. 못 찾으면 **실패**다 — 못 찾은 것을 빈 배열로 내면
+ *  제약이 통째로 사라진 날 이 검사가 「둘 다 비었으니 같다」로 초록이 된다. */
+function CHECK값(제약이름) {
+  const i = 조각.search(new RegExp(`constraint ${제약이름}\\s+check`));
+  assert.notEqual(i, -1, `🔴 조각에서 ${제약이름} 을 못 찾았다 — 제약이 빠졌거나 이름이 갈렸다`);
+  const 끝 = 조각.indexOf('));', i);
+  assert.notEqual(끝, -1, `${제약이름} 의 괄호가 안 닫힌다`);
+  return [...조각.slice(i, 끝).matchAll(/'([^']+)'/g)].map((m) => m[1]);
+}
+
+test('🔴 DB CHECK 세 개가 코드 값목록과 글자까지 같다 (갈라지면 그 학생의 가입만 조용히 거절된다)', () => {
+  assert.deepEqual(CHECK값('learners_home_aimag_c11'), 아이막.map((a) => a.값),
+    '🔴 아이막 목록이 코드와 DB 에서 갈렸다');
+  assert.deepEqual(CHECK값('learners_gender_c11'), 성별.map((g) => g.값),
+    '🔴 성별 목록이 갈렸다 — `undisclosed` 가 빠지면 「밝히지 않음」을 고른 학생이 거절된다');
+  assert.deepEqual(CHECK값('learners_goal_track_c11'), 목표.map((g) => g.값),
+    '🔴 목적 목록이 갈렸다');
+});
+
+test('🔴 조각이 부어지기 «전»에 목록 밖 값을 세어 이름을 대고 멈춘다 (제약 위반은 누구인지 안 알려준다)', () => {
+  assert.ok(/목록 밖 값이 이미 앉아 있다/.test(조각),
+    '🔴 선점검이 사라졌다 — 목록 밖 행이 하나라도 있으면 판이 「제약 위반」 한 줄만 남기고 죽는다');
+  assert.ok(!/update\s+engine\.learners/i.test(조각),
+    '🔴 조각이 값을 «고치고» 있다 — 어느 아이막으로 옮길지는 추정이고, 추정으로 원본을 덮으면 복원이 안 된다');
+});
+
+test('탐지력 픽스처 — 추출기가 죽으면 위 두 검사는 무엇이든 통과시킨다', () => {
+  const 원본 = 조각;
+  assert.ok(원본.includes("'ulaanbaatar'"), '조각 본문에서 값이 안 보인다 — 주석 제거가 너무 많이 먹었다');
+  assert.ok(CHECK값('learners_gender_c11').length === 3, '값 추출기가 개수를 못 센다');
+});
