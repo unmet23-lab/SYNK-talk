@@ -93,6 +93,16 @@ test('🔴 캐시 끊는 자리가 지시문이다 — 변하는 것이 전부 �
   assert.ok(!JSON.stringify(몸.system).includes('Lv2'), '급수가 캐시 접두 안에 들어갔다');
 });
 
+test('🔴 요청 — thinking 을 명시적으로 끈다(생략하면 sonnet-5 가 조용히 켠다)', () => {
+  /* sonnet-5 는 thinking 필드 생략 = adaptive thinking ON 이고(4.6 은 OFF — 조용한 기본값
+   * 변경), max_tokens 는 thinking+본문 합산 상한이다. 복합 오류 문장에서 생각이 1024를 다
+   * 먹으면 text 블록이 없는 응답이 와서 전부 「응답형식밖」이 된다 — 08-12 eval 실측 6문항.
+   * 증상이 원인과 안 닮았다(형식밖 ≠ 토큰 고갈): 이 필드가 지워지면 여기서만 잡힌다. */
+  const 몸 = 요청몸통({ 지시문: 'x', 문장: '안녕하세요', 급수: null });
+  assert.deepEqual(몸.thinking, { type: 'disabled' },
+    'thinking 이 명시적으로 꺼져 있지 않다 — 최대토큰 1024 의 전제(출력=JSON 만)가 깨진다');
+});
+
 test('응답글 — text 조각만 잇고, 모양 밖이면 null', () => {
   assert.equal(응답글({ content: [{ type: 'text', text: 'ㄱ' }, { type: 'text', text: 'ㄴ' }] }), 'ㄱㄴ');
   assert.equal(응답글({ content: [{ type: 'thinking', thinking: '속말' }] }), null);
