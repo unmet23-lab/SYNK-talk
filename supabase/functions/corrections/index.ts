@@ -39,10 +39,21 @@
  *     계약 개정 0 · 마이그레이션 0.
  *   🚫 막혔다고 목록을 비우지 않는다 — 그러면 「교정이 아직 없다」와 「막혔다」가 같은 모양이 되고,
  *     C0 §4-3 ② 의 「빈 카드 금지」 때문에 화면 자체가 안 떠 학생은 이유를 영영 못 듣는다.
+ *
+ * ■ 🔴 `growth_note` — 알아낸 것을 학생에게 돌려주는 **꼬리 한 줄** (2026-08-12 · 유호님 확정)
+ *   철학 Ⅱ-8 둘째 실물이다. **서버가 짓는다 — 앱이 아니다**: 앱이 지으려면 기기에 `error_tags`
+ *   이력을 쌓아야 하는데 이 앱은 그걸 안 하고(조회는 사건을 안 만든다) 기기를 바꾸면 사라진다.
+ *   서버는 그 이력을 이미 갖고 있어 **재료가 0**이다.
+ *   🔑 **또 하나의 「응답 필드를 늘리는 것은 판올림이 아니다」다** — 위 `confirmed_at`(:15)·
+ *     `blocked`(:38) 과 같은 판정이라 **계약 개정 0 · 마이그레이션 0**. 저장 열로 만들면 ①정본이
+ *     둘이 되고(검수자가 옛 태그를 고치는 날 저장된 꼬리만 낡는다) ②계약 판올림 c12 가
+ *     appsscript `SCHEMA_VER` 손사본까지 끌고 가 이 트랙이 지금 막힌 clasp 배포 사슬에 묶인다.
+ *   🔑 판정은 `lib/꼬리.js` **하나**에 있고 이 파일은 재료만 뜬다(회귀 = `tests/꼬리.test.js`).
  */
 import postgres from 'npm:postgres@3.4.4';
 import 토큰모듈 from './토큰.mjs';
 import 동의모듈 from './동의게이트.mjs';
+import 꼬리모듈 from './꼬리.mjs';
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
 
@@ -60,6 +71,13 @@ const { 발급시각, 살아있는학생 } = 토큰모듈 as {
 const { 지금유효, 거절몸통 } = 동의모듈 as {
   지금유효: (sql: unknown, learner_id: string) => Promise<Array<{ consent_ver: string }>>;
   거절몸통: { code: string; field: string; retryable: boolean };
+};
+
+/* 꼬리 — 판정은 `lib/꼬리.js` 하나다(여기 다시 적지 않는다 · 「네 곳에 네 가지」와 같은 축).
+ * 이 파일이 지는 몫은 **재료를 정확히 떠 오는 것**뿐이다. */
+const { 줄들 } = 꼬리모듈 as {
+  줄들: (교정들: Array<{ correction_id: string; error_tags: string[] }>)
+    => Map<string, { 종류: string; 자리: string | null; 글: string }>;
 };
 
 const 계약판 = /^c(\d+)$/;
@@ -171,6 +189,30 @@ Deno.serve(async (req: Request) => {
        order by c.created_at desc, c.correction_id desc
        limit ${쪽크기 + 1}`;
 
+    /* 🔴 **꼬리 재료 — 그 학생 교정 «전량»의 태그만** (철학 Ⅱ-8 둘째 실물 · `lib/꼬리.js`).
+     *   걷는 길은 위 목록과 **같은 사슬**이다(corrections → submissions → learning_events) —
+     *   학생은 토큰에서 오고 쿼리로 지정할 수 없다.
+     * 🔑 **자르지 않는다.** 최근 N건으로 좁히면 꼬리의 「처음이에요」가 **창 안의 처음**이 되어
+     *   학생에게 거짓이 나가는데, 자른 쪽이 더 조용하다(조용한 상한은 통과와 같은 모양으로 온다).
+     *   뜨는 것은 `error_tags` 두 칸뿐이라 행이 쌓여도 가볍고, 정말 무거워지는 날의 처방은
+     *   자르기가 아니라 집계를 SQL 로 내리는 것이다.
+     * 🔑 **표시에서 걸러진 행도 넣는다** — 태그가 빈 행은 `lib/꼬리.js` 가 「판정 안 함」으로
+     *   분자·분모 양쪽에서 빼므로 무해하고, 여기서 미리 거르면 거르는 규칙이 두 곳에 산다.
+     * 🔑 정렬 tiebreak 을 위 목록의 **역순과 같게** 둔다 — 같은 밀리초에 둘이 서면 이력 순서가
+     *   갈려 「직전」의 뜻이 목록과 어긋난다. */
+    const 이력행 = await sql`
+      select c.correction_id, c.error_tags
+        from engine.corrections c
+        join engine.submissions s on s.submission_id = c.submission_id
+        join engine.learning_events e on e.event_id = s.event_id
+       where e.learner_id = ${행.learner_id}::uuid
+       order by c.created_at asc, c.correction_id asc`;
+
+    const 꼬리표 = 줄들(이력행.map((r: Record<string, unknown>) => ({
+      correction_id: String(r.correction_id),
+      error_tags: (Array.isArray(r.error_tags) ? r.error_tags : []) as string[],
+    })));
+
     const 다음있음 = 행들.length > 쪽크기;
     const data = 행들.slice(0, 쪽크기).map((r: Record<string, unknown>) => ({
       correction_id: r.correction_id,
@@ -184,6 +226,18 @@ Deno.serve(async (req: Request) => {
        *   딸리는 한 줄이라 `corrected_text`·`error_tags` 없이 홀로 서는 행은 설계에 없다.
        *   넣으면 강사가 판정만 남긴 골든셋 행이 해설 한 줄만 든 카드로 학생 화면에 뜬다. */
       explanation: r.explanation ?? null,
+      /* 🔴 **꼬리 한 줄** — 「알아낸 것은 학생에게 돌려준다」(철학 Ⅱ-8 둘째 실물 · 유호님 확정
+       *   2026-08-12 「서버에서 짓자」). 저장 열이 아니라 **응답 필드**다 — 위 `confirmed_at`·
+       *   `blocked` 과 같은 판정(계약 개정 0 · 마이그레이션 0 · 앱은 모르는 칸을 지나친다).
+       *   꼬리는 새 사실이 아니라 이미 쌓인 `error_tags` 이력을 읽어 낸 말이라, 저장하면 정본이
+       *   둘이 되고 검수자가 옛 태그를 고치는 날 저장된 꼬리만 낡는다.
+       * 🔑 `lang` 을 같이 준다 — 앱은 이 값으로 **글꼴만** 고른다(키릴 자형이 킷 폰트에 없다 ·
+       *   `explanation` 이 이미 그 자리를 판 이유와 같다). 몽골어 검수가 서는 날 **서버만** 바뀐다.
+       *   지금은 검수자 1인이 이 문구를 아직 안 봐서 `ko` 뿐이다 — 지어내지 않는다(`나침반화면` 규칙).
+       * 🔴 **없으면 `null` 이고, `null` 이면 앱이 안 그린다**(해설 칸과 같은 규칙). */
+      growth_note: 꼬리표.has(String(r.correction_id))
+        ? { text: 꼬리표.get(String(r.correction_id))!.글, lang: 'ko' }
+        : null,
       actor_kind: r.actor_kind,
       confirmed_at: r.confirmed_at,
     }));
