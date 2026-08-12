@@ -65,6 +65,7 @@ test('목록이 낡지 않았다 — 같은 조각이 골격 안에는 실제로
 const 스코프도구 = [
   { 파일: '배달왕복시험.js', 최소: 4 },   // deliver·tasks·corrections·progress
   { 파일: '골든왕복시험.js', 최소: 1 },   // teach 하나(픽스처는 SQL · 성적표는 DB 직독)
+  { 파일: 'eval-run.js', 최소: 1 },        // correct 하나(평가 통로는 DB 무접촉이라 다른 함수를 안 부른다)
 ];
 
 for (const { 파일, 최소 } of 스코프도구) {
