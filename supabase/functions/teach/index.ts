@@ -1229,6 +1229,27 @@ async function 내반목록(staff_id: string, ver: string) {
   }, ver);
 }
 
+/**
+ * 큐 한 항목이 실을 **판정의 재료** 다섯 칸.
+ *
+ * 🔑 함수로 뺀 이유는 모양이 아니라 **기본값이 한 자리**여서다 — 재료 행이 없을 때(있어선 안
+ *   되는 상태) 화면이 받는 것은 `undefined` 가 아니라 `null` 다섯이라 카드가 「빈 칸」으로 서고,
+ *   그 기본값을 호출부마다 적으면 한 곳이 빠지는 날 그 칸만 `undefined` 로 사라진다.
+ * 🔴 **둘을 안 접는다**(`coalesce` 로 한 칸에 담지 않는다) — 쓰기의 원문과 말하기의 「들린 대로」는
+ *   확신의 결이 다르다. 접으면 화면이 기계가 «들은» 문장을 학생이 «쓴» 문장이라고 말하게 되고,
+ *   강사는 그 오차를 학생의 실수로 읽는다.
+ */
+function 재료칸(내: Record<string, unknown> | undefined) {
+  const v = 내 ?? {};
+  return {
+    body_original: v.body_original ?? null,
+    transcript: v.transcript ?? null,
+    ai_corrected_text: v.ai_corrected_text ?? null,
+    ai_explanation: v.ai_explanation ?? null,
+    ai_error_tags: v.ai_error_tags ?? null,
+  };
+}
+
 /* ── GET /v1/teach/feedback/queue?class_id= ──────────────────────────────── */
 
 async function 반큐읽기(url: URL, staff_id: string, ver: string) {
@@ -1252,6 +1273,46 @@ async function 반큐읽기(url: URL, staff_id: string, ver: string) {
 
     const 항목들 = await 기다림질의(tx, staff_id, class_id) as unknown as Array<Record<string, unknown>>;
 
+    /* 🔴 **판정의 재료** — 술어가 고른 id 로만 한 번 더 훑는다.
+     *   설계 §5 ③ 은 「학생이 쓴 문장」을 화면에 놓는데 §4 의 통로는 그것을 안 줬다(짓기 전
+     *   실측에서 드러난 자리다). 학생이 낸 글도, AI 가 이미 낸 교정도 없이 「한 마디」를 쓰라는
+     *   화면은 강사가 쓸 수 없는 화면이다 — 재료 없는 판정 칸은 안 쓰이고, 안 쓰이는 칸의
+     *   라벨 생산량은 0이다.
+     *
+     * 🔑 **술어(`기다림질의`)에 열을 더하지 않는다.** 그 함수는 카드의 셈(`feedback/classes`)과
+     *   같이 쓰는 하나뿐인 정의고, 거기에 본문을 매달면 카드 한 장 그리려고 **내 반 전체의
+     *   대기 글을** 끌어온다(화면 어디에도 안 쓰인다). 여기서 갈리는 것은 «무엇을 고르나»가
+     *   아니라 «고른 것의 무엇을 싣나»라 두 벌이 되지 않는다 — 정본은 그대로 하나다.
+     *
+     * 🔑 AI 행이 여럿이면 **가장 최근 것**(`review_queue` 의 lateral 과 같은 규칙 —
+     *   `20260809050000_review_c10.sql:152`). 규칙을 여기서 새로 정하지 않는다.
+     * ⚠ `inner` 다 — 술어 ① 이 이미 「AI 교정이 났다」를 보장하므로 0행이 나오면 그건 그 사이
+     *   행이 사라진 것이지 정상 상태가 아니다. `left` 로 덮으면 그 사고가 「빈 칸」으로 보인다.
+     * 🚫 `model`·`prompt_ver` 는 안 싣는다 — 골든 큐가 안 싣는 것과 **같은 축**이다(:202 회귀).
+     *   같은 사람이 이 화면을 보고 그 주 골든을 판정한다.
+     * ⚠ 검수 판(`review_queue`)이 `body_original` 을 일부러 뺀 것과 갈리는 자리다: 그쪽 소비자는
+     *   이름을 못 보는 **검수자**이고, 이 응답은 이미 `display_name`·`student_code` 를 싣는
+     *   **담임 강사**다. 같은 열이라도 받는 사람이 다르면 같은 판정이 아니다. */
+    const ids = 항목들.map((r) => String(r.submission_id));
+    const 내용 = ids.length
+      ? await tx`
+          select s.submission_id, s.body_original, s.transcript,
+                 ai.corrected_text as ai_corrected_text,
+                 ai.explanation    as ai_explanation,
+                 ai.error_tags     as ai_error_tags
+            from engine.submissions s
+            join lateral (
+                   select c.corrected_text, c.explanation, c.error_tags
+                     from engine.corrections c
+                    where c.submission_id = s.submission_id
+                      and c.actor_kind = 'ai'
+                    order by c.created_at desc
+                    limit 1
+                 ) ai on true
+           where s.submission_id = any(${ids}::uuid[])` as unknown as Array<Record<string, unknown>>
+      : [];
+    const 내용별 = new Map(내용.map((r) => [String(r.submission_id), r]));
+
     /* ⚠ 0건도 감사 1행. 단위는 **학생**이다 — 「이 반에서 내가 누구를 봤나」가 그 축이다. */
     const 학생들 = [...new Set(항목들.map((r) => String(r.learner_id)))];
     await tx`
@@ -1271,6 +1332,7 @@ async function 반큐읽기(url: URL, staff_id: string, ver: string) {
         task_type: r.task_type,
         task_format: r.task_format ?? null,
         occurred_at: r.occurred_at,
+        ...재료칸(내용별.get(String(r.submission_id))),
       })),
     };
   });

@@ -347,3 +347,106 @@ test('🚫 나침반 답을 사건으로 흘리지 않는다 — 새 event_type 
 test('⑧ ⏳ 관찰 경로는 아직 없다 — 유호님 계약 판정 전에 짓지 않는다', () => {
   assert.ok(!소스.includes('observe'), 'observe 경로가 생겼다 — 계약 판정(observation.noted)이 선행이다');
 });
+
+/* ── ⑨ 반 큐가 «판정의 재료»를 싣는다 (§8-4 화면이 요구한 것) ──────────── */
+
+/** `반큐읽기` 한 함수만 잘라 본다 — 끝을 다음 함수로 못박는다(🚫 나침반 답 검사와 같은 사유:
+ *  파일 끝까지 자르면 뒤 함수를 이 함수가 한 일로 읽고 거짓 적색을 낸다 · F287 계열). */
+function 반큐구간() {
+  const i = 소스.indexOf('async function 반큐읽기');
+  assert.ok(i > 0, '반큐읽기 함수를 못 찾았다 — 아래 검사가 통째로 미실행이다');
+  const 다음 = 소스.indexOf('\nasync function ', i + 1);
+  assert.ok(다음 > i, '반큐읽기의 끝 앵커를 못 찾았다 — 이 검사가 미실행이다');
+  return 소스.slice(i, 다음);
+}
+
+/** 재료 조회(술어가 고른 id 로만 훑는 질의) 한 벌 — 공백을 접어 돌려준다.
+ *  🔑 앵커를 못 찾으면 **던진다**(조용히 빈 문자열을 주면 이 검사가 통과 모양으로 미실행된다). */
+function 재료질의() {
+  const m = /select s\.submission_id[\s\S]*?any\(\$\{ids\}::uuid\[\]\)/.exec(반큐구간());
+  assert.ok(m, '재료 조회를 못 찾았다 — 아래 검사가 통째로 미실행이다');
+  return m[0].replace(/\s+/gu, ' ');
+}
+
+test('⑨ 재료 «질의»가 학생 글과 AI 교정을 실제로 뽑는다', () => {
+  /* 🔴 설계 §5 ③ 은 「학생이 쓴 문장」을 화면에 놓는데 §4 의 통로는 그것을 안 줬다(§8-4 착수
+     전 실측에서 드러난 자리다). 재료 없는 판정 칸은 안 쓰이고, 안 쓰이는 칸의 생산량은 0이다.
+     🔑 **질의와 응답을 갈라 잰다**(2026-08-12 변이 실측): 이름만 훑으면 select 목록에서 열을
+     지워도 응답 조립부의 같은 이름이 검사를 초록으로 만든다 — 그때 증상은 오류가 아니라
+     **모든 항목이 null**, 즉 「AI 교정 카드가 통째로 안 뜬다」라 아무 데도 안 빨개진다. */
+  const 질의 = 재료질의();
+  for (const 칸 of ['s.body_original', 's.transcript',
+    'ai.corrected_text as ai_corrected_text',
+    'ai.explanation as ai_explanation',
+    'ai.error_tags as ai_error_tags']) {
+    assert.ok(질의.includes(칸), `재료 질의가 ${칸} 을 안 뽑는다 — 그 칸이 통째로 null 이 된다`);
+  }
+});
+
+test('⑨ 재료 «응답»이 그 다섯 칸을 싣는다 — 뽑고 안 실으면 화면엔 없는 것과 같다', () => {
+  /* 🔑 사슬이 둘이라 둘 다 본다: ⓐ `재료칸` 이 다섯을 «만드나» ⓑ 항목 조립이 그것을 «펴나».
+     ⓑ 만 보면 헬퍼가 비어도 초록이고, ⓐ 만 보면 헬퍼가 아무 데도 안 불려도 초록이다. */
+  const i = 소스.indexOf('function 재료칸');
+  assert.ok(i > 0, '재료칸을 못 찾았다 — 이 검사가 미실행이다');
+  const 끝 = 소스.indexOf('\n}\n', i);
+  assert.ok(끝 > i, '재료칸의 끝을 못 찾았다 — 이 검사가 미실행이다');
+  const 헬퍼 = 소스.slice(i, 끝);
+  for (const 칸 of ['body_original', 'transcript', 'ai_corrected_text', 'ai_explanation', 'ai_error_tags']) {
+    assert.match(헬퍼, new RegExp(`${칸}:`), `재료칸이 ${칸} 을 안 만든다 — 화면이 그 칸을 못 그린다`);
+    /* 🔴 기본값을 **한 자리**에 둔다 — 재료 행이 없을 때 `undefined` 가 나가면 그 칸은 응답에서
+       통째로 사라지고, 「AI 교정이 아직 없다」와 「서버가 안 실었다」가 같은 모양이 된다. */
+    assert.match(헬퍼, new RegExp(`${칸}: v\\.${칸} \\?\\? null`), `${칸} 의 기본값이 null 이 아니다`);
+  }
+  const 조립 = 반큐구간().slice(반큐구간().indexOf('items: 항목들.map'));
+  assert.ok(조립.length > 0, '응답 조립부를 못 찾았다 — 이 검사가 미실행이다');
+  assert.match(조립, /\.\.\.재료칸\(/, '항목이 재료칸을 안 편다 — 헬퍼가 서 있어도 응답엔 없다');
+});
+
+test('⑨ 학생글과 전사를 «한 칸으로 접지 않는다» — coalesce 0', () => {
+  /* 🔴 쓰기의 원문과 말하기의 전사는 확신의 결이 다르다. 접으면 화면이 기계가 «들은» 문장을
+     학생이 «쓴» 문장이라고 말하게 되고, 강사는 그 오차를 학생의 실수로 읽는다. */
+  const 본문 = 반큐구간();
+  assert.ok(!/coalesce\s*\(\s*s?\.?body_original/i.test(본문), '학생글과 전사를 coalesce 로 접었다');
+});
+
+test('⑨ 술어(`기다림질의`)에 본문 열을 안 매단다 — 카드 셈이 대기 글을 통째로 끌어온다', () => {
+  /* 🔑 `기다림질의` 는 카드의 셈(`feedback/classes`)과 목록이 **같이 쓰는 하나뿐인 정의**다.
+     거기에 본문을 매달면 카드 한 장 그리려고 내 반 전체의 대기 글을 끌어오고, 그건 화면
+     어디에도 안 쓰인다. 재료는 술어가 «고른 뒤» 그 id 로만 훑는다. */
+  const i = 소스.indexOf('function 기다림질의');
+  assert.ok(i > 0, '기다림질의를 못 찾았다 — 이 검사가 미실행이다');
+  const 다음 = 소스.indexOf('\nasync function ', i + 1);
+  const 술어 = 소스.slice(i, 다음 > i ? 다음 : undefined);
+  for (const 칸 of ['body_original', 'transcript', 'corrected_text', 'explanation']) {
+    assert.ok(!술어.includes(칸), `술어가 ${칸} 을 뽑는다 — 카드 셈이 그 글을 통째로 끌어온다`);
+  }
+});
+
+test('⑨ AI 행 고르기 규칙이 `review_queue` 와 «같다» — 여기서 새로 정하지 않는다', () => {
+  /* 두 곳이 각자 「어느 AI 행인가」를 정하면 검수 화면과 강사 화면이 **다른 문장**을 보고,
+     갈린 증상은 「선생님이 본 교정이랑 다른데요」라 아무 데도 안 남는다. */
+  const 본문 = 반큐구간();
+  assert.match(본문, /order by c\.created_at desc\s*\n?\s*limit 1/, 'AI 행 선택이 「가장 최근」이 아니다');
+  assert.match(본문, /c\.actor_kind = 'ai'/, 'AI 행을 actor_kind 로 안 가른다');
+  const 마이그 = fs.readFileSync(
+    path.join(뿌리, 'supabase', 'migrations', '20260809050000_review_c10.sql'), 'utf8');
+  assert.match(마이그, /order by c\.created_at desc/, '대조 대상(review_queue)의 규칙이 바뀌었다 — 둘을 다시 맞춘다');
+});
+
+test('⑨ 반 큐도 model·prompt_ver 를 안 싣는다 — 골든 큐와 «같은 축»이다', () => {
+  /* 🔴 같은 사람이 이 화면을 보고 그 주 골든을 판정한다. 여기서 모델명이 새면 골든 큐가
+     안 싣는 것(:202)이 무의미해진다 — 새는 방향이 「통과」인 자리는 두 문을 같이 잠근다. */
+  const 본문 = 반큐구간();
+  for (const 칸 of ['c.model', 'c.prompt_ver', 'ai_model', 'ai_prompt_ver']) {
+    assert.ok(!본문.includes(칸), `반 큐가 ${칸} 을 싣는다`);
+  }
+});
+
+test('⑨ 재료 조회가 큐 읽기와 «같은 트랜잭션»이다 — 감사 1행과 함께 선다', () => {
+  const 본문 = 반큐구간();
+  const b = 본문.indexOf('sql.begin');
+  assert.ok(b > 0, '반큐읽기가 트랜잭션을 안 연다');
+  assert.ok(본문.indexOf('ai_corrected_text') > b, '재료 조회가 트랜잭션 밖이다');
+  assert.ok(본문.indexOf("'teach.feedback.queue'") > b, '감사가 트랜잭션 밖이다');
+  assert.ok(본문.slice(b).indexOf('sql.begin', 1) === -1, '트랜잭션이 둘로 갈렸다');
+});
