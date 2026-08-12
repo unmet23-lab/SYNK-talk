@@ -1,11 +1,153 @@
--- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
+-- 「반」을 물리로 세운다 — 강사 반 단위 피드백의 §8-1 조각
 --
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 정본 = SYNK-talk `docs/강사_반단위_피드백_설계.md` v2 §3 (유호님 신규 지시 2026-08-12
+--   「반을 보기 쉽게 정해서 해당 반에 들어가서 피드백하기 쉽도록」).
+-- 이 조각이 세우는 것은 **착수 순서 ①뿐**이다 — 표 2 + 칸 1. §8-3 `teach` 라우트·§8-4 화면은
+--   여기 없다(자리를 미리 파 두면 「이미 있다」가 되어 배선 없는 표가 남는다).
+--
+-- 🔴 파일 이름이 **c12 가 아니라 c11 인 이유** — 설계 문서는 「c12 조각」이라 적었지만 그건
+--   이름 오류다. 네 Edge Function(auth·events·uploads·deliver)이 계약판을 **최신 조각 이름**에서
+--   읽고(`tests/마이그레이션이름.test.js`), 제약 이름의 접미는 `계약/수집_교정_계약.json` 의
+--   `버전`에서 파생된다(`tests/L0스키마.test.js` 의 `제약()`). 이 조각은 계약을 **안 바꾼다**:
+--   새 `event_type` 0 · 새 값목록 0 · `learning_events` 0. 그래서 계약판은 c11 그대로이고,
+--   파일 이름을 c12 로 올리면 이름과 계약 파일이 갈려 제약 접미가 어느 쪽을 따르는지 알 수 없게
+--   된다. `season_c11`·`season_review_c11`·`learner_profile_c11` 셋이 `engine_c11` 뒤에 c11 을
+--   그대로 이어 쓴 것과 같은 판단이다.
+--
+-- ■ 왜 `class_name` 한 칸이 아니라 표 둘인가 (설계 §3)
+--   시즌(교재 1권, 약 2달)마다 반이 재편된다. `learners.class_name text` 한 칸이면 재편되는 날
+--   과거 행과 계보가 끊긴다 — `corrections` 에 이름 문자열 대신 `staff_id` 를 적기로 한 것과
+--   같은 이유다. 그리고 `staff_classes` 가 없으면 「자기 반」이라는 말이 정의되지 않아 **모든
+--   강사가 전교생 큐를 본다** — 유호님 지시의 정반대다.
+--
+-- ■ 왜 PK 가 `class_key` 가 아닌가 — 그 키는 **시즌을 넘어 재사용된다**
+--   `평일11A` 는 「평일 11시 A실」이라는 **좌표**이지 학생 무리의 정체성이 아니다. 다음 시즌 같은
+--   슬롯에 다른 무리가 앉으면 같은 키에 다른 반이 온다. 그래서 `class_id`(정체성) ·
+--   `class_key`(좌표) · `season_id`(언제) 셋을 나눈다. ⚠ 그래도 `class_key` 를 **버리지 않는다** —
+--   시트와 원본을 대조하는 유일한 자연키이고, 없으면 다리가 어긋난 날 증상이 「조용함」뿐이다.
+--
+-- ■ 유일성을 제약이 아니라 **부분 인덱스 둘**로 거는 이유
+--   `unique (class_key, season_id)` 하나로는 못 막는다 — Postgres 유일 제약은 NULL 을 서로 다른
+--   값으로 보므로 `season_id is null`(아직 시즌이 없는 미개원 상태)에서 같은 키가 **몇 벌이든**
+--   들어온다. 그 상태가 정확히 지금이라, 제약 하나로 두면 이 표는 태어나는 날부터 안 지켜진다.
+--   그래서 시즌 안(`season_id is not null`)과 시즌 밖(`is null`)을 갈라 각각 건다.
+--
+-- ■ `active` 없이 만들지 않는다
+--   지난 시즌 반은 지우는 게 아니라 닫는다 — 과거 행의 FK 가 살아야 한다. 그래서 삭제 경로를
+--   기본(NO ACTION)으로 두어, 학생이 매달린 반은 **지우려 하면 DB 가 막는다**.
+--
+-- ■ 채우는 코드는 이 조각에 0줄이다 — 정직 표기
+--   생산자 = `functions/roster-ingest`(시트 5열 `class_name` → `engine.classes` upsert →
+--   `learners.class_id`)이고 이 조각과 **같은 커밋**에 선다. 「표가 섰다」를 「반이 돈다」로
+--   읽지 않는다(엔진도달 §5 확인 ③).
+--   ⚠ 아직 **없는 것**을 여기 적어 둔다: 시즌이 넘어갈 때 지난 시즌 반을 `active=false` 로
+--     닫는 일감(시즌 롤오버)은 이 조각에도, 어디에도 없다. 첫 시즌이 끝나기 전에 서야 한다.
+--
+-- ■ 강사↔반 배정은 시트에 없다
+--   「이 반을 누가 가르치나」가 운영 시트 어디에도 없다. 그건 원장 화면의 입력 칸 하나가 맞다 —
+--   반 수가 한 자릿수~24라 사람이 눌러도 철학 ㉡ 위반이 아니다(**판단이 필요한 자리**다).
+--   그래서 이 표는 물리만 세우고 채우는 통로는 §8-3 에서 선다.
+--
+-- 되돌림: alter table engine.learners drop column if exists class_id;
+--        drop table if exists engine.staff_classes;
+--        drop table if exists engine.classes;
+--        delete from engine.schema_migrations where version = '20260812200000';
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260812200000';
+  migration_name constant text := '20260812200000_class_c11.sql';
+  expected_checksum constant text := '01e6ba27c02fbcc305cb90642f3e1f9c06c1d5e87bc815d4e000ae590b65e2e4'; -- migration-checksum
+  base_version constant text := '20260812180000';
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 c11 위에서만 돈다 — engine.schema_migrations가 없다(빈 DB면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      '이 조각은 기준선 % 위에서만 돈다 — 이력에 그 판이 없다(부분·혼합·불명이라 중단한다)',
+      base_version;
+  end if;
+
+  if to_regclass('engine.season') is null then
+    raise exception
+      'engine.season 이 없다 — 반은 시즌에 매달린다(20260812140000_season_c11 이 먼저 서야 한다)';
+  end if;
+
+  -- ① 반 — 정체성(class_id) · 좌표(class_key) · 언제(season_id)를 나눠 든다.
+  --    `season_id` 가 null 인 행 = 「시즌 밖」이다. 미개원 지금이 그 상태이고, 첫 시즌이
+  --    열리면 그 시즌의 반은 **새 행**으로 선다(같은 좌표라도 다른 무리다 · 위 머리말).
+  create table if not exists engine.classes (
+    class_id     uuid primary key default gen_random_uuid(),
+    class_key    text not null constraint classes_key_nonblank_c11 check (btrim(class_key) <> ''),
+    season_id    uuid references engine.season(season_id),
+    display_name text,
+    active       boolean not null default true,
+    created_at   timestamptz not null default now(),
+    schema_ver   text not null
+  );
+
+  -- 🔴 유일성 — 제약 하나로 못 건다(머리말 참고). 시즌 안과 밖을 갈라 각각 건다.
+  --    이게 없으면 명부 스윕이 같은 반을 매 판 새로 만들고, 학생마다 다른 class_id 가 붙어
+  --    「내 반」이 갈라진다 — 증상은 「강사 큐에 학생이 몇 명 없다」뿐이라 조용하다.
+  create unique index if not exists classes_key_in_season
+    on engine.classes (class_key, season_id) where season_id is not null;
+  create unique index if not exists classes_key_no_season
+    on engine.classes (class_key) where season_id is null;
+
+  -- ② 학생이 어느 반인가 — **null 이 정상 상태**다.
+  --    아직 반이 안 정해진 학생은 있고(등록은 했는데 배정 전), 그 학생도 앱은 써야 한다.
+  --    `if not exists` 를 쓰지 않는 것은 위 이력 판정이 「이 판은 아직」을 이미 못박았기
+  --    때문이다 — 칸이 이미 있다면 이력과 실물이 어긋난 상태이고 조용히 넘기지 않는다.
+  --    삭제 경로는 기본(NO ACTION)이다: 학생이 매달린 반은 지우려 하면 DB 가 막는다.
+  alter table engine.learners
+    add column class_id uuid references engine.classes(class_id);
+
+  -- ③ 강사↔반 — 「자기 반」의 정의. 이 표가 없으면 권한이 화면 규약이 되고, 화면 규약은
+  --    서버가 안 지킨다. `staff_id` 는 감사가 사람을 가리키는 안정 키다(계정이 다시 서도 잇는다).
+  create table if not exists engine.staff_classes (
+    staff_id    uuid not null references engine.staff(staff_id),
+    class_id    uuid not null references engine.classes(class_id),
+    assigned_at timestamptz not null default now(),
+    schema_ver  text not null,
+    primary key (staff_id, class_id)
+  );
+
+  -- engine 취급 그대로 — RLS 켜고 정책 0(전면 거부) · service_role 만 쓰기 · PostgREST 비노출.
+  -- 나중에 노출하는 날 잊어도 **닫힌 채로 실패한다**.
+  alter table engine.classes       enable row level security;
+  alter table engine.staff_classes enable row level security;
+
+  insert into engine.schema_migrations(version, name, checksum)
+  values (migration_version, migration_name, expected_checksum);
+end
+$migration$;
+
+commit;
+
 -- ============================================================================
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
+-- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -280,3 +422,35 @@ select case when 테이블수=16 and RLS켜짐=16 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
 from 셈;
+*/
+
+-- 확인
+-- ⓪ 🔴 **순서** — 이 조각은 `20260812180000_learner_profile_c11.sql` «뒤»에만 선다(base_version).
+--    그 앞의 c11 조각들이 아직 유호님 승인 대기라, 이 조각도 **같은 승인에 얹혀** 부어진다.
+--    먼저 부으면 base_version 검사가 「이력에 그 판이 없다」로 중단시킨다(안전 방향).
+-- ① 표 **+2**(`classes`·`staff_classes`) · RLS **+2** · 정책 0 · 트리거 0 · 열 +1(`learners.class_id`).
+--    `삭제차단`(5)은 앞 조각 그대로다 — 이 조각의 고리는 learners 를 «가리키지» 않는다.
+-- ② 새 칸 `겹친반좌표` = **0** · `반좌표유일` = **2**. 뒤엣것이 2 가 아니면 유일성이 물리가
+--    아니고, 그러면 앞엣것의 0 은 「지켜졌다」가 아니라 「아직 안 겹쳤다」일 뿐이다.
+--    두 칸을 함께 읽는다 — 하나만 보면 미설치와 준수가 같은 모양이다.
+-- ③ 이 조각은 **행을 하나도 안 만든다**. `engine.classes` 는 명부 스윕(`roster-ingest`)이
+--    시트 5열에서 채우고, `engine.staff_classes` 는 §8-3 원장 화면이 채운다 — 지금 둘 다 0행이
+--    정상이다. 「표가 섰다」를 「반이 돈다」로 읽지 않는다.
+-- ④ 🔴 아직 **없는 것** — 시즌 롤오버(지난 시즌 반을 `active=false` 로 닫기)는 어디에도 없다.
+--    첫 시즌이 끝나기 전에 서야 하고, 안 서면 반 목록이 시즌마다 누적된다.
+-- ⑤ CHECK 제약은 현행 접미사만 남아야 한다(이 조각이 c11 CHECK 하나를 더한다).
+--    ⚠ 이 줄은 **마지막 조각**이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--      📏 실측 2026-08-12: 이 조각을 짓다 정확히 그걸 밟았다(위 ⓪의 파일명이 잡혔다).
+--    기대: broadcast_segment_kind_c11 · classes_key_nonblank_c11
+--         · corrections_promotion_intent_c11
+--         · corrections_supersedes_not_self_c11 · corrections_verdict_c11
+--         · learners_gender_c11 · learners_goal_track_c11 · learners_home_aimag_c11
+--         · learners_signup_attempts_nonneg_c11 · learners_temp_password_paired_c11
+--         · learning_events_correction_target_c11 · learning_events_event_type_c11
+--         · learning_events_task_type_c11 · pipeline_jobs_discard_reason_c11
+--         · season_compass_answers_c11 · season_dates_c11
+--         · season_review_decided_c11 · season_review_self_c11 · season_review_verdict_c11
+--         · staff_role_c11 · submissions_due_paired_c11 · submissions_task_format_c11
+--         · submissions_translation_source_c11

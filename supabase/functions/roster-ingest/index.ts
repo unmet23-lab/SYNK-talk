@@ -47,17 +47,18 @@ import 학생계정 from './학생계정.mjs';
 import 로그인코드 from './로그인코드.mjs';
 import 계약 from './수집_교정_계약.json' with { type: 'json' };
 
-const { 머리글자리, 표읽기, 행별가르기, 계획 } = 명부규칙 as {
+const { 머리글자리, 표읽기, 행별가르기, 반미배정, 계획 } = 명부규칙 as {
   머리글자리: (표: string[][]) => { 오류: string[] };
   표읽기: (표: string[][]) => {
-    행들: Array<{ 번호: string; 전화: string; 이름: string; 역할: string; 줄: number }>;
+    행들: Array<{ 번호: string; 전화: string; 이름: string; 역할: string; 반: string; 줄: number }>;
     대상아닌행?: Array<{ 역할: string }>;
     오류: string[];
   };
   행별가르기: (행들: unknown[]) => {
-    정상: Array<{ 번호: string; 전화: string; 이름: string; 줄: number }>;
+    정상: Array<{ 번호: string; 전화: string; 이름: string; 반: string; 줄: number }>;
     문제들: Array<{ 줄: number; 번호: string; 사유: string }>;
   };
+  반미배정: (행들: unknown[]) => Array<{ 줄: number; 번호: string }>;
   계획: (행들: unknown[], 있는행들: unknown[]) => {
     넣을것: Array<{ 번호: string; 전화: string; 이름: string }>;
     건너뛴것: Array<{ 번호: string }>;
@@ -123,19 +124,83 @@ Deno.serve(async (req) => {
     : [];
   const { 넣을것, 건너뛴것, 막힌것 } = 계획(정상, 있는것 as unknown[]);
 
+  /* ── 반 (설계 §3 · §8-1) ─────────────────────────────────────────────────────
+   * 시트 5열(`class_name`)이 여기서 **처음** 읽힌다 — 그동안 열별칭에 없어 통째로 버려졌다.
+   * 두 걸음이다: ①좌표를 `engine.classes` 에 세우고 ②학생에 매단다.
+   *
+   * ⛔ 연락처가 어긋난 행(`막힌것`)은 아예 뺀다 — 같은 사람인지 모르는 행에 반을 적으면
+   *   그 학생을 **남의 반에 넣는 것**이고, 그러면 강사가 남의 학생 원문을 보게 된다.
+   * 🔑 반이 빈 칸이면 거절이 아니라 **셈**이다(`반미배정` · lib 머리말) — 여기서 거절하면
+   *   반 배정이 앱 접속의 선행 조건이 되어, 배정 전 학생이 통째로 잠긴다. */
+  const 막힌번호 = new Set((막힌것 as Array<{ 번호: string }>).map((m) => 정규형(m.번호)));
+  const 반있는행 = 정상.filter((r) => (r.반 || '') !== '' && !막힌번호.has(정규형(r.번호)));
+  const 반좌표들 = [...new Set(반있는행.map((r) => r.반))];
+
+  const 반지도 = new Map<string, string>();
+  let 새반: string[] = [];
+  if (반좌표들.length) {
+    /* 열린 시즌 = `ends_on is null`(겹침은 `season_no_overlap_c11` 이 막으므로 최대 하나).
+     * 없으면 null = 「시즌 밖」이고, 미개원 지금이 정확히 그 상태다. */
+    const [시즌] = await sql`select season_id from engine.season
+      where ends_on is null order by starts_on desc limit 1`;
+    const 시즌id = (시즌 as { season_id: string } | undefined)?.season_id ?? null;
+    const 반값들 = 반좌표들.map((k) => ({
+      class_key: k,
+      display_name: k,          // 시트엔 좌표 하나뿐이다 — 사람이 부르는 이름은 뒤에 갈린다
+      season_id: 시즌id,
+      schema_ver: (계약 as { 버전: string }).버전,
+    }));
+    /* 🔑 `on conflict do nothing` 에 **대상을 안 적는다** — 유일성이 부분 인덱스 «둘»이라
+     *   (시즌 안 / 시즌 밖) 어느 하나를 지목하면 다른 쪽 충돌이 그대로 터진다. */
+    const 만든것 = await sql`
+      insert into engine.classes ${sql(반값들 as unknown as Record<string, never>[], 'class_key', 'display_name', 'season_id', 'schema_ver')}
+      on conflict do nothing
+      returning class_key`;
+    새반 = (만든것 as unknown as Array<{ class_key: string }>).map((r) => r.class_key);
+    const 있는반 = await sql`select class_id, class_key from engine.classes
+      where class_key in ${sql(반좌표들)} and season_id is not distinct from ${시즌id}`;
+    for (const r of 있는반 as unknown as Array<{ class_id: string; class_key: string }>) {
+      반지도.set(r.class_key, r.class_id);
+    }
+  }
+
   let 새로: string[] = [];
   if (넣을것.length) {
     const 행값들 = 넣을것.map((r) => ({
       student_code: 학생번호표기(r.번호),
       contact: r.전화,
       display_name: r.이름 || null,
+      class_id: 반지도.get(r.반) ?? null,
       schema_ver: (계약 as { 버전: string }).버전,
     }));
     const 결과 = await sql`
-      insert into engine.learners ${sql(행값들 as unknown as Record<string, never>[], 'student_code', 'contact', 'display_name', 'schema_ver')}
+      insert into engine.learners ${sql(행값들 as unknown as Record<string, never>[], 'student_code', 'contact', 'display_name', 'class_id', 'schema_ver')}
       on conflict (student_code) do nothing
       returning student_code`;
     새로 = (결과 as unknown as Array<{ student_code: string }>).map((r) => r.student_code);
+  }
+
+  /* 🔴 **이미 있는 학생의 반은 위 insert 가 못 고친다** — `계획()` 이 기존 행을 `건너뛴것` 으로
+   *   빼 두므로 그 행은 insert 에 아예 안 실리고, `on conflict do update` 를 달아도 경쟁
+   *   삽입에서만 발화한다. 반은 시즌마다 바뀌는 값이라 그러면 첫 배정 이후 영원히 안 바뀐다.
+   *   그래서 갱신은 **별도 한 문장**으로 낸다.
+   * ⚠ 갱신 대상은 `class_id` **한 칸뿐**이다(설계 §3 ⚠) — 전체 upsert 로 넓히면 시트 오타
+   *   한 번에 이름·연락처가 원본에서 덮인다. 연락처는 어느 문도 안 덮는다(lib `대조판정`).
+   * 🔑 `is distinct from` 으로 **바뀐 행만** 센다 — 안 그러면 매 스윕이 전원 갱신으로 뜨고,
+   *   그 수는 「무엇이 달라졌나」를 하나도 못 알려준다. */
+  let 반갱신: string[] = [];
+  const 짝들 = 반있는행
+    .map((r) => ({ code: 학생번호표기(r.번호), id: 반지도.get(r.반) ?? null }))
+    .filter((p): p is { code: string; id: string } => p.id !== null);
+  if (짝들.length) {
+    const 결과 = await sql`
+      update engine.learners l set class_id = v.class_id
+        from (select unnest(${짝들.map((p) => p.code)}::text[]) as student_code,
+                     unnest(${짝들.map((p) => p.id)}::uuid[]) as class_id) v
+       where l.student_code = v.student_code
+         and l.class_id is distinct from v.class_id
+      returning l.student_code`;
+    반갱신 = (결과 as unknown as Array<{ student_code: string }>).map((r) => r.student_code);
   }
 
   /* 다음 한 걸음 = 동의 (유호 확정: 등록 직후). 여기서 만들지 않는다 — 세어서 부르기만 한다.
@@ -162,6 +227,12 @@ Deno.serve(async (req) => {
     경쟁흡수: 넣을것.length - 새로.length,   // on conflict 가 삼킨 수 — CLI 와 같은 아침에 돌면 0 이 아니다
     건너뜀: 건너뛴것.length,
     무동의,
+    /* 반(§8-1). 🔑 `반미배정` 은 거절이 아니라 **매 판 반복되는 셈**이다 — 반이 안 적힌
+     * 학생은 그대로 들어오되(앱은 써야 한다) 강사 큐엔 안 뜨므로, 여기서 이름을 계속 부른다.
+     * 반 열을 아직 안 쓰는 시트에서는 빈 목록이다(전량 비면 무시 · lib). */
+    반미배정: 반미배정(정상),
+    새반,
+    반갱신,
     schema_ver: (계약 as { 버전: string }).버전,
   });
 });
