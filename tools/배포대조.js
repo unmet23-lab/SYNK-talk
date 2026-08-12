@@ -200,7 +200,10 @@ async function main() {
   const 진단 = args.includes('--진단');
   const 고른것 = args.find((a) => !a.startsWith('--'));
 
-  const e = 자격증명.읽기('배포대조');
+  /* **GET 만 친다**(이 파일 머리) — 그래서 운영을 **읽는** 것은 과녁이 막지 않는다.
+   * 배포·삭제는 `원격배포.js` 몫이다. 이 선언이 거짓이 되는 순간(여기에 쓰기 경로가 생기는
+   * 순간)은 사람 눈에 안 보이므로 `tests/자격증명.test.js` 가 소스로 못박는다. */
+  const e = 자격증명.읽기('배포대조', { 읽기: true });
   const ref = e.SUPABASE_PROJECT_REF;
   const 토큰 = e.SUPABASE_ACCESS_TOKEN;
   if (!ref || !토큰) die('.env 에 SUPABASE_PROJECT_REF·SUPABASE_ACCESS_TOKEN 이 필요하다');

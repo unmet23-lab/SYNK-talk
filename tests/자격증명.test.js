@@ -228,3 +228,82 @@ test('과녁 — ref 상수가 비거나 리허설과 같아지면 게이트가 
   assert.match(리허설REF, /^[a-z]{20}$/);
   assert.notEqual(운영REF, 리허설REF);
 });
+
+/* ── 읽기 갈래 (2026-08-12 신설 · 유호 지시) ───────────────────────────────────
+ * 🔴 실사건: 읽기 전용인 `확인_판번호.sql` 과, 「GET 만 친다」고 자기 머리에 적은 `배포대조.js` 가
+ *   둘 다 운영에서 멈췄다. 그래서 **운영이 지금 어떤 상태인지 재는 눈이 없었고**,
+ *   「⛔운영 미배포 잔여」가 실측 한 번 없이 장부에만 적혀 있었다. 게다가 차단문의 처방이
+ *   `--운영`(쓰기 승인 키)이라 **읽으려면 쓰기 키를 붙이는 것이 유일한 길**이었다(F103).
+ * 🔑 뒤집은 것은 **기본값 하나**다 — 선언 없음 = 쓰기 = 막음. 옛 주석이 걱정한
+ *   「빠뜨린 곳이 통과로 보인다」는 기본값이 **반대**일 때의 이야기고, 이 방향에서 빠뜨린
+ *   호출부는 「막힘」으로 나온다. 그래서 이 갈래는 넓히는 게 아니라 **한 칸 여는** 것이다. */
+
+test('읽기갈래 — 선언이 없으면 운영은 그대로 막힌다 (기본값이 안전 방향이다)', () => {
+  for (const opt of [undefined, null, {}, { 쓰기: false }]) {
+    assert.equal(과녁판정({ SUPABASE_PROJECT_REF: 운영REF }, [], opt).상태, '막음', `opt=${JSON.stringify(opt)}`);
+  }
+});
+
+test('읽기갈래 — 읽기를 선언하면 지나가되 「통과」와 **다른 상태**로 나온다', () => {
+  /* 🔑 상태를 나눈 이유는 호출부가 **소리를 내야** 하기 때문이다. 읽기라고 조용히 지나가면
+   *   통과와 미실행이 같은 모양이 되고(F207), 리허설 숫자를 운영이라 읽는 사고가 거기서 난다. */
+  const r = 과녁판정({ SUPABASE_PROJECT_REF: 운영REF }, [], { 읽기: true });
+  assert.equal(r.상태, '읽기통과');
+  assert.equal(r.ref, 운영REF);
+});
+
+test('읽기갈래 — `=== true` 만 연다 (truthy 로 새면 그게 구멍이다)', () => {
+  for (const v of [1, 'true', 'yes', 'false', {}, [], false, 0, null, '']) {
+    assert.equal(과녁판정({ SUPABASE_PROJECT_REF: 운영REF }, [], { 읽기: v }).상태, '막음',
+      `읽기=${JSON.stringify(v)} 가 열렸다`);
+  }
+});
+
+test('읽기갈래 — 리허설은 선언과 무관하게 마찰 0 · --운영 은 여전히 쓰기 한 길', () => {
+  assert.equal(과녁판정({ SUPABASE_PROJECT_REF: 리허설REF }, [], { 읽기: true }).상태, '통과');
+  assert.equal(과녁판정({ SUPABASE_PROJECT_REF: 리허설REF }, [], { 읽기: false }).상태, '통과');
+  assert.equal(과녁판정({ SUPABASE_PROJECT_REF: 운영REF }, ['--운영'], { 읽기: true }).상태, '통과');
+});
+
+/** 소스에 **쓰기 경로**가 있는가 — 읽기라 선언한 도구가 나중에 쓰기를 얻는 순간을 잡는다.
+ *  ⚠ HTTP 메서드만으로는 못 가른다: Management API 는 **읽기 SQL 도** `POST /database/query` 로
+ *  보낸다(실측 — `엔진뷰어` 는 화면에 「읽기」를 찍으면서 POST 를 친다). 그래서 둘 다 센다. */
+function 쓰기경로(원문) {
+  const 글 = 주석빼기(원문);
+  const 걸린것 = [];
+  if (/method:\s*['"](POST|PUT|PATCH|DELETE)['"]/i.test(글)) 걸린것.push('쓰기 메서드');
+  if (/database\/query/.test(글)) 걸린것.push('database/query');
+  return 걸린것;
+}
+
+test('탐지력 픽스처 — 읽기라 선언한 자리에 생긴 쓰기 경로를 반드시 잡는다', () => {
+  assert.deepEqual(쓰기경로("await fetch(u, { headers: 헤더 });"), []);
+  assert.deepEqual(쓰기경로("await fetch(u, { method: 'POST' });"), ['쓰기 메서드']);
+  assert.deepEqual(쓰기경로("await fetch(u, { method: \"DELETE\" });"), ['쓰기 메서드']);
+  assert.deepEqual(쓰기경로("await fetch(`${API}/${ref}/database/query`, { headers: 헤더 });"), ['database/query']);
+  /* 🔑 주석 속 낱말을 세면 「POST 는 안 친다」고 적어 두기만 해도 빨개진다 — 그건 거짓양성이고,
+   *   거짓양성이 잦은 가드는 곧 꺼진다. */
+  assert.deepEqual(쓰기경로("// 여기서 method: 'POST' 는 안 친다\nawait fetch(u, { headers: 헤더 });"), []);
+});
+
+test('실저장소 — 읽기를 선언한 도구에 쓰기 경로가 생기면 빨개진다', () => {
+  /* ⚠ 대상은 **`읽기: true` 리터럴을 적은 도구뿐**이다. `원격SQL.js` 는 SQL 을 보고 실행마다
+   *   판정하므로(`읽기: 읽기전용(sql) && !적용`) 정적으로는 쓰기 경로가 있는 게 정상이다 —
+   *   그쪽 안전은 그 파일의 SQL 파서와 `--적용` 이 진다. */
+  const 파일들 = [
+    ...fs.readdirSync(TOOLS).filter((f) => f.endsWith('.js')).map((f) => ['tools/' + f, path.join(TOOLS, f)]),
+    ...fs.readdirSync(LIB).filter((f) => f.endsWith('.js')).map((f) => ['lib/' + f, path.join(LIB, f)]),
+  ];
+  const 선언한것 = [];
+  const 위반 = [];
+  for (const [이름, p] of 파일들) {
+    const 글 = fs.readFileSync(p, 'utf8');
+    if (!/자격증명\.읽기\s*\([^)]*읽기\s*:\s*true/.test(주석빼기(글))) continue;
+    선언한것.push(이름);
+    const 걸린것 = 쓰기경로(글);
+    if (걸린것.length) 위반.push(`${이름}: ${걸린것.join('·')}`);
+  }
+  // 🔴 분모부터 밝힌다 — 0건을 잰 것과 통과는 같은 모양이다(F207).
+  assert.ok(선언한것.length >= 1, '읽기를 선언한 도구를 하나도 못 찾았다 — 정규식이나 목록이 깨졌다');
+  assert.deepEqual(위반, [], `읽기라 선언했는데 쓰기 경로가 있다: ${위반.join(' · ')}`);
+});

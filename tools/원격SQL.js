@@ -113,7 +113,10 @@ async function main() {
      유호님 승인을 받은 뒤: node tools/원격SQL.js ${파일} --적용`);
   }
 
-  const e = 자격증명.읽기('원격SQL');
+  /* 이 실행이 읽기인지는 **바로 위에서 이미 판정했다** — 그 결과를 과녁에 그대로 넘긴다(사본 금지).
+   * `--적용` 이 붙었으면 SQL 이 읽기로 보여도 쓰기로 본다: 플래그가 곧 의도이고, 둘 중 하나라도
+   * 쓰기를 가리키면 쓰기다(「애매하면 쓰기」 — 이 파일 머리 §안전). */
+  const e = 자격증명.읽기('원격SQL', { 읽기: 읽기전용(sql) && !적용 });
   const 토큰 = e.SUPABASE_ACCESS_TOKEN;
   const ref = e.SUPABASE_PROJECT_REF;
   if (!토큰 || !ref) 안내();
