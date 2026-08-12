@@ -16,7 +16,7 @@
  * 끄는 법: SYNK_SKIP_GUARD=1 git commit ...   ← 끈 이유를 커밋 메시지에 남길 것.
  */
 
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawnSync } = require('node:child_process');
 const { inspect } = require('./guard.js');
 
 function git(args, opts = {}) {
@@ -74,6 +74,35 @@ function main() {
 
   const paths = stagedPaths();
   if (!paths.length) return 0;
+
+  /* ── 쓰는 문자는 한글·몽골어·영어 셋뿐 (유호님 확정 2026-08-07) ──────────────
+   * 왜 여기인가 (F351 · F379): 이 규칙을 지키던 장치는 형제(SYNK-appsscript)의
+   *   `tests/문서문자.test.js` 하나였다. 그런데 **이 저장소 세션은 그 스위트를 안 돌린다** —
+   *   즉 그 층에서는 원리상 안 잡힌다. 실측 2026-08-12: `prompts/교정.md` 에 「한자·가나 금지」
+   *   규칙을 넣으면서 그 **보기로 금지 문자를 썼고**, 이 파일은 전문이 그대로 모델 `system` 에
+   *   실리므로(lib/교정엔진.js) 문서 흠이 아니라 **모델 입력에 금지 문자를 넣은 것**이었다.
+   *   커밋은 조용히 지나갔고, 한참 뒤 형제 저장소에서 남이 발견했다.
+   * 🔑 판정은 여기서 안 한다 — 형제의 `tools/lib/옛글자.js` 하나가 진다(계약 게이트와 같은 축).
+   * 🔑 처방문을 여기서 다시 쓰지 않고 **그 도구의 말을 그대로 흘린다** — 아래 ①②③ 안내는
+   *   자격증명용이라 이 위반에는 따를 수 없는 처방이 된다(F103).
+   * ⚠ 형제가 없는 기계(폰·클라우드)에서는 **막지 않고 말한다** — 확인 불가를 차단으로 바꾸면
+   *   그 세션은 아무것도 커밋 못 한다. 대신 통과와 미실행이 같은 모양이 되지 않게 찍는다. */
+  const 옛글자도구 = process.env.SYNK_옛글자도구
+    || require('node:path').join(__dirname, '..', '..', 'SYNK-appsscript', 'tools', '옛글자검사.js');
+  if (!require('node:fs').existsSync(옛글자도구)) {
+    console.error('[guard] 형제 저장소가 없어 옛 글자(한자·가나) 대조를 **못 했다**.');
+  } else {
+    /* ⚠ `spawnSync` 인 이유: 이 도구는 **성공했을 때도 stderr 로 분모를 말한다**(몇 개를 열었나 ·
+     *   F207). `execFileSync` 는 성공 시 stdout 만 돌려주므로 그 말을 통째로 버리고, 그러면
+     *   이 저장소에서 「돌았는데 깨끗」과 「안 돌았다」가 같은 모양이 된다 — F379 의 병이
+     *   정확히 그거였다(이 층은 원리상 안 잡히는데 아무도 그걸 몰랐다). */
+    const r = spawnSync(process.execPath, [옛글자도구, '--cached'], { encoding: 'utf8' });
+    process.stderr.write(String(r.stderr || ''));
+    if (r.status !== 0) {
+      if (!r.stderr) process.stderr.write('[guard] 옛 글자 검사를 못 돌렸다 — 커밋을 막는다.\n');
+      return 1;
+    }
+  }
 
   const problems = [];
 
