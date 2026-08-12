@@ -30,7 +30,7 @@ const ROOT = path.resolve(__dirname, '..');
 const 자격증명 = require('../lib/자격증명.js');
 const {
   모델, 왕복제한밀리, 메시지경로, 벤더헤더,
-  프롬프트판, 요청몸통, 응답글, 울타리벗기기, 교정값, 재시도가능, 캐시성적, 성적합,
+  프롬프트판, 요청몸통, 응답글, 응답덩이꺼내기, 교정값, 재시도가능, 캐시성적, 성적합,
 } = require('../lib/교정엔진.js');
 const 계약 = require(path.join(ROOT, '계약', '수집_교정_계약.json'));
 
@@ -54,7 +54,7 @@ const 잠깐 = (ms) => new Promise((r) => setTimeout(r, ms));
 /** 모델 원문(칭찬·다음미션 포함)과 제품 검증(교정값)을 **같은 글**에서 뽑아 항목 하나로. */
 function 항목만들기(id, 글) {
   let 원형 = null;
-  try { 원형 = JSON.parse(울타리벗기기(글)); } catch { /* 형식밖 — 교정값이 사유를 낸다 */ }
+  try { 원형 = JSON.parse(응답덩이꺼내기(글)); } catch { /* 형식밖 — 교정값이 사유를 낸다 */ }
   const 검증 = 교정값(글, 계약.오류태그 || []);
   const 항목 = { id };
   if (원형 && typeof 원형 === 'object' && !Array.isArray(원형)) Object.assign(항목, 원형);
