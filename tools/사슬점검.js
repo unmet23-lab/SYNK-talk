@@ -111,6 +111,35 @@ function 합성이력() {
       행들.push({ event_id: id('af'), event_type: 'affect.reported', occurred_at: t(d + 0.5),
         payload: { affect_kind: 'slump' } });
     }
+
+    /* ⑪ G2 「보고서 교정」 지목 — 탐지축(v8). 세 갈래를 다 낸다: 짚음 · 「고칠 곳 없음」 ·
+     * 무반응. 🔴 갈래가 하나면 「축이 값을 낸다」는 초록이 세 뜻 중 하나만 도는 상태를 덮는다.
+     * ⚠ 표식은 `options_shown` + `rejected_all` **한 벌**이다(`lib/학습자상태.G2지목행인가`) —
+     * 위 ⑦⑧ 행들이 이 표식을 안 갖는 것이 곧 「G2 만 센다」의 실증이다. */
+    const 보기3 = [
+      { option_id: 'w1', label: '회의' }, { option_id: 'w2', label: '시간을' }, { option_id: 'w3', label: '정해졌습니다.' },
+    ];
+    if (d % 4 === 0) {
+      행들.push({ event_id: id('g2s'), event_type: 'submission.created', occurred_at: t(d + 0.7),
+        task_type: '숙제제출',
+        submission: { task_ref: `g2-${d}`, task_format: '쓰기첨삭', body_original: '회의 시간이 정해졌습니다.' },
+        payload: { ver: 1, attempt_no: 1, options_shown: 보기3,
+          selected_option: 보기3[d % 3].option_id, position: (d % 3) + 1,
+          rejected_all: false, skipped: false, latency_ms: 2000 + (d % 5) * 400,
+          ...(d % 8 === 0 ? { selection_reason: '조사:주격(이/가·은/는)' } : {}) } });
+    }
+    if (d % 6 === 0) {
+      행들.push({ event_id: id('g2n'), event_type: 'quiz.answered', occurred_at: t(d + 0.72),
+        task_type: '퀴즈응답',
+        submission: { task_ref: `g2n-${d}`, task_format: '쓰기첨삭' },
+        payload: { ver: 1, attempt_no: 1, options_shown: 보기3, rejected_all: true, skipped: false } });
+    }
+    if (d % 9 === 0) {
+      행들.push({ event_id: id('g2k'), event_type: 'quiz.answered', occurred_at: t(d + 0.74),
+        task_type: '퀴즈응답',
+        submission: { task_ref: `g2k-${d}`, task_format: '쓰기첨삭' },
+        payload: { ver: 1, attempt_no: 1, options_shown: 보기3, rejected_all: false, skipped: true } });
+    }
   }
   return { 행들, 개입들 };
 }
