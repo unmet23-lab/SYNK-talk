@@ -26,6 +26,16 @@ const { 오늘과제, 몽골날짜, 따라말하기문장 } = require(path.join(
 const { 도메인 } = require(path.join(__dirname, '..', 'lib', '로그인코드.js'));
 // 동의 귀속 — 술어를 여기 다시 적지 않는다(`lib/동의게이트.js` 가 유일 정본)
 const { 지금유효id식 } = require(path.join(__dirname, '..', 'lib', '동의게이트.js'));
+/* 게임(G1) — ⑫·⑬ 이 deliver 게임 갈래의 술어·행 규격을 거울로 잰다. 값은 전부 정본 import —
+ * 리터럴 사본은 팩·계약이 개정되는 날 시험만 초록으로 남긴다(§6-8 규칙 3 과 같은 축). */
+const { 재제출의사, 게임챌린지, 시드전부, 게임날인가 } = require(path.join(__dirname, '..', 'lib', '게임배정.js'));
+const { G1스냅샷, 스냅샷모양판, 과제유형: 게임과제유형, 학생공개키 } = require(path.join(__dirname, '..', 'lib', '게임스냅샷.js'));
+const { 사건출처 } = require(path.join(__dirname, '..', 'lib', '사건출처.js'));
+
+/* 왕복 게이트 스코프 — 이 시험이 부르는 함수만 잰다(ⓑ 차단 ②: 전 함수 목록이면 events·correct
+ * 낡음이 이 시험과 무관하게 발화점을 막는다). ⚠ 시험이 부르는 것보다 좁으면 게이트가 옛 판을
+ * 초록으로 재므로, `tests/왕복골격.test.js` 가 소스의 함수 사용과 이 목록을 대조한다. */
+const 게이트함수들 = ['deliver', 'tasks', 'corrections', 'progress'];
 
 /* 어제 배정을 손으로 심는다 — 「첫날이 아닌 학생」은 그렇게만 만들어진다.
  * 배치를 어제 한 번 돌리는 것으로는 못 만든다(그날 날짜로 돌 뿐이다). */
@@ -36,7 +46,7 @@ const 어제 = (오늘) => {
 };
 
 async function main() {
-  const { ref, sql, anon, service_role: service, 확인, 보고 } = await 골격.열기('배달왕복시험');
+  const { ref, sql, anon, service_role: service, 확인, 보고 } = await 골격.열기('배달왕복시험', { 함수목록: 게이트함수들 });
 
   const 호출 = async (질의 = '', 키 = service) => {
     const r = await fetch(`https://${ref}.supabase.co/functions/v1/deliver${질의}`, {
@@ -49,16 +59,19 @@ async function main() {
   const 표 = `t${Date.now().toString(36)}`;   // 이번 실행의 학생들을 가르는 표식
   const 판 = (await sql(`select name from engine.schema_migrations order by version desc limit 1`))[0].name.match(/_(c\d+)\.sql$/)[1];
 
-  /* ── 준비: 네 학생 ──────────────────────────────────────────────
+  /* ── 준비: 다섯 학생 ─────────────────────────────────────────────
    *  A 동의 O·이력 없음      → 첫날 · degraded=false
    *  B 동의 X                → 건너뜀(배정 0)
    *  C 동의 O·어제 배정 O     → 강등(전날 문장) · degraded=true
-   *  D 동의 O·어제 배정 + 그 뒤 확정된 교정 → ②슬롯 = 교정문 · degraded=false */
-  console.log('■ 준비 — 시험 학생 4명');
+   *  D 동의 O·어제 배정 + 그 뒤 확정된 교정 → ②슬롯 = 교정문 · degraded=false
+   *  E 동의 O·어제 배정 + G1 메일 원제출·그 뒤 확정된 «메일» 교정 + 「수정」
+   *    → ⑫ C3 격리(메일 교정문이 낭독으로 안 샘 — 강등) · H3 재제출 재료 */
+  console.log('■ 준비 — 시험 학생 5명');
   const 학생들 = await sql(`
     insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver)
     values ('${표}-A','시험A','Lv2','study','${판}'), ('${표}-B','시험B','Lv2','study','${판}'),
-           ('${표}-C','시험C','Lv2','study','${판}'), ('${표}-D','시험D','Lv2','study','${판}')
+           ('${표}-C','시험C','Lv2','study','${판}'), ('${표}-D','시험D','Lv2','study','${판}'),
+           ('${표}-E','시험E','Lv2','study','${판}')
     returning learner_id, student_code`);
   const id = Object.fromEntries(학생들.map((r) => [r.student_code.slice(-1), r.learner_id]));
 
@@ -66,12 +79,13 @@ async function main() {
     insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver, recorded_by)
     values ('${id.A}'::uuid,'v18.9', now() - interval '30 days','${판}','tools/배달왕복시험.js'),
            ('${id.C}'::uuid,'v18.9', now() - interval '30 days','${판}','tools/배달왕복시험.js'),
-           ('${id.D}'::uuid,'v18.9', now() - interval '30 days','${판}','tools/배달왕복시험.js')`);
+           ('${id.D}'::uuid,'v18.9', now() - interval '30 days','${판}','tools/배달왕복시험.js'),
+           ('${id.E}'::uuid,'v18.9', now() - interval '30 days','${판}','tools/배달왕복시험.js')`);
 
-  // C·D 에게 어제 배정을 심는다 — 배정 행 = learning_events + submissions 쌍이다.
+  // C·D·E 에게 어제 배정을 심는다 — 배정 행 = learning_events + submissions 쌍이다.
   const 어제날 = 어제(오늘);
   const 어제스냅 = 오늘과제({ 날짜: 어제날, 첫날: true }).task_snapshot;
-  for (const k of ['C', 'D']) {
+  for (const k of ['C', 'D', 'E']) {
     await sql(`
       with ev as (
         insert into engine.learning_events
@@ -121,6 +135,46 @@ async function main() {
   const D원제출 = (await sql(`
     select event_id from engine.learning_events
      where learner_id = '${id.D}'::uuid and event_type = 'submission.created' limit 1`))[0].event_id;
+
+  /* 🔴 E — **G1 메일 원제출 + 그 «뒤» 확정된 «메일» 교정 + 「수정」**. ⑫·⑬ 의 재료 전부다.
+   *   교정 시각이 어제 배정 «뒤»라 C3 창 안인데, 붙은 제출이 발화가 아니라 게임(숙제제출)이다 —
+   *   deliver 의 ②슬롯 조인이 task_type='발화녹음' 으로 한정하지 않으면 이 메일 교정문이 오늘
+   *   E 의 낭독 문장으로 나간다(적대 반박 C3). 낡은 배포판이면 ⑫ 가 그 자리에서 빨개진다.
+   *   시드·스냅샷은 정본 조립(`G1스냅샷`)을 지난다 — 배정·제출이 같은 조립(§6-8 규칙 4). */
+  const E시드 = 시드전부[0];
+  const E스냅 = G1스냅샷(E시드);
+  if (!E스냅) die('팩에서 E 시드를 못 폈다 — 팩 개정으로 시드 공간이 비었는지 본다');
+  const E원제출 = (await sql(`
+    with ev as (
+      insert into engine.learning_events
+        (learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
+         level_snapshot, consent_ver, consent_id, degraded, payload, schema_ver)
+      values ('${id.E}'::uuid,'submission.created','${게임과제유형}','learner',
+              '${어제날}T07:00:00Z'::timestamptz, 'sub:${id.E}:g1:${어제날}',
+              'Lv2','v18.9', ${지금유효id식(`'${id.E}'::uuid`)}, false,
+              '{"ver":1,"attempt_no":1}'::jsonb, '${판}')
+      returning event_id)
+    insert into engine.submissions
+      (event_id, task_type, task_ref, task_snapshot, task_schema_ver, body_original, occurred_at, schema_ver)
+    select event_id, '${게임과제유형}', 'task-${어제날}',
+           '${JSON.stringify(E스냅).replace(/'/g, "''")}'::jsonb, '${스냅샷모양판}',
+           '교수님께. 금일 회의에 관하여 문의드립니다.',
+           '${어제날}T07:00:00Z'::timestamptz, '${판}' from ev
+    returning event_id`))[0].event_id;
+  const E교정 = (await sql(`
+    insert into engine.corrections (submission_id, actor_kind, corrected_text, created_at, schema_ver)
+    select submission_id, 'teacher', '교수님께. 오늘 회의에 관하여 문의드립니다.',
+           '${어제날}T09:30:00Z'::timestamptz, '${판}'
+      from engine.submissions where event_id = '${E원제출}'::uuid
+    returning correction_id`))[0].correction_id;
+  await sql(`
+    insert into engine.learning_events
+      (learner_id, event_type, actor_kind, occurred_at, idempotency_key,
+       level_snapshot, consent_ver, consent_id, degraded, payload, schema_ver, correction_id)
+    values ('${id.E}'::uuid,'correction.responded','learner','${어제날}T10:00:00Z'::timestamptz,
+            'resp:${id.E}:${어제날}','Lv2','v18.9', ${지금유효id식(`'${id.E}'::uuid`)}, false,
+            '${JSON.stringify({ ver: 1, learner_response: 재제출의사 }).replace(/'/g, "''")}'::jsonb,
+            '${판}', '${E교정}'::uuid)`);
   console.log(`  준비 완료 — 표식 ${표} · 오늘 ${오늘} · 판 ${판}\n`);
 
   /* ── ① 문 ──────────────────────────────────────────────────── */
@@ -514,7 +568,7 @@ async function main() {
    *   교정이 0건이라 「비었다」와 구별이 안 된다), **철회는 되돌릴 수 없다**: DB 트리거
    *   `protect_consents` 가 「철회는 되돌리지 않는다 — 재동의는 새 행이다」(L0 §9-3)로 막는다.
    *   A 는 아래 ⑩ 이 `지금유효id식(A)` 로 `consent_id` 를 채우며 계속 쓰므로 여기서 막으면
-   *   그쪽이 무너진다. → 그 칸은 **A 를 다 쓴 뒤인 ⑫** 로 옮겼다(이 파일 맨 끝).
+   *   그쪽이 무너진다. → 그 칸은 **A 를 다 쓴 뒤인 ⑭** 로 옮겼다(이 파일 맨 끝).
    *   A 로 되돌린다 — 아래 ⑩ 이 같은 토큰으로 A 를 읽는다. */
   await sql(`update engine.learners set auth_user_id = null where auth_user_id = '${uid}'`);
   await sql(`update engine.learners set auth_user_id = '${uid}' where learner_id = '${id.A}'::uuid`);
@@ -658,7 +712,129 @@ async function main() {
     (await 조회(점검질의, { 함수: 'deliver', 방법: 'POST', 판: null, 토큰: 원장토큰 })).status === 401);
   await sql(`update engine.staff set active = true where auth_user_id = '${duid}'::uuid`);
 
-  /* ── ⑫ 철회한 학생의 교정 (C0 §4-3 ② `blocked` · 전층감사 §2-5 ⓐ) ──────────────
+  /* ── ⑫ 게임(G1) — C3 격리 · H3 거울 조인 (발주 §6-6 ⑩·⑪ · 배정 배선 ⓑ) ──────────
+   * 게임 갈래 본체는 오늘 못 돈다 — `검수확정` 게이트(fail-closed)가 몽골어 검수 전 판을
+   * 학생에게 안 열고, 그건 결함이 아니라 설계다. 그래서 여기서 재는 것은 둘이다:
+   *   ⓐ C3 격리 — E 의 «메일» 교정문이 말하기 ②슬롯로 새지 않는다(준비의 E · 배포판 실측).
+   *   ⓑ H3 조인 — deliver 의 재제출 술어를 DB 에 직접 태운다. 술어 «값» 을 리터럴로 베끼면
+   *      deliver·팩이 바뀌는 날 거울만 초록으로 남으므로, 값(`재제출의사`·`게임챌린지`)은
+   *      정본 import 고 모양은 deliver 의 lateral 그대로다. */
+  console.log('\n■ ⑫ 게임(G1) — C3 격리 · H3 거울 조인');
+  const E배정 = (await 행('E')).find((r) => r.event_type === 'task.assigned');
+  확인('🔴 E(메일 교정만 있음)의 ②슬롯은 전날 문장이다 — 메일 교정문이 낭독으로 안 샌다(C3)',
+    !!E배정 && 따라말하기문장(E배정.task_snapshot) === 따라말하기문장(어제스냅),
+    E배정 && 따라말하기문장(E배정.task_snapshot));
+  확인('E 는 강등이다 — 말하기 교정문은 실제로 없었다',
+    !!E배정 && E배정.degraded === true, E배정 && E배정.degraded);
+  확인('E 의 재발화 고리는 비어 있다 — 메일 교정은 말하기 재시도가 아니다',
+    !!E배정 && E배정.retry_of_event_id === null, E배정 && E배정.retry_of_event_id);
+
+  const 거울조인 = () => sql(`
+    select e2.event_id as 원제출사건, s2.task_snapshot->>'prompt_seed' as 원시드
+      from engine.learning_events r
+      join engine.corrections c2 on c2.correction_id = r.correction_id
+      join engine.submissions s2 on s2.submission_id = c2.submission_id
+      join engine.learning_events e2 on e2.event_id = s2.event_id
+     where r.learner_id = '${id.E}'::uuid
+       and r.event_type = 'correction.responded'
+       and r.payload->>'learner_response' = '${재제출의사}'
+       and e2.event_type = 'submission.created'
+       and s2.task_snapshot->>'challenge_id' = '${게임챌린지}'
+       and not exists (
+         select 1 from engine.learning_events t
+          where t.learner_id = '${id.E}'::uuid
+            and t.event_type = 'task.assigned'
+            and t.retry_of_event_id = e2.event_id)
+     order by r.occurred_at desc limit 1`);
+  const 재제출재료 = await 거울조인();
+  확인('🔴 H3 거울 조인이 E 원제출 1행을 낸다 — 「수정」이 눌렸고 재배정이 아직 없다',
+    재제출재료.length === 1 && 재제출재료[0].원제출사건 === E원제출, 재제출재료);
+  확인('원 시드가 함께 걷힌다 — 재제출은 «같은 메일»이라 새 문항을 지어내지 않는다',
+    재제출재료.length === 1 && 재제출재료[0].원시드 === E시드,
+    재제출재료[0] && 재제출재료[0].원시드);
+
+  /* ── ⑬ 게임 배정 행 규격 — deliver 게임 갈래의 INSERT 를 그대로 태운다 ──────────────
+   * 본체가 게이트에 막혀 있는 동안에도 행 규격·멱등·집계 비오염은 DB 제약의 몫이라, 같은
+   * 열·같은 conflict 로 **직접 INSERT** 해 제약이 실제로 어떻게 답하는지 잰다(코드 독해가
+   * 아니라 상태를 바꿔 본다 — 리허설 전용이라 남는 행이 사고가 아니다). */
+  console.log('\n■ ⑬ 게임 배정 행 규격 — 직접 INSERT (멱등·집계·/tasks 관통)');
+  const 게임행넣기 = (날) => sql(`
+    insert into engine.learning_events
+      (learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
+       level_snapshot, consent_ver, consent_id, degraded, retry_of_event_id, source_kind,
+       payload, schema_ver)
+    values ('${id.E}'::uuid, 'task.assigned', '${게임과제유형}', 'ai',
+            '${날}T04:00:00Z'::timestamptz, 'task:${id.E}:${날}',
+            'Lv2', 'v18.9', ${지금유효id식(`'${id.E}'::uuid`)}, false,
+            '${E원제출}'::uuid, '${사건출처('task.assigned')}'::engine.source_kind,
+            '{"ver":1}'::jsonb, '${판}')
+    on conflict (learner_id, idempotency_key) do nothing
+    returning event_id`);
+
+  const 접힘 = await 게임행넣기(오늘);
+  확인('🔴 같은날 게임 INSERT 는 말하기 멱등키에 접힌다(0행) — 「그날 배정 1건」은 유일 제약이다',
+    접힘.length === 0, 접힘);
+
+  /* 미래 게임날 — 요일 판정도 정본(`게임날인가`)으로 고른다(2999-01-01 부터 앞으로).
+   * 리터럴 날짜를 박으면 게임 요일이 바뀌는 날 이 시험이 「게임날 아님」을 게임날로 잰다. */
+  const 미래게임날 = (() => {
+    const d = new Date('2999-01-01T00:00:00Z');
+    while (!게임날인가(d.toISOString().slice(0, 10))) d.setUTCDate(d.getUTCDate() + 1);
+    return d.toISOString().slice(0, 10);
+  })();
+  const 선행 = await 게임행넣기(미래게임날);
+  확인(`미래 게임날(${미래게임날})엔 게임 배정이 선다 — task_type·enum·retry FK 를 실제 DB 가 받았다`,
+    선행.length === 1, 선행);
+  const 게임행 = 선행[0] && 선행[0].event_id;
+  await sql(`
+    insert into engine.submissions
+      (event_id, task_type, task_ref, task_snapshot, task_schema_ver, occurred_at, schema_ver, due_at, due_ver)
+    values ('${게임행}'::uuid, '${게임과제유형}', 'task-${미래게임날}',
+            '${JSON.stringify(E스냅).replace(/'/g, "''")}'::jsonb, '${스냅샷모양판}',
+            '${미래게임날}T04:00:00Z'::timestamptz, '${판}',
+            ('${미래게임날}'::date + 1)::timestamp at time zone 'Asia/Ulaanbaatar', 'due.v1')`);
+  const 재접힘 = await 게임행넣기(미래게임날);
+  확인('같은 게임 배정의 재INSERT 는 접힌다(0행) — 재실행이 두 행을 못 만든다',
+    재접힘.length === 0, 재접힘);
+
+  /* 집계 비오염 — 게임 배정도 submissions 에 행을 실으므로(⑥ 과 같은 대가), event_type 을
+   * 안 걸면 E 의 「제출 수」가 배정 수만큼 부푼다. E 의 행: 어제 배정·오늘 배정·게임 배정·원제출. */
+  const [{ e전체, e진짜 }] = await sql(`
+    select (select count(*) from engine.submissions s
+              join engine.learning_events e on e.event_id = s.event_id
+             where e.learner_id = '${id.E}'::uuid) as e전체,
+           (select count(*) from engine.submissions s
+              join engine.learning_events e on e.event_id = s.event_id
+             where e.learner_id = '${id.E}'::uuid and e.event_type = 'submission.created') as e진짜`);
+  확인('게임 배정이 제출로 안 세어진다 — E 의 submissions 행 4 중 진짜 제출은 1이다',
+    Number(e전체) === 4 && Number(e진짜) === 1, { e전체, e진짜 });
+
+  /* 🔴 /tasks 관통(C1) — 거름망(`학생판스냅샷`)이 게임 스냅샷을 `학생판게임스냅샷` 에 위임해
+   *   6키를 **전부** 내보내는가를 배포판에서 잰다(F179 계열 — 로컬 회귀는 함수를 재고, 여기가
+   *   재는 것은 배포된 판이 실제로 그 함수를 거치는가다). 키 목록은 정본(`학생공개키`)이다. */
+  await sql(`update engine.learners set auth_user_id = null where auth_user_id = '${uid}'`);
+  await sql(`update engine.learners set auth_user_id = '${uid}' where learner_id = '${id.E}'::uuid`);
+  const 게임읽기 = await 조회(`?date=${미래게임날}`);
+  const 게임읽은 = (게임읽기.몸.data || [])[0] || {};
+  확인('E 토큰으로 미래 게임날 배정이 1건 나온다',
+    게임읽기.status === 200 && (게임읽기.몸.data || []).length === 1, 게임읽기);
+  확인('🔴 앱이 읽은 task_id 가 그 게임 배정이다', 게임읽은.task_id === 게임행,
+    [게임읽은.task_id, 게임행]);
+  const 읽은키 = Object.keys(게임읽은.task_snapshot || {}).sort();
+  확인('🔴 G1 6키가 전부 나온다 — 거름망이 게임 판을 몰라 벗기면 앱은 게임을 원리상 못 본다',
+    읽은키.length === 학생공개키.length && [...학생공개키].sort().every((k, i) => 읽은키[i] === k),
+    읽은키);
+  확인('스냅샷 값이 심은 그대로다 — 지시문·질문이 그날 학생이 볼 그것이다',
+    학생공개키.every((k) => (게임읽은.task_snapshot || {})[k] === E스냅[k]), 게임읽은.task_snapshot);
+  확인('🔴 재발화 고리가 관통한다 — 게임 재제출의 결과 변수가 화면 재료까지 닿는다',
+    게임읽은.retry_of_event_id === E원제출, [게임읽은.retry_of_event_id, E원제출]);
+
+  /* H3 닻 소등 — 재배정이 서고 나면 거울 조인은 0행이어야 한다(닻은 「retry 배정의 부재」).
+   * 안 꺼지면 다음 게임날마다 같은 원제출로 또 배정이 선다(무한 재제출). */
+  const 소등 = await 거울조인();
+  확인('🔴 재배정 뒤 거울 조인은 0행이다 — not exists 닻이 실제로 꺼진다', 소등.length === 0, 소등);
+
+  /* ── ⑭ 철회한 학생의 교정 (C0 §4-3 ② `blocked` · 전층감사 §2-5 ⓐ) ──────────────
    * 🔴 **맨 끝인 것이 설계다.** 이 칸은 A 의 동의를 **실제로 철회**해야 서는데, 철회는
    *   되돌릴 수 없다(DB 트리거 `protect_consents` — 「재동의는 새 행이다」 L0 §9-3). 앞에 두면
    *   ⑩·⑪ 이 A 의 유효 동의를 전제로 하다가 무너진다. 픽스처 학생은 실행마다 새로 서므로
@@ -670,7 +846,7 @@ async function main() {
    *   나갈 수 있었던 답이 죽는다**(append-only · 소급 0).
    * ⚠ 회귀(`tests/동의게이트.test.js`)는 **소스에 게이트가 적혀 있는지**까지만 본다 — 배포본이
    *   옛 판이면 그 초록은 라이브에 대해 아무 말도 안 한다. 그 사이가 이 칸이다. */
-  console.log('\n■ ⑫ 철회한 학생의 교정 — GET /v1/corrections 의 blocked');
+  console.log('\n■ ⑭ 철회한 학생의 교정 — GET /v1/corrections 의 blocked');
 
   await sql(`update engine.learners set auth_user_id = null where auth_user_id = '${uid}'`);
   await sql(`update engine.learners set auth_user_id = '${uid}' where learner_id = '${id.A}'::uuid`);
