@@ -289,6 +289,12 @@ test('⑧ 경로를 «두 마디»로 가른다 — /v1/teach/아무거나/queue
     'retro/open': 'GET',
     'retro/self': 'POST',
     'retro/judge': 'POST',
+    /* [2026-08-12] 강사 반 단위 피드백 셋(설계 §4). 여기 못박는 것이 값을 하는 자리다 —
+     * 앞 두 개가 GET 인데 옛 삼항 판이었다면 **둘 다 POST 로** 요구했을 것이고, 그 실패는
+     * 405 라 「막혔다」로 보이지 조준 실패로 안 보인다. */
+    'feedback/classes': 'GET',
+    'feedback/queue': 'GET',
+    'feedback/give': 'POST',
   });
   // 안내문을 손으로 적으면 경로가 늘 때 낡는다 — 표에서 파생하는지 본다.
   assert.match(소스, /Object\.entries\(경로표\)/);

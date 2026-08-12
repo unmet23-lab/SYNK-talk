@@ -50,6 +50,7 @@ import 나침반모듈 from './나침반문항.mjs';
 import 회고모듈 from './회고.mjs';
 import 상태모듈 from './학습자상태.mjs';
 import 라디오태스크모듈 from './라디오태스크.mjs';
+import 반피드백모듈 from './반피드백.mjs';
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
 
@@ -104,6 +105,16 @@ const { 판정검사, 자기판정검사, 굳히기, 집계정리, 판정보기,
 
 /* 원신호 목록·라디오 제외는 **축 모듈이 정본**이다(`deliver` 와 같은 사슬 · 여기 다시 안 적는다 —
  * 갈라지면 회고가 굳힌 근거와 매일 도는 상태가 다른 사건을 보게 된다). */
+/* 강사 한 마디 — 어휘·검사의 정본은 `lib/반피드백.js` 다. 여기서 다시 적지 않는다
+ * (같은 판정을 두 곳에 적으면 갈리고, 갈린 쪽은 조용히 틀린다 · 가드 맹점 ④). */
+const { 한마디검사, 카드요약, uuid읽기 } = 반피드백모듈 as {
+  한마디검사: (몸: unknown) => { 거절?: string; 문구?: string; 칸?: string; 값?: {
+    submission_id: string; body: string; origin: string; disposition: string;
+  } };
+  카드요약: (반: { 학생수: number; 기다림: number }) => { 학생수: number; 기다림: number; 모양: string };
+  uuid읽기: (값: unknown) => string | null;
+};
+
 const { 쓰는사건 } = 상태모듈 as { 쓰는사건: string[] };
 const { 라디오태스크종 } = 라디오태스크모듈 as { 라디오태스크종: string[] };
 
@@ -139,6 +150,12 @@ const 경로표 = {
   'retro/open': 'GET',
   'retro/self': 'POST',
   'retro/judge': 'POST',
+  /* 강사 반 단위 피드백 — 셋이다(설계 §4). 하나로 합치지 않는 이유가 앞의 회고와 다르다:
+   *   여기선 **권한의 결이 갈린다**. 앞 둘은 「내 반이 무엇인가」를 서버가 정하고, 마지막
+   *   하나는 호출자가 준 산출물이 정말 내 반 것인지를 서버가 되묻는다. */
+  'feedback/classes': 'GET',
+  'feedback/queue': 'GET',
+  'feedback/give': 'POST',
 } as const;
 type 아는경로 = keyof typeof 경로표;
 const 안내 = Object.entries(경로표).map(([p, m]) => `${m} /v1/teach/${p}`).join(' · ');
@@ -170,6 +187,10 @@ const 거절상태 = {
   RETRO_NOT_DUE: 409,
   RETRO_NOT_OPENED: 409,
   SELF_AFTER_JUDGE: 409,
+  /* 강사 한 마디 — 「지금은 안 된다」라 409 다.
+   * `NOTE_BY_OTHER` = 같은 산출물에 **다른 강사**가 이미 한 마디를 남겼다(한 반에 강사 둘이
+   *   정상이라 실제로 난다 · 설계 §1 ⓐ). 자기 것 개서는 이 코드로 안 온다. */
+  NOTE_BY_OTHER: 409,
   CONSENT_MISSING: 403,
   INTERNAL: 500,
 } as const;
@@ -247,6 +268,8 @@ Deno.serve(async (req: Request) => {
     if (경로 === 'gold/queue') return await 큐읽기(url, staff_id, ver);
     if (경로 === 'compass/open') return await 나침반열기(url, staff_id, ver);
     if (경로 === 'retro/open') return await 회고열기(url, staff_id, ver);
+    if (경로 === 'feedback/classes') return await 내반목록(staff_id, ver);
+    if (경로 === 'feedback/queue') return await 반큐읽기(url, staff_id, ver);
     const 본문 = await 본문읽기(req);
     if (본문 === undefined) {
       return 실패(400, { code: 'CONTRACT_VIOLATION', message: 'JSON 이 아닙니다', retryable: false }, ver);
@@ -254,6 +277,7 @@ Deno.serve(async (req: Request) => {
     if (경로 === 'compass/save') return await 나침반저장(본문, staff_id, ver);
     if (경로 === 'retro/self') return await 자기판정(본문, staff_id, ver);
     if (경로 === 'retro/judge') return await 회고판정(본문, staff_id, ver);
+    if (경로 === 'feedback/give') return await 한마디주기(본문, staff_id, ver);
     return await 판정하기(본문, staff_id, ver);
   } catch (e) {
     console.error(`[teach/${경로}] 실패`, String((e as Error)?.message ?? e));
@@ -1077,5 +1101,244 @@ async function 회고판정(본문: unknown, staff_id: string, ver: string) {
   });
 
   if ('거절' in 결과) return 거절응답(결과, ver);
+  return 봉투(200, { ok: true, ...결과 }, ver);
+}
+
+/* ── 강사 반 단위 피드백 (설계 §4·§5) ───────────────────────────────────────
+ *
+ * 🔴 **권한은 라우트가 아니라 `staff_classes` 가 건다.** `service_role` 은 RLS 를 우회하므로
+ *   이 조인이 유일한 방어선이다 — 「내 반만 보인다」를 화면 규약으로 두면 서버가 안 지킨다.
+ *   그래서 `class_id` 를 인자로 받되 **믿지 않는다**(받은 값으로 바로 조인하는 게 아니라, 내 반
+ *   목록과의 교집합을 먼저 낸다).
+ *
+ * 🔑 **`target_ids` 의 단위는 라우트마다 다르다** — 그 라우트가 «무엇에 대해» 일했는지를 적는다
+ *   (`gold/queue` 는 correction · `compass/open` 은 learner). 단위는 `action` 이름이 들고 있다.
+ */
+
+/**
+ * 「기다리는 것」의 **유일한 정의**. 두 라우트가 이 함수 하나를 쓴다.
+ *
+ * 🔴 카드의 셈(`feedback/classes`)과 목록(`feedback/queue`)이 각자 술어를 적으면 갈리고,
+ *   갈린 증상은 **「● 4 인데 들어가면 3건」**이다 — 강사는 자기가 뭘 놓쳤는지 찾다 시간을 쓴다.
+ *   `correct/index.ts:140` 이 「대기 12인데 집히는 건 0」을 막으려고 쓴 것과 같은 처방이다.
+ *
+ * 정의 두 조각:
+ *   ① **AI 교정이 이미 났다** — 강사가 반응할 대상이 있어야 큐에 선다. 곁들여 G2 「맞음」
+ *      자동 하강(설계 §7)이 앞단에서 빼 준 것은 여기 자동으로 안 들어온다(같은 축이다).
+ *   ② **강사 한 마디가 아직 없다** — `teacher_notes` 가 상태의 정본이다(감사 원장이 아니라).
+ *
+ * @param class_id null 이면 내 반 전부.
+ */
+function 기다림질의(tx: unknown, staff_id: string, class_id: string | null) {
+  const q = tx as typeof sql;
+  return q`
+    select l.class_id, l.learner_id, l.display_name, l.student_code,
+           s.submission_id, s.task_type, s.task_format, s.occurred_at
+      from engine.staff_classes sc
+      join engine.learners l        on l.class_id = sc.class_id and l.active
+      join engine.learning_events e on e.learner_id = l.learner_id
+      join engine.submissions s     on s.event_id = e.event_id
+     where sc.staff_id = ${staff_id}::uuid
+       and (${class_id}::uuid is null or sc.class_id = ${class_id}::uuid)
+       and exists (select 1 from engine.corrections c
+                    where c.submission_id = s.submission_id and c.actor_kind = 'ai')
+       and not exists (select 1 from engine.teacher_notes n
+                        where n.submission_id = s.submission_id)
+     order by s.occurred_at`;
+}
+
+/* ── GET /v1/teach/feedback/classes ──────────────────────────────────────── */
+
+async function 내반목록(staff_id: string, ver: string) {
+  /* 주는 **서버가 정한다** — `gold/queue` 와 같은 사유다. 골든표본의 ISO 주 셈을 그대로 쓴다
+   * (시간대 리터럴을 여기 다시 적지 않는다 — 재기입한 사본은 갈리는 날 조용히 틀린다). */
+  const 이번주 = iso주(new Date());
+  const 주 = 주범위(키(이번주.연, 이번주.주))!;
+
+  const 결과 = await sql.begin(async (tx) => {
+    const 반들 = await tx`
+      select c.class_id, c.class_key, c.display_name,
+             (select count(*) from engine.learners l
+               where l.class_id = c.class_id and l.active) as 학생수
+        from engine.staff_classes sc
+        join engine.classes c on c.class_id = sc.class_id and c.active
+       where sc.staff_id = ${staff_id}::uuid
+       order by c.class_key`;
+
+    const ids = 반들.map((r: Record<string, unknown>) => String(r.class_id));
+
+    /* ⚠ **0건도 감사 1행 남긴다** — `gold/queue` 와 같은 판정이다. */
+    await tx`
+      insert into engine.staff_access_log (staff_id, action, target_ids)
+      values (${staff_id}::uuid, 'teach.feedback.classes', ${ids}::uuid[])`;
+
+    if (!ids.length) return { classes: [], quiet: [] };
+
+    const 기다림 = await 기다림질의(tx, staff_id, null) as unknown as Array<{ class_id: string }>;
+    const 반별 = new Map<string, number>();
+    for (const r of 기다림) {
+      const k = String(r.class_id);
+      반별.set(k, (반별.get(k) ?? 0) + 1);
+    }
+
+    /* 🎯 **이번 주 한 마디를 한 번도 못 받은 학생**(설계 §5 한 수 더 · 채택).
+     * 🔑 설계는 이 신호를 `staff_access_log`(누가 어느 «행»을 열었나)에서 뽑자고 적었는데,
+     *   세워 보니 큐를 한 번 열면 그 반 학생이 **전원** 열린 것이 되어 목록이 영구히 빈다 —
+     *   재는 층이 목적과 어긋난다. 그래서 **한 마디를 줬나**로 잰다: 화면을 연 것은 주의가
+     *   아니고, 말을 건 것이 주의다. 곁들여 **아무것도 안 낸 학생도 여기 뜬다**(낼 것이 없으니
+     *   한 마디도 없다) — 조용한 학생이 조용한 채로 지나가는 것을 막는 것이 이 칸의 목적이라
+     *   그게 맞는 동작이다. 🚫 학생에게 보여주지 않는다(강사 자신의 행동 기록이다). */
+    const 조용한 = await tx`
+      select l.class_id, l.learner_id, l.display_name
+        from engine.staff_classes sc
+        join engine.learners l on l.class_id = sc.class_id and l.active
+       where sc.staff_id = ${staff_id}::uuid
+         and not exists (
+           select 1 from engine.teacher_notes n
+             join engine.submissions s2     on s2.submission_id = n.submission_id
+             join engine.learning_events e2 on e2.event_id = s2.event_id
+            where n.staff_id = ${staff_id}::uuid
+              and e2.learner_id = l.learner_id
+              and n.created_at >= ${주.시작}::timestamptz
+              and n.created_at <  ${주.끝}::timestamptz)
+       order by l.display_name`;
+
+    return {
+      classes: 반들.map((r: Record<string, unknown>) => ({
+        class_id: String(r.class_id),
+        class_key: r.class_key,
+        display_name: r.display_name ?? null,
+        ...카드요약({ 학생수: Number(r.학생수), 기다림: 반별.get(String(r.class_id)) ?? 0 }),
+      })),
+      quiet: 조용한.map((r: Record<string, unknown>) => ({
+        class_id: String(r.class_id),
+        learner_id: String(r.learner_id),
+        display_name: r.display_name ?? null,
+      })),
+    };
+  });
+
+  /* 🔴 **빈 화면과 권한 없음이 같은 모양이면 안 된다**(설계 §5). 담당 반이 0개인 강사는
+   *   「아무것도 없다」가 아니라 「배정된 반이 없다」를 본다 — 원장이 배정을 안 한 것이지
+   *   그가 일을 다 끝낸 것이 아니다. */
+  return 봉투(200, {
+    ok: true,
+    week: { starts_at: 주.시작, ends_at: 주.끝 },
+    ...결과,
+    ...(결과.classes.length ? {} : { empty_reason: 'no_classes_assigned' }),
+  }, ver);
+}
+
+/* ── GET /v1/teach/feedback/queue?class_id= ──────────────────────────────── */
+
+async function 반큐읽기(url: URL, staff_id: string, ver: string) {
+  const class_id = uuid읽기(url.searchParams.get('class_id'));
+  if (!class_id) {
+    return 실패(400, {
+      code: 'CONTRACT_VIOLATION', message: 'class_id 가 uuid 가 아닙니다',
+      retryable: false, field: 'class_id',
+    }, ver);
+  }
+
+  const 결과 = await sql.begin(async (tx) => {
+    /* 🔴 내 반인지 **먼저** 판정한다 — 「0행이니 빈 반이겠지」로 접으면 남의 반을 조회한 것과
+     *   내 빈 반이 같은 응답이 되고, 그 순간 이 통로가 「그 반이 있느냐」를 알려주는 통로가 된다. */
+    const [내반] = await tx`
+      select c.class_id, c.class_key, c.display_name
+        from engine.staff_classes sc
+        join engine.classes c on c.class_id = sc.class_id
+       where sc.staff_id = ${staff_id}::uuid and sc.class_id = ${class_id}::uuid`;
+    if (!내반) return { 거절: 'NOT_FOUND' as 거절코드, 문구: '담당 반이 아닙니다', 칸: 'class_id' };
+
+    const 항목들 = await 기다림질의(tx, staff_id, class_id) as unknown as Array<Record<string, unknown>>;
+
+    /* ⚠ 0건도 감사 1행. 단위는 **학생**이다 — 「이 반에서 내가 누구를 봤나」가 그 축이다. */
+    const 학생들 = [...new Set(항목들.map((r) => String(r.learner_id)))];
+    await tx`
+      insert into engine.staff_access_log (staff_id, action, target_ids)
+      values (${staff_id}::uuid, 'teach.feedback.queue', ${학생들}::uuid[])`;
+
+    return {
+      class: { class_id, class_key: 내반.class_key, display_name: 내반.display_name ?? null },
+      /* 🔴 정렬 축은 **「오래 기다린 순」 하나**다(질의의 `order by occurred_at`). 점수·정답률·
+       *   진도로 정렬하는 순간 이 화면이 등수표가 되고 철학 ㉢ 을 정면으로 깬다. 기다린 시간은
+       *   학생의 속성이 아니라 **내 일감의 나이**다. 🚫 평균·상위·배지 어느 자리에도. */
+      items: 항목들.map((r) => ({
+        submission_id: String(r.submission_id),
+        learner_id: String(r.learner_id),
+        display_name: r.display_name ?? null,
+        student_code: r.student_code ?? null,
+        task_type: r.task_type,
+        task_format: r.task_format ?? null,
+        occurred_at: r.occurred_at,
+      })),
+    };
+  });
+
+  if ('거절' in 결과) return 거절응답(결과 as { 거절: 거절코드; 문구: string; 칸?: string }, ver);
+  return 봉투(200, { ok: true, ...결과 }, ver);
+}
+
+/* ── POST /v1/teach/feedback/give ────────────────────────────────────────── */
+
+async function 한마디주기(본문: unknown, staff_id: string, ver: string) {
+  const 검사 = 한마디검사(본문);
+  if (검사.거절) {
+    return 거절응답({ 거절: 검사.거절 as 거절코드, 문구: String(검사.문구), 칸: 검사.칸 }, ver);
+  }
+  const 값 = 검사.값!;
+
+  const 결과 = await sql.begin(async (tx) => {
+    /* 🔴 호출자가 준 `submission_id` 를 **믿지 않는다** — 담당 반 밖 학생의 산출물이면 여기서
+     *   0행으로 막힌다. 「없다」와 「내 것이 아니다」를 **같은 코드**로 묶는 것도 뜻이 있다:
+     *   가르면 응답 자체가 「그 산출물은 있다」를 말한다(:239 NOT_STAFF 와 같은 판단). */
+    const [권한] = await tx`
+      select s.submission_id
+        from engine.submissions s
+        join engine.learning_events e on e.event_id = s.event_id
+        join engine.learners l        on l.learner_id = e.learner_id and l.active
+        join engine.staff_classes sc  on sc.class_id = l.class_id
+       where s.submission_id = ${값.submission_id}::uuid
+         and sc.staff_id = ${staff_id}::uuid`;
+    if (!권한) {
+      return { 거절: 'NOT_FOUND' as 거절코드, 문구: '담당 반의 산출물이 아닙니다', 칸: 'submission_id' };
+    }
+
+    /* 개서는 연다 — 단 **자기 것만**. 한 반에 강사 둘이 정상이라(설계 §1 ⓐ) 남의 한 마디를
+     * 조용히 덮는 길을 열면, 학생에게 간 말이 누구 말인지 아무도 모르게 된다.
+     * ⚠ `where` 가 안 맞으면 `on conflict do update` 는 **0행을 돌려준다** — 그 침묵을
+     *   「성공」으로 읽지 않는다(아래 `if (!행)`). */
+    const [행] = await tx`
+      insert into engine.teacher_notes
+             (submission_id, staff_id, body, origin, disposition, schema_ver)
+      values (${값.submission_id}::uuid, ${staff_id}::uuid,
+              ${값.body}, ${값.origin}, ${값.disposition}, ${ver})
+      on conflict on constraint teacher_notes_once_c11 do update
+         set body = excluded.body, origin = excluded.origin,
+             disposition = excluded.disposition, updated_at = now()
+       where engine.teacher_notes.staff_id = ${staff_id}::uuid
+      returning note_id, created_at, updated_at`;
+    if (!행) {
+      return {
+        거절: 'NOTE_BY_OTHER' as 거절코드,
+        문구: '다른 선생님이 이미 한 마디를 남겼습니다', 칸: 'submission_id',
+      };
+    }
+
+    await tx`
+      insert into engine.staff_access_log (staff_id, action, target_ids)
+      values (${staff_id}::uuid, 'teach.feedback.give', array[${값.submission_id}::uuid])`;
+
+    return {
+      note_id: String(행.note_id),
+      created_at: 행.created_at,
+      /* 고쳐 쓴 것인지 처음 쓴 것인지를 화면이 그 자리에서 안다 — 다시 조회하면 못 가른다. */
+      updated_at: 행.updated_at ?? null,
+      disposition: 값.disposition,
+      origin: 값.origin,
+    };
+  });
+
+  if ('거절' in 결과) return 거절응답(결과 as { 거절: 거절코드; 문구: string; 칸?: string }, ver);
   return 봉투(200, { ok: true, ...결과 }, ver);
 }

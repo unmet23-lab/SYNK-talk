@@ -1,11 +1,155 @@
--- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
+-- 강사 한 마디를 담을 자리 — 강사 반 단위 피드백의 §6 ㉠ 조각
 --
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 정본 = SYNK-talk `docs/강사_반단위_피드백_설계.md` v2 §6 (유호님 신규 지시 2026-08-12
+--   「반을 보기 쉽게 정해서 해당 반에 들어가서 피드백하기 쉽도록」).
+-- 앞 조각(`20260812200000_class_c11`)이 「반」을 세웠고, 이 조각은 그 반 안에서 강사가 낸
+--   한 마디가 **어디에 앉는가**를 세운다. 통로(§8-3 `teach` 라우트 셋)는 같은 커밋에 선다.
+--
+-- ■ 🔴 왜 `corrections` 가 아닌가 (설계 §2 — 이 설계의 급소)
+--   `actor_kind='teacher'` 는 「강사」가 아니라 **「사람 직원」**이고 검수 확정이 그 값으로 앉는다
+--   (`review/index.ts:572`). 강사 한 마디를 그 표에 쓰면 세 자리가 한꺼번에 오염된다:
+--     ① `supersedes` 대상 판정이 `actor_kind='teacher'` **하나로만** 가른다(`review:490`) →
+--        강사 행이 정당한 재검수 대상이 되고, 거절 문구조차 사람 눈엔 정상으로 보인다.
+--     ② `promotion_intent` CHECK(`= false or actor_kind='teacher'`) → 검수 안 거친 한 마디가
+--        **훈련 승격 후보** 자리에 선다.
+--     ③ `verdict` 계보가 검수 확정과 섞인다.
+--   🚫 `actor_kind` 에 값을 더하는 길도 막혀 있다 — c6 이 `actor_values` 를 못박아 검사하므로
+--      계약·CHECK·검사 셋이 동시에 흔들린다. 그래서 **표를 따로 둔다**.
+--
+-- ■ 왜 ㉡(기존 `learning_events`)이 아닌가 — 지금은 «소비자»가 그쪽에 없다
+--   설계 §6 ▶권고 그대로다. 사건으로 쓰면 새 표는 0인데 그 사건을 읽어 학생 화면에 배달하는
+--   배선이 아직 판정도 안 섰다 — 소비자 없는 생산자가 되어 도달 래칫에 걸린다.
+--   이 표는 **태어나는 순간 소비자가 있다**: 강사 큐가 「한 마디가 이미 있는 것」을 빼는 데 쓴다.
+--   ⚠ 배달 배선이 서는 날 ㉡ 을 «더한다»(이 표를 지우는 것이 아니라 — 여기는 강사가 쓴 원문이고
+--     거기는 학생에게 간 사건이다. 뜻이 다르므로 합치지 않는다).
+--
+-- ■ 🔴 파일 이름이 c12 가 아니라 c11 인 이유 — 앞 조각의 판단을 **그대로** 잇는다
+--   설계 문서는 §6 을 「계약 변경」이라 적었지만, 그 판정은 `20260812200000` 이 이미 한 번
+--   바로잡은 것과 같은 이름 오류다. 계약판은 `계약/수집_교정_계약.json` 의 `버전`에서 파생되고
+--   (`tests/L0스키마.test.js` 의 `제약()`), 네 Edge Function 이 계약판을 **최신 조각 이름**에서
+--   읽는다(`tests/마이그레이션이름.test.js`). 이 조각이 계약을 바꾸는가를 셋으로 잰다:
+--     새 `event_type` **0** · 새 값목록(`계약`의 열거) **0** · `learning_events` 손댐 **0**.
+--   셋 다 0이라 계약판은 c11 그대로다. `season_c11`·`season_review_c11`·`learner_profile_c11`·
+--   `class_c11` 이 `engine_c11` 뒤에 c11 을 이어 쓴 것과 같은 판단이다.
+--   ⚠ 이 표의 값목록 둘(`origin`·`disposition`)은 **계약 파일에 없다** — 앱↔서버 계약이 아니라
+--     강사 화면 안에서만 도는 어휘라 `lib/반피드백.js` 가 정본이고 아래 CHECK 가 그 사본이다.
+--     사본을 없앨 수 없으니 기계에 물린다 — `tests/반피드백.test.js` 가 두 소스를 대조한다.
+--
+-- ■ 한 산출물에 한 마디 — 유일 제약으로 못박는다
+--   두 벌을 허용하면 「기다리는 것 n」의 뜻이 즉시 갈린다(마디 수인가 산출물 수인가).
+--   대신 **개서는 연다**(`on conflict do update`) — 삭제가 막힌 자리에서 개서까지 막으면
+--   남는 통로가 0이 되고, 그때 우회가 정상 통로가 된다(F103 · 회고 조각과 같은 판단).
+--   `updated_at` 을 둬서 고쳐 쓴 사실이 **행에 남게** 한다(개서를 열되 조용하지는 않게).
+--
+-- ■ 삭제는 막는다
+--   강사가 낸 말은 사람 손에서만 나오므로 사라지면 소급이 안 된다 — 나침반·회고와 같다.
+--
+-- ■ 채우는 코드는 이 조각에 0줄이다 — 정직 표기
+--   생산자 = `functions/teach` 의 `POST feedback/give` 이고 **같은 커밋**에 선다.
+--   「표가 섰다」를 「강사 피드백이 돈다」로 읽지 않는다 — 라이브 붓기는 ⏳유호님 승인이고,
+--   그 전까지 이 표의 행 수는 0이다.
+--   ⚠ 아직 **없는 것**: 학생에게 배달하는 배선(§6 ㉡)과 시즌 롤오버는 여기에도, 어디에도 없다.
+--
+-- 되돌림: drop table if exists engine.teacher_notes;
+--        drop function if exists engine.teacher_notes_protect();
+--        delete from engine.schema_migrations where version = '20260812210000';
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260812210000';
+  migration_name constant text := '20260812210000_teacher_notes_c11.sql';
+  expected_checksum constant text := '0b8347b2d9a9541c9601f7f4f2b69e5db675217bf4f2e2caa3bcbe2babbd818d'; -- migration-checksum
+  base_version constant text := '20260812200000';
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 c11 위에서만 돈다 — engine.schema_migrations가 없다(빈 DB면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      '이 조각은 기준선 % 위에서만 돈다 — 이력에 그 판이 없다(부분·혼합·불명이라 중단한다)',
+      base_version;
+  end if;
+
+  if to_regclass('engine.classes') is null then
+    raise exception
+      'engine.classes 가 없다 — 한 마디는 반 안에서 나온다(20260812200000_class_c11 이 먼저 서야 한다)';
+  end if;
+
+  -- 강사 한 마디 — 산출물 하나에 하나. `body` 는 강사가 실제로 «보낸» 글이고,
+  --   `origin` 은 그 글이 **어디서 왔나**(AI 문장 그대로냐 · 고쳤냐 · 직접 썼냐)다.
+  --   ⚠ `origin` 을 안 두면 설계 §6 도전안(기본 동작을 「고르기」로)이 답 나는 날 마이그가
+  --     한 벌 더 필요해지고, 그때는 이미 쌓인 행의 갈래를 **영원히 복원 못 한다**.
+  --     지금 칸을 두면 어느 답이 나와도 화면 버튼만 갈리고 물리는 안 흔들린다.
+  create table if not exists engine.teacher_notes (
+    note_id       uuid primary key default gen_random_uuid(),
+    submission_id uuid not null references engine.submissions(submission_id) on delete restrict,
+    staff_id      uuid not null references engine.staff(staff_id),
+    body          text not null constraint teacher_notes_body_nonblank_c11 check (btrim(body) <> ''),
+    origin        text not null constraint teacher_notes_origin_c11
+                    check (origin in ('as_is', 'edited', 'written')),
+    disposition   text not null constraint teacher_notes_disposition_c11
+                    check (disposition in ('confirmed', 'retry')),
+    created_at    timestamptz not null default now(),
+    updated_at    timestamptz,
+    schema_ver    text not null,
+    constraint teacher_notes_once_c11 unique (submission_id)
+  );
+
+  comment on table engine.teacher_notes is
+    '강사가 한 산출물에 낸 한 마디(강사_반단위_피드백_설계 §6 ㉠). 🚫corrections 아님 — actor_kind=teacher 는 「사람 직원」이라 검수 계보를 오염시킨다(§2).';
+
+  -- 「이번 주 이 강사가 누구에게 한 마디를 냈나」가 이 인덱스를 탄다(설계 §5 한 수 더).
+  create index if not exists teacher_notes_staff_created
+    on engine.teacher_notes (staff_id, created_at);
+
+  /* 삭제 금지 — 회고·나침반과 같다. 사람 손에서만 나오는 말은 사라지면 소급이 안 된다.
+   * ⚠ 개서를 «같이» 막지 않는 이유는 머리말 참조(막으면 우회가 정상 통로가 된다 · F103). */
+  create or replace function engine.teacher_notes_protect() returns trigger
+    language plpgsql as $protect$
+  begin
+    raise exception '강사 한 마디는 삭제하지 않는다 — 사람이 낸 말은 소급이 안 된다(강사_반단위_피드백_설계 §6)';
+  end
+  $protect$;
+
+  drop trigger if exists teacher_notes_protect on engine.teacher_notes;
+  create trigger teacher_notes_protect
+    before delete on engine.teacher_notes
+    for each row execute function engine.teacher_notes_protect();
+
+  -- engine 취급 그대로 — RLS 켜고 정책 0(전면 거부) · service_role 만 쓰기 · PostgREST 비노출.
+  -- 나중에 노출하는 날 잊어도 **닫힌 채로 실패한다**.
+  alter table engine.teacher_notes enable row level security;
+
+  insert into engine.schema_migrations(version, name, checksum)
+  values (migration_version, migration_name, expected_checksum);
+end
+$migration$;
+
+commit;
+
 -- ============================================================================
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
+-- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -300,3 +444,37 @@ select case when 테이블수=17 and RLS켜짐=17 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
 from 셈;
+*/
+
+-- 확인
+-- ⓪ 🔴 **순서** — 이 조각은 `20260812200000_class_c11.sql` «뒤»에만 선다(base_version).
+--    앞의 c11 조각들이 아직 유호님 승인 대기라, 이 조각도 **같은 승인에 얹혀** 부어진다.
+--    먼저 부으면 base_version 검사가 「이력에 그 판이 없다」로 중단시킨다(안전 방향).
+-- ① 표 **+1**(`teacher_notes`) · RLS **+1** · 정책 0 · 트리거 **+1**(삭제 금지) · 열 신설 9.
+--    `삭제차단`(5)은 앞 조각 그대로다 — 이 조각의 restrict 고리는 `submissions` 를 가리킨다.
+-- ② 새 칸 `겹친한마디` = **0**. 유일 «제약»의 존재는 `빠진제약` 이 이미 보므로 이 칸은
+--    **데이터**만 잰다(앞 조각의 `겹친반좌표`+`반좌표유일` 두 칸이 필요했던 이유는 부분 인덱스가
+--    pg_constraint 에 안 잡히기 때문이다 — 여기는 제약이라 한 칸으로 족하다).
+-- ③ 이 조각은 **행을 하나도 안 만든다**. `engine.teacher_notes` 는 `POST feedback/give` 가
+--    채운다 — 지금 0행이 정상이다. 「표가 섰다」를 「강사 피드백이 돈다」로 읽지 않는다.
+-- ④ 🔴 아직 **없는 것** — ㉠에 앉은 한 마디를 학생 화면으로 배달하는 배선(§6 ㉡)이 없다.
+--    지금 소비자는 강사 큐 하나뿐이고(「한 마디가 이미 있는 것」을 뺀다), 학생은 아직 못 본다.
+-- ⑤ CHECK 제약은 현행 접미사만 남아야 한다(이 조각이 c11 CHECK 셋을 더한다).
+--    ⚠ 이 줄은 **마지막 조각**이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--      📏 앞 조각이 이 자리를 밟고 경고를 남겼는데 **이 조각도 그대로 밟았다**(위 ⓪의 파일명이
+--        잡혔다) — 경고문은 다음 사람을 못 막는다. 막는 것은 이 회귀 하나다.
+--    ⚠ `teacher_notes_once_c11` 은 여기 없다 — UNIQUE 라 CHECK 목록의 대상이 아니다.
+--    기대: broadcast_segment_kind_c11 · classes_key_nonblank_c11
+--         · corrections_promotion_intent_c11
+--         · corrections_supersedes_not_self_c11 · corrections_verdict_c11
+--         · learners_gender_c11 · learners_goal_track_c11 · learners_home_aimag_c11
+--         · learners_signup_attempts_nonneg_c11 · learners_temp_password_paired_c11
+--         · learning_events_correction_target_c11 · learning_events_event_type_c11
+--         · learning_events_task_type_c11 · pipeline_jobs_discard_reason_c11
+--         · season_compass_answers_c11 · season_dates_c11
+--         · season_review_decided_c11 · season_review_self_c11 · season_review_verdict_c11
+--         · staff_role_c11 · submissions_due_paired_c11 · submissions_task_format_c11
+--         · submissions_translation_source_c11 · teacher_notes_body_nonblank_c11
+--         · teacher_notes_disposition_c11 · teacher_notes_origin_c11
