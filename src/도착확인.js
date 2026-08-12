@@ -106,6 +106,14 @@ export default function 도착확인({ 돌아가기, 가기 }) {
             style={({ pressed }) => [s.줄버튼, pressed && { opacity: 0.65 }]}>
             <Text style={s.줄버튼글}>이번 주 골든 판정 (원장·강사)</Text>
           </Pressable>
+          {/* 🔴 **소급이 원리상 안 되는 유일한 자리**다(시즌회고_설계 §2) — 나침반은 입학하는
+              그날과 시즌이 열리는 그날에만 담긴다. 밀리면 그 학생의 회고는 영원히 반쪽이고,
+              대외로는 「입학할 때, 그리고 시즌마다」가 이미 약속돼 있다(상담AI FAQ Q11).
+              문은 골든 판정과 같다(`teach` · `teacher`·`director`) — 권한은 서버가 정한다. */}
+          <Pressable onPress={() => 가기('나침반')} hitSlop={6}
+            style={({ pressed }) => [s.줄버튼, pressed && { opacity: 0.65 }]}>
+            <Text style={s.줄버튼글}>나침반 세션 (원장·강사)</Text>
+          </Pressable>
           {/* 🔴 이 통로가 없으면 한 기기는 **영원히 한 계정**이다 — 공용·형제 기기에서 다음
               학생의 발화가 앞 학생 행으로 저장되고, append-only 라 되돌릴 방법이 없다. */}
           <Pressable onPress={물어보기} hitSlop={6}

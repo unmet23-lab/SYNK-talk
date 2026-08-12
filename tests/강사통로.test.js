@@ -99,7 +99,12 @@ test('③ 감사 `target_ids` 에 둘을 담는다 — [평가 대상, 골든 �
 test('④ 판정 insert 와 감사 insert 가 같은 `sql.begin` 안이다', () => {
   const i = 소스.indexOf('async function 판정하기');
   assert.ok(i > 0, '판정하기 함수를 못 찾았다');
-  const 본문 = 소스.slice(i);
+  /* [2026-08-12] 끝을 **다음 함수**로 못박는다 — 옛 판은 파일 «끝»까지 잘랐다. 그래서 이
+   * 파일에 새 핸들러(나침반 두 경로)가 붙는 순간 그 함수들의 `sql.begin` 이 「판정하기가
+   * 트랜잭션을 둘로 갈랐다」로 잡혔다. 코드가 아니라 **재는 층**이 틀렸던 자리다(멀쩡한
+   * 것이 빨개진다 · F287 계열). 아래 새 검사가 나침반 쪽 같은 성질을 따로 진다. */
+  const 다음 = 소스.indexOf('\nasync function ', i + 1);
+  const 본문 = 소스.slice(i, 다음 > i ? 다음 : undefined);
   const b = 본문.indexOf('sql.begin');
   assert.ok(b > 0, '판정하기가 트랜잭션을 안 연다');
   const 골든삽입 = 본문.indexOf('insert into engine.corrections');
@@ -243,10 +248,60 @@ test('⑧ 동봉이 실제 lib 파일을 가리킨다(손 사본 0)', () => {
 
 test('⑧ 경로를 «두 마디»로 가른다 — /v1/teach/아무거나/queue 가 안 통한다', () => {
   assert.match(소스, /마디\.slice\(-2\)\.join\('\/'\)/);
-  const m = /const\s+아는경로\s*=\s*\[([^\]]*)\]/.exec(소스);
-  assert.ok(m, '아는경로 선언을 못 찾았다');
-  const 경로들 = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]).sort();
-  assert.deepEqual(경로들, ['gold/judge', 'gold/queue']);
+  /* [2026-08-12] 목록·메서드·안내문이 **한 곳(`경로표`)에서 파생**되도록 바뀌었다.
+   * 옛 판은 `아는경로` 목록만 봤고 메서드는 삼항(`=== 'gold/queue' ? 'GET' : 'POST'`)에
+   * 따로 살았다 — 경로가 넷이 되는 순간 그 `else` 가 **새 GET 경로를 POST 로** 요구한다.
+   * 그래서 여기서 **메서드까지** 못박는다(같은 판정을 두 곳에 적으면 갈라진다). */
+  const m = /const\s+경로표\s*=\s*\{([\s\S]*?)\}\s*as\s+const/.exec(소스);
+  assert.ok(m, '경로표 선언을 못 찾았다');
+  const 표 = Object.fromEntries([...m[1].matchAll(/'([^']+)'\s*:\s*'([A-Z]+)'/g)].map((x) => [x[1], x[2]]));
+  assert.deepEqual(표, {
+    'gold/queue': 'GET',
+    'gold/judge': 'POST',
+    'compass/open': 'GET',
+    'compass/save': 'POST',
+  });
+  // 안내문을 손으로 적으면 경로가 늘 때 낡는다 — 표에서 파생하는지 본다.
+  assert.match(소스, /Object\.entries\(경로표\)/);
+});
+
+/* ── 나침반(시즌회고_설계 §8 ①②) — 같은 성질을 새 경로에도 건다 ─────────── */
+
+test('④ 나침반 저장도 쓰기와 감사가 한 트랜잭션이다', () => {
+  const i = 소스.indexOf('async function 나침반저장');
+  assert.ok(i > 0, '나침반저장 함수를 못 찾았다 — 이 검사가 통째로 미실행이다');
+  const 다음 = 소스.indexOf('\nasync function ', i + 1);
+  const 본문 = 소스.slice(i, 다음 > i ? 다음 : undefined);
+  const b = 본문.indexOf('sql.begin');
+  assert.ok(b > 0, '나침반저장이 트랜잭션을 안 연다');
+  assert.ok(본문.indexOf('insert into engine.season_compass') > b, '나침반 쓰기가 트랜잭션 밖이다');
+  assert.ok(본문.indexOf("'teach.compass.save'") > b, '감사가 트랜잭션 밖이다');
+  assert.ok(본문.slice(b).indexOf('sql.begin', 1) === -1, '트랜잭션이 둘로 갈렸다');
+});
+
+test('🔴 시즌·회차·목적을 **서버가 정한다** — 앱이 보낸 값으로 행을 쓰지 않는다', () => {
+  const i = 소스.indexOf('async function 나침반저장');
+  const 본문 = 소스.slice(i);
+  /* 앱이 고르면 강사가 지난 시즌에 소급 기입할 수 있고, 그 순간 이 설계의 전제
+   * (그때 그 시점의 선언)가 무너진다. `b.season_id` 는 **조준 확인용**으로만 읽힌다. */
+  assert.ok(본문.includes('시즌.season_id'), '오늘의 시즌 행을 안 쓴다');
+  assert.ok(!/values\s*\([^)]*화면시즌/.test(본문), '앱이 보낸 season_id 로 행을 쓴다');
+  assert.ok(본문.includes('회차판정('), '회차를 서버가 안 정한다');
+  assert.ok(!/b\.round|b\.회차/.test(본문), '앱이 보낸 회차를 읽는다');
+  assert.ok(!/b\.goal_track/.test(본문), '앱이 보낸 목적을 그날의 목적으로 굳힌다');
+});
+
+test('🔴 나침반 어휘 사본이 0개다 — 문항키는 `lib/나침반문항.js` 하나가 정본이다', () => {
+  for (const 키 of ['why_learning', 'topik_use', 'season_goal']) {
+    assert.ok(!소스.includes(키), `${키} 사본이 통로에 들어갔다 — 정본이 둘이 된다`);
+  }
+});
+
+test('🚫 나침반 답을 사건으로 흘리지 않는다 — 새 event_type 0(설계 §10)', () => {
+  const i = 소스.indexOf('async function 나침반저장');
+  const 본문 = 소스.slice(i);
+  assert.ok(!본문.includes('learning_events'), '나침반이 learning_events 에 쓴다');
+  assert.ok(!본문.includes('preference.stated'), 'c11 ⑦ 가드를 깎는 자리다');
 });
 
 test('⑧ ⏳ 관찰 경로는 아직 없다 — 유호님 계약 판정 전에 짓지 않는다', () => {

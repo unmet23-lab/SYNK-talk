@@ -36,7 +36,11 @@ with 기대열(t, c) as (values
   ('staff','role'), ('staff','staff_id'), ('staff','active'), ('staff','revoked_before'),
   ('staff_access_log','action'), ('staff_access_log','target_ids'),
   -- 임시번호를 해시로 든다(L0 §4-2-2 · 20260807024500_temp_password_c7)
-  ('learners','temp_password_hash')
+  ('learners','temp_password_hash'),
+  -- 시즌 그릇 ①②(20260812140000 · 소급 불가 — 나침반은 그날 안 물으면 영원히 빈칸이다)
+  ('season','textbook'), ('season','starts_on'), ('season','ends_on'),
+  ('season_compass','answers'), ('season_compass','self_in_5y_changed'),
+  ('season_compass','goal_track_at_open'), ('season_compass','recorded_by')
 ), 기대제약(n) as (values
   ('learning_events_event_type_c11'), ('learning_events_task_type_c11'),
   ('submissions_task_format_c11'), ('submissions_translation_source_c11'),
@@ -50,12 +54,19 @@ with 기대열(t, c) as (values
   ('learning_events_consent_id_fkey'),
   -- 검수 확정 칸 넷(20260809090000) — FK 도 함께 센다(열만 서고 고리가 없으면 계보가 거짓이다)
   ('corrections_supersedes_not_self_c11'), ('corrections_promotion_intent_c11'),
-  ('corrections_supersedes_fkey'), ('pipeline_jobs_discard_reason_c11')
+  ('corrections_supersedes_fkey'), ('pipeline_jobs_discard_reason_c11'),
+  -- 시즌 그릇(20260812140000) — 겹침 배제·날짜 순서·학생×시즌 유일·문항 묶음 + 고리 둘.
+  --   유일키가 빠지면 같은 시즌에 두 행이 서고, 회고가 어느 것을 왼쪽으로 쓸지 모른다.
+  ('season_no_overlap_c11'), ('season_dates_c11'),
+  ('season_compass_once_c11'), ('season_compass_answers_c11'),
+  ('season_compass_learner_id_fkey'), ('season_compass_season_id_fkey')
 ), 기대트리거(n) as (values
   ('learning_events_immutable'), ('corrections_immutable'), ('submissions_original_immutable'),
   ('staff_access_log_immutable'), ('learning_events_correction_same_learner'),
   -- 수집→처리 배선 + 동의 증거 보호(20260807120000)
-  ('submissions_enqueue_job'), ('consents_protect')
+  ('submissions_enqueue_job'), ('consents_protect'),
+  -- 나침반 삭제 금지(20260812140000) — 행이 사라지는 것만 막는다(개서는 촉진 세션의 정상 통로)
+  ('season_compass_protect')
 ), 대상역할(r) as (values ('anon'), ('authenticated'))
 , 대상권한(p) as (values
   ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE'), ('REFERENCES'), ('TRIGGER')
@@ -100,11 +111,8 @@ with 기대열(t, c) as (values
   select CASE WHEN to_regclass('engine.schema_migrations') is null THEN null::xml
               ELSE query_to_xml(
                 'select version, name, checksum, applied_at::text as applied_at
-                   from engine.schema_migrations
-                  order by applied_at desc, version desc
-                  limit 1',
-                false, false, '')
-         END as x
+                   from engine.schema_migrations order by applied_at desc, version desc limit 1',
+                false, false, '') END as x
 ), 현재이력 as (
   select ((xpath('/table/row/version/text()', x))[1])::text as version,
          ((xpath('/table/row/name/text()', x))[1])::text as name,
@@ -119,6 +127,8 @@ with 기대열(t, c) as (values
     where has_table_privilege(r.r, format('%I.%I','engine',t.t), p.p)) as 새는테이블권한,
   (select count(*) from 대상역할 r
     where has_schema_privilege(r.r, to_regnamespace('engine'), 'USAGE')) as 새는스키마권한,
+  -- 🔑 3 → **4**: 시즌 그릇이 `season_compass.learner_id` 에 restrict 를 하나 더 건다.
+  --    학생 행이 지워지면 그 학생의 나침반이 함께 사라지는데, 그건 소급이 안 된다.
   (select count(*) from pg_constraint
     where connamespace=to_regnamespace('engine') and contype='f'
       and confrelid=to_regclass('engine.learners') and confdeltype='r') as 삭제차단,
@@ -179,23 +189,21 @@ with 기대열(t, c) as (values
   -- ── c11: engine.skills 첫 시드(문항 팩 스킬표 30 · skills.v1) — 0이면 승격이 전건 거절된다.
   (select count(*) from engine.skills) as 스킬시드수
 )
-select case when 테이블수=11 and RLS켜짐=11 and 정책수=7
-             and 새는테이블권한=0 and 새는스키마권한=0
-             and 삭제차단=3 and 실패상태=1 and 이력정책=0
-             and 잡없는제출=0 and 검수뷰=1 and 옛검수정책=0
-             and 마감없는배정=0 and 분모칸오염=0 and 폐기사유없는폐기=0
-             and 검수판열=22 and 검수판원문=0
-             and 라디오표수=6 and 라디오RLS수=6 and 라디오정책수=0
-             and 라디오새는권한=0 and 라디오새는스키마=0
-             and 라디오kind제약=1 and 연동보호트리거=1 and 연동활성유일=1
-             and 스킬시드수=30
-             and (select v from 빠진열) is null
-             and (select v from 빠진제약) is null
-             and (select v from 빠진트리거) is null
-             and (select version from 현재이력)='20260812130000'
-              and (select checksum from 현재이력)='ff8a8b3f2874bf6c120dd7911ee22a1ffad8d323131bc74db0a8593aac356f04' -- migration-checksum
+select case when 테이블수=13 and RLS켜짐=13 and 정책수=7
+              and 새는테이블권한=0 and 새는스키마권한=0 and 삭제차단=4 and 실패상태=1
+              and 이력정책=0 and 잡없는제출=0 and 검수뷰=1 and 옛검수정책=0
+              and 마감없는배정=0 and 분모칸오염=0 and 폐기사유없는폐기=0
+              and 검수판열=22 and 검수판원문=0
+              and 라디오표수=6 and 라디오RLS수=6 and 라디오정책수=0
+              and 라디오새는권한=0 and 라디오새는스키마=0 and 라디오kind제약=1
+              and 연동보호트리거=1 and 연동활성유일=1 and 스킬시드수=30
+              and (select v from 빠진열) is null
+              and (select v from 빠진제약) is null
+              and (select v from 빠진트리거) is null
+              and (select version from 현재이력)='20260812140000'
+              and (select checksum from 현재이력)='2582bafc74dbe5e1337b4f2e8f6bf0ddf8f41ce0c3abf20e47cd9474143aac52' -- migration-checksum
             then '✅ 전부 통과'
-            else '❌ 아래 칸을 그대로 알려주세요 (기대: 11·11·7·0·0·3·1·0·0·1·0·0·0·0·22·0·6·6·0·0·0·1·1·1·30 · 빠진 칸은 전부 비어 있어야 합니다)'
+            else '❌ 아래 칸을 그대로 알려주세요 (기대: 13·13·7·0·0·4·1·0·0·1·0·0·0·0·22·0·6·6·0·0·0·1·1·1·30 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
        (select version from 현재이력) as 현재버전,
        (select checksum from 현재이력) as checksum,

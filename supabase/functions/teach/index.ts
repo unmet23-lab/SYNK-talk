@@ -46,6 +46,7 @@ import 토큰모듈 from './토큰.mjs';
 import 확정모듈 from './검수확정.mjs';
 import 표본모듈 from './골든표본.mjs';
 import 동의모듈 from './동의게이트.mjs';
+import 나침반모듈 from './나침반문항.mjs';
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
 
@@ -74,6 +75,15 @@ const { 표본, 지난주키, 주범위, 키, iso주, 주당건수 } = 표본모
   주당건수: number;
 };
 
+/* 나침반 — 문항 정본은 `lib/나침반문항.js` 하나다. 이 파일에 문항키·라벨 **사본을 두지 않는다**
+ * (`강사API` 머리말의 「어휘 사본이 0개다」와 같은 축 — 사본이 없으면 갈릴 일도 없다). */
+type 문항표시 = { 키: string; 라벨: string; 라벨_mn: string | null; 상한: number };
+const { 종류: 회차종류, 물을것, 답검사 } = 나침반모듈 as {
+  종류: { 입학: string; 시즌: string };
+  물을것: (회차: string, 목적: string | null) => 문항표시[];
+  답검사: (회차: string, 답: unknown, 바꿨나: unknown) => { 필드: string; 사유: string } | null;
+};
+
 const { 지금유효, 그때유효, 거절몸통 } = 동의모듈 as {
   지금유효: (질의: unknown, learner_id: string) => Promise<Array<{ consent_id: string }>>;
   그때유효: (질의: unknown, learner_id: string, occurred_at: string) => Promise<Array<{ consent_id: string }>>;
@@ -81,6 +91,22 @@ const { 지금유효, 그때유효, 거절몸통 } = 동의모듈 as {
 };
 
 const 계약판 = /^c(\d+)$/;
+
+/* 🔑 **경로·메서드·안내문을 한 곳에서 파생시킨다**(가드 맹점 ④ — 같은 판정을 두 곳에 적으면
+ *   갈라지고, 갈라진 쪽은 조용히 틀린다). 옛 판은 목록 하나(`아는경로`)와 삼항 하나
+ *   (`=== 'gold/queue' ? 'GET' : 'POST'`)와 손으로 적은 안내문 하나가 따로 있었다 —
+ *   경로가 둘일 땐 안 보였지만, 넷이 되는 순간 삼항의 `else` 가 **새 GET 경로를 POST 로**
+ *   요구하게 된다(그 실패는 405 라 「막혔다」로 보이지 조준 실패로 안 보인다).
+ * 🔴 뒷 **두 마디**로 가른다 — 마지막 마디만 보면 `/v1/teach/아무거나/queue` 가 전부 큐 조회로
+ *   동작한다. 새는 방향이 「통과」인 자리는 좁게 연다. */
+const 경로표 = {
+  'gold/queue': 'GET',
+  'gold/judge': 'POST',
+  'compass/open': 'GET',
+  'compass/save': 'POST',
+} as const;
+type 아는경로 = keyof typeof 경로표;
+const 안내 = Object.entries(경로표).map(([p, m]) => `${m} /v1/teach/${p}`).join(' · ');
 
 /* 🔑 **허용 목록**이다(차단 목록이 아니다 — 못 적은 역할이 새는 방향은 언제나 「통과」다).
  *   `director` 가 있는 이유는 `review` 와 같다: 오늘 이 통로를 쓸 사람이 원장 본인뿐이다.
@@ -97,6 +123,11 @@ const 거절상태 = {
   NOT_IN_SAMPLE: 409,
   ALREADY_JUDGED: 409,
   VERDICT_TEXT_MISMATCH: 409,
+  /* 나침반 — 둘 다 「지금은 안 된다」이지 「틀렸다」가 아니라 409 다.
+   * `SEASON_NOT_OPEN` = 오늘을 덮는 `engine.season` 행이 없다(운영이 아직 안 열었다).
+   * `SEASON_ROLLED`  = 화면이 든 시즌과 오늘의 시즌이 다르다(여는 사이에 경계가 넘어갔다). */
+  SEASON_NOT_OPEN: 409,
+  SEASON_ROLLED: 409,
   CONSENT_MISSING: 403,
   INTERNAL: 500,
 } as const;
@@ -127,14 +158,13 @@ Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
   const 마디 = url.pathname.replace(/\/+$/, '').split('/');
   const 경로 = 마디.slice(-2).join('/');
-  const 아는경로 = ['gold/queue', 'gold/judge'];
-  if (!아는경로.includes(경로)) {
+  if (!(경로 in 경로표)) {
     return 실패(404, {
       code: 'CONTRACT_VIOLATION', retryable: false,
-      message: '없는 경로입니다 — GET /v1/teach/gold/queue · POST /v1/teach/gold/judge',
+      message: `없는 경로입니다 — ${안내}`,
     }, 선언);
   }
-  const 기대메서드 = 경로 === 'gold/queue' ? 'GET' : 'POST';
+  const 기대메서드 = 경로표[경로 as 아는경로];
   if (req.method !== 기대메서드) {
     return 실패(405, { code: 'CONTRACT_VIOLATION', message: `${기대메서드} 만 받는다`, retryable: false }, 선언);
   }
@@ -173,10 +203,12 @@ Deno.serve(async (req: Request) => {
 
   try {
     if (경로 === 'gold/queue') return await 큐읽기(url, staff_id, ver);
+    if (경로 === 'compass/open') return await 나침반열기(url, staff_id, ver);
     const 본문 = await 본문읽기(req);
     if (본문 === undefined) {
       return 실패(400, { code: 'CONTRACT_VIOLATION', message: 'JSON 이 아닙니다', retryable: false }, ver);
     }
+    if (경로 === 'compass/save') return await 나침반저장(본문, staff_id, ver);
     return await 판정하기(본문, staff_id, ver);
   } catch (e) {
     console.error(`[teach/${경로}] 실패`, String((e as Error)?.message ?? e));
@@ -439,6 +471,212 @@ async function 판정하기(본문: unknown, staff_id: string, ver: string) {
       reviewed_correction_id: String(ai.correction_id),
       verdict: q.verdict,
       week: 속한주,
+    };
+  });
+
+  if ('거절' in 결과) return 거절응답(결과, ver);
+  return 봉투(200, { ok: true, ...결과 }, ver);
+}
+
+/* ── 나침반 (시즌회고_설계 §8 ①②) ───────────────────────────────────────
+ *
+ * 이 두 경로가 닫는 것: 대외로 **이미 약속 중인** 「입학할 때, 그리고 시즌마다 나침반 세션을
+ * 엽니다」(상담AI FAQ Q11 `확정: true`)를 받을 자리가 두 저장소에 **0줄**이었다(08-12 실측).
+ * 🔴 왼쪽은 **소급이 원리상 불가능**하다 — 그날 안 물으면 그 학생의 회고는 영원히 반쪽이다.
+ *
+ * ■ 왜 학생 문(`C0`)이 아니라 **강사 문**인가
+ *   나침반은 설계가 「강사가 촉진하는 워크숍」으로 못박은 세션이고(§9-2 ㉤ · §3-1 `recorded_by`
+ *   가 대필을 정상 경로로 적는다), 급수 1 학생도 지난다. 그리고 C0 는 지금 **동결 판정 대기**
+ *   중이라(만장일치 `failed_p0`) 거기에 새 경로를 내는 것은 남의 트랙 위에 짓는 일이다.
+ *   ⏭ 학생 본인 통로가 서는 날 `recorded_by` 에 `'self'` 가 들어온다(그래서 그 칸이 text 다).
+ *
+ * ■ 🔴 서버가 정하는 것 셋 — 앱이 못 고른다
+ *   ① **시즌**: 오늘을 덮는 `engine.season` 행. 앱이 고르면 강사가 지난 시즌에 소급 기입할 수
+ *      있고, 그 순간 이 설계의 전제(그때 그 시점의 선언)가 무너진다.
+ *   ② **회차**(입학/시즌): 그 학생에게 «다른 시즌» 나침반 행이 있나로 정한다. 앱이 보내면
+ *      입학 행을 시즌 행으로 위장 저장할 수 있고, 그러면 `self_in_5y_changed` 가 있지도 않은
+ *      지난 답을 가리킨다.
+ *   ③ **`goal_track_at_open`**: 저장 시점 `learners.goal_track`. 앱이 보내면 화면에 없던 값이
+ *      그날의 목적으로 굳는다.
+ *   🔑 앱이 보내는 `season_id` 는 **조준 확인용**이다 — 화면이 들고 있던 시즌과 오늘의 시즌이
+ *     다르면 409(`SEASON_ROLLED`). 「승인은 행위에 대한 것이지 조준이 아니다」의 코드층 번역:
+ *     화면을 열어 둔 사이에 경계가 넘어가면 그 저장은 **다음 시즌 행**이 되어야 한다.
+ *
+ * 🚫 나침반 답을 `preference.stated` 사건으로 흘리지 않는다(c11 ⑦ 가드를 깎아야 하고 그
+ *   가드는 G2 통로까지 덮는다 · 설계 §10). 🚫 새 `event_type` 신설.
+ * 🚫 답을 자동 채점·판정하지 않는다(「목표 런타임 자동 판정 🚫」 유호 확정 승계).
+ */
+
+/** 오늘을 덮는 시즌 한 행. **겹침은 DDL 이 막는다**(`season_no_overlap_c11`) — 그래서 여기서
+ *  여러 행을 어떻게 고를지 정하지 않는다(고르는 규칙을 두면 그게 두 번째 판정이 된다). */
+function 이번시즌(tx: unknown) {
+  const q = tx as typeof sql;
+  return q`
+    select season_id, code, textbook, starts_on, ends_on
+      from engine.season
+     where starts_on <= current_date
+       and (ends_on is null or ends_on >= current_date)`;
+}
+
+/** 그 학생의 회차 — **이 시즌 행은 세지 않는다.**
+ *  안 빼면 같은 시즌에 두 번째로 저장할 때(강사가 오타를 고치는 그 자리) 회차가 입학→시즌으로
+ *  뒤집히고, 그러면 답 키 집합이 달라져 CHECK 가 거절한다. 「고치려다 막힌다」는 우회를 정상
+ *  통로로 만드는 자리다(F103). */
+async function 회차판정(tx: unknown, learner_id: string, season_id: string): Promise<string> {
+  const q = tx as typeof sql;
+  const [행] = await q`
+    select 1 as 있음
+      from engine.season_compass
+     where learner_id = ${learner_id}::uuid
+       and season_id <> ${season_id}::uuid
+     limit 1`;
+  return 행 ? 회차종류.시즌 : 회차종류.입학;
+}
+
+/* ── GET /v1/teach/compass/open ──────────────────────────────────────── */
+
+async function 나침반열기(url: URL, staff_id: string, ver: string) {
+  /* 🔑 **학생번호로도 연다.** 강사가 손에 들고 있는 것은 uuid 가 아니라 `SYNK-001` 이다
+   *   (L0 §4-1 — `student_code` 는 사람이 부르는 이름표이고 비밀이 아니다). uuid 만 받으면
+   *   이 화면은 원리상 못 쓰이고, 그러면 나침반은 「나중에 옮겨 적기」가 된다 — 그 순간
+   *   자동화 축이 그 자리에서 죽는다(설계 §8 ①). 응답이 `learner_id` 를 돌려주고, 저장은
+   *   그 값을 그대로 쓴다(화면이 두 번 조회하지 않는다). */
+  const 넘긴id = (url.searchParams.get('learner_id') || '').trim();
+  const 학생번호 = (url.searchParams.get('student_code') || '').trim();
+  if (!/^[0-9a-f-]{36}$/i.test(넘긴id) && !학생번호) {
+    return 실패(400, {
+      code: 'CONTRACT_VIOLATION', field: 'learner_id', retryable: false,
+      message: 'learner_id 또는 student_code 가 필요합니다',
+    }, ver);
+  }
+
+  const 결과 = await sql.begin(async (tx) => {
+    const [시즌] = await 이번시즌(tx);
+    if (!시즌) {
+      /* 처방을 **그대로 실행할 수 있게** 적는다 — 「시즌이 없다」만 내면 강사는 앱이 고장난
+       * 줄 안다. 시즌 행을 여는 것은 운영의 일이고, 그 사실을 말하는 자리가 여기뿐이다. */
+      return { 거절: 'SEASON_NOT_OPEN' as const,
+        문구: '오늘이 속한 시즌이 아직 열려 있지 않습니다 — 교재 1권 단위로 시즌 행을 먼저 엽니다' };
+    }
+    const [학생] = /^[0-9a-f-]{36}$/i.test(넘긴id)
+      ? await tx`
+          select learner_id, student_code, display_name, goal_track
+            from engine.learners where learner_id = ${넘긴id}::uuid`
+      : await tx`
+          select learner_id, student_code, display_name, goal_track
+            from engine.learners where student_code = ${학생번호}`;
+    if (!학생) return { 거절: 'NOT_FOUND' as const, 칸: 'learner_id', 문구: '없는 학생입니다' };
+    const learner_id = String(학생.learner_id);
+
+    const 회차 = await 회차판정(tx, learner_id, String(시즌.season_id));
+
+    /* 지난 답 — **[그대로]/[바꿀래] 버튼의 재료**다(설계 §9-2 ㉤).
+     * 🔑 이 시즌 행은 뺀다(위 회차판정과 같은 이유 — 고쳐 쓰는 자리에서 자기 답이 「지난
+     *   답」으로 다시 뜨면 화면이 자기 자신을 지난 시즌으로 그린다). */
+    const [지난] = 회차 === 회차종류.시즌
+      ? await tx`
+          select answers ->> 'self_in_5y' as 답, recorded_at
+            from engine.season_compass
+           where learner_id = ${learner_id}::uuid
+             and season_id <> ${시즌.season_id}::uuid
+           order by recorded_at desc
+           limit 1`
+      : [];
+
+    const [이미] = await tx`
+      select recorded_at from engine.season_compass
+       where learner_id = ${learner_id}::uuid and season_id = ${시즌.season_id}::uuid`;
+
+    /* ⚠ **0건도 감사 1행 남긴다** — `gold/queue` 와 같은 판정이다. 나침반은 학생 한 명의
+     *   선언을 여는 자리라 「누가 언제 열었나」가 그 자체로 재료다. */
+    await tx`
+      insert into engine.staff_access_log (staff_id, action, target_ids)
+      values (${staff_id}::uuid, 'teach.compass.open', array[${learner_id}::uuid])`;
+
+    return {
+      learner_id,
+      student_code: 학생.student_code ?? null,
+      display_name: 학생.display_name ?? null,
+      season: {
+        season_id: String(시즌.season_id), code: 시즌.code, textbook: 시즌.textbook,
+        starts_on: 시즌.starts_on, ends_on: 시즌.ends_on,
+      },
+      round: 회차,
+      goal_track: 학생.goal_track ?? null,
+      questions: 물을것(회차, (학생.goal_track as string | null) ?? null),
+      previous_self_in_5y: (지난?.답 as string | undefined) ?? null,
+      already_recorded_at: (이미?.recorded_at as string | undefined) ?? null,
+    };
+  });
+
+  if ('거절' in 결과) return 거절응답(결과, ver);
+  return 봉투(200, { ok: true, ...결과 }, ver);
+}
+
+/* ── POST /v1/teach/compass/save ─────────────────────────────────────── */
+
+async function 나침반저장(본문: unknown, staff_id: string, ver: string) {
+  const b = (본문 && typeof 본문 === 'object' ? 본문 : {}) as Record<string, unknown>;
+  const learner_id = typeof b.learner_id === 'string' ? b.learner_id.trim() : '';
+  const 화면시즌 = typeof b.season_id === 'string' ? b.season_id.trim() : '';
+  if (!/^[0-9a-f-]{36}$/i.test(learner_id) || !/^[0-9a-f-]{36}$/i.test(화면시즌)) {
+    return 실패(400, {
+      code: 'CONTRACT_VIOLATION', retryable: false,
+      message: 'learner_id · season_id 가 필요합니다',
+    }, ver);
+  }
+
+  const 결과 = await sql.begin(async (tx) => {
+    const [시즌] = await 이번시즌(tx);
+    if (!시즌) {
+      return { 거절: 'SEASON_NOT_OPEN' as const,
+        문구: '오늘이 속한 시즌이 아직 열려 있지 않습니다 — 교재 1권 단위로 시즌 행을 먼저 엽니다' };
+    }
+    if (String(시즌.season_id) !== 화면시즌) {
+      return { 거절: 'SEASON_ROLLED' as const, 칸: 'season_id',
+        문구: '화면을 연 뒤 시즌 경계가 넘어갔습니다 — 다시 열어 이번 시즌으로 적습니다' };
+    }
+    const [학생] = await tx`
+      select goal_track from engine.learners where learner_id = ${learner_id}::uuid`;
+    if (!학생) return { 거절: 'NOT_FOUND' as const, 칸: 'learner_id', 문구: '없는 학생입니다' };
+
+    const 회차 = await 회차판정(tx, learner_id, String(시즌.season_id));
+    /* 🔑 회차는 서버가 정했으므로 검사도 **그 회차로** 돈다. 앱이 보낸 답 묶음이 다른 회차의
+     *   것이면 여기서 갈린다 — 그리고 DB CHECK(`season_compass_answers_c11`)가 같은 판정을
+     *   한 번 더 진다. 두 층이 같은 lib 를 못 쓰므로(하나는 JS·하나는 DDL) **회귀가 그 둘을
+     *   대조한다**(`tests/나침반문항.test.js`). */
+    const 바꿨나 = 회차 === 회차종류.시즌 ? b.self_in_5y_changed : null;
+    const 흠 = 답검사(회차, b.answers, 바꿨나);
+    if (흠) return { 거절: 'CONTRACT_VIOLATION' as const, 칸: 흠.필드, 문구: 흠.사유 };
+
+    /* 개서를 허용한다 — 촉진 세션 «그 자리»에서 오타를 고치는 통로다(마이그레이션 머리말).
+     * 🔑 지난 시즌 답이 덮이는 일은 원리상 없다: 시즌이 다르면 **다른 행**이다.
+     * 🔑 `recorded_at` 을 갱신한다 — 마지막으로 확정한 시각이 그 행의 시각이다. */
+    const [행] = await tx`
+      insert into engine.season_compass
+        (learner_id, season_id, answers, self_in_5y_changed, goal_track_at_open,
+         recorded_by, schema_ver)
+      values (${learner_id}::uuid, ${시즌.season_id}::uuid, ${tx.json(b.answers as object)},
+              ${바꿨나 as boolean | null}, ${(학생.goal_track as string | null) ?? null},
+              ${staff_id}, ${ver})
+      on conflict (learner_id, season_id) do update
+        set answers            = excluded.answers,
+            self_in_5y_changed = excluded.self_in_5y_changed,
+            goal_track_at_open = excluded.goal_track_at_open,
+            recorded_by        = excluded.recorded_by,
+            recorded_at        = now(),
+            schema_ver         = excluded.schema_ver
+      returning compass_id, recorded_at`;
+
+    await tx`
+      insert into engine.staff_access_log (staff_id, action, target_ids)
+      values (${staff_id}::uuid, 'teach.compass.save', array[${learner_id}::uuid])`;
+
+    return {
+      compass_id: String(행.compass_id),
+      season_id: String(시즌.season_id),
+      round: 회차,
+      recorded_at: 행.recorded_at,
     };
   });
 
