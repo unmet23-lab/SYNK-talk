@@ -60,19 +60,29 @@ test('목록이 낡지 않았다 — 같은 조각이 골격 안에는 실제로
 /* 게이트 스코프(`열기` 의 `함수목록`) — 시험이 부르는 함수보다 좁은 스코프는 옛 판을 초록으로
  * 재므로(새는 방향은 통과), 스코프를 선언한 도구는 「소스가 부르는 함수 ⊆ 선언 목록」을 여기서
  * 잰다. 함수 사용은 사람이 실제로 쓰는 표기 셋에서 걷는다: URL 리터럴 · 조회 기본값 · `함수:` 옵션. */
-test('배달왕복시험 게이트 스코프 — 시험이 부르는 함수를 전부 덮는다', () => {
-  const 소스 = fs.readFileSync(path.join(ROOT, 'tools', '배달왕복시험.js'), 'utf8');
-  const 선언문 = 소스.match(/const 게이트함수들 = \[([^\]]*)\]/);
-  assert.ok(선언문, '배달왕복시험에 게이트함수들 선언이 없다 — 스코프를 접었으면 이 회귀도 같이 접는다');
-  assert.ok(소스.includes('함수목록: 게이트함수들'),
-    '게이트함수들이 열기에 안 실린다 — 선언만 있고 발동이 없으면 스코프는 장식이다');
-  const 선언 = new Set([...선언문[1].matchAll(/'([^']+)'/g)].map((m) => m[1]));
-  const 사용 = new Set();
-  for (const m of 소스.matchAll(/functions\/v1\/([a-z_-]+)/g)) 사용.add(m[1]);   // URL 리터럴(호출 = deliver)
-  for (const m of 소스.matchAll(/옵션\.함수 \?\? '([^']+)'/g)) 사용.add(m[1]);   // 조회 기본값(tasks)
-  for (const m of 소스.matchAll(/함수: '([^']+)'/g)) 사용.add(m[1]);             // 조회 옵션
-  assert.ok(사용.size >= 4, `함수 사용을 ${사용.size}종밖에 못 걷었다 — 표기가 바뀌었으면 걷는 정규식부터 고친다`);
-  for (const f of 사용) {
-    assert.ok(선언.has(f), `게이트 스코프에 「${f}」 가 없다 — 시험이 부르는데 그 함수의 낡음을 안 잰다`);
-  }
-});
+/* 스코프를 선언한 도구가 둘 이상이라 **판정을 한 곳에서 파생**시킨다 — 도구마다 이 검사를
+ * 베껴 적으면 갈라지고, 갈라진 쪽의 증상은 「그 도구만 조용히 안 재짐」이다(=통과 모양). */
+const 스코프도구 = [
+  { 파일: '배달왕복시험.js', 최소: 4 },   // deliver·tasks·corrections·progress
+  { 파일: '골든왕복시험.js', 최소: 1 },   // teach 하나(픽스처는 SQL · 성적표는 DB 직독)
+];
+
+for (const { 파일, 최소 } of 스코프도구) {
+  test(`${파일} 게이트 스코프 — 시험이 부르는 함수를 전부 덮는다`, () => {
+    const 소스 = fs.readFileSync(path.join(ROOT, 'tools', 파일), 'utf8');
+    const 선언문 = 소스.match(/const 게이트함수들 = \[([^\]]*)\]/);
+    assert.ok(선언문, `${파일} 에 게이트함수들 선언이 없다 — 스코프를 접었으면 이 회귀도 같이 접는다`);
+    assert.ok(소스.includes('함수목록: 게이트함수들'),
+      `${파일}: 게이트함수들이 열기에 안 실린다 — 선언만 있고 발동이 없으면 스코프는 장식이다`);
+    const 선언 = new Set([...선언문[1].matchAll(/'([^']+)'/g)].map((m) => m[1]));
+    const 사용 = new Set();
+    for (const m of 소스.matchAll(/functions\/v1\/([a-z_-]+)/g)) 사용.add(m[1]);   // URL 리터럴(호출 = deliver·teach)
+    for (const m of 소스.matchAll(/옵션\.함수 \?\? '([^']+)'/g)) 사용.add(m[1]);   // 조회 기본값(tasks)
+    for (const m of 소스.matchAll(/함수: '([^']+)'/g)) 사용.add(m[1]);             // 조회 옵션
+    assert.ok(사용.size >= 최소,
+      `${파일}: 함수 사용을 ${사용.size}종밖에 못 걷었다(최소 ${최소}) — 표기가 바뀌었으면 걷는 정규식부터 고친다`);
+    for (const f of 사용) {
+      assert.ok(선언.has(f), `${파일}: 게이트 스코프에 「${f}」 가 없다 — 시험이 부르는데 그 함수의 낡음을 안 잰다`);
+    }
+  });
+}

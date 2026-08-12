@@ -36,9 +36,19 @@ const { VERDICT } = require('../lib/검수확정.js');
 const die = (m) => { console.error('[골든왕복시험] ' + m); process.exit(1); };
 const 따옴 = (s) => `'${String(s).replace(/'/g, "''")}'`;
 
+/* 배포판 게이트를 이 시험이 «실제로 지나는» 함수로 한정한다(배달왕복시험 선례).
+ * 왕복은 `functions/v1/teach` 하나만 지난다 — 재료·오염 픽스처는 전부 SQL 로 심고,
+ * 성적표는 DB 를 직접 읽는다(`auth/v1/*` 는 GoTrue 라 우리 Edge Fn 이 아니다).
+ * 전 함수 게이트로 두면 **남의 트랙이 고친 함수 하나가 이 증명을 통째로 막고**, 그 처방이
+ * 「남의 작업본을 대신 배포하라」가 되어 따를 수 없다 — 따를 수 없는 처방은 우회를 정상
+ * 통로로 만든다(F103). ⚠ 좁히는 방향은 「새는 방향」이라 회귀가 「부르는 함수 ⊆ 이 목록」을
+ * 문다(`tests/왕복골격.test.js`) — 시험이 다른 함수를 부르기 시작하면 그날 빨개진다. */
+const 게이트함수들 = ['teach'];
+
 async function main() {
   const { ref, sql, anon, service_role: 서비스키, 확인, 치명확인, 보고 } =
     await 골격.열기('골든왕복시험', {
+      함수목록: 게이트함수들,
       사유: '판정은 지울 수 없는 teacher 골든 행과 감사 행을 남긴다',
     });
   const base = `https://${ref}.supabase.co`;
@@ -319,7 +329,49 @@ async function main() {
       !JSON.stringify(후).includes(String(오염.correction_id)));
   }
 
-  보고(`주 ${주키} · 풀 ${풀.length} · 표본 ${지역표본.length} · 판정 ${성공수}건 · 오염 픽스처 ${String(오염.correction_id).slice(0, 8)}`);
+  /* ── ⑤-b 인수 ⓑ 의 «가르는» 모양 — 판정된 표본 행 위에 얹힌 중복 확정 행 ─────
+   * 위 ⑤ 픽스처는 표본 «밖» + 미판정이라 **이중 실격**이다 — 소속 판정이 감사 원장이 아니라
+   * 「풀 행에 붙은 teacher 행 세기」였어도 그대로 초록이 난다. 즉 ⑤ 는 인수 ⓑ 의 문구는
+   * 만족시키지만 **그 문구가 막으려던 결함을 못 가른다**(08-11 관찰이 「안 심는다」로 남긴 자리).
+   * 가르는 모양은 하나다: ④ 에서 «정당하게» 판정돼 이미 분모에 세어진 그 AI 행 위에,
+   * teach 감사 없는 teacher 확정 행을 하나 더 얹는다. `reviewed_correction_id` 는 비유일이라
+   * 물리가 허용하고(실측), 앱 밖 통로(검수 확정)가 실제로 낼 수 있는 모양이다.
+   * 감사 원장 조인이면 분모 불변 · 「행 세기」였으면 여기서 분모가 뛴다. */
+  console.log('\n■ ⑤-b 오염의 가르는 모양 — 판정된 표본 행 위 중복 확정(감사 없음)');
+  const 대상행 = 풀.find((x) => String(x.correction_id) === String(대상.correction_id));
+  확인('④ 대상의 submission_id 를 풀에서 찾았다(FK 같은제출 제약을 지킨다)', !!대상행);
+  let 중복 = null;
+  let 막힌사유 = null;
+  if (대상행) {
+    try {
+      [중복] = await sql(`
+        insert into engine.corrections
+          (submission_id, reviewed_correction_id, actor_kind, verdict, verdict_reason,
+           reviewer, transcript_at_review, schema_ver)
+        values (${따옴(대상행.submission_id)}::uuid, ${따옴(대상.correction_id)}::uuid, 'teacher'::engine.actor_kind,
+                ${따옴(VERDICT.AI)}, ${따옴('오염 픽스처 ⑤-b — 판정된 표본 행 위 중복 확정(teach 감사 없음)')},
+                ${따옴(강사.uid)}, ${따옴('전사')}, ${따옴(판)})
+        returning correction_id`);
+    } catch (e) { 막힌사유 = String((e && e.message) || e); }
+  }
+  if (중복) {
+    const 후2 = 성적표돌리기('중복 확정 후');
+    /* 후 가 null 이면 계측기 확인이 이미 적색이다 — null 위에서 비교하면 미실행이 통과로 샌다(F207). */
+    if (후 && 후2) {
+      확인(`🔴 인수 ⓑ 가르는 축 — 감사 없는 중복 확정은 0으로 계수, 분모 불변 (${후.분모}→${후2.분모})`,
+        후2.분모 === 후.분모, { 후: 후.분모, 후2: 후2.분모, 참고: '뛰면 소속 판정이 감사 원장이 아니라 행 세기다' });
+      확인('중복 확정 행 id 가 성적표 산출물 어디에도 없다',
+        !JSON.stringify(후2).includes(String(중복.correction_id)));
+    }
+  } else if (대상행) {
+    /* 물리가 막았다면 이 오염 모양 자체가 원리상 불가다 — 제약이 시험 대신 증명한다.
+     * 단 「못 심었다」를 조용히 넘기지 않는다: 막은 사유가 유일 제약이 «아니면» 적색이어야 한다. */
+    확인('중복 확정 행을 물리 제약이 막았다 — 이 오염 모양은 원리상 불가(제약이 대신 증명한다)',
+      /23505|duplicate key|unique/i.test(String(막힌사유)), 막힌사유);
+  }
+
+  보고(`주 ${주키} · 풀 ${풀.length} · 표본 ${지역표본.length} · 판정 ${성공수}건 · 오염 픽스처 ${String(오염.correction_id).slice(0, 8)}`
+    + (중복 ? ` · ⑤-b ${String(중복.correction_id).slice(0, 8)}` : ''));
 }
 
 main().catch((e) => die(String(e && e.stack ? e.stack : e)));
