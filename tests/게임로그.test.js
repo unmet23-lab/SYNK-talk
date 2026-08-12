@@ -10,6 +10,11 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { 코드만 } = require('./lib/소스검사.js');
+
+const 뿌리 = path.resolve(__dirname, '..');
 
 const {
   항목id, 항목추가, 다음시도번호, 제출항목, 턴항목, 죽은배정들, 전송기록, 밀린것, 보낼것,
@@ -226,4 +231,28 @@ test('⑦ 턴항목 — 짚음·무산출 **둘 다** 「이 턴은 냈다」로
 test('⑦ 제출항목(배정 단위)은 G1 뜻 그대로다 — 두 축을 한 이름에 얹지 않았다', () => {
   const { 로그 } = 항목추가([], 메일사건('s', 'task-x'));
   assert.ok(제출항목(로그, 'task-x'), 'G1 판정이 바뀌었다');
+});
+
+/* ⑧ 🔴 **같은 뿌리 세 번째라 원인을 쓸 수 없게 만든다**(CLAUDE.md 신뢰성).
+ *   뿌리 = 「생산자는 사건을 내는데 그 사건이 통로에 착지하는지 아무도 안 잰다」. 실측 셋:
+ *   ①1단계가 전제한 봉투 밖 칸이 통로에 없어 `게임재료` 가 영원히 null(3단계 ①배선)
+ *   ②`quiz.answered` 가 이 큐의 접두 표 밖이라 담기가 버림(이 커밋)
+ *   ③2·3턴이 같은 항목 id 로 접힘(이 커밋).
+ *   셋 다 **정상 반환값**이라 어느 층도 안 빨개진다. 그래서 아래는 「고쳤다」가 아니라
+ *   **새 모듈이 같은 방식으로 새면 그 자리에서 운다**를 짓는다 — 목록은 생산자 소스에서
+ *   파생시킨다(여기 event_type 을 손으로 적으면 그 손목록이 다음 구멍이다). */
+test('⑧ 게임 생산자가 내는 event_type 이 **전부** 이 큐의 접두 표에 있다', () => {
+  const 생산자들 = ['lib/게임제출.js', 'lib/보고서교정제출.js'];
+  const 낸것 = new Set();
+  for (const 파일 of 생산자들) {
+    /* 주석은 벗기고 본다 — 설명 속 사건 이름이 코드로 읽히면 없는 요구가 생긴다. */
+    const 코드 = 코드만(fs.readFileSync(path.join(뿌리, 파일), 'utf8'));
+    for (const m of 코드.matchAll(/event_type:\s*'([^']+)'/g)) 낸것.add(m[1]);
+  }
+  assert.ok(낸것.size >= 3,
+    `생산자 소스에서 event_type 을 ${낸것.size}개만 찾았다 — 수집 규칙이 낡았다(통과가 아니라 미실행이다)`);
+  for (const t of 낸것) {
+    assert.notEqual(항목id({ event_type: t, correlation_id: 's' }), null,
+      `생산자가 내는 «${t}» 가 큐 접두 표 밖이다 — 담기가 정상 반환값(새것:false)으로 그 사건을 버리고, 화면도 큐도 멀쩡하다`);
+  }
 });
