@@ -9,5 +9,7 @@
   "성과회수.mjs": "lib/성과회수.js",
   "게임배정.mjs": "lib/게임배정.js",
   "게임스냅샷.mjs": "lib/게임스냅샷.js",
-  "교수멘탈문항.mjs": "contents/교수멘탈문항.js"
+  "교수멘탈문항.mjs": "contents/교수멘탈문항.js",
+  "보고서교정.mjs": "lib/보고서교정.js",
+  "보고서교정문항.mjs": "contents/보고서교정문항.js"
 }
