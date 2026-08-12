@@ -535,7 +535,10 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
   let 상태: { estimator_version: string; estimator_confidence: number;
     evidence_refs: Record<string, unknown> } | null = null;
   try {
-    상태 = 학습자상태((학생.원신호 ?? []) as unknown[], { as_of: 지금 });
+    /* 🔴 `시간대` 를 **넘겨준다** — 집중띠 축(v7)만 현지 시각을 쓰고, 안 넘기면 그 축은 조용히
+     *   `null` 이다(모듈이 UTC 로 접는 것을 거부한다 · `lib/학습자상태.js` JSDoc). 여기서 IANA
+     *   이름을 다시 적지 않는 이유는 이 파일 머리(93행)에 이미 적혀 있다. */
+    상태 = 학습자상태((학생.원신호 ?? []) as unknown[], { as_of: 지금, 시간대 });
   } catch (e) {
     console.error('[deliver] 학습자 상태 계산 실패(배달은 계속한다)', learner_id, String((e as Error)?.message ?? e));
   }
