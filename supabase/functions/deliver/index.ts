@@ -30,6 +30,7 @@ import 과제모듈 from './오늘과제.mjs';
 import 출처모듈 from './사건출처.mjs';
 import 토큰모듈 from './토큰.mjs';
 import 상태모듈 from './학습자상태.mjs';
+import 회수모듈 from './성과회수.mjs';
 import 게임모듈 from './게임배정.mjs';
 import 라디오태스크모듈 from './라디오태스크.mjs';
 
@@ -66,12 +67,27 @@ const { 라디오태스크종 } = 라디오태스크모듈 as { 라디오태스�
  * 사건에 스탬프한다(엔진도달_설계 §3 경로 A · 제품방향 불변식 6 「🚫C·D 파생 테이블 지금 신설」).
  * `창일수`·`쓰는사건` 은 아래 질의가 **가져다 쓴다**: 여기 다시 적으면 축을 늘린 날 코드는
  * 그 사건을 세려는데 질의가 안 실어 주고, 증상은 값이 조용히 낮아지는 것뿐이다. */
-const { 학습자상태, 창일수, 쓰는사건 } = 상태모듈 as {
+const { 학습자상태, 창일수 } = 상태모듈 as {
   창일수: number;
   쓰는사건: string[];
   학습자상태: (사건들: unknown[], 옵션: { as_of: string }) => {
     estimator_version: string; estimator_confidence: number;
     evidence_refs: Record<string, unknown>; 축: Record<string, unknown>;
+  };
+};
+/* 사슬 ⑦칸의 **남은 절반** — 개입이 실제로 닿았고 그 뒤에 무엇이 달라졌나.
+ * 🔴 2026-08-12 까지 이 모듈의 런타임 호출부는 **0줄**이었다(손 CLI 하나뿐 · 엔진도달_설계 §2 ⑦행).
+ *   그리고 부르려 해도 못 부르는 상태였다 — 아래 질의가 **닻(`intervention.delivered`)도
+ *   관측(`content.viewed`)도 안 실었고, 고리 칸(`parent_event_id`)도 없었다.** 셋 다 증상이
+ *   「효과 없음」 하나뿐인 조용한 실패라, 붙이는 김에 한 커밋에서 같이 닫는다.
+ * 🔑 `걷는사건` 을 여기서 파생시키는 이유 = 그것이 **합집합의 정본**이기 때문이다
+ *   (회수 = 닻 + 관측 + 상태가 쓰는 것 전량). 상태 쪽에 축을 하나 늘리면 그 목록이 저절로
+ *   따라오고, 질의는 손댈 데가 없다. 여기에 배열을 다시 적으면 그 연결이 끊긴다. */
+const { 회수요약, 쓰는사건: 걷는사건 } = 회수모듈 as {
+  쓰는사건: string[];
+  회수요약: (사건들: unknown[], 옵션: { 기준시각: string | Date }) => {
+    개입: number; 닿음: number; 고리없음: number; 연결률: number | null;
+    창별: Record<string, { 측정: number; 미도래: number; 표본0: number }>;
   };
 };
 /* 🔴 `시간대` 를 **가져다 쓴다** — IANA 이름을 여기에 다시 적으면 그 순간 날짜 경계가 두 곳에
@@ -285,19 +301,30 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
         select coalesce(jsonb_agg(jsonb_build_object(
                  'event_id', x.event_id, 'event_type', x.event_type, 'occurred_at', x.occurred_at,
                  'retry_of_event_id', x.retry_of_event_id, 'correction_id', x.correction_id,
-                 'task_type', x.task_type, 'payload', x.payload, 'due_at', x.due_at)), '[]'::jsonb) as 행들
+                 'task_type', x.task_type, 'payload', x.payload, 'due_at', x.due_at,
+                 /* 관측 짝의 **유일한 고리**(계약 c9 — 「무엇을 봤나」). 이 칸이 없으면 회수는
+                  * 개입을 세고도 관측을 하나도 못 잇고, 증상은 「아무도 안 본다」 하나뿐이다. */
+                 'parent_event_id', x.parent_event_id,
+                 /* 개입을 «고른» 규칙과 «상태를 잰» 판. 성과를 규칙별로 갈라 보는 짝이라
+                  * 회수가 「evidence_refs」 에 그대로 싣는다(없으면 null 을 낸다 — 지어내지 않는다).
+                  * ⚠ 이 주석은 sql 템플릿 리터럴 «안»이라 백틱 한 글자가 리터럴을 끊는다(F180 —
+                  *   2026-08-12 에 이 자리에서 실제로 한 번 끊었다. 강조는 「」로 한다). */
+                 'policy_ver', x.policy_ver, 'estimator_version', x.estimator_version,
+                 'intervention_id', x.intervention_id)), '[]'::jsonb) as 행들
           from (
             select y.event_id, y.event_type, y.occurred_at, y.retry_of_event_id,
-                   y.correction_id, y.task_type, y.payload, y.due_at
+                   y.correction_id, y.task_type, y.payload, y.due_at,
+                   y.parent_event_id, y.policy_ver, y.estimator_version, y.intervention_id
               from (
                 select e.event_id, e.event_type, e.occurred_at, e.retry_of_event_id,
                        e.correction_id, e.task_type, e.payload, s.due_at,
+                       e.parent_event_id, e.policy_ver, e.estimator_version, e.intervention_id,
                        row_number() over (partition by e.event_type
                                           order by e.occurred_at desc) as 몇째
                   from engine.learning_events e
                   left join engine.submissions s on s.event_id = e.event_id
                  where e.learner_id = l.learner_id
-                   and e.event_type = any(${쓰는사건}::text[])
+                   and e.event_type = any(${걷는사건}::text[])
                    and not (e.event_type = 'submission.created'
                             and e.task_type is not null
                             and e.task_type = any(${라디오태스크종}::text[]))
@@ -322,12 +349,37 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
     return 봉투(500, { ok: false, date: 오늘, error: { code: 'SERVER_ERROR', message: '서버 설정 오류입니다' } });
   }
 
+  /* 회수의 기준시각은 **배치 전체가 하나**를 쓴다 — 학생마다 새로 찍으면 루프가 자정을 넘는 날
+   * 앞 학생과 뒤 학생의 「미도래」 경계가 갈리고, 그 차이는 값만 보고 알 수 없다. */
+  const 기준시각 = new Date();
+
   const results: Record<string, unknown>[] = [];
+  const 회수들: { 개입: number; 닿음: number; 고리없음: number }[] = [];
   for (const 학생 of 대상) {
     results.push(await 한명(학생 as Record<string, unknown>, 오늘, ver));
+    /* 🔑 배달의 **부속이 아니라 나란한 일**이다 — 회수가 재는 것은 오늘 나가는 개입이 아니라
+     *   «지난» 개입이라, 오늘 배달이 건너뛰거나 실패해도 회수는 그대로 성립한다. 그래서
+     *   `한명()` 안에 넣지 않는다(반환 지점이 일곱이라 넣으면 반드시 몇 개를 빠뜨린다).
+     * ⚠ 계산만 하고 아무것도 저장하지 않는다 — 저장하면 「이 개입은 효과 없음」이라는 틀린
+     *   낙인이 굳는다(`lib/성과회수.js` 머리말 · 코어엔진 §원칙1). 내는 것은 계수뿐이다. */
+    try {
+      const r = 회수요약(((학생 as Record<string, unknown>).원신호 ?? []) as unknown[], { 기준시각 });
+      회수들.push({ 개입: r.개입, 닿음: r.닿음, 고리없음: r.고리없음 });
+    } catch (e) {
+      console.error('[deliver] 성과 회수 실패(배달은 계속한다)',
+        (학생 as Record<string, unknown>).learner_id, String((e as Error)?.message ?? e));
+    }
   }
 
   const 센다 = (s: string) => results.filter((r) => r.status === s).length;
+  const 사슬 = 회수들.reduce((a, r) => ({
+    개입: a.개입 + r.개입, 닿음: a.닿음 + r.닿음, 고리없음: a.고리없음 + r.고리없음,
+  }), { 개입: 0, 닿음: 0, 고리없음: 0 });
+  /* 🔴 분모 0 은 `null` 이다 — 0% 로 접으면 «배달이 아직 없는 날»과 «나갔는데 아무도 안 본 날»이
+   *   같은 값이 된다(`lib/성과회수.js` 의 일관 규칙). */
+  const 잴수있는것 = 사슬.개입 - 사슬.고리없음;
+  const 연결률 = 잴수있는것 > 0 ? Math.round((사슬.닿음 / 잴수있는것) * 1000) / 1000 : null;
+
   const 몸 = {
     ok: true, date: 오늘, contract_ver: ver, mode: 한사람 ? '단건' : '전원', 재적: 대상.length,
     배정: 센다('assigned') + 센다('duplicate'),
@@ -335,8 +387,17 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
     강등: results.filter((r) => r.degraded).length,
     건너뜀: results.filter((r) => r.status === 'skipped'),
     실패: results.filter((r) => r.status === 'failed'),
+    /* 사슬 ⑦칸의 계수 — 이 칸이 응답에 있어야 왕복시험이 「사슬이 끝까지 도는가」를 밖에서 잰다. */
+    사슬: { ...사슬, 연결률 },
   };
   if (몸.배정 < 몸.재적) console.error(`[deliver] 🔴 배정 미달 — ${오늘} ${몸.배정}/${몸.재적}`);
+  console.log(`[deliver] 사슬 회수 — 개입 ${사슬.개입} · 관측 ${사슬.닿음} · 연결률 ${연결률 ?? '분모0'}`);
+  /* ⚠ 경보 문구가 원인을 **가르지 않는다** — 관측 생산자가 아직 한 화면뿐이라(`lib/오늘과제.js`)
+   *   그 화면을 안 거친 배달은 원리상 관측이 0건이다. 「학생이 무시했다」로 단정해 적으면
+   *   거짓 경보가 매일 울리고, 매일 울리는 줄은 아무도 안 읽게 된다(F103 과 같은 병). */
+  if (사슬.개입 > 0 && 사슬.닿음 === 0) {
+    console.error(`[deliver] 🔴 개입 ${사슬.개입}건이 관측으로 하나도 안 이어졌다 — 미열람 xor 관측 생산자 미배선`);
+  }
   return 봉투(200, 몸);
 }
 
