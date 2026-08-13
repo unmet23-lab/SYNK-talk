@@ -6,5 +6,6 @@
   "게임스냅샷.mjs": "lib/게임스냅샷.js",
   "교수멘탈문항.mjs": "contents/교수멘탈문항.js",
   "보고서교정.mjs": "lib/보고서교정.js",
-  "보고서교정문항.mjs": "contents/보고서교정문항.js"
+  "보고서교정문항.mjs": "contents/보고서교정문항.js",
+  "알바변명문항.mjs": "contents/알바변명문항.js"
 }
