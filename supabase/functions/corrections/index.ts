@@ -76,11 +76,16 @@ const { 지금유효, 거절몸통 } = 동의모듈 as {
 /* 꼬리 — 판정은 `lib/꼬리.js` 하나다(여기 다시 적지 않는다 · 「네 곳에 네 가지」와 같은 축).
  * 이 파일이 지는 몫은 **재료를 정확히 떠 오는 것**뿐이다. */
 const { 줄들 } = 꼬리모듈 as {
-  줄들: (교정들: Array<{ correction_id: string; error_tags: string[] }>)
+  줄들: (교정들: Array<{ correction_id: string; error_tags: string[]; 재발화?: boolean }>)
     => Map<string, { 종류: string; 자리: string | null; 글: string }>;
 };
 
 const 계약판 = /^c(\d+)$/;
+
+/* 「학생 화면에 뜨는 행인가」 — 목록 WHERE 와 꼬리 재료의 `재발화` 가 **같은 한 벌**을 쓴다.
+ * 두 곳에 각자 적으면 갈라지고, 갈라지면 화면에 안 뜬 행이 꼬리를 「낸 것」으로 세어져
+ * 다음 진짜 줄을 조용히 삼킨다(줄들 의 연속 금지는 학생이 «본» 줄을 기준으로 추론한다). */
+const 보여줄행 = () => sql`(c.corrected_text is not null or array_length(c.error_tags, 1) is not null)`;
 
 /* 커서 = `<ISO 시각>|<uuid>`. **시각만으로는 부족하다** — 같은 밀리초에 둘이 서면 경계에서
  * 한 건이 조용히 사라진다(append-only 라 되짚을 수도 없다). 그래서 정렬키와 같은 짝을 싣는다. */
@@ -182,26 +187,34 @@ Deno.serve(async (req: Request) => {
         join engine.submissions s on s.submission_id = c.submission_id
         join engine.learning_events e on e.event_id = s.event_id
        where e.learner_id = ${행.learner_id}::uuid
-         and (c.corrected_text is not null or array_length(c.error_tags, 1) is not null)
+         and ${보여줄행()}
          and (${커서시각}::timestamptz is null
               or (c.created_at, c.correction_id)
                   < (${커서시각}::timestamptz, ${커서id}::uuid))
        order by c.created_at desc, c.correction_id desc
        limit ${쪽크기 + 1}`;
 
-    /* 🔴 **꼬리 재료 — 그 학생 교정 «전량»의 태그만** (철학 Ⅱ-8 둘째 실물 · `lib/꼬리.js`).
-     *   걷는 길은 위 목록과 **같은 사슬**이다(corrections → submissions → learning_events) —
-     *   학생은 토큰에서 오고 쿼리로 지정할 수 없다.
+    /* 🔴 **꼬리 재료 — 그 학생 교정 «전량»의 태그와 재발화 여부만** (철학 Ⅱ-8 둘째 실물 ·
+     *   `lib/꼬리.js`). 걷는 길은 위 목록과 **같은 사슬**이다(corrections → submissions →
+     *   learning_events) — 학생은 토큰에서 오고 쿼리로 지정할 수 없다.
      * 🔑 **자르지 않는다.** 최근 N건으로 좁히면 꼬리의 「처음이에요」가 **창 안의 처음**이 되어
      *   학생에게 거짓이 나가는데, 자른 쪽이 더 조용하다(조용한 상한은 통과와 같은 모양으로 온다).
-     *   뜨는 것은 `error_tags` 두 칸뿐이라 행이 쌓여도 가볍고, 정말 무거워지는 날의 처방은
+     *   뜨는 것은 태그·bool 세 칸뿐이라 행이 쌓여도 가볍고, 정말 무거워지는 날의 처방은
      *   자르기가 아니라 집계를 SQL 로 내리는 것이다.
      * 🔑 **표시에서 걸러진 행도 넣는다** — 태그가 빈 행은 `lib/꼬리.js` 가 「판정 안 함」으로
      *   분자·분모 양쪽에서 빼므로 무해하고, 여기서 미리 거르면 거르는 규칙이 두 곳에 산다.
+     * 🔑 `재발화` 는 `functions/progress` 의 교정재발화와 **같은 물리**(`retry_of_event_id
+     *   is not null`)다 — 유호 지시 2026-08-13 「열심히 한 학생도 결과에서 만족감을」의 재료.
+     *   판정은 여기 없다(`lib/꼬리.js` 하나) — 이 파일은 재료만 뜬다.
+     * 🔴 단 **화면에 안 뜨는 행(`보여줄행` 거짓)의 재발화는 거짓으로 접는다** — 태그도 교정문도
+     *   없는 행(강사가 판정만 남긴 골든셋 행 등)이 노력 줄을 「낸 것」으로 세어지면, 학생이 보지
+     *   못한 줄이 연속 금지의 「직전」이 되어 다음 진짜 줄을 조용히 삼킨다. 태그 있는 행은 늘
+     *   화면에 뜨므로 성과 줄에는 이 문제가 원리상 없다 — 노력 줄만의 구멍이라 재료에서 막는다.
      * 🔑 정렬 tiebreak 을 위 목록의 **역순과 같게** 둔다 — 같은 밀리초에 둘이 서면 이력 순서가
      *   갈려 「직전」의 뜻이 목록과 어긋난다. */
     const 이력행 = await sql`
-      select c.correction_id, c.error_tags
+      select c.correction_id, c.error_tags,
+             (${보여줄행()} and e.retry_of_event_id is not null) as 재발화
         from engine.corrections c
         join engine.submissions s on s.submission_id = c.submission_id
         join engine.learning_events e on e.event_id = s.event_id
@@ -211,6 +224,7 @@ Deno.serve(async (req: Request) => {
     const 꼬리표 = 줄들(이력행.map((r: Record<string, unknown>) => ({
       correction_id: String(r.correction_id),
       error_tags: (Array.isArray(r.error_tags) ? r.error_tags : []) as string[],
+      재발화: r.재발화 === true,
     })));
 
     const 다음있음 = 행들.length > 쪽크기;
