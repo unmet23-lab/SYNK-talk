@@ -1,0 +1,20 @@
+# 라디오24 송출 유닛 — /etc/systemd/system/radio-stream.service (설계 §5-P1 · §6-5)
+# 설치(VPS): sudo cp radio-stream.service /etc/systemd/system/ && sudo systemctl enable --now radio-stream
+# ⛔ enable 은 송출 개시다 — 채널 분리 판정(§7-2) 전에는 설치하지 않는다.
+[Unit]
+Description=SYNK radio24 stream (ffmpeg -c copy loop)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/synk-radio/송출
+ExecStart=/usr/bin/bash /opt/synk-radio/송출/송출.sh /opt/synk-radio/팩
+Restart=always
+RestartSec=5
+# 새벽 장애는 아침 복구가 기대치(§6-5) — 무한 재시도로 유튜브에 초당 재접속하는 것만 막는다.
+StartLimitIntervalSec=600
+StartLimitBurst=60
+
+[Install]
+WantedBy=multi-user.target

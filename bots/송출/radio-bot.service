@@ -1,0 +1,18 @@
+# 라디오24 수집봇 유닛 — /etc/systemd/system/radio-bot.service (설계 §5-P0 · 봇=bots/라디오수집봇.js)
+# 설치(VPS): sudo cp radio-bot.service /etc/systemd/system/ && sudo systemctl enable --now radio-bot
+# 봇 .env: YOUTUBE_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN(⚠채널 확정 뒤 그 계정으로 발급),
+#          RADIO_INGEST_URL(운영 Fn), RADIO_INGEST_SECRET(운영 값 — 착지 도구가 회전 관리)
+[Unit]
+Description=SYNK radio24 chat collector bot (read-only, 60s polling)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/synk-radio
+ExecStart=/usr/bin/node /opt/synk-radio/bots/라디오수집봇.js
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
