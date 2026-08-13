@@ -30,6 +30,7 @@ const 붓는곳 = {
   '명부 통로(실학생)': ['tools/명부등록.js', 'supabase/functions/roster-ingest/index.ts'],
   '시험 시딩(리허설 픽스처)': [
     'tools/왕복시험.js', 'tools/인증왕복시험.js', 'tools/교정왕복시험.js', 'tools/배달왕복시험.js',
+    'tools/라디오승격왕복시험.js',
     'tools/검증_마이그레이션.sh',
   ],
 };
