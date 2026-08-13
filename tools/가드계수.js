@@ -102,6 +102,26 @@ function 정제로감쌌나(노드, 정제함수) {
   return false;
 }
 
+/**
+ * 이 부분트리의 «맨 바깥»이 `JSON.parse` 인가 — 소스 «글»이 아니라 **구조**를 내주는 자리.
+ *
+ * 🔴 [2026-08-13 2차 실측] 이 경계가 없어서 `const 계약 = JSON.parse(readFileSync(…))` 가
+ *   원문 변수로 섰고, 그것을 인자로 만든 **생성된 SQL 문자열**(`const q = 삽입SQL({판: 계약.버전})`)
+ *   까지 원문 파생으로 번져 위험으로 셌다(`교정확정:82`·`동의발급:116`). 그 자리들은 파일 원문을
+ *   재는 것이 «아니»라 처방이 통째로 틀린다 — 감싸 봐야 잴 대상이 안 바뀐다.
+ *   🔑 JSON 엔 **주석이 없다.** 이 축(「가드가 자기 주석에 눈먼다」)이 원리상 성립하지 않는다.
+ */
+function JSON구조인가(노드) {
+  let n = 노드;
+  while (n && (n.type === 'MemberExpression' || n.type === 'CallExpression')) {
+    if (n.type === 'CallExpression') {
+      if (이름(n.callee) === 'JSON.parse') return true;
+      n = n.callee;
+    } else n = n.object;
+  }
+  return false;
+}
+
 /* 문자열 내용을 재는 술어 — 이게 없으면 「소스를 대상으로 삼은 검사」가 아니다. */
 const 술어RE = /\.(includes|indexOf|match|search|test|exec|startsWith|endsWith|split)\s*\(/;
 
@@ -272,6 +292,9 @@ for (const 파일 of 파일들(뿌리)) {
    *   선언 순서에 안 기대려고 **바뀌지 않을 때까지** 돌린다(파일 하나라 회차는 몇 안 된다). */
   const 원문변수 = new Set();
   const 정제변수 = new Set();
+  /* 파일에서 왔지만 «글»이 아닌 것 — `JSON.parse(readFileSync(…))`. 주석이 없는 층이라
+   * 이 축(가드가 자기 주석에 눈먼다)이 원리상 성립하지 않는다. 셋 중 어디에도 안 넣는다. */
+  const 구조변수 = new Set();
   for (let 회차 = 0; 회차 < 6; 회차 += 1) {
     const 이전 = 원문변수.size + 정제변수.size;
     훑기(ast, (n) => {
@@ -287,6 +310,9 @@ for (const 파일 of 파일들(뿌리)) {
       });
       /* ⚠ 정제된 것의 파생(`조각 = 소스.slice(…)`)도 «정제»다 — 안 이어받으면 그 단언이
        *   ❔모름으로 새고, 모름이 부풀면 이 도구의 숫자를 아무도 안 읽는다. */
+      /* JSON 구조는 이 축이 아니다 — 어느 쪽에도 안 넣어 «파생이 번지는 것»부터 끊는다.
+       * ⚠ ❔모름이 아니라 «구조»로 따로 적는다: 모름은 「못 갈랐다」인데 여기는 갈랐다. */
+      if (JSON구조인가(n.init)) { 구조변수.add(n.id.name); return; }
       if (!읽기가있나(n.init, 원문함수) && !원문파생 && !정제파생 && !식사본변수.has(n.id.name)) return;
       if (원문파생 || 읽기가있나(n.init, 원문함수)) {
         /* 🔑 «식 모양 사본»도 정제다 — 통로가 공용이 아닐 뿐, 그 자리는 원문을 직접 재지 않는다.
@@ -333,6 +359,7 @@ for (const 파일 of 파일들(뿌리)) {
     for (const r of 받는것) {
       if (r.type === 'Literal' || r.type === 'TemplateLiteral') continue; // 상수를 재는 단언 — 이 축이 아니다
       if (r.type === 'Identifier') {
+        if (구조변수.has(r.name)) continue;            // JSON 구조 — 이 축이 아니다
         if (정제변수.has(r.name)) { 정제닿음 = true; continue; }
         if (원문변수.has(r.name)) { 원문닿음 = true; continue; }
         모름닿음 = true; continue;
