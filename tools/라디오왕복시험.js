@@ -112,16 +112,19 @@ async function main() {
   });
   확인(`같은 것을 다시 보내면 새로 0 · 중복 ${픽스처.length}`,
     다시.몸 && 다시.몸.새로 === 0 && 다시.몸.중복 === 픽스처.length, 다시.몸);
-  const [{ n: 행수 }] = await sql`
-    select count(*)::int as n from radio.chat_message where message_id like ${`${회차}-%`}`;
+  /* ⚠ 골격.sql 은 문자열 하나를 받는다 — 태그드 템플릿(postgres.js 풍)으로 부르면 배열이 가서
+   *   Management API 가 400 을 낸다(2026-08-13 첫 실측이 이 도구 자신에게서 잡음 · F207).
+   *   회차·video 는 내부 생성 토큰([a-z0-9-])이라 리터럴 삽입이 안전하다. */
+  const [{ n: 행수 }] = await sql(
+    `select count(*)::int as n from radio.chat_message where message_id like '${회차}-%'`);
   확인(`원장 행 수가 안 늘었다 — ${픽스처.length}건 그대로`, 행수 === 픽스처.length, { 행수 });
 
   /* ── ④ 원장이 무엇을 남겼나 ───────────────────────────────────────── */
   console.log('\n■ ④ 원장 보증(§4-2)');
-  const 행들 = await sql`
+  const 행들 = await sql(`
     select message_id, channel_id, display_name, body, raw, sent_at,
            command_kind, command_arg, parser_ver, schema_ver
-      from radio.chat_message where message_id like ${`${회차}-%`} order by message_id`;
+      from radio.chat_message where message_id like '${회차}-%' order by message_id`);
   const 찾기 = (n) => 행들.find((r) => r.message_id === 아이디(n));
 
   확인('원문 그대로 남는다 — 키릴을 깎지 않는다',
@@ -154,9 +157,9 @@ async function main() {
 
   /* ── ⑤ 맥박 ───────────────────────────────────────────────────────── */
   console.log('\n■ ⑤ 수집 맥박 — 조용한 구간과 죽은 구간을 가른다');
-  const 맥박 = await sql`
+  const 맥박 = await sql(`
     select messages_seen, concurrent_viewers, video_id, schema_ver
-      from radio.ingest_heartbeat where video_id = ${video} order by id`;
+      from radio.ingest_heartbeat where video_id = '${video}' order by id`);
   확인('호출마다 맥박 1행 — 두 번 불렀으니 2행', 맥박.length === 2, { 맥박: 맥박.length });
   확인(`messages_seen 은 봇이 «본» 전량(${픽스처.length + 3})이지 저장 수가 아니다`,
     맥박[0] && 맥박[0].messages_seen === 픽스처.length + 3, 맥박[0]);
@@ -164,12 +167,12 @@ async function main() {
     맥박[0] && 맥박[0].concurrent_viewers === 17, 맥박[0]);
 
   const 빈 = await 부르기({ video_id: `${video}-quiet`, polled_at: new Date().toISOString(), messages_seen: 0, messages: [] });
-  const [{ n: 조용 }] = await sql`
-    select count(*)::int as n from radio.ingest_heartbeat where video_id = ${`${video}-quiet`}`;
+  const [{ n: 조용 }] = await sql(
+    `select count(*)::int as n from radio.ingest_heartbeat where video_id = '${video}-quiet'`);
   확인('🔴 채팅 0건이어도 맥박이 남는다 — 이것이 없으면 「봇이 죽은 구간」이 영영 안 보인다',
     빈.status === 200 && 조용 === 1, { status: 빈.status, 조용 });
   확인('시청자 수를 안 주면 null 이다 — 0 으로 적으면 「아무도 안 봤다」가 굳는다',
-    (await sql`select concurrent_viewers as v from radio.ingest_heartbeat where video_id = ${`${video}-quiet`}`)[0].v === null);
+    (await sql(`select concurrent_viewers as v from radio.ingest_heartbeat where video_id = '${video}-quiet'`))[0].v === null);
 
   /* ── ⑥ 결측 ───────────────────────────────────────────────────────── */
   console.log('\n■ ⑥ 결측 — 한 건 때문에 그 폴링이 통째로 날아가지 않는다');
