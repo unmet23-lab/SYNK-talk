@@ -54,6 +54,10 @@ import { 무오류인가, 무오류표식 } from '../lib/꼬리.js';
 import { 교정로그읽기, 교정로그쓰기 } from './저장.js';
 import { 효과음 } from './소리.js';
 import 막힘카드 from './막힘카드.js';
+/* 마스코트 — 이 화면이 «보는 화면»이라 캐릭터가 산다(생명감 설계 §5 배치 = 홈·답장 ·
+   말하기(녹음) 화면은 08-12 판정으로 금지 — 배선 회귀 tests/마스코트배선.test.js).
+   화면은 사건 이름만 넘기고 연출·문구는 전부 캐릭터 층(src/마스코트.js·lib/마스코트생명.js) 몫이다. */
+import 마스코트 from './마스코트.js';
 
 /** 누가 고쳤나 — `actor_kind` 그대로 말한다(계약이 이 칸을 준 이유다 · L0 §3-4). */
 const 고친이 = { teacher: '선생님이 고쳐 줬어요', ai: 'AI 가 고쳐 줬어요' };
@@ -77,6 +81,8 @@ export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = nu
   const [로그, set로그] = useState([]);
   const [오류, set오류] = useState(null);
   const [도는중, set도는중] = useState(true);
+  // 마스코트에 넘기는 최신 사건 1건 — 값은 이름뿐이고 연출은 캐릭터 층이 정한다(반응 지도 §2)
+  const [캐릭터사건, set캐릭터사건] = useState(null);
 
   /* 🔑 **한 번 열린 것이 한 앉음**이다 — 사건마다 새로 지으면 「한 번에 다 봤다」와
      「나눠 봤다」가 같은 모양이 된다(`교정API.교정앉음` 머리말 · P0 §3-1 ④).
@@ -128,7 +134,14 @@ export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = nu
            · 판정은 `lib/꼬리.js` 무오류인가 **하나**다 — 여기 다시 적으면 서버 꼬리와 갈라진다.
            · `새것`(이 기기에서 이 교정의 첫 열람)에만 — 화면을 오갈 때마다 울리면 벽지가 된다.
            · 게이트(`lib/소리게이트.js`)가 녹음 중이면 알아서 무음 — 여기서 더 묻지 않는다. */
-        if (새것 && 무오류인가(교정)) 효과음('achieve');
+        if (새것 && 무오류인가(교정)) {
+          효과음('achieve');
+          // 놀람→기쁨·큰 점프 — achieve 소리와 **같은 순간**(생명감 §2 · 판정은 위 무오류인가 하나)
+          set캐릭터사건({ 이름: '무오류첫열람', 때: Date.now() });
+        } else if (교정 && !무오류인가(교정) && (교정.error_tags || []).length) {
+          // 오류 남은 답장 — 기쁨도 슬픔도 아니다: 카드 쪽으로 몸을 기울여 «같이 들여다본다»(§1-3)
+          set캐릭터사건({ 이름: '오류남은답장', 때: Date.now() });
+        }
         await 흘려보내기(더한것);
       } catch (e) {
         /* 🔴 읽기 실패를 빈 로그로 둔갑시키지 않는다 — 빈 로그로 이어 가면 이미 보낸 열람을
@@ -143,6 +156,8 @@ export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = nu
 
   const 답하기 = async (값) => {
     set도는중(true);
+    // 「다시 말해 볼래요」를 고른 순간 = 재도전(반응 지도 §2) — 서버 왕복을 기다리지 않는다(3초 원칙)
+    if (값 === '수정') set캐릭터사건({ 이름: '재도전', 때: Date.now() });
     try {
       const { 로그: 더한것 } = 항목추가(
         로그,
@@ -173,7 +188,8 @@ export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = nu
   const 태그 = ((교정 && 교정.error_tags) || []).filter((t) => t !== 무오류표식);
 
   return (
-    <ScrollView style={s.wrap} contentContainerStyle={s.inner}>
+    <View style={s.wrap}>
+    <ScrollView style={s.흐름} contentContainerStyle={s.inner}>
       <Text style={s.머리}>답장</Text>
 
       {교정 ? (
@@ -256,11 +272,16 @@ export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = nu
         <Text style={s.backText}>← 말하기로 돌아가기</Text>
       </Pressable>
     </ScrollView>
+      {/* 스크롤 밖(겉테 층) — 캐릭터는 화면에 «사는» 존재라 내용과 같이 흘러가지 않는다.
+          🚫 코랄 0 · 면 0 — 이 화면의 신호 1점은 오류 태그 그대로다(`테마.신호자리`). */}
+      <마스코트 사건={캐릭터사건} />
+    </View>
   );
 }
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: 색.바탕 },
+  흐름: { flex: 1 }, // 마스코트를 스크롤 밖에 두려고 바탕(wrap)과 흐름을 갈랐다 — 색은 wrap 이 진다
   inner: { padding: 24, paddingTop: 84, paddingBottom: 48, gap: 18 },
 
   머리: { fontFamily: 폰트.헤드, fontSize: 26, lineHeight: 36, color: 색.잉크 },

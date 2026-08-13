@@ -99,6 +99,14 @@ Module._load = function (요청, ...나머지) {
   return 원래로드.call(this, 요청, ...나머지);
 };
 
+/* ④ 그림 자산 — node 는 `require('*.webp')` 를 못 연다. Metro 는 숫자 모듈 id 를, 웹 번들러는
+   URL 문자열을 주는 자리라, 여기서는 **파일 이름 문자열**을 준다(react-native-web 의 Image 가
+   문자열 source 를 uri 로 그대로 받는다 — 지어낸 구조가 아니라 가장 얇은 실값).
+   첫 소비자 = `src/마스코트.js` 컷 지도 (2026-08-13 · 답장 화면이 정적으로 import 한다). */
+for (const 확장 of ['.webp', '.png']) {
+  require.extensions[확장] = (m, 파일) => { m.exports = path.basename(파일); };
+}
+
 const React = require('react');
 const { renderToString } = require('react-dom/server');
 
