@@ -12,6 +12,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { 마이크준비, 마이크끄기, 거절_메시지 } = require('../lib/마이크권한.js');
+/* 주석 제거는 **공용 통로 하나**다(`tests/lib/소스검사.js`) — 이 파일에 사본을 두면
+ * JSX 여러 줄 주석 같은 표기가 늘어나는 날 갈라진 쪽이 조용히 눈이 먼다. */
+const { 코드만, 코드만픽스처 } = require('./lib/소스검사.js');
 
 const 승인 = { granted: true, canAskAgain: true };
 const 거절 = { granted: false, canAskAgain: false };
@@ -99,11 +102,30 @@ test('마이크끄기가 실패해도 던지지 않는다 — 흐름을 막을 �
 // 마운트 시점 호출 여부 자체는 RN 렌더러 없이는 못 재므로 여기서 증명하지 않는다.
 
 test('화면은 녹음 모드를 직접 켜지 않는다 — 통로는 lib/마이크권한.js 하나', () => {
+  /* 🔴 **코드만 잰다** — 옛 판은 파일 전문을 `includes` 해서 «금지를 설명하는 주석»까지
+   *   위반으로 잡았다(2026-08-13 실사고: 언마운트 `마이크끄기` 누락을 고치면서 그 이유를
+   *   주석에 적자 이 검사가 적색이 됐다 — 고친 사람은 코드를 한 줄도 안 어겼다).
+   *   따를 수 없는 처방은 우회를 정상 통로로 만든다(F103) — 여기서는 「주석에 그 낱말을
+   *   쓰지 마라」가 그 처방이었고, 그러면 다음 사람이 이유를 못 적는다.
+   *   같은 계열은 2026-08-12 에 이미 한 번 걷혔는데(소스검사 `코드만픽스처` 머리말) 이
+   *   가드만 안 옮겨져 남아 있었다. 판정은 공용 통로 하나로 모은다. */
   const 화면 = fs.readFileSync(path.join(__dirname, '..', 'src', '말하기화면.js'), 'utf8');
   assert.equal(
-    화면.includes('allowsRecording'),
+    코드만(화면).includes('allowsRecording'),
     false,
     '화면에서 allowsRecording을 직접 켜면 「버튼 누를 때 묻는다」가 깨진다 — 마이크준비()를 쓸 것'
+  );
+});
+
+test('그 통로 검사의 눈이 멀지 않았다 — 주석 제거기 탐지력(픽스처)', () => {
+  /* 🔑 탐지력은 **픽스처**가 진다 — 실저장소에 위반이 남아 있기를 요구하지 않는다.
+   *   이게 없으면 위 검사는 「`코드만` 이 전부를 지워도 초록」이라 통과의 뜻이 사라진다. */
+  assert.equal(코드만(코드만픽스처.입력), 코드만픽스처.기대,
+    '주석을 안 지우거나 코드까지 지운다 — 위 통로 검사가 눈이 먼다');
+  /* 그리고 «코드에 있는» 위반은 여전히 잡힌다 — 제거기가 코드를 안 먹는다는 증명. */
+  assert.ok(
+    코드만('  await 오디오모드({ allowsRecording: true });').includes('allowsRecording'),
+    '코드 줄의 allowsRecording 까지 지운다 — 그러면 위 검사는 영원히 초록이다'
   );
 });
 
