@@ -249,7 +249,9 @@ test('🔴 초기화 — 잠긴 학생(`auth_user_id is null`)을 조회에서 �
 });
 
 test('🔴 앱은 `signUp` 을 부르지 않는다 (계정이 서는 통로는 first-login 하나뿐 · C0 §2-3)', () => {
-  const 소스 = require('fs').readFileSync(SRC, 'utf8');
+  /* 🔴 주석을 지우고 잰다(이 파일은 :223 에서 이미 통로를 든다) — `signUp` 금지를 설명하는
+   *   주석 한 줄이 그대로 위반으로 잡힌다. 계정 통로가 하나뿐이라는 규칙은 자주 설명된다. */
+  const 소스 = 코드만(require('fs').readFileSync(SRC, 'utf8'));
   assert.ok(!/\/auth\/v1\/signup|signUp\s*\(/.test(소스), '🔴 앱에서 계정을 만들려 한다');
 });
 

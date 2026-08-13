@@ -26,6 +26,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
+const { 코드만, 코드만픽스처 } = require('./lib/소스검사.js');
 const 나침반 = require('../lib/나침반문항.js');
 const { 종류, 문항, 입학키, 시즌키, 물을것, 답검사, 서술상한, 한줄상한 } = 나침반;
 
@@ -203,7 +204,11 @@ test('🔴 시즌 주기 상수를 코드에 박지 않았다 — 주기는 `sea
   // 「2달」이 DDL 에 기본값·CHECK 로 굳으면 교재가 늦게 끝나는 날 운영이 DDL 을 고치게 된다.
   assert.ok(!/interval\s*'2\s*month/i.test(SQL), 'DDL 에 2개월 간격이 박혔다');
   assert.ok(!/ends_on[^,]*default/i.test(SQL), 'ends_on 에 기본값이 박혔다 — 끝을 미리 정하는 자리다');
-  const 코드 = fs.readFileSync(path.join(뿌리, 'lib', '나침반문항.js'), 'utf8');
+  /* 🔴 주석을 지우고 잰다 — 금지어가 「2개월」·「60*24」라, lib 이 자기 머리말에서 «주기를 여기
+   *   두지 않는 이유»를 설명하는 순간(설명하려면 그 낱말을 써야 한다) 거짓 적색이 났다.
+   *   ⚠ 위 `SQL` 은 안 감싼다 — 언어가 달라 이 통로가 못 읽는다(SQL 은 이 파일의 SQL 제거기 몫). */
+  assert.equal(코드만(코드만픽스처.입력), 코드만픽스처.기대, '주석 제거기가 죽었다');
+  const 코드 = 코드만(fs.readFileSync(path.join(뿌리, 'lib', '나침반문항.js'), 'utf8'));
   assert.ok(!/60\s*\*\s*24|2\s*개월|two\s*month/i.test(코드), 'lib 에 주기 상수가 들어갔다');
 });
 

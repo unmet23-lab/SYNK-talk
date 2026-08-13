@@ -15,11 +15,21 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
+const { 코드만, 코드만픽스처 } = require('./lib/소스검사.js');
+
 const ROOT = path.resolve(__dirname, '..');
 const 읽기 = (...p) => fs.readFileSync(path.join(ROOT, ...p), 'utf8');
 
+test('🔴 주석 제거기가 살아 있다 — 죽으면 EVENTS 금지 검사가 원문으로 되돌아간다(증상은 초록)', () => {
+  assert.equal(코드만(코드만픽스처.입력), 코드만픽스처.기대, '주석 제거기가 죽었다');
+});
+
 const DELIVER = 읽기('supabase', 'functions', 'deliver', 'index.ts');
-const EVENTS = 읽기('supabase', 'functions', 'events', 'index.ts');
+/* 🔴 주석을 지우고 잰다 — 이 파일이 EVENTS 에 거는 것은 「`due_at` 을 쓰지 마라」는 **금지**라,
+ *   events/index.ts 에 「마감은 여기서 안 쓴다(`due_at` 은 배정 행의 것)」는 설명 한 줄만 있어도
+ *   거짓 적색이 났다. ⚠ `읽기` 자체는 안 감싼다 — 같은 헬퍼가 SQL 조각(:23)도 여는데 `코드만` 은
+ *   JS 렉서라 SQL `--` 주석을 모른다. 감싸는 것은 **JS/TS 를 여는 이 자리**뿐이다. */
+const EVENTS = 코드만(읽기('supabase', 'functions', 'events', 'index.ts'));
 const 조각 = 읽기('supabase', 'migrations', '20260808010000_engine_c10.sql');
 const 계약 = require('../계약/수집_교정_계약.json');
 

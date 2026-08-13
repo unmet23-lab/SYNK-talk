@@ -29,6 +29,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { 코드만, 코드만픽스처 } = require('./lib/소스검사.js');
 const { 세우기 } = require('./lib/앱모듈세우기.js');
 
 const 뿌리 = path.resolve(__dirname, '..');
@@ -369,14 +370,17 @@ test('🚫 is_correct 를 만들지 않는다 — 판정 산출은 라벨 셋뿐
    *   그때 처방은 「주석을 지워라」가 되어 우회가 정상 통로가 된다(F103). 그래서 대입·속성 꼴만
    *   잡고, 그 탐지력은 아래 픽스처가 진다. */
   const 파생칸 = /is_correct\s*[:=]/;
-  assert.ok(!파생칸.test(fs.readFileSync(로직경로, 'utf8')), 'is_correct 칸이 섰다');
+  assert.ok(!파생칸.test(코드만(fs.readFileSync(로직경로, 'utf8'))), 'is_correct 칸이 섰다');
   assert.ok(파생칸.test('return { is_correct: true };'), '탐지력 — 실제 칸은 걸린다');
   assert.ok(파생칸.test('const is_correct = 자리 === 정답;'), '탐지력 — 대입도 걸린다');
 });
 
 test('⑥ 부분일치 채점 금지 — 소스 전문에 그 문자열 호출 0', () => {
-  const 원문 = fs.readFileSync(로직경로, 'utf8');
-  assert.ok(!/includes\s*\(/.test(원문),
+  /* 🔴 주석을 지우고 잰다 — `includes(` 금지는 자기 주석에 걸리는 전형이다(F401 이 그 사고).
+   *   금지를 설명하려면 그 표기를 써야 하므로, 가장 잘 적어 둔 파일이 먼저 적색이 된다. */
+  assert.equal(코드만(코드만픽스처.입력), 코드만픽스처.기대, '주석 제거기가 죽었다');
+  const 코드 = 코드만(fs.readFileSync(로직경로, 'utf8'));
+  assert.ok(!/includes\s*\(/.test(코드),
     'lib/보고서교정.js 에 부분일치 호출이 있다 — 안 고친 답이 통과한다(§6-4 ③)');
 });
 
