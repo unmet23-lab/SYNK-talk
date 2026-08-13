@@ -28,7 +28,7 @@ import { 머뭇거림추적, 발화문턱_DB, 데시벨, 다음호흡 } from '..
 import { wav조립 } from '../lib/wav조립.js';
 import { 정본 as 음성정본 } from '../lib/음성헤더.js';
 import { 마이크준비, 마이크끄기 } from '../lib/마이크권한.js';
-import { 흐름id, 항목추가, 다음시도번호, 학습출석, 전송기록, 보낼것, 되듣기기록, 되듣기보낼것, 선택기록, 선택보낼것, 배달상태 } from '../lib/제출로그.js';
+import { 흐름id, 항목추가, 다음시도번호, 학습출석, 전송기록, 보낼것, 되듣기기록, 되듣기보낼것, 선택기록, 선택보낼것, 배달상태, 깨진기록안내 } from '../lib/제출로그.js';
 /* 문구는 「어제의 나」 화면과 **같은 함수**에서 나온다 — 두 곳에 적으면 한쪽만 고쳐지고,
    갈라진 날 학생은 같은 사실을 두 문장으로 듣는다(`lib/견줌.js`). */
 import { 늘어난말 } from '../lib/견줌.js';
@@ -307,7 +307,8 @@ export default function 말하기화면({
         if (!살아있음) return;
         로그참조.current = 기록;
         set로그(기록);
-        if (r.깨진줄 > 0) set오류(`저장된 기록 중 ${r.깨진줄}줄을 읽지 못했다`);
+        const 깨짐 = 깨진기록안내(r.깨진줄);
+        if (깨짐) set오류(깨짐);
       } catch (e) {
         if (살아있음) set오류(String(e.message || e));
       }
@@ -537,7 +538,7 @@ export default function 말하기화면({
           key="따라"
           step="따라"
           제시문={편지.핵심문장}
-          안내="이 문장을, 신호가 끝나면 따라 말해요"
+          안내="이 문장을 따라 말해요 — 버튼을 누르면 녹음이 시작돼요"
           date={date}
           로그={로그}
           기록추가={기록추가}
@@ -598,7 +599,7 @@ function 불러오는중() {
   return (
     <View style={s.카드}>
       <Text style={s.카드라벨}>01</Text>
-      <Text style={s.불러오는글}>오늘 온 말을 가져오는 중이에요…</Text>
+      <Text style={s.불러오는글}>오늘의 문장을 가져오는 중이에요…</Text>
     </View>
   );
 }

@@ -198,7 +198,7 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
   return (
     <ScrollView style={s.wrap} contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
       <Text style={s.label}>TEACH</Text>
-      <Text style={s.머리}>골든 판정</Text>
+      <Text style={s.머리}>이번 주 AI 교정 채점</Text>
 
       {/* 진행 1줄 — 「소모」가 아니라 「기여」로 보이는 자리(검수 화면 ④ 선례).
           🔑 남은 건수를 **상시** 표시한다(설계 §7) · 분모는 서버 상수라 손으로 안 적는다. */}
@@ -259,7 +259,7 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
           {/* 🔑 무엇을 보고 판정했는지가 라벨의 값이라, 전사가 «확정»인지 «기계»인지 먼저 말한다.
               기계 전사는 Whisper 가 오발음을 정타로 고쳐 들었을 수 있다(설계 §5). */}
           <Text style={s.메타}>
-            {항목.transcript_confirmed ? '확정 전사' : '기계 전사 — 검수 전이에요'}
+            {항목.transcript_confirmed ? '검수로 확정한 「들린 대로」' : '기계가 받아 적은 것 — 검수 전이에요'}
           </Text>
 
           <View style={s.칸}>

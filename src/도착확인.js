@@ -104,7 +104,7 @@ export default function 도착확인({ 돌아가기, 가기 }) {
               `teacher`·`director`). 여기서도 숨기지 않는다 — 권한은 서버가 정한다. */}
           <Pressable onPress={() => 가기('강사')} hitSlop={6}
             style={({ pressed }) => [s.줄버튼, pressed && { opacity: 0.65 }]}>
-            <Text style={s.줄버튼글}>이번 주 골든 판정 (원장·강사)</Text>
+            <Text style={s.줄버튼글}>이번 주 AI 교정 채점 (원장·강사)</Text>
           </Pressable>
           {/* 🔑 골든 판정과 같은 문(`teach`)인데 **메뉴를 나눈다** — 한 화면으로 합치면 골든의
               주 5건 상한이 반 큐 물량에 묻혀 「유인이 0인 업무」가 영영 안 끝난다

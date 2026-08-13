@@ -214,7 +214,7 @@ export default function 반피드백화면({ 토큰, 돌아가기 }) {
             )}
           </View>
 
-          <Text style={s.칸이름}>이 산출물은</Text>
+          <Text style={s.칸이름}>학생이 보낸 것은</Text>
           <View style={s.칩줄}>
             {처분값.map((코드) => (
               <Pressable
@@ -292,7 +292,7 @@ export default function 반피드백화면({ 토큰, 돌아가기 }) {
             <Text style={s.칸이름}>이번 주 아직 한 마디를 못 준 학생</Text>
             <Text style={s.문장}>{조용한이반.map((q) => q.이름 ?? '—').join(' · ')}</Text>
             <Text style={s.메모}>
-              낸 것이 없어도 여기 떠요 — 조용한 학생이 조용한 채로 지나가는 걸 막는 칸이에요.
+              보낸 것이 없어도 여기 떠요 — 조용한 학생이 조용한 채로 지나가는 걸 막는 칸이에요.
             </Text>
           </View>
         )}

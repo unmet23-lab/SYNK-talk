@@ -11,7 +11,7 @@ import { 계측시작, 타건, 계측payload } from '../lib/작성과정.js';
  * 다시 지켜져야 하고, 한 화면이 잊으면 그 자리에서만 조용히 깨진다. */
 import { 관찰한줄 } from '../lib/돌려주기.js';
 import { 다음시도번호, 제출항목 } from '../lib/게임로그.js';
-import { 흐름id } from '../lib/제출로그.js';
+import { 흐름id, 깨진기록안내 } from '../lib/제출로그.js';
 import { 몽골날짜 } from '../lib/오늘과제.js';
 /* 게임 로그의 읽기·쓰기·전송은 **직렬 통로 하나**로만 간다(B3 · `src/게임큐.js`).
  * 저장을 직접 잡으면 동시 쓰기가 파일을 덮어 남의 사건(고름·이탈)을 지운다 — 그 소실은
@@ -98,7 +98,8 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
         const { 로그: 저장된, 깨진줄 } = await 게임큐읽기();
         if (!살아있음) return;
         set로그(저장된);
-        if (깨진줄 > 0) set오류(`저장된 기록 중 ${깨진줄}줄을 읽지 못했다`);
+        const 깨짐 = 깨진기록안내(깨진줄);
+        if (깨짐) set오류(깨짐);
         if (재료) {
           const 이미 = 제출항목(저장된, 재료.task_ref);
           if (이미) {

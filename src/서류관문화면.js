@@ -10,7 +10,7 @@ import {
 import { 채점 } from '../lib/서류관문.js';
 import { 다음시도번호, 턴항목 } from '../lib/게임로그.js';
 import { 계측시작, 타건, 계측payload } from '../lib/작성과정.js';
-import { 흐름id } from '../lib/제출로그.js';
+import { 흐름id, 깨진기록안내 } from '../lib/제출로그.js';
 import { 몽골날짜 } from '../lib/오늘과제.js';
 /* 게임 로그의 읽기·쓰기·전송은 **직렬 통로 하나**로만 간다(B3 · `src/게임큐.js`) — 화면이
  * 저장을 직접 잡으면 동시 쓰기가 파일을 덮어 남의 사건을 지운다(오류 없이 「성공」의 모양). */
@@ -115,7 +115,8 @@ export default function 서류관문화면({
         const { 로그: 저장된, 깨진줄 } = await 게임큐읽기();
         if (!살아있음) return;
         set로그(저장된);
-        if (깨진줄 > 0) set오류(`저장된 기록 중 ${깨진줄}줄을 읽지 못했다`);
+        const 깨짐 = 깨진기록안내(깨진줄);
+        if (깨짐) set오류(깨짐);
         if (성립) {
           /* 이어서 연다 — 껐다 켠 학생이 첫 칸부터 다시 하지 않고, 낸 턴이 두 번 나가지도
            * 않는다. 🔑 턴 열쇠는 **그 턴의 스냅샷 prompt_seed** 다 — `앵커시드` 는 관문 전체가
