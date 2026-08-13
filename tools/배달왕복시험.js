@@ -26,10 +26,17 @@ const { 오늘과제, 몽골날짜, 따라말하기문장 } = require(path.join(
 const { 도메인 } = require(path.join(__dirname, '..', 'lib', '로그인코드.js'));
 // 동의 귀속 — 술어를 여기 다시 적지 않는다(`lib/동의게이트.js` 가 유일 정본)
 const { 지금유효id식 } = require(path.join(__dirname, '..', 'lib', '동의게이트.js'));
-/* 게임(G1) — ⑫·⑬ 이 deliver 게임 갈래의 술어·행 규격을 거울로 잰다. 값은 전부 정본 import —
- * 리터럴 사본은 팩·계약이 개정되는 날 시험만 초록으로 남긴다(§6-8 규칙 3 과 같은 축). */
-const { 재제출의사, 게임챌린지, 시드전부, 게임날인가 } = require(path.join(__dirname, '..', 'lib', '게임배정.js'));
-const { G1스냅샷, 스냅샷모양판, 과제유형: 게임과제유형, 학생공개키 } = require(path.join(__dirname, '..', 'lib', '게임스냅샷.js'));
+/* 게임(G1·G2) — ⑫·⑬·⑫-G2 가 deliver 게임 갈래의 술어·행 규격을 거울로 잰다. 값은 전부 정본
+ * import — 리터럴 사본은 팩·계약이 개정되는 날 시험만 초록으로 남긴다(§6-8 규칙 3 과 같은 축). */
+const {
+  재제출의사, 게임챌린지, 시드전부, 게임날인가, G2챌린지, G2재제출앵커들,
+} = require(path.join(__dirname, '..', 'lib', '게임배정.js'));
+const {
+  G1스냅샷, 스냅샷모양판, 과제유형: 게임과제유형, 학생공개키,
+  G2스냅샷, G2스냅샷모양판, G2과제유형, G2학생공개키,
+} = require(path.join(__dirname, '..', 'lib', '게임스냅샷.js'));
+/* ⑫-G2 의 «세울 수 없는 원 제출» 픽스처 재료 — 대조 문항은 팩 원자료에서 고른다(정본 한 곳). */
+const { 문항들: G2문항들 } = require(path.join(__dirname, '..', 'contents', '보고서교정문항.js'));
 const { 사건출처 } = require(path.join(__dirname, '..', 'lib', '사건출처.js'));
 
 /* 왕복 게이트 스코프 — 이 시험이 부르는 함수만 잰다(ⓑ 차단 ②: 전 함수 목록이면 events·correct
@@ -65,13 +72,15 @@ async function main() {
    *  C 동의 O·어제 배정 O     → 강등(전날 문장) · degraded=true
    *  D 동의 O·어제 배정 + 그 뒤 확정된 교정 → ②슬롯 = 교정문 · degraded=false
    *  E 동의 O·어제 배정 + G1 메일 원제출·그 뒤 확정된 «메일» 교정 + 「수정」
-   *    → ⑫ C3 격리(메일 교정문이 낭독으로 안 샘 — 강등) · H3 재제출 재료 */
-  console.log('■ 준비 — 시험 학생 5명');
+   *    → ⑫ C3 격리(메일 교정문이 낭독으로 안 샘 — 강등) · H3 재제출 재료
+   *  F 동의 O·G2 원제출 2(앵커 문항 + «더 최신» 대조 문항)·각각 교정 + 「수정」
+   *    → ⑫-G2 넓힌 H3(챌린지 동봉 · 대조 그늘 차단 · 닻 소등) */
+  console.log('■ 준비 — 시험 학생 6명');
   const 학생들 = await sql(`
     insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver)
     values ('${표}-A','시험A','Lv2','study','${판}'), ('${표}-B','시험B','Lv2','study','${판}'),
            ('${표}-C','시험C','Lv2','study','${판}'), ('${표}-D','시험D','Lv2','study','${판}'),
-           ('${표}-E','시험E','Lv2','study','${판}')
+           ('${표}-E','시험E','Lv2','study','${판}'), ('${표}-F','시험F','Lv1','study','${판}')
     returning learner_id, student_code`);
   const id = Object.fromEntries(학생들.map((r) => [r.student_code.slice(-1), r.learner_id]));
 
@@ -80,7 +89,8 @@ async function main() {
     values ('${id.A}'::uuid,'v18.9', now() - interval '30 days','${판}','tools/배달왕복시험.js'),
            ('${id.C}'::uuid,'v18.9', now() - interval '30 days','${판}','tools/배달왕복시험.js'),
            ('${id.D}'::uuid,'v18.9', now() - interval '30 days','${판}','tools/배달왕복시험.js'),
-           ('${id.E}'::uuid,'v18.9', now() - interval '30 days','${판}','tools/배달왕복시험.js')`);
+           ('${id.E}'::uuid,'v18.9', now() - interval '30 days','${판}','tools/배달왕복시험.js'),
+           ('${id.F}'::uuid,'v18.9', now() - interval '30 days','${판}','tools/배달왕복시험.js')`);
 
   // C·D·E 에게 어제 배정을 심는다 — 배정 행 = learning_events + submissions 쌍이다.
   const 어제날 = 어제(오늘);
@@ -175,6 +185,56 @@ async function main() {
             'resp:${id.E}:${어제날}','Lv2','v18.9', ${지금유효id식(`'${id.E}'::uuid`)}, false,
             '${JSON.stringify({ ver: 1, learner_response: 재제출의사 }).replace(/'/g, "''")}'::jsonb,
             '${판}', '${E교정}'::uuid)`);
+
+  /* 🔴 F — **G2 원제출 «둘» + 각각 확정 교정 + 「수정」**. ⑫-G2 의 재료 전부다.
+   *   ① 앵커 문항(오류문 — 앉음이 선다) T07:10 → 걷혀야 한다.
+   *   ② 대조 문항(멀쩡한 문장을 짚은 과잉 교정) T07:20 · 「수정」도 **더 최신**(T10:20) —
+   *      재배정이 원리상 못 서는 원 제출이라 안 걷혀야 하고, limit 1 이 최신부터 보므로
+   *      필터가 없으면 ①을 그늘로 가린다(넓힌 H3 의 `= any(목록)` 이 재는 자리).
+   *   스냅샷은 정본 조립(`G2스냅샷`)을 지난다 — 배정·제출이 같은 조립(§6-8 규칙 4). */
+  const F앵커 = G2재제출앵커들[0];
+  const F대조문항 = (G2문항들.find((q) => !('교정문' in q)) || {}).문항id;
+  if (!F앵커 || !F대조문항) die('G2 팩에서 앵커·대조 재료를 못 골랐다 — 팩 개정으로 풀이 비었는지 본다');
+  const F제출심기 = async (문항id, 몇시, 표식) => {
+    const 스냅 = G2스냅샷(문항id);
+    if (!스냅) die(`G2 스냅샷을 못 폈다 — ${문항id}`);
+    return (await sql(`
+      with ev as (
+        insert into engine.learning_events
+          (learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
+           level_snapshot, consent_ver, consent_id, degraded, payload, schema_ver)
+        values ('${id.F}'::uuid,'submission.created','${G2과제유형.짚음}','learner',
+                '${어제날}T${몇시}:00Z'::timestamptz, 'sub:${id.F}:${표식}:${어제날}',
+                'Lv1','v18.9', ${지금유효id식(`'${id.F}'::uuid`)}, false,
+                '{"ver":1,"attempt_no":1}'::jsonb, '${판}')
+        returning event_id)
+      insert into engine.submissions
+        (event_id, task_type, task_ref, task_format, task_snapshot, task_schema_ver,
+         body_original, occurred_at, schema_ver)
+      select event_id, '${G2과제유형.짚음}', 'task-${어제날}', '쓰기첨삭',
+             '${JSON.stringify(스냅).replace(/'/g, "''")}'::jsonb, '${G2스냅샷모양판}',
+             '학생이 그 어절만 고쳐 낸 문장', '${어제날}T${몇시}:00Z'::timestamptz, '${판}' from ev
+      returning event_id`))[0].event_id;
+  };
+  const F수정심기 = async (원제출, 몇시, 표식) => {
+    const 교정 = (await sql(`
+      insert into engine.corrections (submission_id, actor_kind, corrected_text, created_at, schema_ver)
+      select submission_id, 'teacher', '기준 교정문', '${어제날}T09:${표식 === 'g2' ? '40' : '45'}:00Z'::timestamptz, '${판}'
+        from engine.submissions where event_id = '${원제출}'::uuid
+      returning correction_id`))[0].correction_id;
+    await sql(`
+      insert into engine.learning_events
+        (learner_id, event_type, actor_kind, occurred_at, idempotency_key,
+         level_snapshot, consent_ver, consent_id, degraded, payload, schema_ver, correction_id)
+      values ('${id.F}'::uuid,'correction.responded','learner','${어제날}T${몇시}:00Z'::timestamptz,
+              'resp:${id.F}:${표식}:${어제날}','Lv1','v18.9', ${지금유효id식(`'${id.F}'::uuid`)}, false,
+              '${JSON.stringify({ ver: 1, learner_response: 재제출의사 }).replace(/'/g, "''")}'::jsonb,
+              '${판}', '${교정}'::uuid)`);
+  };
+  const F원제출 = await F제출심기(F앵커, '07:10', 'g2');
+  const F대조제출 = await F제출심기(F대조문항, '07:20', 'g2c');
+  await F수정심기(F원제출, '10:10', 'g2');
+  await F수정심기(F대조제출, '10:20', 'g2c');
   console.log(`  준비 완료 — 표식 ${표} · 오늘 ${오늘} · 판 ${판}\n`);
 
   /* ── ① 문 ──────────────────────────────────────────────────── */
@@ -729,24 +789,29 @@ async function main() {
   확인('E 의 재발화 고리는 비어 있다 — 메일 교정은 말하기 재시도가 아니다',
     !!E배정 && E배정.retry_of_event_id === null, E배정 && E배정.retry_of_event_id);
 
-  const 거울조인 = () => sql(`
-    select e2.event_id as 원제출사건, s2.task_snapshot->>'prompt_seed' as 원시드
+  const 따옴 = (목록) => 목록.map((x) => `'${x}'`).join(',');
+  const 거울조인 = (학생) => sql(`
+    select e2.event_id as 원제출사건, s2.task_snapshot->>'prompt_seed' as 원시드,
+           s2.task_snapshot->>'challenge_id' as 원챌린지
       from engine.learning_events r
       join engine.corrections c2 on c2.correction_id = r.correction_id
       join engine.submissions s2 on s2.submission_id = c2.submission_id
       join engine.learning_events e2 on e2.event_id = s2.event_id
-     where r.learner_id = '${id.E}'::uuid
+     where r.learner_id = '${학생}'::uuid
        and r.event_type = 'correction.responded'
        and r.payload->>'learner_response' = '${재제출의사}'
        and e2.event_type = 'submission.created'
-       and s2.task_snapshot->>'challenge_id' = '${게임챌린지}'
+       and ((s2.task_snapshot->>'challenge_id' = '${게임챌린지}'
+             and s2.task_snapshot->>'prompt_seed' in (${따옴(시드전부)}))
+         or (s2.task_snapshot->>'challenge_id' = '${G2챌린지}'
+             and s2.task_snapshot->>'prompt_seed' in (${따옴(G2재제출앵커들)})))
        and not exists (
          select 1 from engine.learning_events t
-          where t.learner_id = '${id.E}'::uuid
+          where t.learner_id = '${학생}'::uuid
             and t.event_type = 'task.assigned'
             and t.retry_of_event_id = e2.event_id)
      order by r.occurred_at desc limit 1`);
-  const 재제출재료 = await 거울조인();
+  const 재제출재료 = await 거울조인(id.E);
   확인('🔴 H3 거울 조인이 E 원제출 1행을 낸다 — 「수정」이 눌렸고 재배정이 아직 없다',
     재제출재료.length === 1 && 재제출재료[0].원제출사건 === E원제출, 재제출재료);
   확인('원 시드가 함께 걷힌다 — 재제출은 «같은 메일»이라 새 문항을 지어내지 않는다',
@@ -831,8 +896,70 @@ async function main() {
 
   /* H3 닻 소등 — 재배정이 서고 나면 거울 조인은 0행이어야 한다(닻은 「retry 배정의 부재」).
    * 안 꺼지면 다음 게임날마다 같은 원제출로 또 배정이 선다(무한 재제출). */
-  const 소등 = await 거울조인();
+  const 소등 = await 거울조인(id.E);
   확인('🔴 재배정 뒤 거울 조인은 0행이다 — not exists 닻이 실제로 꺼진다', 소등.length === 0, 소등);
+
+  /* ── ⑫-G2 재제출 — 넓힌 H3: 챌린지 동봉 · 대조 그늘 차단 · 닻 소등 (08-13 소트랙) ──────
+   * deliver 의 H3 조인이 G1 한정을 벗었다(`lib/게임배정.G2재제출앵커들` 이 술어 목록의 정본).
+   * 여기서 재는 것은 넷: ⓐ G2 원제출이 챌린지와 함께 걷힌다 ⓑ 세울 수 없는 원 제출(대조
+   * 문항)은 **더 최신이어도** 안 걷힌다 — limit 1 의 그늘을 목록 필터가 막는다 ⓒ G2 재배정
+   * 행(짚음 통로·G2 모양판·retry_of)을 DB·/tasks 가 그대로 받는다 ⓓ 재배정 뒤 닻이 꺼진다. */
+  console.log('\n■ ⑫-G2 재제출 — 넓힌 H3: 챌린지 동봉 · 대조 그늘 차단 · 닻 소등');
+  const F재료 = await 거울조인(id.F);
+  확인('🔴 넓힌 H3 가 F 의 G2 원제출을 낸다 — 조인이 G1 한정을 벗었다',
+    F재료.length === 1 && F재료[0].원제출사건 === F원제출, F재료);
+  확인('원챌린지·원시드가 함께 걷힌다 — 모듈을 가르는 것은 지금 급수가 아니라 이 값이다',
+    F재료.length === 1 && F재료[0].원챌린지 === G2챌린지 && F재료[0].원시드 === F앵커, F재료[0]);
+  확인('🔴 «더 최신»인 대조 문항 「수정」은 안 걷힌다 — 세울 수 없는 원 제출이 limit 1 을 그늘로 못 가린다',
+    F재료.length === 1 && F재료[0].원제출사건 !== F대조제출, F재료);
+
+  /* G2 재배정 행 — deliver 게임 갈래의 INSERT 를 같은 열·같은 conflict 로 직접 태운다(⑬ 과
+   * 같은 이유 — 본체는 `검수확정` 게이트에 막혀 있고 그건 설계다). */
+  const F스냅 = G2스냅샷(F앵커);
+  const F재배정 = (await sql(`
+    insert into engine.learning_events
+      (learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
+       level_snapshot, consent_ver, consent_id, degraded, retry_of_event_id, source_kind,
+       payload, schema_ver)
+    values ('${id.F}'::uuid, 'task.assigned', '${G2과제유형.짚음}', 'ai',
+            '${미래게임날}T04:00:00Z'::timestamptz, 'task:${id.F}:${미래게임날}',
+            'Lv1', 'v18.9', ${지금유효id식(`'${id.F}'::uuid`)}, false,
+            '${F원제출}'::uuid, '${사건출처('task.assigned')}'::engine.source_kind,
+            '{"ver":1}'::jsonb, '${판}')
+    on conflict (learner_id, idempotency_key) do nothing
+    returning event_id`))[0];
+  확인('G2 재배정 행이 선다 — 짚음 통로·retry FK 를 실제 DB 가 받았다', !!F재배정, F재배정);
+  if (!F재배정) die('G2 재배정 행이 안 섰다 — 아래 칸들이 전부 공허해진다');
+  await sql(`
+    insert into engine.submissions
+      (event_id, task_type, task_ref, task_snapshot, task_schema_ver, occurred_at, schema_ver, due_at, due_ver)
+    values ('${F재배정.event_id}'::uuid, '${G2과제유형.짚음}', 'task-${미래게임날}',
+            '${JSON.stringify(F스냅).replace(/'/g, "''")}'::jsonb, '${G2스냅샷모양판}',
+            '${미래게임날}T04:00:00Z'::timestamptz, '${판}',
+            ('${미래게임날}'::date + 1)::timestamp at time zone 'Asia/Ulaanbaatar', 'due.v1')`);
+
+  /* /tasks 관통 — G2 판이 거름망(`학생판게임스냅샷` 위임)을 지나 공개키 그대로 나오는가.
+   * 🔴 「정답」이 그 목록에 없어야 한다 — 새면 학생이 기준 교정문을 미리 보고, 이 게임이 재는
+   *   것(무엇을 오류로 보나)이 통째로 죽는다(측정 타당성 축 · §6-8). */
+  await sql(`update engine.learners set auth_user_id = null where auth_user_id = '${uid}'`);
+  await sql(`update engine.learners set auth_user_id = '${uid}' where learner_id = '${id.F}'::uuid`);
+  const g2읽기 = await 조회(`?date=${미래게임날}`);
+  const g2읽은 = (g2읽기.몸.data || [])[0] || {};
+  확인('F 토큰으로 미래 게임날 G2 재배정이 1건 나온다',
+    g2읽기.status === 200 && (g2읽기.몸.data || []).length === 1 && g2읽은.task_id === F재배정.event_id, g2읽기);
+  const g2키 = Object.keys(g2읽은.task_snapshot || {}).sort();
+  확인('🔴 G2 공개키 그대로다 — 벗기지도(빈 화면) 새지도(정답 유출) 않는다',
+    g2키.length === G2학생공개키.length && [...G2학생공개키].sort().every((k, i) => g2키[i] === k)
+      && !g2키.includes('정답'), g2키);
+  확인('🔴 재발화 고리·원 문항이 화면 재료까지 닿는다 — 앵커 턴이 retry 를 지는 재료(§4-11)',
+    g2읽은.retry_of_event_id === F원제출
+      && (g2읽은.task_snapshot || {}).prompt_seed === F앵커, [g2읽은.retry_of_event_id, F원제출]);
+
+  /* G2 닻 소등 — F 의 거울에는 대조 「수정」이 남아 있지만(세울 수 없는 원 제출) 그건 목록
+   * 필터가 이미 걸렀으므로, 재배정이 서면 걷힐 것이 0 이어야 한다. */
+  const F소등 = await 거울조인(id.F);
+  확인('🔴 G2 재배정 뒤 F 거울 조인은 0행이다 — 닻이 꺼지고 대조 「수정」도 그늘을 못 만든다',
+    F소등.length === 0, F소등);
 
   /* ── ⑭ 철회한 학생의 교정 (C0 §4-3 ② `blocked` · 전층감사 §2-5 ⓐ) ──────────────
    * 🔴 **맨 끝인 것이 설계다.** 이 칸은 A 의 동의를 **실제로 철회**해야 서는데, 철회는

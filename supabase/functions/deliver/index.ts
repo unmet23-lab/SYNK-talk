@@ -34,12 +34,18 @@ import 회수모듈 from './성과회수.mjs';
 import 게임모듈 from './게임배정.mjs';
 import 라디오태스크모듈 from './라디오태스크.mjs';
 
-/* 게임(G1) 갈래 — 판정은 전부 lib 이 지고(발주 §6-6 ⑩·⑪) 여기는 행만 만든다.
- * `재제출의사`·`게임챌린지` 는 H3 조인의 술어 값이다 — 리터럴을 여기 적으면 계약·팩과
- * 두 곳에 살고, 갈라진 날 재제출 조인은 오류 없이 0건이 된다. */
-const { 게임배정, 재제출의사, 게임챌린지 } = 게임모듈 as {
+/* 게임 갈래 — 판정은 전부 lib 이 지고(발주 §6-6 ⑩·⑪) 여기는 행만 만든다.
+ * `재제출의사`·챌린지·앵커 목록은 H3 조인의 술어 값이다 — 리터럴을 여기 적으면 계약·팩과
+ * 두 곳에 살고, 갈라진 날 재제출 조인은 오류 없이 0건이 된다.
+ * `시드전부`·`G2재제출앵커들` 은 「⑤가 실제로 세울 수 있는 원 제출」의 정본 목록이다 — 조인이
+ * limit 1 이라 세울 수 없는 원 제출(G2 대조 문항·팩에서 사라진 시드)이 최신이면 걷힐 수 있는
+ * 재제출까지 그늘로 가리므로, SQL 이 그 목록으로 거른다(근거는 lib/게임배정.js 목록 머리말). */
+const { 게임배정, 재제출의사, 게임챌린지, G2챌린지, 시드전부, G2재제출앵커들 } = 게임모듈 as {
   재제출의사: string;
   게임챌린지: string;
+  G2챌린지: string;
+  시드전부: readonly string[];
+  G2재제출앵커들: readonly string[];
   게임배정: (재료: Record<string, unknown>) => {
     task_ref: string; task_type: string; task_snapshot: Record<string, unknown>;
     task_schema_ver: string; retry_of_event_id: string | null; degraded: boolean; 출처: string;
@@ -216,7 +222,7 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
     select l.learner_id, l.level_current, l.goal_track,
            배정.occurred_at as 마지막배정, 배정.task_snapshot as 마지막스냅샷,
            교정.corrected_text as 교정문, 교정.원사건, 동의.consent_ver, 동의.consent_id,
-           재제출.원제출사건, 재제출.원시드,
+           재제출.원제출사건, 재제출.원시드, 재제출.원챌린지,
            원신호.행들 as 원신호
       from engine.learners l
       left join lateral (
@@ -248,17 +254,20 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
            and s.task_type = ${통로}
            and c.created_at > coalesce(배정.occurred_at, '-infinity'::timestamptz)
          order by c.created_at desc limit 1) 교정 on true
-      /* H3(발주 §6-6 ⑩) — 「고쳐서 다시 보낼래요」가 눌린 게임(G1) 교정 중 **재배정이 아직
+      /* H3(발주 §6-6 ⑩) — 「고쳐서 다시 보낼래요」가 눌린 게임(G1·G2) 교정 중 **재배정이 아직
        * 없는** 원 제출. 게임 교정은 위 ②슬롯을 안 탄다(바로 위 task_type 한정 — 메일 교정문을
        * 낭독 문장으로 내보내는 사고를 막는다 · C3) — 배달 통로가 답장 화면(/corrections)이라
        * 워터마크와 무관하고, 재제출 판은 다음 게임날 새 배정 행이 낸다.
        * · 닻은 시각이 아니라 「retry_of_event_id 로 잇는 배정의 부재」다 — 날을 놓쳐도 안
        *   사라진다(워터마크였다면 게임 미룬 날마다 증발했을 자리).
-       * · 원 제출의 시드를 함께 걷는다 — 재제출은 «같은 메일»을 다시 쓰는 것이라 새 문항을
-       *   지어내면 고리의 뜻이 죽는다.
+       * · 원 제출의 시드·챌린지를 함께 걷는다 — 재제출은 «같은 문항»을 다시 쓰는 것이라 새
+       *   문항을 지어내면 고리의 뜻이 죽고, 모듈을 가르는 것은 지금 급수가 아니라 챌린지다.
+       * · 시드를 목록으로 거른다 — 판정이 세울 수 없는 원 제출(G2 대조 문항·사라진 시드)이
+       *   최신이면 limit 1 이 걷힐 수 있는 재제출을 그늘로 가린다(목록 정본 = lib).
        * ⚠ 이 주석은 sql 템플릿 리터럴 «안»이다 — 백틱을 쓰면 리터럴이 여기서 끊긴다(F180). */
       left join lateral (
-        select e2.event_id as 원제출사건, s2.task_snapshot->>'prompt_seed' as 원시드
+        select e2.event_id as 원제출사건, s2.task_snapshot->>'prompt_seed' as 원시드,
+               s2.task_snapshot->>'challenge_id' as 원챌린지
           from engine.learning_events r
           join engine.corrections c2 on c2.correction_id = r.correction_id
           join engine.submissions s2 on s2.submission_id = c2.submission_id
@@ -267,7 +276,10 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
            and r.event_type = 'correction.responded'
            and r.payload->>'learner_response' = ${재제출의사}
            and e2.event_type = 'submission.created'
-           and s2.task_snapshot->>'challenge_id' = ${게임챌린지}
+           and ((s2.task_snapshot->>'challenge_id' = ${게임챌린지}
+                 and s2.task_snapshot->>'prompt_seed' = any(${시드전부 as string[]}))
+             or (s2.task_snapshot->>'challenge_id' = ${G2챌린지}
+                 and s2.task_snapshot->>'prompt_seed' = any(${G2재제출앵커들 as string[]})))
            and not exists (
              select 1 from engine.learning_events t
               where t.learner_id = l.learner_id
@@ -434,7 +446,11 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
       교정문: 학생.교정문 ?? null,
       급수: 학생.level_current ?? null,
       재제출: 학생.원제출사건
-        ? { 원사건: String(학생.원제출사건), 원시드: (학생.원시드 ?? null) as string | null }
+        ? {
+          원사건: String(학생.원제출사건),
+          원시드: (학생.원시드 ?? null) as string | null,
+          원챌린지: (학생.원챌린지 ?? null) as string | null,
+        }
         : null,
     });
   } catch (e) {
