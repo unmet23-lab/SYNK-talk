@@ -12,6 +12,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { 학생번호맞나, 이메일, 학생번호표기, 뒤4자리, 뒷자리맞나, 시도상한 } = require('../lib/학생계정.js');
 
+const { 코드만 } = require('./lib/소스검사.js');
+
 const ROOT = path.join(__dirname, '..');
 
 // ── 학생번호 형식 ────────────────────────────────────────────
@@ -100,8 +102,7 @@ test('게이트: 다른 뒷자리는 막는다', () => {
  *   주석은 지우고 본다 — 이 파일 옆 주석에도 그 이름이 여러 번 나오므로 `includes` 로 재면
  *   실제 호출이 사라져도 초록이다(가드가 자기 전처리에 눈머는 자리). */
 test('🔴 첫 등록: 남이 선점한 계정을 이을 때 비밀번호를 덮는다 — 안 덮으면 그 학생 계정이 남의 것이 된다', () => {
-  const 소스 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'auth', 'index.ts'), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const 소스 = 코드만(fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'auth', 'index.ts'), 'utf8'));
 
   const 찾기 = 소스.indexOf('select id from auth.users');
   const 잇기 = 소스.indexOf('const 이음');

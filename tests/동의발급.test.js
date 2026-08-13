@@ -22,8 +22,13 @@ const {
   따옴표, 판꼴, 학생꼴, 시각식, 인자파싱, 현황SQL, 대조SQL, 삽입SQL, 확인SQL, 문서해시,
 } = require('../tools/동의발급.js');
 
+const { 코드만 } = require('./lib/소스검사.js');
+
 const ROOT = path.resolve(__dirname, '..');
 const 계약 = JSON.parse(fs.readFileSync(path.join(ROOT, '계약', '수집_교정_계약.json'), 'utf8'));
+/* 이 도구의 소스를 «주석 벗겨» 본다 — 통로는 공용 하나다(F401). 세 자리가 같은 파일을 저마다
+ * 읽고 저마다 벗기던 것을 한 곳으로 모은다 — 사본은 갈라지고, 갈라진 쪽은 조용히 눈이 먼다. */
+const 도구소스 = () => 코드만(fs.readFileSync(path.join(ROOT, 'tools', '동의발급.js'), 'utf8'));
 const LID = '11111111-2222-4333-8444-555555555555';
 
 /* ── ① 서버 게이트와 같은 조건인가 ────────────────────────────────────────────
@@ -129,8 +134,7 @@ test('문서해시 — 같은 내용이면 같은 값, 한 글자만 달라도 �
 
 /* ── ⑤ 넣은 뒤 되읽기 ────────────────────────────────────────────────────── */
 test('🔴 넣은 뒤 **게이트가 보는 값**을 되읽는다 — 조용한 미적용은 통과와 같은 모양이다', () => {
-  const 소스 = fs.readFileSync(path.join(ROOT, 'tools', '동의발급.js'), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const 소스 = 도구소스();
   assert.match(소스, /확인SQL\(대상\.learner_id\)/,
     'insert 의 returning 만 믿으면 「행은 들어갔는데 게이트가 못 본다」를 못 잡는다');
   assert.match(소스, /게이트\.consent_ver !== opt\.판/, '되읽은 값을 실제로 대조해야 되읽기다');
@@ -157,16 +161,14 @@ test('깃발 뒤에 값이 없으면 다음 깃발을 값으로 삼지 않는다
 });
 
 test('🔴 거절은 종료코드 1 로 나간다 — process.exit() 는 fetch 중에 127(abort)을 낸다', () => {
-  const 소스 = fs.readFileSync(path.join(ROOT, 'tools', '동의발급.js'), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const 소스 = 도구소스();
   assert.ok(!/process\.exit\s*\(/.test(소스), 'process.exit() 대신 process.exitCode 를 세운다');
   assert.match(소스, /process\.exitCode\s*=\s*1/);
 });
 
 /* ── ⑦ 과녁 게이트를 탄다 ────────────────────────────────────────────────── */
 test('🔴 과녁 게이트를 탄다 — 이 도구는 운영 DB 에 법적 근거가 되는 행을 넣는다', () => {
-  const 소스 = fs.readFileSync(path.join(ROOT, 'tools', '동의발급.js'), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const 소스 = 도구소스();
   assert.match(소스, /자격증명\.읽기\('동의발급'\)/,
     '.env 를 직접 읽으면 과녁 게이트(--운영)를 통째로 우회한다 — 2026-08-07 실사고 자리다');
   assert.ok(!/process\.env\.SUPABASE/.test(소스), '공용 통로 밖에서 자격증명을 집지 않는다');

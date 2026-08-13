@@ -33,8 +33,10 @@ const 뿌리 = path.resolve(__dirname, '..');
 const 조각경로 = path.join(뿌리, 'supabase', 'migrations', '20260812140000_season_c11.sql');
 assert.ok(fs.existsSync(조각경로), `${조각경로} 가 없다 — ② 가 통째로 미실행이다`);
 
-/** SQL 블록 주석을 뗀다 — 안 떼면 머리말의 설명 문자열이 검사에 걸려 영원히 초록이 된다. */
-const SQL = fs.readFileSync(조각경로, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+/** SQL 주석을 뗀다 — 안 떼면 머리말의 설명 문자열이 검사에 걸려 영원히 초록이 된다.
+ *  ⚠ 줄 주석 `--` 도 뗀다: 블록만 떼던 옛 판은 `-- ends_on 은 …` 같은 한 줄 설명을
+ *  코드로 읽었다. JS 공용 통로(`tests/lib/소스검사.js`)는 **언어가 달라** 여기 못 쓴다. */
+const SQL = fs.readFileSync(조각경로, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/--.*$/gm, '');
 
 /* ── ① 문항 묶음 ─────────────────────────────────────────────────────── */
 

@@ -23,6 +23,8 @@ const {
   따옴표, uuid꼴, 태그검증, 인자파싱, 대기SQL, 대조SQL, 삽입SQL, 최신SQL,
 } = require('../tools/교정확정.js');
 
+const { 코드만 } = require('./lib/소스검사.js');
+
 const ROOT = path.resolve(__dirname, '..');
 const 계약 = JSON.parse(fs.readFileSync(path.join(ROOT, '계약', '수집_교정_계약.json'), 'utf8'));
 const SUB = '11111111-2222-4333-8444-555555555555';
@@ -44,8 +46,7 @@ test('대기 목록의 학생 필터는 값을 따옴표로 감싼다 — 없으
 test('🔴 오류태그의 정본은 계약 파일이다 — 도구 안에 목록 사본이 없다', () => {
   /* 주석은 먼저 지운다 — 쓰는 법 예시의 «어미:시제» 는 사본이 아니다(그게 갈려도 아무 일도
    * 안 난다). 안 지우면 이 가드가 **거짓양성**으로 서고, 거짓양성 가드는 다음 사람이 끈다. */
-  const 소스 = fs.readFileSync(path.join(ROOT, 'tools', '교정확정.js'), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  const 소스 = 코드만(fs.readFileSync(path.join(ROOT, 'tools', '교정확정.js'), 'utf8'));
   const 베낀것 = 계약.오류태그.filter((t) => 소스.includes(`'${t}'`) || 소스.includes(`"${t}"`));
   assert.deepEqual(베낀것, [],
     `태그가 도구에 박혔다: ${베낀것.join(', ')} — 계약이 올라가는 날 조용히 갈라진다`);
@@ -126,8 +127,7 @@ test('깃발 뒤에 값이 없으면 다음 깃발을 값으로 삼지 않는다
 test('🔴 거절은 종료코드 1 로 나간다 — process.exit() 는 fetch 중에 127(abort)을 낸다', () => {
   /* 2026-08-07 실측: 거절 경로가 `종료코드=127` 로 나갔다. 셸에서 127 은 「그런 명령이 없다」라
    * 정상적인 거절이 **설치 사고**로 읽힌다. 원인은 소켓이 닫히는 중의 process.exit 이다. */
-  const 소스 = fs.readFileSync(path.join(ROOT, 'tools', '교정확정.js'), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const 소스 = 코드만(fs.readFileSync(path.join(ROOT, 'tools', '교정확정.js'), 'utf8'));
   assert.ok(!/process\.exit\s*\(/.test(소스), 'process.exit() 대신 process.exitCode 를 세운다');
   assert.match(소스, /process\.exitCode\s*=\s*1/);
 });

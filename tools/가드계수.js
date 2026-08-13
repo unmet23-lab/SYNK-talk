@@ -137,11 +137,11 @@ function 주석정규식(re) {
   return null;
 }
 
-/** 주석 제거기처럼 생긴 함수인가 — ㉡ 축. 반환 = null | 'js' | 'sql' */
-function 주석제거기갈래(init) {
-  if (!init || (init.type !== 'ArrowFunctionExpression' && init.type !== 'FunctionExpression')) return null;
+/** 이 부분트리가 «주석을 지우는가» — 판정은 `.replace()` 첫 인자의 정규식 «모양» 하나뿐.
+ *  반환 = null | 'js' | 'sql' */
+function 주석지우나(노드) {
   let 갈래 = null;
-  훑기(init, (n) => {
+  훑기(노드, (n) => {
     if (n.type !== 'CallExpression' || !n.callee || n.callee.type !== 'MemberExpression') return;
     if (이름(n.callee.property) !== 'replace') return;
     const a = n.arguments[0];
@@ -153,6 +153,21 @@ function 주석제거기갈래(init) {
     else if (g === 'js' && 갈래 !== 'sql') 갈래 = 'js';
   });
   return 갈래;
+}
+
+/**
+ * 주석 제거기처럼 생긴 «함수»인가 — ㉡ 축. 반환 = null | 'js' | 'sql'
+ *
+ * 🔴 [2026-08-13 2차] **«함수 모양»만 보던 것이 이 도구의 사각이었다** (F401 이 남긴 재료를
+ *   처분하다 실측). 첫 판은 `const 주석제거 = (s) => …` 만 셌다. 그런데 저장소의 사본 다수는
+ *   함수가 아니라 **식**이다 — `const 주석뺀소스 = 소스.replace(/\/\*…/g,' ')…`. 그래서
+ *   계수기가 「지역 사본 0벌」을 냈고, 그것을 값으로 못박은 회귀(`tests/소스검사통로.test.js`)가
+ *   **13벌이 살아 있는 채로 초록**이었다. 새는 방향이 언제나 「통과」인 그 모양 그대로다.
+ *   👉 이제 세 모양을 다 본다: 화살표·함수식(여기) · 함수선언 · **식**(아래 `식사본`).
+ */
+function 주석제거기갈래(init) {
+  if (!init || (init.type !== 'ArrowFunctionExpression' && init.type !== 'FunctionExpression')) return null;
+  return 주석지우나(init);
 }
 
 /** 전수를 «센다». 파서가 없으면 던진다 — 「0건」으로 접지 않는다(F207). */
@@ -193,6 +208,8 @@ for (const 파일 of 파일들(뿌리)) {
   const 정제함수 = new Set(['코드만', '구간']);
   /* ② 파일 원문을 «내주는» 함수 이름 — `const 읽기 = (p) => fs.readFileSync(...)`. */
   const 원문함수 = new Set();
+  /* ②-b 식 모양 사본이 내놓은 «이미 정제된» 변수 이름 — 아래 ③ 이 정제변수로 이어받는다. */
+  const 식사본변수 = new Set();
 
   /* 공용 통로를 import 로 들여왔으면 그 지역 이름도 정제로 센다.
    * ⚠ 이 수집이 **먼저**다 — 아래 원문 생산자 판정이 이 목록을 읽는다. 뒤에 두면
@@ -204,6 +221,16 @@ for (const 파일 of 파일들(뿌리)) {
     }
   });
 
+  /* 함수 «선언» 모양의 사본 — `function 주석없이(s) { return s.replace(…) }`.
+   * 08-13 실측: `tests/검수큐.test.js`·`tests/스폰통로.test.js` 가 이 모양이라 통째로 사각이었다. */
+  훑기(ast, (n) => {
+    if (n.type !== 'FunctionDeclaration' || !n.id) return;
+    const 갈래 = 주석지우나(n);
+    if (!갈래) return;
+    const 자리 = { 파일: 상대, 줄: 줄번호(n.start), 이름: n.id.name, 본문: 소스.slice(n.start, n.end).replace(/\s+/g, ' ').slice(0, 120) };
+    if (갈래 === 'js') { 정제함수.add(n.id.name); 결과.사본.push(자리); } else 결과.SQL사본.push(자리);
+  });
+
   훑기(ast, (n) => {
     if (n.type !== 'VariableDeclarator' || !n.id || n.id.type !== 'Identifier') return;
     const 갈래 = 주석제거기갈래(n.init);
@@ -211,6 +238,19 @@ for (const 파일 of 파일들(뿌리)) {
       const 자리 = { 파일: 상대, 줄: 줄번호(n.start), 이름: n.id.name, 본문: 소스.slice(n.init.start, n.init.end).replace(/\s+/g, ' ').slice(0, 120) };
       if (갈래 === 'js') { 정제함수.add(n.id.name); 결과.사본.push(자리); } else 결과.SQL사본.push(자리);
       return;
+    }
+    /* 🔴 «식» 모양의 사본 — `const 주석뺀소스 = 소스.replace(/\/\*…/g, ' ')…`.
+     *   함수가 아니라 **값**이라 위 갈래에 안 걸렸다(이 도구의 사각 · 머리말 2차 실측).
+     *   여기서 잡아 두면 아래 ③ 이 이 이름을 «정제변수»로 이어받는다 — 그 자리들은
+     *   원문을 직접 재는 것이 «아니»므로 위험이 아니고, 그러나 **사본이므로 보고된다.** */
+    if (n.init && n.init.type !== 'ArrowFunctionExpression' && n.init.type !== 'FunctionExpression') {
+      const 식갈래 = 주석지우나(n.init);
+      if (식갈래) {
+        const 자리 = { 파일: 상대, 줄: 줄번호(n.start), 이름: n.id.name, 본문: 소스.slice(n.init.start, n.init.end).replace(/\s+/g, ' ').slice(0, 120) };
+        if (식갈래 === 'js') 결과.사본.push(자리); else 결과.SQL사본.push(자리);
+        식사본변수.add(n.id.name);
+        return;
+      }
     }
     if ((n.init && (n.init.type === 'ArrowFunctionExpression' || n.init.type === 'FunctionExpression')) && 읽기가있나(n.init, 원문함수)) {
       /* ⚠ 읽기만으로 「원문 생산자」라 부르면 `() => 코드만(readFileSync(...))` 를 오분류한다 —
@@ -247,9 +287,11 @@ for (const 파일 of 파일들(뿌리)) {
       });
       /* ⚠ 정제된 것의 파생(`조각 = 소스.slice(…)`)도 «정제»다 — 안 이어받으면 그 단언이
        *   ❔모름으로 새고, 모름이 부풀면 이 도구의 숫자를 아무도 안 읽는다. */
-      if (!읽기가있나(n.init, 원문함수) && !원문파생 && !정제파생) return;
+      if (!읽기가있나(n.init, 원문함수) && !원문파생 && !정제파생 && !식사본변수.has(n.id.name)) return;
       if (원문파생 || 읽기가있나(n.init, 원문함수)) {
-        if (정제로감쌌나(n.init, 정제함수)) 정제변수.add(n.id.name);
+        /* 🔑 «식 모양 사본»도 정제다 — 통로가 공용이 아닐 뿐, 그 자리는 원문을 직접 재지 않는다.
+         *   위험으로 세면 처방이 「감싸라」로 나오는데 실제 처방은 「사본을 공용으로 돌려라」다. */
+        if (정제로감쌌나(n.init, 정제함수) || 식사본변수.has(n.id.name)) 정제변수.add(n.id.name);
         else 원문변수.add(n.id.name);
       } else 정제변수.add(n.id.name);
     });

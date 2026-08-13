@@ -20,6 +20,8 @@ const path = require('path');
 
 const { 지금유효, 그때유효, 지금유효술어, 거절몸통 } = require('../lib/동의게이트.js');
 
+const { 코드만 } = require('./lib/소스검사.js');
+
 const ROOT = path.resolve(__dirname, '..');
 const 읽기 = (...p) => fs.readFileSync(path.join(ROOT, ...p), 'utf8');
 const 함수 = (이름, 파일 = 'index.ts') => 읽기('supabase', 'functions', 이름, 파일);
@@ -99,7 +101,7 @@ for (const 이름 of ['tasks', 'corrections']) {
     /* 🔑 **막힘을 응답에 싣는가**까지 본다. 게이트를 불러 놓고 값을 안 실으면 앱은 그대로
      *   사건을 보내고, 이 검사만 초록이 된다 — 새는 방향은 언제나 「통과」다.
      *   주석은 걷는다 — 이 규칙을 설명하는 자리라 글자가 그대로 나온다(설명이 구현을 위장한다). */
-    const 코드 = 글.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+    const 코드 = 코드만(글);
     assert.match(코드, /blocked/, `${이름} 가 blocked 를 응답에 안 싣는다 — 앱이 큐를 못 멈춘다`);
   });
 }
@@ -147,7 +149,8 @@ test('픽스처 — 들여쓰기·줄바꿈만 다른 소스는 통과 (거짓�
  *   그래서 소스에서 기계로 본다. 레이아웃은 검사하지 않는다(그건 기기에서 볼 층이다). */
 test('🚫 막힘 카드에 「동의하기」 버튼이 없다 — S1 은 앱이 확인만 한다', () => {
   const 소스 = fs.readFileSync(path.join(__dirname, '..', 'src', '막힘카드.js'), 'utf8');
-  const 코드 = 소스.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, ''); // 주석은 이 규칙을 **설명**한다
+  /* 주석은 이 규칙을 **설명**한다 — 공용 통로가 JSX `{/* … *​/}` 까지 진다(지역 사본은 못 졌다). */
+  const 코드 = 코드만(소스);
   const 누른다 = 코드.match(/Pressable|TouchableOpacity|Button|onPress/);
   assert.equal(누른다, null,
     `🔴 막힘 카드에 누를 것이 생겼다(${누른다 && 누른다[0]}) — 동의를 앱에서 받으면 근거 없는 동의가 쌓인다.\n` +

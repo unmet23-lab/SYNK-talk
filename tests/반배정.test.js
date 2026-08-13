@@ -18,10 +18,13 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
+const { 코드만 } = require('./lib/소스검사.js');
+
 const ROOT = path.resolve(__dirname, '..');
 const 규칙 = require('../lib/명부규칙.js');
 const 소스 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'roster-ingest', 'index.ts'), 'utf8');
-const 주석뺀소스 = 소스.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+/* 통로는 공용 하나다 — 여기 있던 지역 사본은 문자열 속 `//` 를 먹었다(F401). */
+const 주석뺀소스 = 코드만(소스);
 const 조각 = fs.readFileSync(
   path.join(ROOT, 'supabase', 'migrations', '20260812200000_class_c11.sql'), 'utf8');
 

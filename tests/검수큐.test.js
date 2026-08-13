@@ -33,6 +33,8 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
+const { 코드만 } = require('./lib/소스검사.js');
+
 const 뿌리 = path.resolve(__dirname, '..');
 const 스키마 = fs.readFileSync(path.join(뿌리, 'supabase', 'L0_스키마.sql'), 'utf8');
 const 확인 = fs.readFileSync(path.join(뿌리, 'supabase', '확인_적용후상태.sql'), 'utf8');
@@ -238,15 +240,22 @@ const 직원표식 = /engine\.staff\b|current_staff\s*\(|staff_access_log/;
  *   낱말 회피를 정상 통로로 만든다(F272 가 같은 병을 C0 계약 검사에서 신고했다). */
 
 /** 주석을 지운다 — 주석에 적힌 열 이름은 읽는 코드가 아니다(위 ①).
- *  `//` 는 `://`(URL)를 피해 앞 글자를 함께 본다. */
-function 주석없이(s) {
-  return s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
-}
+ *  통로는 공용 하나다(F401): 문자열 속 `//`(URL 포함)는 공용 통로가 렉서로 지킨다 —
+ *  옛 지역 사본의 `[^:]` 어림법은 `a://` 만 막고 `'// 참고'` 는 못 지켰다. */
+const 주석없이 = 코드만;
+
+/** 🔑 **SQL 주석은 층이 다르다 — 공용 통로가 못 지고, 져서도 안 된다.**
+ *  공용 `코드만` 은 템플릿 리터럴 «안»을 안 건드린다. JS 에서 그건 주석이 아니라 **값**이기
+ *  때문이고, 그게 옳다. 그런데 이 파일이 재는 것은 그 값 «안의 SQL» 이고 거기선 `/* *​/`·`--`
+ *  가 진짜 주석이다. 그래서 여기서 한 겹 더 벗긴다 — 언어가 달라 «합치는 대상이 아니다»
+ *  (`tools/가드계수.js` 가 SQL 사본을 따로 세는 이유가 이것이다).
+ *  ⚠ 옛 판은 이 두 층을 정규식 한 방으로 뭉갰다: 그래서 문자열 속 `//` 까지 먹었다(F401). */
+const SQL주석없이 = (q) => q.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ');
 
 /** sql 템플릿 리터럴 **안쪽만** — TS 타입 선언은 쿼리가 아니다(위 ①).
  *  이 저장소는 sql 리터럴 안에 백틱을 쓰지 않는다(`deliver/index.ts:173` 이 그 규약을 못박는다). */
 function 쿼리들(조각) {
-  return [...주석없이(조각).matchAll(/sql`([^`]*)`/g)].map((m) => m[1]);
+  return [...주석없이(조각).matchAll(/sql`([^`]*)`/g)].map((m) => SQL주석없이(m[1]));
 }
 
 /* ②(쓰기를 읽기로 세는 것)에는 **따로 붙일 코드가 없다.** `from|join engine.submissions` 조건이

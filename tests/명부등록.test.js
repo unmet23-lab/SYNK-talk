@@ -24,9 +24,12 @@ const {
   표파싱, 구분자추측, 헤더찾기, 명부읽기, 검증, 열별칭, 학생인가, 대상아님글,
 } = require('../tools/명부등록.js');
 
+const { 코드만 } = require('./lib/소스검사.js');
+
 const ROOT = path.resolve(__dirname, '..');
 const 소스 = fs.readFileSync(path.join(ROOT, 'tools', '명부등록.js'), 'utf8');
-const 주석뺀소스 = 소스.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+/* 통로는 공용 하나다 — 여기 있던 지역 사본은 문자열 속 `//` 를 먹었다(F401). */
+const 주석뺀소스 = 코드만(소스);
 
 test('🔴 동의 0건이면 **따라갈 명령 그대로** 준다 — 등록 직후가 유호님 확정이다', () => {
   const 글 = 다음걸음('SYNK-001', 0);

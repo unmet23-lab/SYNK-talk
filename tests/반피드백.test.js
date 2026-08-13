@@ -19,6 +19,8 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
+const { 코드만 } = require('./lib/소스검사.js');
+
 const ROOT = path.resolve(__dirname, '..');
 const 반피드백 = require('../lib/반피드백.js');
 const 조각 = fs.readFileSync(
@@ -30,7 +32,7 @@ const 동봉 = JSON.parse(fs.readFileSync(
 
 /* 주석을 벗긴 소스 — 「금지된 것이 코드에 없다」를 볼 땐 주석의 그 낱말이 거짓 적색을 낸다.
  * (이 파일의 주석에도 `corrections` 가 여러 번 나온다 — 벗기지 않으면 검사가 자기 설명에 걸린다.) */
-const 주석뺀소스 = 소스.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+const 주석뺀소스 = 코드만(소스);
 
 /** SQL CHECK 의 값목록을 뽑는다 — `check (열 in ('a', 'b'))`. */
 function SQL값목록(열) {
