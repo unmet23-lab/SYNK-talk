@@ -45,4 +45,16 @@ assert.equal(주석없이(소스).includes('석차'), false);
 const 납작 = 소스.replace(/\s+/g, ' ');
 assert.ok(!납작.includes('평균점'));
 
-module.exports = { b64, 주석없이 };
+/* ⑩ 위험이 아니라 ❔모름이어야 한다 — **한 이름이 두 뜻**이다.
+ * 이 도구는 파일 전체를 한 스코프로 근사해서, 아래 두 `두뜻` 을 못 가른다. 못 가른 것을
+ * 조용히 위험으로 세면 처방(「공용 통로로 감싸라」)이 **상수를 감싸라**는 말이 된다(F103).
+ * (실측 자리 = `tests/기기비우기.test.js` — 탐지력 픽스처가 상수를 넘기는 모양이었다.) */
+const 두뜻 = fs.readFileSync('없는파일2.js', 'utf8');
+assert.ok(!두뜻.includes('평균1'));
+
+function 픽스처판() {
+  const 두뜻 = '상수 판 — 파일이 아니다';
+  assert.ok(!두뜻.includes('평균2'));
+}
+
+module.exports = { b64, 주석없이, 픽스처판 };

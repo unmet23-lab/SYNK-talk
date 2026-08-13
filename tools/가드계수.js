@@ -324,6 +324,25 @@ for (const 파일 of 파일들(뿌리)) {
     if (원문변수.size + 정제변수.size === 이전) break;
   }
 
+  /* ⚠ **한 이름이 두 곳에서 «다르게» 선언되면 이 근사가 깨진다.**
+   *   위 ③ 은 파일 전체를 한 스코프로 근사한다(테스트 파일 관례). 그런데 테스트는 같은 이름을
+   *   test 본문마다 다시 선언한다 — 윗쪽엔 `const 순서 = 지우는순서(readFileSync(…))` 가 있고
+   *   탐지력 픽스처엔 `const 순서 = 지우는순서(빠뜨린판)` 가 있다(파일이 아니라 **상수**다).
+   *   근사가 뒤엣것까지 원문으로 물들여 위험으로 셌다(2026-08-13 실측 · `기기비우기` 3건).
+   *   🔑 이건 위험이 아니라 **못 가른 것**이라 ❔모름으로 «드러낸다». 조용히 위험으로 세면
+   *   그 처방(「공용 통로로 감싸라」)이 상수를 감싸라는 말이 되고, 따를 수 없는 처방은
+   *   우회를 정상 통로로 만든다(F103). */
+  const 모호변수 = new Set();
+  훑기(ast, (n) => {
+    if (n.type !== 'VariableDeclarator' || !n.id || n.id.type !== 'Identifier' || !n.init) return;
+    if (!원문변수.has(n.id.name)) return;
+    let 파생 = false;
+    훑기(n.init, (m) => {
+      if (m.type === 'Identifier' && (원문변수.has(m.name) || 정제변수.has(m.name))) 파생 = true;
+    });
+    if (!읽기가있나(n.init, 원문함수) && !파생) 모호변수.add(n.id.name);
+  });
+
   /* ④ 부정 단언 — 「그렇지 않다」를 말하는 단언만 센다. */
   const 단언이름 = (nm) => nm === 'assert' || /^assert\.(ok|equal|strictEqual|deepEqual|deepStrictEqual|match|doesNotMatch)$/.test(nm);
   훑기(ast, (n) => {
@@ -360,6 +379,7 @@ for (const 파일 of 파일들(뿌리)) {
       if (r.type === 'Literal' || r.type === 'TemplateLiteral') continue; // 상수를 재는 단언 — 이 축이 아니다
       if (r.type === 'Identifier') {
         if (구조변수.has(r.name)) continue;            // JSON 구조 — 이 축이 아니다
+        if (모호변수.has(r.name)) { 모름닿음 = true; continue; }  // 같은 이름이 두 뜻 — 못 갈랐다
         if (정제변수.has(r.name)) { 정제닿음 = true; continue; }
         if (원문변수.has(r.name)) { 원문닿음 = true; continue; }
         모름닿음 = true; continue;
