@@ -50,7 +50,9 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { 색, 폰트, 모노트래킹, 몽골어 } from './테마';
 import { 교정앉음, 열람사건, 응답사건, 교정사건보내기, 학생응답값 } from './교정API.js';
 import { 항목추가, 응답값, 전송기록, 보낼것 } from '../lib/교정로그.js';
+import { 무오류인가, 무오류표식 } from '../lib/꼬리.js';
 import { 교정로그읽기, 교정로그쓰기 } from './저장.js';
+import { 효과음 } from './소리.js';
 import 막힘카드 from './막힘카드.js';
 
 /** 누가 고쳤나 — `actor_kind` 그대로 말한다(계약이 이 칸을 준 이유다 · L0 §3-4). */
@@ -115,10 +117,18 @@ export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = nu
     (async () => {
       try {
         const { 로그: 저장된 } = await 교정로그읽기();
-        const { 로그: 더한것 } = 항목추가(저장된, 열람사건({ correction_id: id, correlation_id: 앉음 }));
+        const { 로그: 더한것, 새것 } = 항목추가(저장된, 열람사건({ correction_id: id, correlation_id: 앉음 }));
         await 교정로그쓰기(더한것).catch(() => {});
         if (!살아있음) return;
         set로그(더한것);
+        /* 🔊 achieve — **무오류 답장을 처음 여는 순간** 한 번(유호 확정 2026-08-13 「웅 넣어 —
+           빈도를 올려도 좋다, 학생이 케어받는 느낌을 받길 원해」 · 결과_성취감_설계 §6-1 승격).
+           · 무오류에만 — **소리도 사실이다**: 「오늘 고칠 데가 없었다」가 참인 날만 울려야
+             소리가 흔한 보상으로 인플레되지 않는다(오류 남은 날의 온기는 노력 줄 글이 진다).
+           · 판정은 `lib/꼬리.js` 무오류인가 **하나**다 — 여기 다시 적으면 서버 꼬리와 갈라진다.
+           · `새것`(이 기기에서 이 교정의 첫 열람)에만 — 화면을 오갈 때마다 울리면 벽지가 된다.
+           · 게이트(`lib/소리게이트.js`)가 녹음 중이면 알아서 무음 — 여기서 더 묻지 않는다. */
+        if (새것 && 무오류인가(교정)) 효과음('achieve');
         await 흘려보내기(더한것);
       } catch (e) {
         /* 🔴 읽기 실패를 빈 로그로 둔갑시키지 않는다 — 빈 로그로 이어 가면 이미 보낸 열람을
@@ -156,7 +166,11 @@ export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = nu
     (e) => e.correction_id === id && e.event_type === 'correction.responded'
       && !e.event_id && e.send_final,
   );
-  const 태그 = (교정 && 교정.error_tags) || [];
+  /* 무오류 표식(`오류없음`)은 «찾을 오류»가 아니다 — 이 화면의 코랄은 「학생이 찾아야 하는
+     자리」의 신호인데, 성취의 날에 그 표식까지 코랄로 세우면 잘한 날이 경고의 옷을 입는다.
+     그날의 말은 꼬리·소리가 진다(유호 확정 08-13 케어 방향). 판정값 자체는 그대로 온다 —
+     거르는 것은 표시 한 줄뿐이다. */
+  const 태그 = ((교정 && 교정.error_tags) || []).filter((t) => t !== 무오류표식);
 
   return (
     <ScrollView style={s.wrap} contentContainerStyle={s.inner}>

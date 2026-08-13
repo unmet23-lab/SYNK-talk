@@ -76,7 +76,7 @@ const { 지금유효, 거절몸통 } = 동의모듈 as {
 /* 꼬리 — 판정은 `lib/꼬리.js` 하나다(여기 다시 적지 않는다 · 「네 곳에 네 가지」와 같은 축).
  * 이 파일이 지는 몫은 **재료를 정확히 떠 오는 것**뿐이다. */
 const { 줄들 } = 꼬리모듈 as {
-  줄들: (교정들: Array<{ correction_id: string; error_tags: string[]; 재발화?: boolean }>)
+  줄들: (교정들: Array<{ correction_id: string; error_tags: string[]; 재발화?: boolean; 그자리재도전?: boolean }>)
     => Map<string, { 종류: string; 자리: string | null; 글: string }>;
 };
 
@@ -218,12 +218,28 @@ Deno.serve(async (req: Request) => {
      *   있다 — 그건 갈라짐이 아니라 그릇 차이다(고리 표시 vs 카드에 붙는 글).
      * 🔑 정렬 tiebreak 을 위 목록의 **역순과 같게** 둔다 — 같은 밀리초에 둘이 서면 이력 순서가
      *   갈려 「직전」의 뜻이 목록과 어긋난다. */
+    /* 🔑 `그자리재도전` — 제2 노력 갈래(유호 확정 2026-08-13 「빈도를 올려도 좋다 — 학생이
+     *   케어받는 느낌을 받길 원해」): 그 제출이 **말하는 과제에서 스스로 다시 말해 본 다음
+     *   보낸 것**(`attempt_no >= 2`)인가. 게이트는 재발화와 같은 축으로 곱한다:
+     *   ①`submission.created` — submissions 에는 제출 아닌 행이 산다(위 ②와 같은 이유).
+     *   ②말하기 형식 둘(`낭독`=②되말하기 · `자유발화`=③답하기) — 원신호 `attempt_no` 는
+     *     쓰기(게임·보고서·서류관문)·선택(`응답`) 제출에도 실리는 「제출 계열 payload 의 시도
+     *     서수」(lib/이벤트검증)라, 술어 없이 쓰면 타자 친 제출에 「다시 «말해» 봤다」가 붙는
+     *     거짓이 된다. `응답`(보기 고르기)은 고른 것이지 말한 것이 아니라 뺀다.
+     *   ③`보여줄행` — 학생이 못 본 행이 연속 금지의 「직전」이 되지 않게(위 ③ 그대로).
+     *   숫자꼴 검사·아니면 1(첫 시도)은 `functions/progress` 재시도 술어와 같은 한 벌이다 —
+     *   payload 는 자유 JSON 이라 바로 `::int` 캐스팅하면 행 하나가 조회 전체를 500 으로 만든다. */
     const 이력행 = await sql`
       select c.correction_id, c.error_tags,
              (${보여줄행()}
               and e.event_type = 'submission.created'
               and s.task_format = '낭독'
-              and e.retry_of_event_id is not null) as 재발화
+              and e.retry_of_event_id is not null) as 재발화,
+             (${보여줄행()}
+              and e.event_type = 'submission.created'
+              and s.task_format in ('낭독', '자유발화')
+              and (case when (e.payload->>'attempt_no') ~ '^[0-9]+$'
+                        then (e.payload->>'attempt_no')::int else 1 end) >= 2) as 그자리재도전
         from engine.corrections c
         join engine.submissions s on s.submission_id = c.submission_id
         join engine.learning_events e on e.event_id = s.event_id
@@ -234,6 +250,7 @@ Deno.serve(async (req: Request) => {
       correction_id: String(r.correction_id),
       error_tags: (Array.isArray(r.error_tags) ? r.error_tags : []) as string[],
       재발화: r.재발화 === true,
+      그자리재도전: r.그자리재도전 === true,
     })));
 
     const 다음있음 = 행들.length > 쪽크기;
