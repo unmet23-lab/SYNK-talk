@@ -201,6 +201,117 @@ function 주석제거기갈래(init) {
   return 주석지우나(init);
 }
 
+/* ── 불투명 import — 원문 생산자가 «다른 파일»에 살 때 ────────────────────────────────
+ * 🔴 [2026-08-14 4차 · as 실측] 같은 병의 **네 번째**다. 앞의 셋은 「모양을 하나만 봤다」였고
+ *   이번은 「이 파일만 봤다」다. 원문 생산자를 **지역 선언**에서만 찾으니
+ *   `const { engineSource } = require('./_engine-source')` 는 영영 안 보인다.
+ *   as 실측: `engineSource()` 는 엔진 7파일을 `readFileSync` 해 이어 붙인 **원문 그대로**인데
+ *   그것을 받은 `const code = engineSource()` 가 원문변수로 못 서서, 그 파일의 단언이 통째로
+ *   ❔모름으로 샜다 — 직접 17자리에 파생(`section`·`code.slice`)까지 ~48자리.
+ *   👉 talk 에선 원리상 안 드러난다(그 모양이 여기 없다) — 3차와 **같은 자리**다.
+ *
+ * ⚠ 대가(틀릴 때의 모습): 상대경로 require 를 **한 겹만** 따라간다.
+ *   ① `node_modules`·절대경로·동적 경로는 안 본다 — 따라가면 분모가 저장소 밖으로 번지고,
+ *      못 읽는 날 이 도구가 통째로 죽는다(F296).
+ *   ② 한 겹이다 — 들여온 파일이 «또» 들여온 것은 안 본다(지금 실측 0건 · 나오면 그때 늘린다).
+ *   ③ 못 읽거나 못 파싱하면 **아무것도 안 더한다** — 모름으로 남는 것이 「깨끗하다」보다 정직하다.
+ *   ④ 정제가 **이긴다** — 읽고 나서 정제해 주는 함수를 원문으로 세면 처방이 「감싸라」로 나오고,
+ *      이미 감싼 것을 또 감싸라는 따를 수 없는 처방이 된다(F103). */
+const 들여온것캐시 = new Map();
+
+/** 그 함수 «자신»의 반환식만 — 안에 든 다른 함수의 `return` 은 그 함수 몫이다.
+ *  (`세우기` 의 require 셤이 안쪽에서 `return m` 을 하는데, 그것까지 세면 판정이 흔들린다.) */
+function 제반환식(fn) {
+  if (fn.body && fn.body.type !== 'BlockStatement') return [fn.body];
+  const out = [];
+  const 타기 = (노드) => {
+    if (!노드 || typeof 노드 !== 'object') return;
+    if (Array.isArray(노드)) { for (const c of 노드) 타기(c); return; }
+    if (typeof 노드.type === 'string' && /Function/.test(노드.type)) return;
+    if (노드.type === 'ReturnStatement' && 노드.argument) out.push(노드.argument);
+    for (const k of Object.keys(노드)) {
+      if (k === 'type' || k === 'start' || k === 'end' || k === 'loc') continue;
+      타기(노드[k]);
+    }
+  };
+  타기(fn.body);
+  return out;
+}
+
+/** 이 반환식이 «파일 원문 글»인가 — **읽었다고 글을 내주는 것은 아니다.**
+ *
+ * 🔴 [2026-08-14 4차 · 내 첫 판이 여기서 틀렸다] 이 경계 없이 「읽으면 원문 생산자」로 셌더니
+ *   `tests/lib/앱모듈세우기.js` 의 `세우기()` 가 원문 생산자로 섰다 — 그 함수는 파일을 읽지만
+ *   내주는 것은 `module_.exports`, 즉 **모듈 객체**다. 그러자 그 팩에서 나온 «데이터»가 전부
+ *   원문 파생이 되어 talk 에서 `팩.같은스킬다른문항(…)`·`JSON.stringify(학생판)` 까지 위험으로
+ *   섰다(실측 오탐 3건). 처방이 「모듈 객체를 주석 제거기로 감싸라」가 되는데, 따를 수 없는
+ *   처방은 우회를 정상 통로로 만든다(F103).
+ *   지역 판정의 `JSON구조인가` 와 **같은 축**이다 — 파일에서 왔지만 «글»이 아닌 것. */
+function 원문글인가(r, 원문변수, 빈함수) {
+  if (!r) return false;
+  if (r.type === 'ObjectExpression' || r.type === 'ArrayExpression') return false;
+  if (JSON구조인가(r)) return false;
+  if (읽기가있나(r, 빈함수)) return true;          // 반환식 «안»에 읽기가 있다 — engineSource 모양
+  if (r.type === 'Identifier') return 원문변수.has(r.name);
+  let 파생 = false;
+  훑기(r, (m) => { if (m.type === 'Identifier' && 원문변수.has(m.name)) 파생 = true; });
+  return 파생;
+}
+
+/** 상대경로 하나를 실제 파일로. 없으면 null(확장자·index 까지만 본다 — 해석기를 짓지 않는다). */
+function 붙이기(기준, 상대) {
+  for (const c of [상대, `${상대}.js`, path.join(상대, 'index.js')]) {
+    const p = path.resolve(기준, c);
+    try { if (fs.statSync(p).isFile()) return p; } catch (_) { /* 다음 후보 */ }
+  }
+  return null;
+}
+
+/** 그 파일이 내보내는 이름 중 «원문을 내주는» 것 / «읽고서 정제해 주는» 것. */
+function 내보내는생산자(파일) {
+  if (들여온것캐시.has(파일)) return 들여온것캐시.get(파일);
+  const 결과 = { 원문: new Set(), 정제: new Set() };
+  들여온것캐시.set(파일, 결과);   // 순환 require 방어 — 재귀 전에 먼저 넣는다
+  let 소스;
+  let ast;
+  try {
+    소스 = fs.readFileSync(파일, 'utf8');
+    ast = acorn.parse(소스, { ecmaVersion: 'latest', sourceType: 'module', allowReturnOutsideFunction: true });
+  } catch (_) {
+    try { ast = acorn.parse(소스, { ecmaVersion: 'latest', sourceType: 'script', allowReturnOutsideFunction: true }); }
+    catch (_2) { return 결과; }   // ③ 못 읽으면 아무것도 안 더한다
+  }
+  /* 그 파일 «자신의» 정제 통로 — 여기 없이 판정하면 ④ 가 깨진다. */
+  const 정제함수 = new Set(['코드만', '구간']);
+  훑기(ast, (n) => {
+    if (n.type === 'FunctionDeclaration' && n.id && 주석지우나(n) === 'js') 정제함수.add(n.id.name);
+    if (n.type === 'VariableDeclarator' && n.id && n.id.type === 'Identifier'
+        && 주석제거기갈래(n.init) === 'js') 정제함수.add(n.id.name);
+  });
+  /* 그 파일 «안»에서 읽기로 생긴 이름 — 반환식이 그것의 파생인지 보려면 필요하다. */
+  const 원문변수 = new Set();
+  const 빈함수 = new Set();
+  훑기(ast, (n) => {
+    if (n.type !== 'VariableDeclarator' || !n.id || n.id.type !== 'Identifier' || !n.init) return;
+    if (JSON구조인가(n.init)) return;
+    if (읽기가있나(n.init, 빈함수)) 원문변수.add(n.id.name);
+  });
+  const 판정 = (본문, nm) => {
+    if (정제함수.has(nm)) { 결과.정제.add(nm); return; }
+    if (!읽기가있나(본문, 빈함수)) return;          // 파일을 안 읽으면 이 축이 아니다
+    const 돌려주는것 = 제반환식(본문);
+    if (!돌려주는것.length) return;
+    if (돌려주는것.every((r) => 정제로감쌌나(r, 정제함수))) { 결과.정제.add(nm); return; }
+    if (돌려주는것.some((r) => 원문글인가(r, 원문변수, 빈함수))) 결과.원문.add(nm);
+  };
+  훑기(ast, (n) => {
+    if (n.type === 'FunctionDeclaration' && n.id) 판정(n, n.id.name);
+    else if (n.type === 'VariableDeclarator' && n.id && n.id.type === 'Identifier' && n.init
+             && (n.init.type === 'ArrowFunctionExpression' || n.init.type === 'FunctionExpression')) 판정(n.init, n.id.name);
+  });
+  return 결과;
+}
+
 /** 전수를 «센다». 파서가 없으면 던진다 — 「0건」으로 접지 않는다(F207). */
 function 재기(뿌리) {
 if (!잴수있나()) throw new Error('acorn 을 못 불렀다 — 셀 수 없다(0건이 아니다)');
@@ -249,6 +360,30 @@ for (const 파일 of 파일들(뿌리)) {
     if (n.type === 'VariableDeclarator' && n.id && n.id.type === 'ObjectPattern' && n.init
         && n.init.type === 'CallExpression' && /소스검사/.test(소스.slice(n.init.start, n.init.end))) {
       for (const p of n.id.properties) if (p.value && p.value.type === 'Identifier') 정제함수.add(p.value.name);
+    }
+  });
+
+  /* ②-c 상대경로 require 로 들여온 «원문 생산자» — 위 ①② 가 «이 파일만» 보던 사각(4차 · 머리말).
+   *   두 받는 모양을 다 본다: 구조분해(`const { engineSource } = require(…)`)와
+   *   통째(`const E = require(…)` → `E.engineSource()` — `이름()` 이 점 이름을 내므로 그대로 맞는다). */
+  훑기(ast, (n) => {
+    if (n.type !== 'VariableDeclarator' || !n.id || !n.init) return;
+    if (n.init.type !== 'CallExpression' || 이름(n.init.callee) !== 'require') return;
+    const 인자 = n.init.arguments[0];
+    if (!인자 || 인자.type !== 'Literal' || !/^\.\.?\//.test(String(인자.value))) return;  // ① 상대경로만
+    const 대상 = 붙이기(path.dirname(파일), String(인자.value));
+    if (!대상) return;
+    const 생산자 = 내보내는생산자(대상);
+    if (n.id.type === 'ObjectPattern') {
+      for (const p of n.id.properties) {
+        if (!p.key || !p.value || p.value.type !== 'Identifier') continue;
+        const 원이름 = 이름(p.key);
+        if (생산자.정제.has(원이름)) 정제함수.add(p.value.name);
+        else if (생산자.원문.has(원이름)) 원문함수.add(p.value.name);
+      }
+    } else if (n.id.type === 'Identifier') {
+      for (const nm of 생산자.정제) 정제함수.add(`${n.id.name}.${nm}`);
+      for (const nm of 생산자.원문) 원문함수.add(`${n.id.name}.${nm}`);
     }
   });
 
@@ -307,7 +442,30 @@ for (const 파일 of 파일들(뿌리)) {
    * 이 축(가드가 자기 주석에 눈먼다)이 원리상 성립하지 않는다. 셋 중 어디에도 안 넣는다. */
   const 구조변수 = new Set();
   for (let 회차 = 0; 회차 < 6; 회차 += 1) {
-    const 이전 = 원문변수.size + 정제변수.size;
+    const 이전 = 원문변수.size + 정제변수.size + 원문함수.size + 정제함수.size;
+    /* ③-b 함수 «선언» 모양의 원문 생산자 — `function 구간(a, b) { return code.slice(a, b) }`.
+     *
+     * 🔴 [2026-08-14 · as 실측] 위 ② 는 화살표·함수식만 원문 생산자로 본다. 같은 판정을
+     *   **함수 선언**에도 해야 하는데 그 모양은 ㉡(사본) 축에서만 봤다 — 08-13 에 사본 축에서
+     *   정확히 이 사각을 고쳐 놓고(「함수 «선언» 모양의 사본」) 원문 축에는 안 옮긴 것이다.
+     *   한 축에서 배운 모양을 다른 축에 안 옮기면 그 축은 그대로 눈이 먼다.
+     *   as 실측: `수집.test.js` 의 `function section()` 이 `code.slice(…)` 를 내주는데도
+     *   원문함수에 못 서서 그 파일 24자리가 통째로 ❔모름이었다.
+     *
+     * ⚠ 루프 «안»이라야 한다 — `section` 이 원문인지는 `code` 가 원문변수로 선 뒤에야 안다.
+     *   밖에 두면 선언 순서에 기대게 되고, 그 기대는 파일마다 다르게 깨진다. */
+    훑기(ast, (n) => {
+      if (n.type !== 'FunctionDeclaration' || !n.id) return;
+      const nm = n.id.name;
+      if (정제함수.has(nm) || 원문함수.has(nm)) return;
+      const 돌려주는것 = 제반환식(n);
+      if (!돌려주는것.length) return;
+      /* 정제가 이긴다 — 이미 감싼 것을 또 감싸라는 처방은 따를 수 없다(F103). */
+      if (돌려주는것.every((r) => 정제로감쌌나(r, 정제함수))) { 정제함수.add(nm); return; }
+      /* 「읽었다고 «글»은 아니다」 경계를 여기도 그대로 쓴다 — 한 축에서 배운 것을 다른 축에
+       *   안 옮기면 그 축이 눈이 먼다는 것이 바로 이 조임(③-b)이 고치는 병이다. */
+      if (돌려주는것.some((r) => 원문글인가(r, 원문변수, 원문함수))) 원문함수.add(nm);
+    });
     훑기(ast, (n) => {
       if (n.type !== 'VariableDeclarator' || !n.id || n.id.type !== 'Identifier' || !n.init) return;
       if (정제함수.has(n.id.name) || 원문함수.has(n.id.name)) return;
@@ -324,7 +482,11 @@ for (const 파일 of 파일들(뿌리)) {
       /* JSON 구조는 이 축이 아니다 — 어느 쪽에도 안 넣어 «파생이 번지는 것»부터 끊는다.
        * ⚠ ❔모름이 아니라 «구조»로 따로 적는다: 모름은 「못 갈랐다」인데 여기는 갈랐다. */
       if (JSON구조인가(n.init)) { 구조변수.add(n.id.name); return; }
-      if (!읽기가있나(n.init, 원문함수) && !원문파생 && !정제파생 && !식사본변수.has(n.id.name)) return;
+      /* 🔑 «읽기»가 init 에 안 보여도 정제 통로가 감쌌으면 정제다 — 들여온 생산자(②-c)가
+       *   읽기를 **자기 안에** 감추기 때문이다(`const 정제된 = 깨끗이(경로)`). 이 갈래가 없으면
+       *   정제해 준 것이 ❔모름으로 새고, 모름이 부풀면 이 도구의 숫자를 아무도 안 읽는다. */
+      const 정제감쌈 = 정제로감쌌나(n.init, 정제함수);
+      if (!읽기가있나(n.init, 원문함수) && !원문파생 && !정제파생 && !식사본변수.has(n.id.name) && !정제감쌈) return;
       if (원문파생 || 읽기가있나(n.init, 원문함수)) {
         /* 🔑 «식 모양 사본»도 정제다 — 통로가 공용이 아닐 뿐, 그 자리는 원문을 직접 재지 않는다.
          *   위험으로 세면 처방이 「감싸라」로 나오는데 실제 처방은 「사본을 공용으로 돌려라」다. */
@@ -332,7 +494,7 @@ for (const 파일 of 파일들(뿌리)) {
         else 원문변수.add(n.id.name);
       } else 정제변수.add(n.id.name);
     });
-    if (원문변수.size + 정제변수.size === 이전) break;
+    if (원문변수.size + 정제변수.size + 원문함수.size + 정제함수.size === 이전) break;
   }
 
   /* ⚠ **한 이름이 두 곳에서 «다르게» 선언되면 이 근사가 깨진다.**
