@@ -82,12 +82,16 @@ test('⑤ 대기 단계 — 「교수님이 읽고 있어요」뿐, 즉답처럼
 });
 
 test('⑥ controlled TextInput 금지 — defaultValue 만 쓴다(발주 G1 §4-5 ⚙ · 한글 조합 보호)', () => {
-  assert.ok(/defaultValue/.test(소스), 'TextInput 이 defaultValue 를 안 쓴다');
-  assert.ok(!/value=\{/.test(소스),
+  /* 이 파일의 다른 소스층 검사(:94·:104·:130)는 전부 `코드만` 을 지나는데 여기만 원문이었다.
+     `value={` 는 특히 위험한 표기다 — 금지를 설명하는 JSX 주석(`{/* value={…} 금지 *​/}`)이
+     그대로 위반으로 잡혀 거짓 적색이 난다(공용 통로 머리말의 `반피드백화면` 실측과 같은 모양). */
+  const 코드 = 코드만(소스);
+  assert.ok(/defaultValue/.test(코드), 'TextInput 이 defaultValue 를 안 쓴다');
+  assert.ok(!/value=\{/.test(코드),
     'TextInput 에 value= 가 있다 — 매 글자 되돌려 넣으면 「안녕」이 「ㅇㅏㄴㄴㅕㅇ」으로 흩어진다');
   /* 게이지 갱신 조건 — 같은판정이 false 일 때만 setState(그 줄이 사라지면 매 글자 리렌더다).
    * 소스층인 이유: 핸들러는 첫 렌더가 못 돈다(⑩ 선례 — 못 재는 층을 비워 두지 않는다). */
-  assert.match(소스, /같은판정\(/, '게이지 갱신이 같은판정을 안 지난다 — 매 글자 리렌더 = controlled 와 같은 파괴다');
+  assert.match(코드, /같은판정\(/, '게이지 갱신이 같은판정을 안 지난다 — 매 글자 리렌더 = controlled 와 같은 파괴다');
 });
 
 test('⑥-b 입력 칸은 본문 하나다 — 제목 합성이 계측·게이지·body_original 을 오염시켰다(H1)', () => {

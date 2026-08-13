@@ -30,6 +30,12 @@ const 본체경로 = path.join(함수방, 'index.ts');
 
 assert.ok(fs.existsSync(본체경로), 'functions/review/index.ts 가 없다 — 이 검사가 통째로 미실행이다');
 const 소스 = fs.readFileSync(본체경로, 'utf8');
+/* 🔴 `소스` 는 **원문으로 남긴다** — 통째로 정제하면 이 파일이 깨진다(실측 2026-08-13):
+ *   `함수본문()` 이 쓰는 구간 앵커가 `/* ── §5 승인·폐기` 처럼 **주석 배너**라, 주석을 지우면
+ *   앵커가 함께 사라져 「이 검사가 통째로 미실행」으로 떨어진다. 즉 여기서 주석은 설명이
+ *   아니라 **구조**다. 대신 «금지» 단언만 아래 `코드` 를 쓴다 — 금지는 주석 한 줄에 거짓
+ *   적색으로 뒤집히는 방향이고(F401), 앵커와 달리 코드만 보면 되는 자리다. */
+const 코드 = 코드만(소스);
 const 계약 = fs.readFileSync(path.join(뿌리, 'docs', '검수_내부계약.md'), 'utf8');
 const 스키마 = fs.readFileSync(path.join(뿌리, 'supabase', 'L0_스키마.sql'), 'utf8');
 
@@ -195,14 +201,14 @@ test('검수 역할은 허용 목록이다 (차단 목록이면 못 적은 역�
   assert.deepEqual(역할.sort(), ['director', 'inspector'],
     '검수 역할이 계약 §1 과 다르다 — `director` 를 빼면 2027-02 까지 이 통로를 쓸 사람이 0명이다');
   assert.match(소스, /role = any\(/u, '역할을 허용 목록으로 안 묻는다');
-  assert.ok(!/role\s*(!=|<>)|not in \(/u.test(소스),
+  assert.ok(!/role\s*(!=|<>)|not in \(/u.test(코드),
     '역할을 차단 목록으로 가른다 — 못 적은 역할이 새는 방향은 언제나 「통과」다');
 });
 
 test('직원 폐기 판정은 lib 정본을 부른다 (사본을 두지 않는다)', () => {
   assert.match(소스, /살아있는직원\(sql, 주체, 발급시각\(req\)\)/u,
     '폐기 판정을 안 부른다 — 폐기된 검수자의 옛 토큰이 큐를 계속 읽는다');
-  assert.ok(!/revoked_before/u.test(소스),
+  assert.ok(!/revoked_before/u.test(코드),
     '폐기 술어를 이 파일이 직접 적는다 — 정본은 `lib/토큰.js` 하나다(절단문서 ②-15)');
 });
 
@@ -287,7 +293,7 @@ test('승인은 **한 트랜잭션**에 넷을 쓴다 — 하나라도 새면 �
 test('🔴 `verdict` 를 요청에서 받지 않는다 — 서버가 세 텍스트에서 낸다', () => {
   const 승인 = 함수본문('async function 승인(', 'async function 폐기(');
   assert.match(승인, /const verdict = 판정\(\{/u, '판정을 안 부른다 — verdict 가 어디서 오는지 불명이다');
-  assert.ok(!/b\.verdict|q\.verdict|본문\.verdict/u.test(소스),
+  assert.ok(!/b\.verdict|q\.verdict|본문\.verdict/u.test(코드),
     '요청 본문에서 verdict 를 읽는다 — 사람이 고르면 그 순서 판정이 화면마다 갈린다(§5-1)');
 });
 
