@@ -207,6 +207,43 @@ test('⑩ 비밀번호 변경 갈래가 **새 세션을 세우고** 끝난다 �
     '🔴 화면이 `토큰` prop 을 다시 받는다 — 받아 두면 다음 사람이 그 자리에 또 쓴다');
 });
 
+test('⑪ G3 알바변명화면이 재료와 함께 그려진다 — 말하기화면 G3 갈래의 실물 (2026-08-13)', () => {
+  /* 🔴 이 import 사슬이 살아 있는지가 이 파일의 ⑥에도 걸린다 — 말하기화면이 두 게임 화면을
+     정적으로 import 하므로, 화면 파일이 없거나 깨지면 ⑥이 MODULE_NOT_FOUND 로 함께 죽는다
+     (그게 이 화면들이 서기 전의 실측 적색이다). 세부 상태·규율은 tests/알바변명화면.test.js 몫. */
+  const { 시드만들기, 펴기 } = require(path.join(ROOT, 'contents', '알바변명문항.js'));
+  const { G3스냅샷 } = require(path.join(ROOT, 'lib', '게임스냅샷.js'));
+  const 시드 = 시드만들기('g3t01', 0, 0);
+  const 문항 = 펴기(시드);
+  const 글 = 그리기('src/알바변명화면.js', {
+    재료: {
+      prompt_seed: 시드, 스냅샷: G3스냅샷(시드), 상황문: 문항.상황문,
+      사장님대사: 문항.사장님대사, 지시문: 문항.지시문,
+      task_ref: 'task-2026-08-13', level_snapshot: 'Lv3', goal_snapshot: null, retry_of_event_id: null,
+    },
+    date: '2026-08-13', 로그: [], 기록추가: async () => {}, 학생번호: 'SYNK-042',
+  });
+  assert.match(글, /알바 변명/, '머리글부터 안 그려졌다 — 화면이 첫 렌더에서 죽었다');
+  assert.ok(글.includes(문항.상황문), '상황 카드가 비었다 — 팩 정본이 그리는 재료다');
+});
+
+test('⑪-b G4 서류관문화면이 벌과 함께 그려진다 — 말하기화면 G4 갈래의 실물 (2026-08-13)', () => {
+  const 팩 = require(path.join(ROOT, 'contents', '서류관문문항.js'));
+  const { G4스냅샷 } = require(path.join(ROOT, 'lib', '게임스냅샷.js'));
+  const 편성 = 팩.관문편성(팩.문항들[0].관문id);
+  const 벌 = 편성.map((시드) => {
+    const 턴 = 팩.펴기(시드);
+    return {
+      앵커시드: 편성[0], 스냅샷: G4스냅샷(시드),
+      ...(턴.종류 === '변환' ? { 형식: 턴.형식 } : {}),
+      task_ref: 'task-2026-08-13', level_snapshot: 'Lv3', goal_snapshot: null, retry_of_event_id: null,
+    };
+  });
+  const 글 = 그리기('src/서류관문화면.js', { 벌, 토큰: 'x', 학생번호: 'SYNK-042' });
+  assert.match(글, /서류 관문/, '머리글부터 안 그려졌다 — 화면이 첫 렌더에서 죽었다');
+  assert.match(글, /모르겠어요/, '「모르겠어요」가 첫 턴에 없다 — 회피 신호의 문이 통째로 사라졌다');
+});
+
 test('⑤ 이 하네스는 F268 그 모양을 실제로 잡는다 (탐지력은 픽스처가 진다)', () => {
   /* `tests/fixtures/깨진화면.js` 는 선언 없는 이름을 그릴 때 부른다 — 구문검사·번들링은
      통과하고 **그리는 순간** 죽는 그 형태다. 여기서 안 죽으면 위 ①~④ 의 초록은

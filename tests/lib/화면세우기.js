@@ -87,7 +87,11 @@ const expo스텁 = {
     useAudioPlayer: () => ({}),
     useAudioPlayerStatus: () => null,
   },
-  'expo-audio/build/AudioStream': {},
+  /* `useAudioStream()` — 첫 소비자는 `알바변명화면` 의 녹음 단계 렌더(2026-08-13 · G3 가
+     녹음카드를 실제로 그린다). 첫 렌더가 쓰는 것은 `{ stream }` 구조분해뿐이고 stream 의
+     메서드(start·stop)는 전부 핸들러·effect 안이다 — 그래서 빈 판 하나만 준다(머리말 🔑:
+     안 부르는 자리를 채우면 이 통로가 화면이 아니라 자기 자신을 재게 된다). */
+  'expo-audio/build/AudioStream': { useAudioStream: () => ({}) },
 };
 const 원래로드 = Module._load;
 Module._load = function (요청, ...나머지) {
