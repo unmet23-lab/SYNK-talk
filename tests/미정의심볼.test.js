@@ -108,6 +108,20 @@ function 훑기(코드) {
       case 'ImportDeclaration':
         for (const s of 노드.specifiers) 선언.add(s.local.name);
         return; // 안쪽에 참조가 없다
+      case 'ExportNamedDeclaration':
+        /* [2026-08-13] F378 — `export { A as B }` 의 B(exported)는 참조가 아니라 **새로 짓는
+         * 수출 이름**이라 선언될 자리가 원리상 없다. 갈래 없이 default 순회에 맡기면 B 가
+         * Identifier 로 참조에 실려 미정의로 잡힌다(실측: lib/보고서교정제출.js '스냅샷모양판' —
+         * 그 자리는 지역 상수 우회로 피해 있다). `from` 재수출은 local 쪽도 남의 모듈 이름공간이다. */
+        if (노드.source) return; // export { X as Y } from './m' — X·Y 둘 다 이 파일의 이름이 아니다
+        걷기(노드.declaration, 노드);
+        for (const s of 노드.specifiers || []) 걷기(s, 노드);
+        return;
+      case 'ExportSpecifier':
+        /* local 은 이 파일 안의 이름이다 — 미정의면 babel 이 파스 층에서 이미 거절하므로
+         * (ModuleExportUndefined) 여기 걷기는 무해한 명시다. exported 는 일부러 안 걷는다. */
+        걷기(노드.local, 노드);
+        return;
       case 'VariableDeclarator':
         이름모으기(노드.id, (n) => 선언.add(n));
         걷기(노드.init, 노드);
@@ -227,4 +241,29 @@ test('탐지력 픽스처 — 정상 코드에 거짓양성이 없다', () => {
   `);
   const 샌것 = 참조.filter((n) => !선언.has(n.name) && !전역.has(n.name)).map((n) => n.name);
   assert.deepStrictEqual(샌것, ['useState'], 'useState 만 미import 로 잡혀야 한다');
+});
+
+/* F378 — 별칭 재수출 3픽스처. 탐지력은 여기 픽스처가 못박고, 실저장소(위 본검사)에는
+ * 거짓양성만 검사한다(가드 맹점 ②). */
+test('픽스처 — 별칭 재수출의 exported 이름은 참조가 아니다 (F378)', () => {
+  const { 선언, 참조 } = 훑기(`
+    const 원본 = 1;
+    export { 원본 as 별칭 };
+  `);
+  const 샌것 = 참조.filter((n) => !선언.has(n.name) && !전역.has(n.name)).map((n) => n.name);
+  assert.deepStrictEqual(샌것, [], 'exported(별칭)는 새 수출 이름 — 선언될 자리가 원리상 없다');
+});
+
+test('픽스처 — export 선언 안의 참조는 여전히 잡힌다 (F378 탐지력)', () => {
+  /* 미정의 local(`export { 유령 }`)은 babel 이 파스 층에서 이미 거절하므로(ModuleExportUndefined)
+   * 탐지력이 걸릴 자리는 declaration 쪽이다 — 새 갈래가 참조를 삼키지 않는 것을 여기서 못박는다. */
+  const { 선언, 참조 } = 훑기(`export const 값 = 없는이름;`);
+  const 샌것 = 참조.filter((n) => !선언.has(n.name) && !전역.has(n.name)).map((n) => n.name);
+  assert.deepStrictEqual(샌것, ['없는이름'], 'export 갈래가 declaration 안의 미정의 참조를 삼키면 안 된다');
+});
+
+test('픽스처 — from 재수출은 local·exported 둘 다 이 파일 이름이 아니다 (F378)', () => {
+  const { 선언, 참조 } = 훑기(`export { 밖이름 as 새이름 } from './다른모듈.js';`);
+  const 샌것 = 참조.filter((n) => !선언.has(n.name) && !전역.has(n.name)).map((n) => n.name);
+  assert.deepStrictEqual(샌것, [], 'from 재수출의 두 이름은 남의 모듈 이름공간이다');
 });
