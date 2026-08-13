@@ -642,13 +642,13 @@ test('픽스처 — 이 검사가 리터럴 사본과 기기 시계를 실제로
   assert.equal(기기시계.test('let 그날 = 몽골날짜();'), false);
 });
 
-test('출하 코드에서 시간대를 손으로 적는 곳은 lib/오늘과제.js 하나다', () => {
-  const 정본 = path.join(ROOT, 'lib', '오늘과제.js');
+test('출하 코드에서 시간대를 손으로 적는 곳은 lib/몽골날짜.js 하나다', () => {
+  const 정본 = path.join(ROOT, 'lib', '몽골날짜.js');
   const 사본 = 출하뿌리.flatMap(소스들)
     .filter((p) => p !== 정본 && 시간대사본.test(fs.readFileSync(p, 'utf8')))
     .map((p) => path.relative(ROOT, p));
   assert.deepEqual(사본, [],
-    '시간대를 손으로 적었다 — `lib/오늘과제.js` 의 `시간대` 를 가져다 써라(SQL 에도 ${시간대} 로 넣는다).');
+    '시간대를 손으로 적었다 — `lib/몽골날짜.js` 의 `시간대` 를 가져다 써라(SQL 에도 ${시간대} 로 넣는다).');
 });
 
 test('앱은 날짜를 기기 시계로 끊지 않는다 — 정본은 몽골 달력이다', () => {

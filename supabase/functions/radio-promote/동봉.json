@@ -4,15 +4,7 @@
   "라디오태스크.mjs": "lib/라디오태스크.js",
   "이벤트검증.mjs": "lib/이벤트검증.js",
   "동의게이트.mjs": "lib/동의게이트.js",
-  "오늘과제.mjs": "lib/오늘과제.js",
-  "선택로그.mjs": "lib/선택로그.js",
-  "게임스냅샷.mjs": "lib/게임스냅샷.js",
-  "알바변명문항.mjs": "contents/알바변명문항.js",
-  "서류관문문항.mjs": "contents/서류관문문항.js",
-  "서류관문.mjs": "lib/서류관문.js",
-  "교수멘탈문항.mjs": "contents/교수멘탈문항.js",
-  "보고서교정.mjs": "lib/보고서교정.js",
-  "보고서교정문항.mjs": "contents/보고서교정문항.js",
+  "몽골날짜.mjs": "lib/몽골날짜.js",
   "사건출처.mjs": "lib/사건출처.js",
   "토큰.mjs": "lib/토큰.js"
 }
