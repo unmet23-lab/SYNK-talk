@@ -18,6 +18,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const { 코드만, 코드만픽스처 } = require('./lib/소스검사.js');
 
 const 뿌리 = path.resolve(__dirname, '..');
 const {
@@ -203,7 +204,10 @@ test('⑤ 풀이 배열이 아니거나 주키·n 이 모양이 아니면 null',
 /* ── ⑥ 이 파일이 무작위를 직접 부르지 않는다 ───────────────────────── */
 
 test('⑥ 조립기 소스에 `Math.random` 이 없다 — 있으면 재현이 원리상 불가능하다', () => {
-  const 소스 = require('node:fs').readFileSync(path.join(뿌리, 'lib', '골든표본.js'), 'utf8');
-  /* 주석에서 「부르지 않는다」고 말하는 자리는 백틱으로 감싸 두었다 — 호출 표기만 센다. */
-  assert.equal(/Math\.random\s*\(/.test(소스), false, 'Math.random 호출이 있다');
+  /* 🔴 옛 판은 원문을 재면서 **주석 쪽 표기 관례**로 버텼다 — 「`Math.random` 은 부르지 않는다」를
+   *   백틱으로 감싸 괄호를 안 붙이는 규칙. 규칙이 사람 기억에 얹혀 있으면 언젠가 깨지고, 그날의
+   *   증상은 「멀쩡한 파일이 적색」이다. 통로로 지우면 그 관례 자체가 필요 없어진다. */
+  assert.equal(코드만(코드만픽스처.입력), 코드만픽스처.기대, '주석 제거기가 죽었다');
+  const 코드 = 코드만(require('node:fs').readFileSync(path.join(뿌리, 'lib', '골든표본.js'), 'utf8'));
+  assert.equal(/Math\.random\s*\(/.test(코드), false, 'Math.random 호출이 있다');
 });

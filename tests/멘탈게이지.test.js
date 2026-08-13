@@ -18,6 +18,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { 코드만, 코드만픽스처 } = require('./lib/소스검사.js');
 const { 세우기 } = require('./lib/앱모듈세우기.js');
 const { 판정기, 판정, 같은판정 } = require('../lib/멘탈게이지.js');
 
@@ -105,8 +106,13 @@ test('산출은 얼어 나가고, 같은판정이 리렌더 판단을 진다', (
 });
 
 test('부분일치 채점 금지 — 소스에 .includes( 0(보드 인계 규약의 기계 강제)', () => {
+  /* 🔴 주석을 지우고 잰다 — 이 금지야말로 자기 주석에 걸리는 전형이다. 세 파일 어디든
+   *   「부분일치(`.includes(`)를 쓰지 않는다」는 **설명 한 줄**이 그대로 위반으로 잡혔다.
+   *   F401 이 그 사고였다: `tests/마이크권한.test.js` 가 주석의 `allowsRecording` 을 원문
+   *   `includes` 로 재서, 코드는 한 줄도 안 어긴 커밋이 master 를 적색으로 만들었다. */
+  assert.equal(코드만(코드만픽스처.입력), 코드만픽스처.기대, '주석 제거기가 죽었다');
   for (const 파일 of ['멘탈게이지.js', '게임스냅샷.js', '서류관문.js']) {
-    const 원문 = fs.readFileSync(path.join(뿌리, 'lib', 파일), 'utf8');
-    assert.ok(!/\.includes\(/.test(원문), `${파일}: .includes( 발견`);
+    const 코드 = 코드만(fs.readFileSync(path.join(뿌리, 'lib', 파일), 'utf8'));
+    assert.ok(!/\.includes\(/.test(코드), `${파일}: .includes( 발견`);
   }
 });

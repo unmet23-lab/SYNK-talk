@@ -13,10 +13,23 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 
+const { 코드만, 코드만픽스처 } = require('./lib/소스검사.js');
+
 const 방 = path.join(__dirname, '..', 'supabase', 'functions', 'correct');
-const 본체 = fs.readFileSync(path.join(방, 'index.ts'), 'utf8');
+/* 🔴 **주석을 지우고 잰다**(F401 계열 · 대기열 P3 줄72). 이 파일의 단언은 거의 전부 «사본 금지»다 —
+ *   `cache_control`·`api.anthropic.com`·오류태그 리터럴·프롬프트 원문이 함수 본체에 있으면 적색.
+ *   그런데 그 금지를 **설명하는 주석**이 correct/index.ts 에 한 줄만 있어도 같은 적색이 났다.
+ *   금지가 자세할수록 그 설명이 코드 옆에 붙으므로, 이 검사는 정확히 가장 잘 지킨 파일에서
+ *   깨진다. 구조 추출(import 목록·`if (값.사유)` 자리·평가 갈래 블록)도 전부 코드층이라 함께 정제한다. */
+const 본체 = 코드만(fs.readFileSync(path.join(방, 'index.ts'), 'utf8'));
 const 동봉 = JSON.parse(fs.readFileSync(path.join(방, '동봉.json'), 'utf8'));
 const 납작 = (s) => s.replace(/\s+/g, ' ').trim();
+
+test('🔴 주석 제거기가 살아 있다 — 죽으면 이 파일의 «사본 금지» 전부가 원문 검사로 되돌아간다', () => {
+  /* 탐지력은 픽스처로 못박는다(CLAUDE.md 가드 맹점 ②). `코드만` 이 조용히 입력을 그대로
+   * 돌려주게 되는 날, 위 `본체` 는 다시 원문이 되고 그 증상은 **적색이 아니라 초록**이다. */
+  assert.equal(코드만(코드만픽스처.입력), 코드만픽스처.기대, '주석 제거기가 죽었다');
+});
 
 test('🔴 index.ts 가 import 하는 .mjs 는 전부 동봉 표에 있다', () => {
   /* 없으면 **배포는 ✅ 로 끝나고 첫 호출의 import 에서 죽는다** — 이 저장소가 이미 두 번 겪은

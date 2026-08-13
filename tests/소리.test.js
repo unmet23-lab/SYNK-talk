@@ -17,6 +17,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { 띄우기 } = require('./lib/띄우기.js');
+const { 코드만, 코드만픽스처 } = require('./lib/소스검사.js');
 
 const 뿌리 = path.resolve(__dirname, '..');
 const { 만들기, 효과음이름 } = require('../lib/소리게이트.js');
@@ -110,8 +111,15 @@ test('BGM ④ — 재렌더가 바이트까지 같다(손 편집·비결정 렌�
 });
 
 test('어댑터 ⑤ — src/소리.js 는 expo 를 최상위에서 잡지 않고, 게이트를 지난다', () => {
-  const 소스 = fs.readFileSync(path.join(뿌리, 'src', '소리.js'), 'utf8');
-  assert.ok(!/^import[^\n]*expo/m.test(소스), 'expo 최상위 import — node 가 이 파일을 못 읽게 된다');
-  assert.match(소스, /lib\/소리게이트/, '게이트 import 가 사라졌다 — 판정 우회');
-  assert.ok(!/impactAsync[\s\S]{0,120}impactAsync/.test(소스), '햅틱 호출부가 늘었다 — 상태 전이(도장) 하나만');
+  /* 🔴 주석을 지우고 잰다 — `src/소리.js` 는 자기 머리말에서 「expo 를 최상위에서 import 하지
+   *   않는다」와 `impactAsync` 를 **설명해야만 하는** 파일이라(그게 이 파일의 규칙 자체다),
+   *   원문으로 재면 가장 잘 적어 둔 판이 적색이 된다.
+   *   ⚠ `코드만` 은 주석만 있던 줄을 «버린다» — 그래서 아래 `{0,120}` 거리 창이 **코드 사이
+   *   거리**를 재게 된다. 이 단언이 겨눈 것이 정확히 그것이라(호출 두 개가 붙어 있나) 뜻이
+   *   맞고, 창이 좁아지는 쪽이라 금지가 느슨해지지 않는다(`줄맞춰코드만` 은 반대로 늘린다). */
+  assert.equal(코드만(코드만픽스처.입력), 코드만픽스처.기대, '주석 제거기가 죽었다');
+  const 코드 = 코드만(fs.readFileSync(path.join(뿌리, 'src', '소리.js'), 'utf8'));
+  assert.ok(!/^import[^\n]*expo/m.test(코드), 'expo 최상위 import — node 가 이 파일을 못 읽게 된다');
+  assert.match(코드, /lib\/소리게이트/, '게이트 import 가 사라졌다 — 판정 우회');
+  assert.ok(!/impactAsync[\s\S]{0,120}impactAsync/.test(코드), '햅틱 호출부가 늘었다 — 상태 전이(도장) 하나만');
 });
