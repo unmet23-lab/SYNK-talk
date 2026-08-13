@@ -19,6 +19,11 @@ const { 몽골날짜, 멱등키, 오늘과제, 따라말하기문장, 화면과�
   학생판스냅샷, 학생공개키, 구제할까, 선택판, 판지문 } = require('../lib/오늘과제.js');
 const { 차원들, 보기세우기, 선택payload } = require('../lib/선택로그.js');
 const { 검증 } = require('../lib/이벤트검증.js');
+/* 🔴 소스층 단언은 전부 **주석을 지우고** 잰다(F401 계열 · 대기열 P3 줄72). 이 파일의 소스층
+ *   검사는 「금지한 표기가 남아 있나」 계열이라, 그 금지를 설명하는 주석 한 줄이 곧 거짓 적색이다.
+ *   같은 파일을 여는 자리가 여럿이면 **전부 같이** 돌린다 — 하나만 남기면 `가드계수` 가 파일을
+ *   한 스코프로 근사하고 첫 선언이 이겨서, 남은 원문 자리가 「정제됐다」로 잘못 세어진다. */
+const { 코드만, 코드만픽스처 } = require('./lib/소스검사.js');
 
 const 날짜 = '2026-08-07';
 const 호흡 = (r, 차례) => r.task_snapshot.호흡.find((h) => h.차례 === 차례);
@@ -26,6 +31,12 @@ const 호흡 = (r, 차례) => r.task_snapshot.호흡.find((h) => h.차례 === �
 /* ── 날짜 ─────────────────────────────────────────────────────────
  * 🔴 UTC 로 끊으면 몽골 오전 8시까지가 「어제」다. 그 오독은 증상이 조용하다 —
  *   아침에 앱을 연 학생이 어제 과제를 오늘 것으로 받고, 배치는 「1건 냈다」고 보고한다. */
+test('🔴 주석 제거기가 살아 있다 — 죽으면 이 파일의 소스층 금지 전부가 원문 검사로 되돌아간다', () => {
+  /* 탐지력은 픽스처로 못박는다(CLAUDE.md 가드 맹점 ②). `코드만` 이 조용히 입력을 그대로
+   * 돌려주게 되는 날 증상은 **적색이 아니라 초록**이라, 이 한 줄이 없으면 아무도 모른다. */
+  assert.equal(코드만(코드만픽스처.입력), 코드만픽스처.기대, '주석 제거기가 죽었다');
+});
+
 test('날짜는 몽골 달력으로 끊는다 — 16:00Z 가 경계다', () => {
   assert.equal(몽골날짜(new Date('2026-08-07T15:59:59Z')), '2026-08-07');
   assert.equal(몽골날짜(new Date('2026-08-07T16:00:00Z')), '2026-08-08');
@@ -652,7 +663,7 @@ test('출하 코드에서 시간대를 손으로 적는 곳은 lib/몽골날짜.
 });
 
 test('앱은 날짜를 기기 시계로 끊지 않는다 — 정본은 몽골 달력이다', () => {
-  const 화면 = fs.readFileSync(path.join(ROOT, 'src', '말하기화면.js'), 'utf8');
+  const 화면 = 코드만(fs.readFileSync(path.join(ROOT, 'src', '말하기화면.js'), 'utf8'));
   assert.equal(기기시계.test(화면), false,
     '기기 시계로 날짜를 조립했다 — `몽골날짜()` 를 써라(attempt_no 가 남의 날 바구니에서 세어진다).');
   /* 🔴 `/몽골날짜/` 로는 부족하다 — **import 줄이 그대로 매치된다.** 호출을 지우고 날짜를
@@ -856,7 +867,7 @@ test('②-20 목록이 비어 있지 않다 — 빈 목록은 무엇이든 통�
 test('②-20 `/tasks` 가 실제로 그 필터를 거쳐 응답한다', () => {
   /* 목록만 서고 호출부가 안 갈리면 증상이 0 이다(계약·회귀 다 초록인데 라이브만 샌다).
    *   그래서 출하 통로를 직접 읽는다 — 이 저장소가 F073·변이 ④ 로 이미 겪은 자리다. */
-  const 통로 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'tasks', 'index.ts'), 'utf8');
+  const 통로 = 코드만(fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'tasks', 'index.ts'), 'utf8'));
   assert.ok(/task_snapshot:\s*학생판스냅샷\(/.test(통로),
     '`/tasks` 가 필터를 안 거친다 — `task_snapshot: 학생판스냅샷(r.task_snapshot)` 로 내보내라.');
   assert.equal(/task_snapshot:\s*r\.task_snapshot\b/.test(통로), false,
@@ -871,7 +882,7 @@ test('②-20 `/tasks` 가 실제로 그 필터를 거쳐 응답한다', () => {
  *   시험.js` ⑧ 이 진다). 여기가 잡는 것은 「칸이 통째로 사라진 것」 하나다.
  * 🔑 SQL 별칭만 봐서는 안 된다 — 변이 ⑥ 은 응답 줄만 지웠고 별칭은 남겼다. 둘을 **잇는 줄**을 본다. */
 test('🔴 `/tasks` 가 배달 사건의 event_id 를 실제로 실어 보낸다 (c9 생산자의 유일한 재료)', () => {
-  const 통로 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'tasks', 'index.ts'), 'utf8');
+  const 통로 = 코드만(fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'tasks', 'index.ts'), 'utf8'));
   assert.ok(/event_id:\s*r\.intervention_event_id\b/.test(통로),
     '`intervention.event_id` 가 응답에서 빠졌다 — 앱이 `parent_event_id` 로 쓸 값이 사라져 `content.viewed` 생산자가 다시 0이 된다(C0 §4-3 ①).');
   assert.ok(/개입\.event_id\s+as\s+intervention_event_id/.test(통로),
@@ -923,7 +934,7 @@ test('🔴 배달·조회 두 마디가 실제로 서 있다 — 앱만 초록�
   assert.ok(/retry_of_event_id,\s*source_kind/.test(배달) && /\$\{재발화고리\}::uuid/.test(배달),
     '배정 INSERT 가 그 값을 안 박는다 — lateral 이 집어 와도 행에 안 남으면 `/tasks` 가 줄 것이 없다.');
 
-  const 조회 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'tasks', 'index.ts'), 'utf8');
+  const 조회 = 코드만(fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'tasks', 'index.ts'), 'utf8'));
   assert.ok(/e\.retry_of_event_id/.test(조회) && /retry_of_event_id:\s*r\.retry_of_event_id\b/.test(조회),
     '`/tasks` 응답에서 고리가 빠졌다 — 별칭만 남고 응답 줄이 없으면 앱 값은 늘 `undefined` 다(위 c9 변이 ⑥ 과 같은 모양).');
 });
@@ -957,7 +968,7 @@ test('B3 — 못 재는 값을 「부른다」로 접지 않는다 (새는 방�
 });
 
 test('🔴 B3 배선 — `/tasks` 가 그 판정을 **불러서** 쓰고, 새 배정 통로를 만들지 않는다', () => {
-  const 조회 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'tasks', 'index.ts'), 'utf8');
+  const 조회 = 코드만(fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'tasks', 'index.ts'), 'utf8'));
 
   assert.ok(/구제할까\(\{[^}]*배정수:/.test(조회),
     '`구제할까` 를 안 부른다 — 조건을 인라인으로 다시 적으면 판정이 두 곳에 살고 갈라진 쪽이 통과한다');
@@ -1053,7 +1064,7 @@ test('오늘과제가 **자기 판에 서명한다** — 이 값이 곧 행의 p
  * ⚠ 값 비교로는 원리상 못 잡는다(둘이 같으니까). 그래서 여기만 **소스**를 본다 — 단 파일
  *   어딘가가 아니라 그 함수 본문을 떼어내서(낱말 검사는 주석 한 줄로 샌다). */
 test('② 판을 **상수로** 실어야 한다 — 리터럴을 베끼면 올린 날 조용히 갈린다 (변이 M5)', () => {
-  const 소스 = fs.readFileSync(path.join(ROOT, 'lib', '오늘과제.js'), 'utf8');
+  const 소스 = 코드만(fs.readFileSync(path.join(ROOT, 'lib', '오늘과제.js'), 'utf8'));
   const 본문 = (소스.match(/function 오늘과제\([\s\S]*?\n\}/) || [''])[0];
   assert.ok(본문.length > 400, '`오늘과제` 본문을 못 떼어냈다 — 못 잰 것을 통과로 접지 않는다');
   /* ⚠ `선택판\b` 로 쓰면 **원리상 안 맞는다** — 한글은 JS 정규식의 word 문자가 아니라 그
@@ -1133,9 +1144,10 @@ test('③ 자기 처방 — 「판을 올리고 장부에 줄을 추가한다」
 });
 
 test('🔴 배달이 그 판을 **행에 박는다** — 순수 함수만 서 있으면 칸은 여전히 빈다', () => {
-  const 소스 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'deliver', 'index.ts'), 'utf8');
+  const 소스 = 코드만(fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'deliver', 'index.ts'), 'utf8'));
   /* 파일 어딘가에 낱말이 있는지가 아니라 **개입 insert 안**에 있는지를 본다 — 낱말 검사는
-   * 주석에 이름만 남겨도 초록이 된다(이 파일이 이미 변이로 겪은 자리).
+   * 주석에 이름만 남겨도 초록이 된다(이 파일이 이미 변이로 겪은 자리 · 이제 위에서 주석을
+   * 지우고 열지만, 구간을 좁히는 이 수법은 그대로 둔다 — 둘은 서로를 대신하지 않는다).
    * 🔑 「첫 insert」 로 집지 않는다 — ④가 게임 배정 insert 를 개입 insert 앞에 두면서 위치
    *   앵커가 죽었다(엉뚱한 열 목록을 재고 빨개진다). 문서 위치가 아니라 내용으로 집는다. */
   const 개입insert = 소스.split(/insert into engine\.learning_events/)
