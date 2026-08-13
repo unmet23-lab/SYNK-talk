@@ -203,18 +203,27 @@ Deno.serve(async (req: Request) => {
      *   자르기가 아니라 집계를 SQL 로 내리는 것이다.
      * 🔑 **표시에서 걸러진 행도 넣는다** — 태그가 빈 행은 `lib/꼬리.js` 가 「판정 안 함」으로
      *   분자·분모 양쪽에서 빼므로 무해하고, 여기서 미리 거르면 거르는 규칙이 두 곳에 산다.
-     * 🔑 `재발화` 는 `functions/progress` 의 교정재발화와 **같은 물리**(`retry_of_event_id
-     *   is not null`)다 — 유호 지시 2026-08-13 「열심히 한 학생도 결과에서 만족감을」의 재료.
-     *   판정은 여기 없다(`lib/꼬리.js` 하나) — 이 파일은 재료만 뜬다.
-     * 🔴 단 **화면에 안 뜨는 행(`보여줄행` 거짓)의 재발화는 거짓으로 접는다** — 태그도 교정문도
-     *   없는 행(강사가 판정만 남긴 골든셋 행 등)이 노력 줄을 「낸 것」으로 세어지면, 학생이 보지
-     *   못한 줄이 연속 금지의 「직전」이 되어 다음 진짜 줄을 조용히 삼킨다. 태그 있는 행은 늘
-     *   화면에 뜨므로 성과 줄에는 이 문제가 원리상 없다 — 노력 줄만의 구멍이라 재료에서 막는다.
+     * 🔑 `재발화` 의 원신호는 `functions/progress` 의 교정재발화와 같다(`retry_of_event_id`).
+     *   단 **게이트 셋을 곱한다** — 원신호 그대로 쓰면 학생에게 거짓이 나간다(적대 리뷰 B1 실측):
+     *   ①`s.task_format = '낭독'` — `retry_of_event_id` 는 `lib/오늘과제.제출사건` 이 step 분기
+     *     **없이** 싣므로(:724) 같은 날 ③자유발화(새로 지어 말한 답)에도, 쓰기 트랙(게임·보고서·
+     *     서류관문) 제출에도 붙는다. 「전에 고쳐 준 문장을 다시 «말했»다」가 참인 것은 ② 낭독
+     *     (교정문 되말하기)뿐이다 — 술어가 없으면 새로 답한 말에 「되말했다」가 붙는다.
+     *   ②`e.event_type = 'submission.created'` — submissions 에는 제출 아닌 행이 산다
+     *     (`tools/교정확정.js` 「이 질의의 급소」 · 배치의 task.assigned · 라디오 퀴즈 재도전).
+     *   ③`보여줄행` — 태그도 교정문도 없는 행(골든셋 판정만 남은 행)이 노력 줄을 「낸 것」으로
+     *     세어지면, 학생이 보지 못한 줄이 연속 금지의 「직전」이 되어 다음 진짜 줄을 삼킨다.
+     *   판정은 여기 없다(`lib/꼬리.js` 하나) — 이 파일은 재료만 뜨되, 재료의 «뜻»을 지킨다.
+     *   그래서 `어제의 나`(progress · 게이트 없는 원신호)와 이 꼬리는 같은 날 다르게 말할 수
+     *   있다 — 그건 갈라짐이 아니라 그릇 차이다(고리 표시 vs 카드에 붙는 글).
      * 🔑 정렬 tiebreak 을 위 목록의 **역순과 같게** 둔다 — 같은 밀리초에 둘이 서면 이력 순서가
      *   갈려 「직전」의 뜻이 목록과 어긋난다. */
     const 이력행 = await sql`
       select c.correction_id, c.error_tags,
-             (${보여줄행()} and e.retry_of_event_id is not null) as 재발화
+             (${보여줄행()}
+              and e.event_type = 'submission.created'
+              and s.task_format = '낭독'
+              and e.retry_of_event_id is not null) as 재발화
         from engine.corrections c
         join engine.submissions s on s.submission_id = c.submission_id
         join engine.learning_events e on e.event_id = s.event_id
