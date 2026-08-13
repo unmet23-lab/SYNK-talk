@@ -646,3 +646,72 @@ test('🔴 ⑨ IANA 이름을 lib 에 베끼지 않았다 — 사본이 되는 �
   const 베낌 = 모듈본체.match(/['"][A-Za-z]+\/[A-Za-z_]+['"]/g) || [];
   assert.deepEqual(베낌, [], `시간대 이름을 코드에 박았다(${베낌}) — 부르는 쪽이 넘기는 값이다`);
 });
+
+/* ── ⑩ 강제산출 — G4 「서류 관문」(v9 · 발주_게임모듈.md G4 §2 ㉡·§5) ───────────────
+ * 🔑 표식은 **submission.task_snapshot.challenge_id** = 서류관문 팩 정본이다 — 여기 리터럴을
+ *   박지 않고 팩에서 가져온다(사람이 실제로 쓰는 표기 · 팩이 id 를 갈면 여기가 같이 빨개진다).
+ * 🔑 실생산자 산출 → 이 축의 사슬은 `tests/서류관문제출.test.js` ⑤ 가 진다 — 여기는 소비자의
+ *   판정(표식 필터·계산·null·잰 행만)을 위반 픽스처로 못박는다. */
+const { 모듈상수: 서류관문상수 } = require('../contents/서류관문문항.js');
+const G4스냅 = { challenge_id: 서류관문상수.challenge_id, prompt_seed: 'g4t01.b1' };
+const g4행 = (event_type, task_type, payload, 더 = {}) => 사건(event_type, 전(기준, 일), {
+  task_type,
+  submission: { task_ref: 't', task_format: '응답', task_snapshot: G4스냅, task_schema_ver: 'g4스냅샷.v1' },
+  payload: { ver: 1, ...payload },
+  ...더,
+});
+const g4빈칸 = (payload = {}, 더) => g4행('quiz.answered', '퀴즈응답', { attempt_no: 1, ...payload }, 더);
+const g4변환 = (payload = {}) => g4행('submission.created', '숙제제출', { attempt_no: 1, ...payload });
+
+test('⑩ 강제산출 — 모름넘김률·재도전률·빈칸체류를 «한 분모» 위에서 낸다', () => {
+  const r = 학습자상태([
+    g4빈칸({ latency_ms: 3000 }),
+    g4빈칸({ skipped: true }),
+    g4빈칸({ attempt_no: 2, latency_ms: 5000 }),
+    g4변환(),
+  ], { as_of: 기준 });
+  const 축 = r.축.강제산출;
+  assert.ok(축, '강제산출축이 안 섰다 — 생산자만 있고 소비자가 없다(수집은 엔진 도달까지 한 벌)');
+  assert.equal(축.n, 4, '분모는 「그날 지난 턴 수」다 — 갈래별로 나누면 비율이 항상 1 에 붙는다');
+  assert.equal(축.모름넘김률, 0.25);
+  assert.equal(축.재도전률, 0.25);
+  assert.equal(축.빈칸체류_중앙, 4000, '잰 두 행의 중앙값 — 변환·모름 행은 latency 가 없어 분모 밖이다');
+});
+
+test('🔴 ⑩ 표식 필터 — G4 스냅샷 없는 행·남의 챌린지·라디오 승격 행은 안 든다', () => {
+  const r = 학습자상태([
+    g4빈칸(),
+    /* 남의 챌린지 — G2 지목 행은 탐지축 몫이다(모양이 아니라 표식으로 가른다). */
+    사건('quiz.answered', 전(기준, 일), {
+      task_type: '퀴즈응답',
+      submission: { task_ref: 't', task_format: '응답', task_snapshot: { challenge_id: 'g2-보고서교정' } },
+      payload: { ver: 1, attempt_no: 1 },
+    }),
+    /* 스냅샷 없는 행 — 라디오 승격 퀴즈·옛 행의 모양이다. */
+    사건('quiz.answered', 전(기준, 일), { payload: { ver: 1, confidence: 'low' } }),
+    /* 라디오 승격 «제출» 이 언젠가 G4 스냅샷을 싣는 날의 위조 — 표식 하나에만 기대면 통과한다.
+     * `앱제출만`(task_type) 이 두 번째 문이라 여기서 걸려야 한다(v6·탐지축과 같은 결함 계열). */
+    g4행('submission.created', '목표선언', { attempt_no: 1 }),
+  ], { as_of: 기준 });
+  assert.equal(r.축.강제산출.n, 1, 'G4 표식(스냅샷 challenge_id) 밖의 행이 들어왔다');
+});
+
+test('⑩ 재료 0 이면 null — 0 으로 채우면 「재료 없음」이 「못한다」로 읽힌다', () => {
+  const r = 학습자상태([사건('quiz.answered', 전(기준, 일), { payload: { ver: 1 } })], { as_of: 기준 });
+  assert.equal(r.축.강제산출, null);
+});
+
+test('⑩ 못 잰 값은 축에도 안 든다 — latency 없는 행만이면 체류는 null, skipped 는 true 로만 센다', () => {
+  const r = 학습자상태([g4빈칸(), g4빈칸({ skipped: false })], { as_of: 기준 });
+  assert.equal(r.축.강제산출.빈칸체류_중앙, null, '0 으로 접으면 「즉시 답했다」가 되어 분포가 왼쪽으로 쏠린다');
+  assert.equal(r.축.강제산출.모름넘김률, 0, 'skipped:false 가 모름으로 세어졌다 — 「실려 있나」로 재면 오염이다');
+});
+
+test('🔴 ⑩ 신뢰도가 공짜로 안 오른다 — 자기인식축이 이미 센 사건이라 표본에서 뺀다', () => {
+  assert.ok(표본제외.includes('강제산출'), '표본제외 목록에서 빠졌다 — 같은 퀴즈응답이 두 번 세어진다');
+  const r = 학습자상태([g4빈칸(), g4빈칸({ skipped: true })], { as_of: 기준 });
+  assert.equal(r.축.강제산출.n, 2, '축은 두 건을 봤다');
+  /* 두 행은 자기인식축(quiz.answered)이 표본으로 이미 센다 — 강제산출이 더해지면 4 가 된다. */
+  assert.equal(r.estimator_confidence, Math.round((2 / (2 + 완충)) * 100) / 100,
+    '표본이 2 가 아니다 — 같은 사건을 두 축이 세면 신뢰도가 공짜로 오른다');
+});

@@ -387,3 +387,117 @@ test('⑧ⓔ SQL 필터 목록이 팩 원자료와 갈라지지 않는다 — �
     'G2재제출앵커들이 팩 원자료와 갈라졌다 — 갈라진 쪽의 재제출은 조용히 0건이 된다');
   assert.ok(기대.length > 0, '앵커가 0개다 — H3 의 G2 축이 통째로 죽는다');
 });
+
+/* ═══════════ ⑨ 비초급 로테이션 — G1 단독 → G1·G3·G4 (08-13) ═══════════
+ *
+ * 재는 것은 넷: ⓐ 셋 다 미확정이면 종전 그대로 null(행동 불변 — 회전이 조용히 열리지 않는다)
+ * ⓑ 회전이 결정적이고 실제로 배분한다 ⓒ G3·G4 배정행 규격(task_type·판·출처·task_ref)
+ * ⓓ G3·G4 원챌린지 재제출은 null(H3 는 안 넓혔다 — deliver SQL 앵커 목록이 G1·G2 만 걷는다).
+ * ⚠ 게이트 우회는 이 파일의 기존 방식(검수확정 소스 치환 픽스처) **하나만** 쓴다. */
+const G3팩경로 = path.join(ROOT, 'contents', '알바변명문항.js');
+const G4팩경로 = path.join(ROOT, 'contents', '서류관문문항.js');
+const G3확정소스 = fs.readFileSync(G3팩경로, 'utf8').replace('const 검수확정 = false;', 'const 검수확정 = true;');
+const G4확정소스 = fs.readFileSync(G4팩경로, 'utf8').replace('const 검수확정 = false;', 'const 검수확정 = true;');
+assert.notEqual(G3확정소스, fs.readFileSync(G3팩경로, 'utf8'), 'G3 팩의 검수확정 표기가 바뀌었다 — 이 치환부터 고쳐라');
+assert.notEqual(G4확정소스, fs.readFileSync(G4팩경로, 'utf8'), 'G4 팩의 검수확정 표기가 바뀌었다 — 이 치환부터 고쳐라');
+
+/* 세 인스턴스 — 회전풀이 [G3]·[G4]·[G1,G3,G4] 인 판. 한 팩만 확정인 판이 규격 검사의 눈이다
+ * (셋 다 확정인 판에서만 재면 「어느 모듈이 나왔나」가 해시 운에 걸린다). */
+const G3만 = 세우기(배정경로, fetch금지, { 캐시: new Map(), 바꾼소스: new Map([[G3팩경로, G3확정소스]]) });
+const G4만 = 세우기(배정경로, fetch금지, { 캐시: new Map(), 바꾼소스: new Map([[G4팩경로, G4확정소스]]) });
+const 셋팩캐시 = new Map();
+const 셋확정 = 세우기(배정경로, fetch금지, {
+  캐시: 셋팩캐시,
+  바꾼소스: new Map([[팩경로, 확정팩소스], [G3팩경로, G3확정소스], [G4팩경로, G4확정소스]]),
+});
+const { 모듈상수: G3상수 } = 세우기(G3팩경로, fetch금지, { 캐시: 셋팩캐시 });
+const { 모듈상수: G4상수, 관문편성: G4편성 } = 세우기(G4팩경로, fetch금지, { 캐시: 셋팩캐시 });
+
+test('⑨ⓐ 셋 다 미확정이면 비초급 새 문항 = null — 회전을 이어도 런타임 행동은 종전 그대로다', () => {
+  for (const 급수 of ['Lv3', 'Lv5']) {
+    assert.equal(실판.게임배정(기본({ 급수 })), null,
+      '미검수 판이 회전풀에 들었다 — 게이트는 모듈마다다(fail-closed)');
+  }
+});
+
+test('⑨ⓑ 회전은 결정적이고 실제로 배분한다 — 같은 (학생,날짜) = 같은 모듈, 학생이 갈리면 모듈도 갈린다', () => {
+  const a = 셋확정.게임배정(기본());
+  const b = 셋확정.게임배정(기본());
+  assert.equal(a.task_snapshot.challenge_id, b.task_snapshot.challenge_id,
+    '같은 (학생,날짜)가 다른 모듈을 받았다 — 배치 재실행이 duplicate 접힘과 안 맞는다');
+  assert.equal(a.task_snapshot.prompt_seed, b.task_snapshot.prompt_seed, '모듈 안 앵커까지 결정적이어야 한다');
+  const 나온모듈 = new Set();
+  for (let i = 1; i < 60 && 나온모듈.size < 3; i += 1) {
+    const id = `aaaaaaaa-0000-4000-8000-${String(i).padStart(12, '0')}`;
+    나온모듈.add(셋확정.게임배정(기본({ learner_id: id })).task_snapshot.challenge_id);
+  }
+  assert.equal(나온모듈.size, 3,
+    `60명이 ${[...나온모듈].join(',')} 만 받았다 — 회전이 모듈을 실제로 배분하지 않는다`);
+});
+
+test('⑨ⓒ-1 G3 배정행 규격 — 발화녹음·g3스냅샷.v1·출처 게임G3·task_ref 는 날짜에서만', () => {
+  const r = G3만.게임배정(기본());
+  assert.ok(r, 'G3 만 확정인 판에서 비초급이 빈손이다 — 풀 필터가 G3 를 못 담았다');
+  assert.equal(r.task_snapshot.challenge_id, 'g3-알바변명');
+  assert.equal(r.task_type, '발화녹음', 'G3 는 음성 모듈이다 — 말하기와 같은 통로 이름(G3 §6-1)');
+  assert.equal(r.task_schema_ver, 'g3스냅샷.v1');
+  assert.equal(r.출처, '게임G3');
+  assert.equal(r.task_ref, `task-${화요일}`, 'task_ref 는 날짜에서만 판다(⑩ 확정 1)');
+  assert.equal(r.retry_of_event_id, null, '새 문항 배정이 결과 변수 고리를 지어냈다');
+  assert.equal(r.degraded, false);
+  assert.ok(G3만.G3시드전부.includes(r.task_snapshot.prompt_seed), '고른 시드가 시드 공간 밖이다');
+  assert.equal(G3만.G3시드전부.length, 45, '팩 5문항×사유3×세부3 — 수가 바뀌었으면 팩 개정이다');
+  const 다른날 = G3만.게임배정(기본({ 날짜: 금요일 }));
+  assert.notEqual(다른날.task_snapshot.prompt_seed, r.task_snapshot.prompt_seed,
+    '날이 달라도 같은 시드다 — 배분 축에 날짜가 안 들어갔다');
+});
+
+test('⑨ⓒ-2 G4 배정행 규격 — 퀴즈응답·g4스냅샷.v1·출처 게임G4·앵커 = 관문편성 첫 턴', () => {
+  const r = G4만.게임배정(기본());
+  assert.ok(r, 'G4 만 확정인 판에서 비초급이 빈손이다 — 풀 필터가 G4 를 못 담았다');
+  assert.equal(r.task_snapshot.challenge_id, 'g4-서류관문');
+  assert.equal(r.task_type, '퀴즈응답', '앵커는 빈칸 턴이다 — 통로 이름이 그 스테이지 것이어야 한다(G4 §6-1)');
+  assert.equal(r.task_schema_ver, 'g4스냅샷.v1');
+  assert.equal(r.출처, '게임G4');
+  assert.equal(r.task_ref, `task-${화요일}`, 'task_ref 는 날짜에서만 판다(⑩ 확정 1)');
+  assert.equal(r.retry_of_event_id, null);
+  const 관문 = r.task_snapshot.prompt_seed.split('.')[0];
+  assert.ok(G4만.G4관문전부.includes(관문), '고른 관문이 관문 공간 밖이다');
+  assert.equal(r.task_snapshot.prompt_seed, G4편성(관문)[0],
+    '앵커 시드가 관문편성 첫 턴이 아니다 — 화면이 여는 관문과 행이 가리키는 턴이 갈린다');
+  assert.ok('빈칸' in r.task_snapshot && typeof r.task_snapshot.채점기판본 === 'string',
+    '배정 행 스냅샷에 그 턴의 채점 근거가 없다(§6-2 ⓑ — 배정 쪽도 같은 표다 · §6-8 규칙 4)');
+});
+
+test('⑨ⓒ-3 게이트는 모듈마다다 — G1 만 확정인 판의 회전풀에 G3·G4 가 없다(fail-closed 맞짝)', () => {
+  /* `게임배정`(G1 만 확정 · ⓪ 절 인스턴스)의 비초급 산출은 언제나 G1 이어야 한다 —
+   * 미검수 G3·G4 가 회전에 섞이면 그 문항이 학생에게 열린다(팩 §3 이 막으려던 그것). */
+  for (let i = 1; i < 60; i += 1) {
+    const id = `aaaaaaaa-0000-4000-8000-${String(i).padStart(12, '0')}`;
+    const r = 게임배정(기본({ learner_id: id }));
+    assert.equal(r.task_snapshot.challenge_id, 'g1-교수멘탈', `학생 ${i} 에게 미검수 모듈이 나갔다`);
+  }
+});
+
+test('⑨ⓓ G3·G4 원챌린지 재제출은 null — H3 는 안 넓혔다(원 문항을 못 펴는 갈래는 말하기 폴백)', () => {
+  /* deliver 의 H3 조인은 G1·G2 앵커만 걷는다(SQL 술어 — `시드전부`·`G2재제출앵커들`). 혹시
+   * 그 밖의 원챌린지가 들어와도 여기 else 갈래(G1)가 그 시드를 못 펴 null 이다 — 그 사실을
+   * 행동으로 못박아, 조인을 넓히는 날 이 회귀부터 빨개지게 한다(넓히기는 별개 소트랙 몫). */
+  const g3 = 셋확정.게임배정(기본({
+    재제출: { 원사건: 'abababab-0000-4000-8000-00000000000c', 원시드: 셋확정.G3시드전부[0], 원챌린지: G3상수.challenge_id },
+  }));
+  assert.equal(g3, null, 'G3 원챌린지 재제출이 배정으로 섰다 — H3 를 넓히지 않았는데 서면 남의 스냅샷이다');
+  const g4 = 셋확정.게임배정(기본({
+    재제출: { 원사건: 'abababab-0000-4000-8000-00000000000d', 원시드: G4편성(셋확정.G4관문전부[0])[0], 원챌린지: G4상수.challenge_id },
+  }));
+  assert.equal(g4, null, 'G4 원챌린지 재제출이 배정으로 섰다');
+});
+
+test('⑨ 공간 전수 — G3 시드·G4 관문 전부가 스냅샷으로 펴진다(팩 목록에서 파생하므로 개정이 닿는다)', () => {
+  const { G3스냅샷, G4스냅샷 } = 세우기(path.join(ROOT, 'lib', '게임스냅샷.js'), fetch금지, { 캐시: 셋팩캐시 });
+  for (const 시드 of 셋확정.G3시드전부) assert.ok(G3스냅샷(시드), `못 펴는 G3 시드가 공간에 있다: ${시드}`);
+  assert.equal(셋확정.G4관문전부.length, 4, '팩 관문 4벌 — 수가 바뀌었으면 팩 개정이다');
+  for (const 관문 of 셋확정.G4관문전부) {
+    for (const 시드 of G4편성(관문)) assert.ok(G4스냅샷(시드), `못 펴는 G4 턴이 편성에 있다: ${시드}`);
+  }
+});

@@ -27,6 +27,9 @@ const { 학습자상태, 창일수, 추정판, 쓰는사건: 상태가쓰는사�
 const { 시간대 } = require('../lib/오늘과제.js');
 const { 회수요약, 성과회수, 회수창, 쓰는사건: 회수가쓰는사건 } = require('../lib/성과회수.js');
 const { 칸들: 작성칸들 } = require('../lib/작성과정.js');
+/* G4 표식의 정본 — 강제산출축(v9)이 이 챌린지로 행을 가른다. 리터럴 사본을 두면 팩이 id 를
+ * 간 날 합성 이력만 옛 표식을 들고 남는다(추정판을 안 베끼는 것과 같은 이유). */
+const { 모듈상수: 서류관문상수 } = require('../contents/서류관문문항.js');
 
 const 일 = 86400000;
 const 날수 = 60;
@@ -139,6 +142,32 @@ function 합성이력() {
         task_type: '퀴즈응답',
         submission: { task_ref: `g2k-${d}`, task_format: '쓰기첨삭' },
         payload: { ver: 1, attempt_no: 1, options_shown: 보기3, rejected_all: false, skipped: true } });
+    }
+
+    /* ⑫ G4 「서류 관문」 지목 — 강제산출축(v9). 세 갈래를 다 낸다: 빈칸(친 것) · 「모르겠어요」 ·
+     * 변환(열린 산출). 🔴 갈래가 하나면 모름넘김률·재도전률·빈칸체류 중 일부만 도는 상태를
+     * 초록이 덮는다. ⚠ 표식은 `submission.task_snapshot.challenge_id`(팩 정본 지목)다 —
+     * 위 ⑪ G2 행들이 스냅샷 없이 서는 것이 곧 「G4 만 센다」의 실증이다. */
+    if (d % 4 === 1) {
+      행들.push({ event_id: id('g4b'), event_type: 'quiz.answered', occurred_at: t(d + 0.76),
+        task_type: '퀴즈응답',
+        submission: { task_ref: `g4b-${d}`, task_format: '응답', body_original: '에서',
+          task_snapshot: { challenge_id: 서류관문상수.challenge_id, prompt_seed: 'g4t01.b1' } },
+        payload: { ver: 1, attempt_no: d % 8 === 1 ? 2 : 1, latency_ms: 1500 + (d % 4) * 300 } });
+    }
+    if (d % 6 === 1) {
+      행들.push({ event_id: id('g4k'), event_type: 'quiz.answered', occurred_at: t(d + 0.78),
+        task_type: '퀴즈응답',
+        submission: { task_ref: `g4k-${d}`, task_format: '응답',
+          task_snapshot: { challenge_id: 서류관문상수.challenge_id, prompt_seed: 'g4t01.b2' } },
+        payload: { ver: 1, attempt_no: 1, skipped: true } });
+    }
+    if (d % 9 === 1) {
+      행들.push({ event_id: id('g4t'), event_type: 'submission.created', occurred_at: t(d + 0.8),
+        task_type: '숙제제출',
+        submission: { task_ref: `g4t-${d}`, task_format: '높임전환', body_original: '서류를 드리러 왔습니다.',
+          task_snapshot: { challenge_id: 서류관문상수.challenge_id, prompt_seed: 'g4t01.t1' } },
+        payload: { ver: 1, attempt_no: 1 } });
     }
   }
   return { 행들, 개입들 };

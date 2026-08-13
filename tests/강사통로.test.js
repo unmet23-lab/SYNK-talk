@@ -255,11 +255,16 @@ test('⑧ 동봉이 실제 lib 파일을 가리킨다(손 사본 0)', () => {
    *   옛 판은 그 사슬을 「목록이 낡았다」로 읽어 거짓 적색을 냈고, 그 처방은 사슬을 끊는
    *   것이라 더 나쁘다. 그래서 **본체 import ∪ 동봉끼리의 require** 로 잰다. */
   const 쓰임 = new Set([...원문.matchAll(/from '\.\/([^']+\.mjs)'/g)].map((m) => m[1]));
+  /* 🔴 require 정규식은 배포 해석기의 것(`원격배포.REQUIRE문`)을 그대로 쓴다 — 여기 따로
+   *   적었던 판은 `./` 만 봐서 건너 디렉터리 require(`../contents/서류관문문항.js` — 학습자상태
+   *   v9 실측)를 못 보고 「목록이 낡았다」 거짓 적색을 냈다(`tests/동봉신호.test.js` 가 같은
+   *   구멍을 같은 처방으로 닫은 자리 — 라우팅이 해석기보다 좁으면 그 자체가 구멍이다). */
+  const { REQUIRE문 } = require('../tools/원격배포.js');
   for (const 경로 of Object.values(동봉)) {
     const 파일 = path.join(뿌리, 경로);
     if (!fs.existsSync(파일)) continue;
-    for (const m of fs.readFileSync(파일, 'utf8').matchAll(/require\('\.\/([^']+)\.js'\)/g)) {
-      쓰임.add(`${m[1]}.mjs`);
+    for (const m of fs.readFileSync(파일, 'utf8').matchAll(REQUIRE문)) {
+      쓰임.add(`${m[3]}.mjs`);
     }
   }
   for (const [별칭, 경로] of Object.entries(동봉)) {

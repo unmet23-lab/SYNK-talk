@@ -50,3 +50,15 @@ test('탐지력 ④ — 사건이 하나도 없으면 여러 자리가 동시에
   const { 끊김 } = 판정([], 끝시각);
   assert.ok(끊김.length >= 3, `빈 이력인데 끊김이 ${끊김.length}건뿐이다 — 0 이 조용히 통과한다`);
 });
+
+test('탐지력 ⑤ — G4 지목 행을 빼면 강제산출 축이 null 로 잡힌다(표식이 사건 종이 아니라 스냅샷이다)', () => {
+  /* 이 축은 사건 «종»을 빼서는 못 죽는다(quiz.answered 를 빼면 자기인식이 먼저 죽는다) —
+   * 표식(팩 challenge_id)으로만 갈리므로, 탐지력도 그 표식으로 걷어낸 이력으로 잰다. */
+  const { 모듈상수 } = require('../contents/서류관문문항.js');
+  const 남김 = 합성이력().행들.filter((e) => {
+    const snap = e.submission && e.submission.task_snapshot;
+    return !(snap && snap.challenge_id === 모듈상수.challenge_id);
+  });
+  const 글 = 끊김글(남김);
+  assert.match(글, /강제산출[^]*축이 null/, 'G4 행을 뺐는데 강제산출 축이 null 로 안 잡혔다');
+});
