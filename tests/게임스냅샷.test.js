@@ -36,10 +36,13 @@ const {
   G1스냅샷, 스냅샷키들, G1스냅샷인가, 게임스냅샷인가, 학생판게임스냅샷, 등록challenge들,
   G2스냅샷, G2스냅샷키들, G2필수키들, G2스냅샷모양판, G2과제유형, G2학생공개키, 턴열쇠값,
   G3스냅샷, G3스냅샷키들, G3스냅샷인가, G3과제유형, G3학생공개키,
+  G4스냅샷, G4스냅샷키들, G4필수키들, G4스냅샷모양판, G4과제유형, G4학생공개키, G4스냅샷인가,
 } = 조립기;
 const 팩 = 세우기(팩경로, fetch금지, { 캐시 }); // 같은 캐시 = 조립기가 쓴 그 팩 인스턴스
 const G2팩 = 세우기(G2팩경로, fetch금지, { 캐시 });
 const G3팩 = 세우기(G3팩경로, fetch금지, { 캐시 });
+const G4팩경로 = path.join(뿌리, 'contents', '서류관문문항.js');
+const G4팩 = 세우기(G4팩경로, fetch금지, { 캐시 });
 const { 학생판스냅샷 } = require('../lib/오늘과제.js'); // 실제 거름망 — 픽스처가 아니라 그 경로다
 
 /* ══════════════════════ G1 ══════════════════════ */
@@ -190,6 +193,99 @@ test('탐지력 — G2 도 반쪽을 안 낸다(재료를 비운 팩 · 한 어�
     .G2스냅샷('g2t01'), null, '한 어절 차이가 아니면 정답 자리가 없다');
 });
 
+/* ══════════════════════ G4 「서류 관문」 ══════════════════════ */
+
+test('G4 빈칸 턴 = §6-8 7키 정확히 — 공통층 4 + prompt_seed + 모듈층 2(빈칸·채점기판본)', () => {
+  const snap = G4스냅샷('g4t01.b1');
+  assert.deepEqual(Object.keys(snap).sort(), [...G4스냅샷키들].sort());
+  assert.deepEqual([...G4스냅샷키들].sort(),
+    ['challenge_id', 'prompt_seed', '문항판', '빈칸', '지시문', '질문', '채점기판본'].sort(),
+    '픽스처(서류관문문항.test.js 규칙 5)와 같은 표 — addressee_level 은 G4 키가 아니다');
+  assert.equal(snap.challenge_id, 'g4-서류관문');
+  assert.equal(snap.prompt_seed, 'g4t01.b1', '턴 열쇠 그 자체(§6-8 조건층 전 모듈 개정)');
+  const 펴진 = G4팩.펴기('g4t01.b1');
+  assert.equal(snap.지시문, 펴진.지시문, '값 사본 0');
+  assert.equal(snap.질문, 펴진.질문);
+  assert.equal(snap.문항판, 펴진.문항판);
+  assert.deepEqual(snap.빈칸, G4팩.문항들[0].빈칸[0], '그 턴의 원소 하나 — 팩 원소 그대로');
+  assert.equal(snap.채점기판본, require('../lib/서류관문.js').채점기판본,
+    '정본은 채점기 하나다 — 값 사본이면 규칙 개정이 스냅샷에 안 닿는다');
+  assert.equal(G4스냅샷모양판, 'g4스냅샷.v1', '스냅샷 «모양»의 판 — 문항판과 다른 축');
+  assert.ok(Object.isFrozen(snap));
+});
+
+test('G4 변환 턴 = 5키 — `빈칸`·`채점기판본` 키가 «없다»(§6-8 규칙 1)', () => {
+  const snap = G4스냅샷('g4t01.t1');
+  assert.deepEqual(Object.keys(snap).sort(), [...G4필수키들].sort());
+  assert.equal('빈칸' in snap, false,
+    '열린 산출(검수 큐 몫)이라 닫힌 채점 근거가 애초에 없다 — null·빈 객체 어느 것도 안 쓴다');
+  assert.equal('채점기판본' in snap, false);
+  assert.equal(snap.질문, G4팩.문항들[0].변환.제시문, '변환 턴의 질문 = 제시문');
+});
+
+test('G4 전수 — 19턴(빈칸 15·변환 4)이 표대로 서고 결정적이다', () => {
+  const 표키 = new Set(G4스냅샷키들);
+  let 빈칸수 = 0;
+  let 변환수 = 0;
+  for (const 관문 of G4팩.문항들) {
+    for (const 시드 of G4팩.관문편성(관문.관문id)) {
+      const snap = G4스냅샷(시드);
+      assert.ok(snap, `${시드}: 스냅샷이 안 선다`);
+      for (const 키 of Object.keys(snap)) assert.ok(표키.has(키), `${시드}: 표 밖 키 ${키}`);
+      for (const 키 of G4필수키들) {
+        assert.ok(typeof snap[키] === 'string' && snap[키].trim() !== '', `${시드}.${키} 비었다`);
+      }
+      assert.deepEqual(G4스냅샷(시드), snap, `같은 시드 = 같은 스냅샷: ${시드}`);
+      if ('빈칸' in snap) 빈칸수 += 1; else 변환수 += 1;
+    }
+  }
+  assert.equal(빈칸수, 15, '분모 — 빈칸 턴');
+  assert.equal(변환수, 4, '분모 — 변환 턴');
+});
+
+test('G4 못 펴는 시드는 null — 지어내지 않는다', () => {
+  for (const 시드 of ['g4t99.b1', 'g4t01.b0', 'g4t01.b9', 'g4t01.t2', 'g4t01', '', null,
+    undefined, 7, 'g1t01.s0d0', 'g3t01.s0d0']) {
+    assert.equal(G4스냅샷(시드), null, String(시드));
+  }
+});
+
+test('⑤ G4 학생판 — `채점기판본` 하나만 벗겨진다 · `빈칸`(정답집합 포함)은 나간다', () => {
+  const snap = G4스냅샷('g4t01.b1');
+  const 학생판 = 학생판게임스냅샷(snap);
+  assert.deepEqual(Object.keys(학생판).sort(), [...G4학생공개키].sort());
+  assert.equal('채점기판본' in 학생판, false, '서버 재현용 값 — 기본값 「안 나감」 그대로(②-20)');
+  assert.equal('채점기판본' in snap, true, '원본은 안 건드린다 — 행에는 그대로 남는다');
+  /* 🔴 G2 `정답` 비공개와 축이 다르다 — G4 정답집합은 되돌아보기(§4-5)가 학생에게 «보여주는»
+   *   커리큘럼 값이고, 즉시판정·재도전 루프(§4-4)가 기기 판정을 요구한다(메모리 minigame 확정). */
+  assert.deepEqual(학생판.빈칸, snap.빈칸, '빈칸은 원소 통째로 나간다 — 없으면 즉시판정이 못 선다');
+  assert.deepEqual(학생판스냅샷(snap), 학생판, '실거름망도 같은 판을 낸다 — 등록부 위임');
+  // 변환 턴은 5키 전부 공개다(비공개 키 자체가 없다)
+  const 변환 = G4스냅샷('g4t01.t1');
+  assert.deepEqual(학생판게임스냅샷(변환), { ...변환 });
+});
+
+test('G4 과제유형은 «둘»이다 — 빈칸은 퀴즈응답·변환은 숙제제출(발주 G4 §6-1)', () => {
+  assert.deepEqual(Object.keys(G4과제유형).sort(), ['변환', '빈칸']);
+  assert.equal(G4과제유형.빈칸, '퀴즈응답',
+    '닫힌 정답을 submission.created 로 보내면 제출 수가 부풀고 검수 큐가 빈칸을 빨아들인다');
+  assert.equal(G4과제유형.변환, '숙제제출', '열린 산출 — 검수 큐 몫');
+  const 계약 = JSON.parse(fs.readFileSync(path.join(뿌리, '계약', '수집_교정_계약.json'), 'utf8'));
+  for (const v of Object.values(G4과제유형)) {
+    assert.ok(new Set(계약.learning_events.값목록.task_type).has(v), `${v} 가 계약 값목록에 없다`);
+  }
+});
+
+test('탐지력 — G4 도 반쪽을 안 낸다(정답집합을 비운 팩이면 스냅샷 자체가 null)', () => {
+  const 원문 = fs.readFileSync(G4팩경로, 'utf8');
+  const 비운팩 = 원문.replace("정답집합: ['에서'],\n        오답집합: ['에', '로', '으로'],",
+    "정답집합: ['에서'],\n        오답집합: [],");
+  assert.notEqual(비운팩, 원문, '픽스처 치환이 실제로 일어났다');
+  const 조립기2 = 세우기(조립기경로, fetch금지, { 캐시: new Map(), 바꾼소스: new Map([[G4팩경로, 비운팩]]) });
+  assert.equal(조립기2.G4스냅샷('g4t01.b1'), null,
+    '오답집합이 빈 행은 축오답 판정이 영영 재현 안 되는 반쪽이다 — 통째로 거부한다');
+});
+
 /* ══════════════════════ 학생판 거름망 · 등록부 ══════════════════════ */
 
 test('⑤ 🔴 G2 `정답` 이 학생판에 안 샌다 — 다섯 키만 나간다', () => {
@@ -293,20 +389,29 @@ test('두 판정을 이름으로 가른다 — 넓은 쪽/좁은 쪽을 바꿔 �
   const g1 = G1스냅샷('g1t01.s0d0');
   const g2 = G2스냅샷('g2t01');
   const g3 = G3스냅샷('g3t01.s0d0');
+  const g4 = G4스냅샷('g4t01.b1');
   assert.equal(게임스냅샷인가(g1), true);
   assert.equal(게임스냅샷인가(g2), true, '거름망은 «등록된 게임 전부»를 알아야 한다');
   assert.equal(게임스냅샷인가(g3), true);
+  assert.equal(게임스냅샷인가(g4), true);
   assert.equal(G1스냅샷인가(g1), true);
   assert.equal(G1스냅샷인가(g2), false,
     '🔴 라우팅이 넓으면 G1 화면이 G2 배정을 연다 — 문항 팩이 달라 화면이 빈 채로 뜬다');
   assert.equal(G1스냅샷인가(g3), false, 'G3 배정이 G1 화면에 열리면 쓰기 화면이 음성 과제를 연다');
+  assert.equal(G1스냅샷인가(g4), false);
   assert.equal(G3스냅샷인가(g3), true);
   assert.equal(G3스냅샷인가(g1), false);
   assert.equal(G3스냅샷인가(g2), false);
+  assert.equal(G3스냅샷인가(g4), false, 'G4 배정이 G3 화면에 열리면 녹음 화면이 빈칸 과제를 연다');
+  assert.equal(G4스냅샷인가(g4), true);
+  assert.equal(G4스냅샷인가(g1), false);
+  assert.equal(G4스냅샷인가(g2), false);
+  assert.equal(G4스냅샷인가(g3), false);
   for (const 아닌것 of [null, undefined, 7, [], { ver: 1, 호흡: [] }]) {
     assert.equal(게임스냅샷인가(아닌것), false, String(아닌것));
     assert.equal(G1스냅샷인가(아닌것), false, String(아닌것));
     assert.equal(G3스냅샷인가(아닌것), false, String(아닌것));
+    assert.equal(G4스냅샷인가(아닌것), false, String(아닌것));
   }
 });
 
@@ -333,7 +438,8 @@ test('⑥ 등록부는 «의식적으로» 늘린다 — 새 모듈은 이 줄�
   /* 🔑 자동 수집으로 만들지 않는다: 새 모듈의 기본값이 「안 나감」이어야 화면이 비어 그날
    *   사람이 오고, 그 자리에서 「이 키를 학생이 봐도 되나」를 정한다(②-20 허용 목록의 설계).
    *   그래서 목록을 여기 못박아 둔다 — 등록만 하고 공개 키를 안 정하는 길을 막는다. */
-  assert.deepEqual([...등록challenge들], ['g1-교수멘탈', 'g2-보고서교정', 'g3-알바변명']);
+  assert.deepEqual([...등록challenge들],
+    ['g1-교수멘탈', 'g2-보고서교정', 'g3-알바변명', 'g4-서류관문']);
   assert.equal(G2학생공개키.length, 6, '`정답` 하나만 빼고 여섯 — 빼는 것은 정답 «뿐»이다');
   assert.equal(G2학생공개키.includes('정답'), false, '🔴 정답이 기기에 실리면 이 게임은 탐지 능력이 아니라 「정답을 봤나」를 잰다');
 });
@@ -346,6 +452,8 @@ test('⑦ 턴 열쇠 — G2 는 문항으로 턴을 가르고, G1·모르는 모
   assert.equal(턴열쇠값(G2), G2.prompt_seed, 'G2 는 한 앉음이 3턴이다 — 턴을 가르는 값은 문항 열쇠다');
   assert.equal(턴열쇠값(G1스냅샷('g1t01.s0d0')), null, 'G1 은 한 앉음 = 메일 하나다');
   assert.equal(턴열쇠값(G3스냅샷('g3t01.s0d0')), null, 'G3 은 한 앉음 = 녹음 하나다(1왕복 고정)');
+  assert.equal(턴열쇠값(G4스냅샷('g4t02.b3')), 'g4t02.b3',
+    'G4 는 한 앉음 = 빈칸 3~5 + 변환 1 — 턴을 가르는 값은 시드다(안 가르면 2턴부터 접힌다)');
   assert.equal(턴열쇠값({ challenge_id: 'g9-없는것', prompt_seed: 'x' }), null, '모르는 모듈에 규칙을 지어내지 않는다');
   assert.equal(턴열쇠값(null), null);
   assert.equal(턴열쇠값({ challenge_id: G2.challenge_id }), null, '값이 없으면 null — 빈 문자열로 접지 않는다');

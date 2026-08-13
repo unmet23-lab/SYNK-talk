@@ -105,7 +105,7 @@ test('산출은 얼어 나가고, 같은판정이 리렌더 판단을 진다', (
 });
 
 test('부분일치 채점 금지 — 소스에 .includes( 0(보드 인계 규약의 기계 강제)', () => {
-  for (const 파일 of ['멘탈게이지.js', '게임스냅샷.js']) {
+  for (const 파일 of ['멘탈게이지.js', '게임스냅샷.js', '서류관문.js']) {
     const 원문 = fs.readFileSync(path.join(뿌리, 'lib', 파일), 'utf8');
     assert.ok(!/\.includes\(/.test(원문), `${파일}: .includes( 발견`);
   }
