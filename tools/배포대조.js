@@ -24,9 +24,12 @@
  *   GET 만 친다. 배포·삭제 경로는 여기 없다 — 그건 `원격배포.js` 몫이다.
  *
  * 사용:
- *   node tools/배포대조.js              배포된 함수 전부
+ *   node tools/배포대조.js              배포된 함수 전부 (과녁 = `.env` 의 SUPABASE_PROJECT_REF)
  *   node tools/배포대조.js tasks        하나만
  *   node tools/배포대조.js --진단 tasks 본문이 어떤 형식으로 오는지만 본다
+ *   node tools/배포대조.js --운영       과녁을 **운영**(Synk Core)으로 갈아탄다 — 읽기만 (F400)
+ *
+ * ⚠ 모르는 `--` 플래그는 **거절한다**. 조용히 무시하던 판이 F400 을 냈다(아래 `아는플래그`).
  */
 'use strict';
 const fs = require('fs');
@@ -195,19 +198,54 @@ async function 왕복전게이트(도구, e, opt = {}) {
     (판정.못잼.length ? ` (미측정 ${판정.못잼.length})` : ''));
 }
 
+/* 아는 플래그 — 여기 없는 `--` 인자는 오타이거나 **다른 도구의 낱말**이다.
+ *
+ * 🔴 F400(2026-08-13 실측): `--운영` 은 이 도구가 한 번도 안 읽던 낱말인데 오류 없이 무시됐고,
+ *   `.env` 의 리허설을 **다시 재서** 「다름 0」 초록을 냈다. 같은 14함수 초록을 두 번 받은
+ *   사람이 「운영도 최신」으로 읽었다 — 헤더의 `대상 ▸ synk-core-rehearsal` 을 다시 읽어서야
+ *   갈렸다. **새는 방향이 통과**다(CLAUDE.md 가드 맹점 ③).
+ *   그래서 처방이 둘이다: 모르는 플래그는 die 하고, `--운영` 은 **실제 운영 과녁으로 잇는다**.
+ *   잇는 쪽이 안전한 근거 = 이 파일은 GET 만 친다(파일 머리 「읽기 전용」 절). 쓰기 갈래가
+ *   생기는 순간 `tests/자격증명.test.js` 가 소스로 잡는다. */
+const 아는플래그 = ['--진단', '--운영'];
+
+/** 인자 + `.env` → 과녁. **순수 함수**다 — 자격증명·네트워크 없이 회귀가 여기를 문다(F296:
+ *  repo 밖 환경에 기대는 검사는 CI 에서 깨진다. 탐지력은 이 함수가 진다). */
+function 인자판정(args, env) {
+  const 준것 = args || [];
+  const 모름 = 준것.filter((a) => a.startsWith('--') && !아는플래그.includes(a));
+  if (모름.length) {
+    return {
+      오류: `모르는 플래그 ${모름.join(' ')} — 아는 것은 ${아는플래그.join(' ')} 뿐이다.`
+        + ' 조용히 무시하면 「딴 과녁을 재고 초록」이 된다(F400).',
+    };
+  }
+  const 운영 = 준것.includes('--운영');
+  return {
+    진단: 준것.includes('--진단'),
+    운영,
+    /* `--운영` 이 곧 자격증명의 과녁 승인 키다(lib/자격증명.js 과녁판정) — 그 키를 명시적으로
+     * 친 것이 「한 손 더」이므로, 여기서 REF 를 갈아타는 것은 게이트 우회가 아니라 그 키의 뜻을
+     * 실현하는 것이다. 키가 없으면 `.env` 가 정한 과녁 그대로다. */
+    ref: 운영 ? 자격증명.운영REF : (env || {}).SUPABASE_PROJECT_REF,
+    고른것: 준것.find((a) => !a.startsWith('--')),
+  };
+}
+
 async function main() {
   const args = process.argv.slice(2);
-  const 진단 = args.includes('--진단');
-  const 고른것 = args.find((a) => !a.startsWith('--'));
 
   /* **GET 만 친다**(이 파일 머리) — 그래서 운영을 **읽는** 것은 과녁이 막지 않는다.
    * 배포·삭제는 `원격배포.js` 몫이다. 이 선언이 거짓이 되는 순간(여기에 쓰기 경로가 생기는
    * 순간)은 사람 눈에 안 보이므로 `tests/자격증명.test.js` 가 소스로 못박는다. */
   const e = 자격증명.읽기('배포대조', { 읽기: true });
-  const ref = e.SUPABASE_PROJECT_REF;
+  const 과녁 = 인자판정(args, e);
+  if (과녁.오류) die(과녁.오류);
+  const { 진단, ref, 고른것 } = 과녁;
   const 토큰 = e.SUPABASE_ACCESS_TOKEN;
   if (!ref || !토큰) die('.env 에 SUPABASE_PROJECT_REF·SUPABASE_ACCESS_TOKEN 이 필요하다');
   const 헤더 = { Authorization: `Bearer ${토큰}` };
+  if (과녁.운영) console.error('[배포대조] ⚠ `--운영` 으로 과녁을 갈아탔다 — `.env` 가 아니라 **운영 REF** 를 «읽는다»(GET 전용).');
 
   // 대상이 리허설인지 운영인지 **이름으로** 알린다(원격배포.js 와 같은 이유 — 환경변수 하나로 조용히 바뀐다).
   try {
@@ -244,4 +282,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch((err) => die(String((err && err.message) || err)));
-module.exports = { 정규, 펴기, 평평하게, 함수들, 대조, 게이트판정, 왕복전게이트, 시각뒤처짐, 바이트로잴수있나 };
+module.exports = { 정규, 펴기, 평평하게, 함수들, 대조, 게이트판정, 왕복전게이트, 시각뒤처짐, 바이트로잴수있나, 인자판정, 아는플래그 };
