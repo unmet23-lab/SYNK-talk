@@ -232,7 +232,9 @@ const 조립기소스 = fs.readFileSync(path.join(ROOT, 'lib', '돌려주기.js'
 const 화면소스 = fs.readFileSync(path.join(ROOT, 'src', '교수멘탈화면.js'), 'utf8');
 /* 머리말·주석은 그 금지의 «사유»를 적는 자리라 검사 대상에서 뺀다(사유를 적었다고 빨개지면
  * 다음 사람은 사유를 지운다 — `tests/검수확정.test.js` 가 겪은 그 병의 예방). */
-const 코드만 = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+/* [2026-08-13 · F401] 사본을 걷고 공용 통로로. 이 사본은 줄머리 `//` 만 지워, 코드 줄 끝에
+ * 달린 `// input_burst_max` 같은 주석을 위반으로 읽었다 — 공용 판은 인라인까지 지운다. */
+const { 코드만 } = require('./lib/소스검사.js');
 
 test('시간 축·input_burst_max 를 안 읽는다 — 문턱 0 판정이 말없이 뒤집히지 않게', () => {
   for (const 키 of ['first_keystroke_ms', 'total_compose_ms', 'input_burst_max']) {
