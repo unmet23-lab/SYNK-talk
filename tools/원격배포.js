@@ -434,5 +434,5 @@ async function main() {
 
 /* `require풀기` 는 회귀 이음매다 — `동봉묶기` 는 HEAD 에서 읽어(git show) 픽스처 소스를 못
  * 먹이므로, 재작성 규칙(상위 경로 포함)의 탐지력은 이 함수를 직접 태워 잰다. */
-module.exports = { 파일들, 동봉읽기, 동봉목록, 동봉묶기, 배포묶음, 마지막커밋, 작업본다름, 저장소판, 판뒤처짐, require풀기 };
+module.exports = { 파일들, 동봉읽기, 동봉목록, 동봉묶기, 배포묶음, 마지막커밋, 작업본다름, 저장소판, 판뒤처짐, require풀기, REQUIRE문 };
 if (require.main === module) main().catch((err) => die(String(err && err.message || err)));

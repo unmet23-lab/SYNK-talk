@@ -22,7 +22,7 @@ const { 띄우기 } = require('./lib/띄우기.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const { 경로들파싱, 커밋된경로들, 영향받은함수, 안내문 } = require('../tools/동봉신호.js');
-const { 동봉목록 } = require('../tools/원격배포.js');
+const { 동봉목록, REQUIRE문 } = require('../tools/원격배포.js');
 
 /** 픽스처 저장소 — 표의 값은 **한글 경로**로 둔다(실물이 전부 한글이라 그게 사람이 쓰는 표기다). */
 function 픽스처저장소() {
@@ -180,19 +180,28 @@ test('🔑 커밋 경로에 네트워크가 없다 — `배포대조` 를 끌고
  *   그리고 이 자리는 배포를 **시도할 때**에만 드러난다: 커밋한 세션은 모르고, 미는 세션이 만난다.
  * 🔑 그래서 여기서 잰다 — require 를 한 줄 늘린 사람이 **그 자리에서** 표를 닫게. */
 
-/** 표 하나를 검사한다. `읽기(경로)` 를 주입받아 픽스처와 실저장소에 같은 로직을 쓴다. */
+/** 표 하나를 검사한다. `읽기(경로)` 를 주입받아 픽스처와 실저장소에 같은 로직을 쓴다.
+ * 🔴 정규식은 배포 해석기의 것(`원격배포.REQUIRE문`)을 그대로 쓴다 — 여기 따로 적었던 판은
+ *   `./` 만 봐서 `../contents/알바변명문항.js`(G3 · 2026-08-13 실측)를 통과시켰고, 그 구멍은
+ *   커밋한 세션이 아니라 **미는 세션**이 radio-promote 배포 거절로 만났다(라우팅이 훅보다
+ *   좁으면 그 자체가 구멍 — CLAUDE.md 신뢰성 ③ · 1번째 선택로그 08-10 · 2번째가 이것).
+ *   구멍 판정도 해석기와 같다: 표 값의 **파일명(basename)** 이 키가 된다. */
 function 표의구멍(표, 읽기) {
+  const 있는mjs = new Set(
+    Object.entries(표)
+      .filter(([n]) => n.endsWith('.mjs'))
+      .map(([, p]) => String(p).replace(/^.*\//, '').replace(/\.js$/, '')),
+  );
   const 구멍 = [];
   let 잰것 = 0;
   for (const [, 원본] of Object.entries(표)) {
     if (!String(원본).endsWith('.js')) continue;   // 계약 JSON·프롬프트는 require 를 안 한다
     const src = 읽기(원본);
     if (src == null) continue;
-    for (const m of src.matchAll(/require\(\s*['"]\.\/([^'"]+)\.js['"]\s*\)/g)) {
+    for (const m of src.matchAll(REQUIRE문)) {
       잰것 += 1;
-      if (!Object.prototype.hasOwnProperty.call(표, `${m[1]}.mjs`)) {
-        구멍.push(`${원본} → ./${m[1]}.js`);
-      }
+      const [, , 경로, 파일명] = m;
+      if (!있는mjs.has(파일명)) 구멍.push(`${원본} → ${경로}${파일명}.js`);
     }
   }
   return { 구멍, 잰것 };
@@ -210,6 +219,20 @@ test('🔴 탐지력 — 표에 없는 `require` 를 한 줄 넣으면 잡는다
 
   /* 자기 처방 — 사유가 시키는 대로 표에 넣으면 통과한다(따를 수 없는 처방은 우회를 만든다 · F103). */
   const 고침 = 표의구멍({ ...표, '병.mjs': 'lib/병.js' }, (p) => 파일[p] ?? null);
+  assert.deepEqual(고침.구멍, []);
+});
+
+test('🔴 탐지력 — `../` 건너 디렉터리 require 도 잡는다 (G3 실측 모양 그대로)', () => {
+  /* 사람이 실제로 쓰는 표기로 검사한다 — 2026-08-13 실물은 lib 파일이 contents 를
+   * `require('../contents/알바변명문항.js')` 로 부른 것이었고, `./` 만 보던 옛 정규식이
+   * 이걸 통과시켰다. 이 픽스처가 그 탐지력을 못박는다(버그가 아직 있을 것을 요구하지 않는다). */
+  const 표 = { '갑.mjs': 'lib/갑.js' };
+  const 파일 = { 'lib/갑.js': "const 팩 = require('../contents/병문항.js');\n" };
+  const r = 표의구멍(표, (p) => 파일[p] ?? null);
+  assert.equal(r.잰것, 1, '분모가 안 맞다 — `../` require 를 정규식이 못 읽었다');
+  assert.deepEqual(r.구멍, ['lib/갑.js → ../contents/병문항.js']);
+
+  const 고침 = 표의구멍({ ...표, '병문항.mjs': 'contents/병문항.js' }, (p) => 파일[p] ?? null);
   assert.deepEqual(고침.구멍, []);
 });
 
