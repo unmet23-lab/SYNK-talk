@@ -57,8 +57,13 @@ const 밤인가 = (시각) => { const h = 시각.getHours(); return h >= 22 || h
  *   '무오류첫열람'(놀람→기쁨·큰 점프 · achieve 소리와 동기) · '오류남은답장'(카드 쪽 기울임 ·
  *   말 금지 — 기죽는 반응 절대 금지) · '재도전'(앞으로 기울임 · 「다시! 같이!」).
  * @param {object} [props.자리] 위치 덮어쓰기(absolute top/right 등) — 배치는 화면 몫이다.
+ * @param {{글: string, 때: number}|null} [props.말건네기] 화면이 시키는 정형 발화 한 마디 —
+ *   ㉮ 로컬 정형(배선 §2)의 표시 자리. 문구는 lib 상수에서만 온다(여기·화면 어디서도 짓지
+ *   않는다 — 강사판 = lib/마스코트강사말). 확률 없이 그대로 말하되 멈춤·줄임 게이트는 지난다.
+ * @param {boolean} [props.잡담] false 면 idle 혼잣말·방치말·탭 수다를 잠근다(표정·몸짓은
+ *   그대로) — 강사판은 말할순간 표에 idle 줄이 없다(표 밖 발화 금지 · 말할순간 §1-1).
  */
-export default function 마스코트({ 사건 = null, 자리 = null }) {
+export default function 마스코트({ 사건 = null, 자리 = null, 말건네기 = null, 잡담 = true }) {
   const [표정, set표정] = useState('기본');
   const [깜빡중, set깜빡중] = useState(false);
   const [졸림, set졸림] = useState(false);
@@ -124,7 +129,17 @@ export default function 마스코트({ 사건 = null, 자리 = null }) {
   };
   /* «가끔» — 사건 혼잣말은 그 사건에 최대 1회, 그마저 절반만 말한다(무언이 기본 · §1-1).
      ⚠확률 절반도 초기값이다 — 빈도 눈금은 v5 시연·부트캠프에서 유호님이 정한다(§3). */
-  const 가끔말하기 = (풀) => { if (Math.random() < 0.5) 말하기(풀); };
+  const 가끔말하기 = (풀) => { if (잡담 && Math.random() < 0.5) 말하기(풀); };
+
+  /* 말건네기 — 정형 발화는 확률이 없다(숫자·상태 문장은 「가끔」이 아니라 「그 순간」이 값이다).
+     상한은 화면이 말한기록으로 이미 걸렀고, 여기는 게이트(멈춤·줄임)와 표시만 진다.
+     문장이라 혼잣말(1~4어절)보다 오래 띄운다. */
+  useEffect(() => {
+    if (!말건네기 || !말건네기.글 || 멈춤()) return;
+    깨우기();
+    set말(말건네기.글);
+    예약(() => set말(null), 때.말지속 + 1800);
+  }, [말건네기 && 말건네기.때]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const 점프 = (높이) => {
     Animated.sequence([
@@ -171,7 +186,7 @@ export default function 마스코트({ 사건 = null, 자리 = null }) {
       else if (r < 0.6) 기울이기(3, 1100); // 끄덕임꼴
     }, 때.idle주기);
     const 중얼 = setInterval(() => {
-      if (멈춤() || 말 || 졸림 || 표정 !== '기본') return;
+      if (!잡담 || 멈춤() || 말 || 졸림 || 표정 !== '기본') return;
       말하기(혼잣말.idle);
     }, 때.idle혼잣말주기);
     return () => { clearInterval(두리번); clearInterval(중얼); };

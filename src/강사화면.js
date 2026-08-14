@@ -40,6 +40,9 @@ import { 색, 폰트, 모노트래킹, 몽골어 } from './테마';
 import { 큐받기, 판정하기 } from './강사API.js';
 import { 오류태그 } from './검수API.js';
 import { VERDICT, 텍스트내는판정, 골든판정요청 } from '../lib/검수확정.js';
+import 마스코트 from './마스코트.js';
+import { 강사순간고르기 } from '../lib/마스코트강사말.js';
+import { 마스코트기록읽기, 마스코트기록쓰기 } from './저장.js';
 
 /**
  * 큐 항목 상태 — 정본은 `functions/teach:75` 의 `상태` 다.
@@ -121,6 +124,12 @@ export function 진행(목록) {
   };
 }
 
+/** 기기 시계의 오늘 — UTC 가 아니라 현지 날짜다(몽골 UTC+8 · toISOString 은 하루가 밀린다). */
+function 날짜줄(d) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 export default function 강사화면({ 토큰, 돌아가기 }) {
   const [주, set주] = useState('');
   const [표본크기, set표본크기] = useState(0);
@@ -136,6 +145,29 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
   const [출처펼침, set출처펼침] = useState(false);
   const [보내는중, set보내는중] = useState(false);
   const [끝낸수, set끝낸수] = useState(0);
+  const [캐릭터말, set캐릭터말] = useState(null);
+
+  /* 마스코트 발화 시도 — 판정(어느 줄·상한)은 lib 이 전부 지고, 여기는 신호 조립과 표시뿐이다
+     (말할순간 §1-1 「표 밖 발화 금지」의 기계 자리 — 이 화면에는 문구가 한 글자도 없다).
+     실패는 조용히 접는다: 마스코트 때문에 판정 화면이 죽는 것이 최악이다(보조 원칙 ③). */
+  const 말시도 = useCallback(async (계기, 셈값, 목록값, 주값) => {
+    try {
+      const 기록 = await 마스코트기록읽기();
+      const 지금 = new Date();
+      const 고른 = 강사순간고르기(계기, {
+        셈: 셈값,
+        주: 주값,
+        요일: ((지금.getDay() + 6) % 7) + 1,
+        오늘: 날짜줄(지금),
+        막힌카드: (목록값 || [])
+          .filter((it) => it && it.status === 큐상태.막힘)
+          .map((it) => String(it.correction_id)),
+      }, 기록);
+      if (!고른) return;
+      await 마스코트기록쓰기({ ...기록, [고른.키]: 날짜줄(지금) });
+      set캐릭터말({ 글: 고른.풀[Math.floor(Math.random() * 고른.풀.length)], 때: Date.now() });
+    } catch { /* 침묵 — 틀린 말도 오류 화면도 아니고 그날 말이 없는 것이다 */ }
+  }, []);
 
   /* 🔑 **한 번만 읽는다.** 조회 한 번이 감사 1행이고(`teach:241`) 그 장부는 조회 횟수의
      분모다 — 화면이 되풀이하면 분모가 조용히 달라진다(`검수API` 머리말과 같은 규칙).
@@ -149,6 +181,7 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
         set주(r.주); set표본크기(r.표본크기); set풀크기(r.풀크기); set목록(r.목록);
         const 첫 = 다음열림(r.목록, null);
         set지금id(첫 ? 첫.correction_id : null);
+        await 말시도('열림', 진행(r.목록), r.목록, r.주);
       } catch (e) {
         if (살아있음) set오류(문구(e));
       } finally {
@@ -182,12 +215,16 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
       await 판정하기(토큰, 요청);
       /* 🔑 서버가 200 을 준 **뒤에만** 상태를 바꾼다 — 낙관적 반영은 되돌릴 수 없는 쓰기에
          대한 거짓말이 된다(`ALREADY_JUDGED` 로 재판정도 안 된다). */
-      set목록((v) => v.map((it) => (String(it.correction_id) === String(항목.correction_id)
-        ? { ...it, status: 큐상태.판정됨 } : it)));
+      const 갱신목록 = 목록.map((it) => (String(it.correction_id) === String(항목.correction_id)
+        ? { ...it, status: 큐상태.판정됨 } : it));
+      set목록(갱신목록);
       set끝낸수((n) => n + 1);
       const 다음 = 다음열림(목록, 항목.correction_id);
       set지금id(다음 ? 다음.correction_id : null);
       set편집(편집초기값()); set태그펼침(false); set출처펼침(false);
+      // T3 — 「전부 완료한 순간」은 여기뿐이다(다시 연 화면은 「이번 주 끝」 카드가 말한다).
+      const 셈뒤 = 진행(갱신목록);
+      if (셈뒤.남음 === 0) await 말시도('완료', 셈뒤, 갱신목록, 주);
     } catch (e) {
       set오류(문구(e));
     } finally {
@@ -196,7 +233,8 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
   }, [항목, 보내는중, 막힘문구, 토큰, 요청, 목록]);
 
   return (
-    <ScrollView style={s.wrap} contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
+    <View style={s.wrap}>
+    <ScrollView style={s.말림} contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
       <Text style={s.label}>TEACH</Text>
       <Text style={s.머리}>이번 주 AI 교정 채점</Text>
 
@@ -394,6 +432,10 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
         <Text style={s.backText}>← 돌아가기</Text>
       </Pressable>
     </ScrollView>
+    {/* 마스코트 — 스크롤 밖 고정(비서는 화면에 산다). 잡담 잠금: 강사판 표에 idle 줄이 없다.
+        발화는 전부 말시도(lib 판정)를 지난 것뿐 — 여기는 자리만 정한다(머리 위 빈 띠). */}
+    <마스코트 잡담={false} 말건네기={캐릭터말} 자리={s.마스코트자리} />
+    </View>
   );
 }
 
@@ -415,6 +457,9 @@ const 입력바탕 = {
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: 색.바탕 },
+  말림: { flex: 1 },
+  /* 머리글 위 빈 띠(paddingTop 76) 안 — 내용과 안 겹치고, 스크롤해도 제자리다. */
+  마스코트자리: { top: 10, right: 16 },
   inner: { padding: 20, paddingTop: 76, paddingBottom: 48, gap: 12 },
 
   label: { fontFamily: 폰트.모노, fontSize: 10, letterSpacing: 모노트래킹.라벨, color: 색.잉크_메타 },
