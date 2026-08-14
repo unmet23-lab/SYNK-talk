@@ -232,8 +232,39 @@ test('벤더 실패를 다시 걸 것과 걸어도 같은 것으로 가른다', 
 
 // ── 배치: 제출과 회수가 갈린 자리 ─────────────────────────────────────────
 
-const { 배치키, 배치키풀기, 배치몸통, 배치줄해석, 캐시성적, 성적합 } = require('../lib/교정엔진.js');
+const {
+  배치키, 배치키풀기, 배치키규격안, 배치키어긋남, 배치몸통, 배치줄해석, 캐시성적, 성적합, 벤더사유,
+} = require('../lib/교정엔진.js');
 const 제출id = '11111111-2222-3333-4444-555555555555';
+
+/* 🔴 벤더 규격을 **이 파일에 다시 적는다.** `배치키규격` 상수를 빌려 쓰면 이 검사는 「우리가
+ *   우리 상수를 지킨다」까지만 말하고, 상수 자체가 규격 밖인 날 함께 초록이 된다 — 그게 정확히
+ *   08-15 이전의 상태였다(픽스처가 구분자 `|` 를 못박고 있어서, 실제 제출이 매번 400 으로
+ *   튕기는 동안 이 스위트는 계속 초록이었다 · #Q83). 사본이 두 벌인 것을 알고 두는 자리다.
+ *   출처 = Batches API 문서: 「Must be 1 to 64 characters and contain only alphanumeric
+ *   characters, hyphens, and underscores (matching ^[a-zA-Z0-9_-]{1,64}$)」. */
+const 벤더규격 = /^[a-zA-Z0-9_-]{1,64}$/;
+
+test('🔴 custom_id 가 벤더 규격 안이다 — 어기면 배치 한 벌이 통째로 400 이다', () => {
+  /* 400 은 `봉투(200, …)` 로 나가므로 cron 이 도는 날 매 회차 **조용히 0건**이 된다.
+   * 실측 08-15: 구분자가 `|` 라 대기 396건이 전량 튕겼다(`batch_submit_failed`). */
+  const 몸 = 배치몸통(
+    [{ submission_id: 제출id, 문장: 'ㄱ', 급수: 'Lv2' },
+     { submission_id: '99999999-8888-7777-6666-555555555555', 문장: 'ㄴ', 급수: null }],
+    '지시문원문', 'v12',
+  );
+  for (const 요청 of 몸.requests) {
+    assert.match(요청.custom_id, 벤더규격, `규격 밖 custom_id: ${요청.custom_id}`);
+  }
+  assert.equal(배치키규격안(배치키(제출id, 'v1')), true);
+});
+
+test('🔴 구분자가 uuid 와 안 섞인다 — 섞이면 판이 엉뚱하게 적힌다(소급 불가)', () => {
+  /* 규격이 허용하는 글자는 영숫자·`-`·`_` 셋뿐인데 `-` 는 uuid 가 이미 쓴다. 그걸 고르면
+   * `배치키풀기` 의 `indexOf` 가 첫 하이픈에서 갈라 **400 은 안 나고 판만 깨진다** — 규격만
+   * 보고 고르면 안 되는 이유다. 왕복으로 못박는다. */
+  assert.deepEqual(배치키풀기(배치키(제출id, 'v12')), { submission_id: 제출id, 판: 'v12' });
+});
 
 test('🔴 제출한 판이 회수까지 살아 온다 — 그 사이 프롬프트가 바뀌어도', () => {
   /* 회수는 몇 시간~하루 뒤다. 그때 파일에서 읽은 판은 **그 출력을 만들지 않은 판**이라,
@@ -245,9 +276,22 @@ test('🔴 제출한 판이 회수까지 살아 온다 — 그 사이 프롬프�
 
 test('키 모양이 다르면 추측하지 않고 버린다', () => {
   assert.equal(배치키풀기('구분자가없다'), null);
-  assert.equal(배치키풀기('|판만있다'), null);
-  assert.equal(배치키풀기(`${제출id}|`), null, '판이 빈 채로 적히면 그 행은 근거가 없다');
+  assert.equal(배치키풀기('_판만있다'), null);
+  assert.equal(배치키풀기(`${제출id}_`), null, '판이 빈 채로 적히면 그 행은 근거가 없다');
   assert.equal(배치키풀기(null), null);
+});
+
+test('🔴 규격 밖은 내보내기 «전에» 잡힌다 — 물으면 0원, 안 물으면 왕복 한 번', () => {
+  /* 탐지력은 픽스처가 진다(실저장소 행은 uuid 라 늘 통과한다 — 그것만 재면 「안 도는 가드」와
+   * 같은 모양이다). 규격을 깨는 세 갈래를 심어 각각 잡히는지 본다. */
+  assert.deepEqual(배치키어긋남([{ submission_id: 제출id }], 'v1'), [],
+    '정상 uuid 를 어긋남으로 세면 거짓양성이고, 쏟아지는 가드는 곧 꺼진다');
+  assert.equal(배치키어긋남([{ submission_id: `${제출id}|섞임` }], 'v1').length, 1, '옛 구분자');
+  assert.equal(배치키어긋남([{ submission_id: 제출id }], 'v 1').length, 1, '판에 공백');
+  assert.equal(배치키어긋남([{ submission_id: 'x'.repeat(70) }], 'v1').length, 1, '64자 상한');
+  assert.equal(배치키어긋남([{ submission_id: 제출id }, { submission_id: '한글' }], 'v1').length, 1,
+    '한 벌에 하나만 어긋나도 벤더는 배치 전체를 튕긴다');
+  assert.deepEqual(배치키어긋남(null, 'v1'), []);
 });
 
 test('배치 요청은 동기 왕복과 같은 몸통을 쓴다 — 두 통로의 품질이 갈리면 안 된다', () => {
@@ -256,16 +300,30 @@ test('배치 요청은 동기 왕복과 같은 몸통을 쓴다 — 두 통로�
     '지시문원문', 'v1',
   );
   assert.equal(몸.requests.length, 1);
-  assert.equal(몸.requests[0].custom_id, `${제출id}|v1`);
+  assert.equal(몸.requests[0].custom_id, `${제출id}_v1`);
   const p = 몸.requests[0].params;
   assert.deepEqual(p, 요청몸통({ 지시문: '지시문원문', 문장: '학교에서 갔어요', 급수: 'Lv2' }),
     '배치 요청이 동기 요청과 다르다 — 캐시 설정이나 모델이 한쪽에만 붙은 것이다');
   assert.deepEqual(배치몸통(null, 'x', 'v1').requests, []);
 });
 
+test('🔴 벤더가 말한 «왜»가 응답까지 온다 — 상태 코드만으로는 처방이 안 나온다', () => {
+  /* 400 은 「몸통을 고쳐라」인데 «어디를»이 빠져 있다. 그 글이 `console.error` 안에만 살면
+   * Edge 로그를 따로 열어야 나오고, 그 한 칸이 없어서 #Q83 이 며칠 늦었다. */
+  assert.equal(
+    벤더사유('{"type":"error","error":{"type":"invalid_request_error","message":"custom_id: String should match pattern"}}'),
+    'invalid_request_error: custom_id: String should match pattern',
+  );
+  assert.equal(벤더사유('<html>502 Bad Gateway</html>'), '<html>502 Bad Gateway</html>',
+    'JSON 이 아니어도 빈손으로 돌아오지 않는다 — 「못 읽었다」와 「사유가 없다」는 다르다');
+  assert.equal(벤더사유(''), null);
+  assert.equal(벤더사유(null), null);
+  assert.equal(벤더사유(`{"error":{"message":"${'ㄱ'.repeat(400)}"}}`).length, 200, '길이는 자른다');
+});
+
 test('결과 줄 — 성공은 글과 벤더가 태운 모델을 준다', () => {
   const 줄 = JSON.stringify({
-    custom_id: `${제출id}|v2`,
+    custom_id: `${제출id}_v2`,
     result: {
       type: 'succeeded',
       message: {
@@ -285,14 +343,14 @@ test('결과 줄 — 성공은 글과 벤더가 태운 모델을 준다', () => 
 
 test('🔴 모델 이름이 없으면 버린다 — 「어느 모델이 만들었나」가 빈 행은 못 쓴다', () => {
   const 줄 = JSON.stringify({
-    custom_id: `${제출id}|v1`,
+    custom_id: `${제출id}_v1`,
     result: { type: 'succeeded', message: { content: [{ type: 'text', text: 'ㄱ' }] } },
   });
   assert.equal(배치줄해석(줄).사유, '모델없음');
 });
 
 test('성공 아닌 갈래는 사유별로 갈린다 — 처방이 서로 다르다', () => {
-  const 만들기 = (result) => 배치줄해석(JSON.stringify({ custom_id: `${제출id}|v1`, result }));
+  const 만들기 = (result) => 배치줄해석(JSON.stringify({ custom_id: `${제출id}_v1`, result }));
   assert.equal(만들기({ type: 'errored', error: { type: 'invalid_request' } }).사유, '배치오류:invalid_request');
   assert.equal(만들기({ type: 'expired' }).사유, '배치expired');
   assert.equal(만들기({ type: 'canceled' }).사유, '배치canceled');

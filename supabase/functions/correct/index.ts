@@ -55,8 +55,8 @@ type 교정칸 = {
 
 const {
   모델, 왕복제한밀리, 메시지경로, 배치경로, 벤더헤더,
-  프롬프트판, 태그어긋남, 요청몸통, 응답글, 교정값, 재시도가능,
-  배치몸통, 배치줄해석, 캐시성적, 성적합,
+  프롬프트판, 태그어긋남, 요청몸통, 응답글, 교정값, 재시도가능, 벤더사유,
+  배치몸통, 배치키어긋남, 배치줄해석, 캐시성적, 성적합,
 } = 교정모듈 as {
   모델: string;
   왕복제한밀리: number;
@@ -69,7 +69,9 @@ const {
   응답글: (본문: unknown) => string | null;
   교정값: (글: string, 태그목록: string[]) => 교정칸;
   재시도가능: (status: number) => boolean;
+  벤더사유: (글: string, 상한?: number) => string | null;
   배치몸통: (행들: unknown[], 지시문: string, 판: string) => Record<string, unknown>;
+  배치키어긋남: (행들: unknown[], 판: string) => string[];
   배치줄해석: (줄: string) => {
     submission_id?: string; 판?: string; 글?: string; 모델?: string;
     사용량?: Record<string, number> | null; 사유: string | null;
@@ -273,7 +275,10 @@ Deno.serve(async (req: Request) => {
     if (!목록r.ok) {
       const 글 = (await 목록r.text()).slice(0, 300);
       console.error('[correct] 배치 목록 실패', 목록r.status, 글);
-      return 봉투(200, { 대기: 대기수, 적음: 0, 이유: 'batch_list_failed', status: 목록r.status });
+      return 봉투(200, {
+        대기: 대기수, 적음: 0, 이유: 'batch_list_failed',
+        status: 목록r.status, 벤더사유: 벤더사유(글),
+      });
     }
     const 목록 = (await 목록r.json()) as {
       data?: { id: string; processing_status: string; created_at?: string }[];
@@ -362,6 +367,20 @@ Deno.serve(async (req: Request) => {
     if (!행들.length) {
       return 봉투(200, { 대기: 대기수, 적음, 미룸, 버림, 이유: 'nothing_to_submit', 회수, 캐시: 성적합(성적들) });
     }
+    /* 🔴 `custom_id` 규격은 **내보내기 전에** 본다 — `tag_drift` 와 같은 자리다. 어기면 벤더가
+     *   배치 한 벌을 통째로 400 으로 튕기는데, 그 실패는 아래에서 `봉투(200, …)` 으로 나가므로
+     *   cron 이 켜지는 날 매 회차 조용히 0건이 된다. 여기서 물으면 0원이고, 안 물으면 왕복 한 번.
+     *   ⚠ 왕복이 아니라 **규격**을 재는 자리다 — 통과가 「벤더가 받아 준다」의 증명은 아니다. */
+    const 키어긋남 = 배치키어긋남(행들, 판);
+    if (키어긋남.length) {
+      console.error('[correct] 🔴 custom_id 규격 밖', 키어긋남.length, 키어긋남.slice(0, 3).join(','));
+      센다(버림, '키규격밖');
+      return 봉투(200, {
+        대기: 대기수, 적음, 미룸, 버림, 이유: 'batch_key_invalid',
+        규격밖: 키어긋남.length, 보기: 키어긋남.slice(0, 3), 회수,
+      });
+    }
+
     const r = await fetch(배치경로, {
       method: 'POST',
       headers: 벤더헤더(키),
@@ -372,7 +391,13 @@ Deno.serve(async (req: Request) => {
       const 글 = (await r.text()).slice(0, 300);
       console.error('[correct] 배치 제출 실패', r.status, 글);
       센다(버림, 재시도가능(r.status) ? `제출_재시도:${r.status}` : `제출_영구:${r.status}`);
-      return 봉투(200, { 대기: 대기수, 적음, 미룸, 버림, 이유: 'batch_submit_failed', status: r.status, 회수 });
+      /* 🔑 **벤더가 말한 사유를 응답에 싣는다.** 여기 없으면 「400 이다」까지만 알고 «왜»는
+       *   Edge 로그를 따로 열어야 나온다 — 그 한 칸이 없어서 #Q83 이 며칠 늦었다. 로그에 이미
+       *   같은 글이 나가므로 새로 드러나는 것은 없고(노출 층이 안 늘어난다), 길이만 자른다. */
+      return 봉투(200, {
+        대기: 대기수, 적음, 미룸, 버림, 이유: 'batch_submit_failed',
+        status: r.status, 벤더사유: 벤더사유(글), 회수,
+      });
     }
     const 만든것 = (await r.json()) as { id?: string };
     return 봉투(200, {
