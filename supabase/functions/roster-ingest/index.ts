@@ -216,7 +216,7 @@ Deno.serve(async (req) => {
   let 조해제 = 0;
   const 조편성문제: Array<{ 줄: number; 번호: string; 사유: string }> = [];
   if (Array.isArray(몸.조편성)) {
-    const 짝지도 = new Map<string, { g: number; s: number }>();
+    const 짝지도 = new Map<string, { g: number; s: number; 줄: number; 원번호: string }>();
     (몸.조편성 as unknown[]).forEach((원행, i) => {
       const [sid, 조글, 좌석글] = (Array.isArray(원행) ? 원행 : [])
         .map((c) => String(c == null ? '' : c).trim());
@@ -233,7 +233,8 @@ Deno.serve(async (req) => {
         조편성문제.push({ 줄, 번호: sid, 사유: '연락처 대조가 막힌 학생 — 조를 적지 않는다' });
         return;
       }
-      짝지도.set(학생번호표기(sid), { g: 조, s: 좌석 }); // 같은 학생 두 줄 = 뒤가 이긴다(시트 최신판)
+      // 같은 학생 두 줄 = 뒤가 이긴다(시트 최신판) · 줄·원번호는 되돌릴 때 사람이 찾을 재료다
+      짝지도.set(학생번호표기(sid), { g: 조, s: 좌석, 줄, 원번호: sid });
     });
     const 코드들 = [...짝지도.keys()];
     if (코드들.length) {
@@ -249,6 +250,26 @@ Deno.serve(async (req) => {
            and (l.group_no is distinct from v.g or l.seat_no is distinct from v.s)
         returning l.student_code`;
       조갱신 = (갱신 as unknown as Array<{ student_code: string }>).map((r) => r.student_code);
+
+      /* 🔴 **명부에 없는 번호는 여태 아무 데도 안 적히고 아무 말도 안 했다**(반박 P2-③).
+       * `update … where student_code = v.student_code` 는 0행 매치를 오류로 안 낸다 — 그리고
+       * 바로 아래 해제가 그 학생을 「스냅샷에 안 실린 사람」으로 보고 **실물 학생의 조를 지운다.**
+       * groups 시트의 번호 한 글자 오타가 매일 아침 되풀이되고, 알림은 0이며, 증상은 그 학생만
+       * 「조 미편성」으로 뜨는 것뿐이다 — 편성 전과 **같은 모양**이라 아무도 못 가른다.
+       * 🔑 그래서 **짝 수와 매치 수를 대조한다**: 안 맞은 번호는 조편성문제로 되돌려, 시트를
+       *   고칠 사람에게 줄·번호·사유로 간다(갱신 0행 = 「값이 같았다」이지 「없다」가 아니므로
+       *   `조갱신` 의 길이로는 이 구분을 원리상 못 한다). */
+      const 없는것 = await sql`
+        select v.student_code from (select unnest(${코드들}::text[]) as student_code) v
+         where not exists (select 1 from engine.learners l where l.student_code = v.student_code)`;
+      (없는것 as unknown as Array<{ student_code: string }>).forEach((r) => {
+        const 짝 = 짝지도.get(r.student_code);
+        조편성문제.push({
+          줄: 짝 ? 짝.줄 : 0,
+          번호: 짝 ? 짝.원번호 : r.student_code,
+          사유: '명부에 없는 학생 번호 — 조를 적지 못했다(번호 오타이거나 아직 명부에 안 선 학생)',
+        });
+      });
     }
     const 해제 = await sql`
       update engine.learners
