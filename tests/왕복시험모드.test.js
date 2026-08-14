@@ -13,9 +13,12 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 
+const { 코드만 } = require('./lib/소스검사.js');
+
 const 소스 = fs.readFileSync(path.join(__dirname, '..', 'tools', '왕복시험.js'), 'utf8');
 
-/** 주석·문자열이 아니라 실제로 도는 줄만 본다 — 설명문의 낱말이 검사를 통과시키면 안 된다. */
+/** 주석·문자열이 아니라 실제로 도는 줄만 본다 — 설명문의 낱말이 검사를 통과시키면 안 된다.
+ *  ⚠ 줄머리 필터라 **줄 꼬리의 인라인 주석은 남는다** — 부정 단언은 `코드만` 으로 마저 걷는다. */
 const 실행줄 = 소스.split('\n').filter((줄) => {
   const t = 줄.trim();
   return t && !t.startsWith('*') && !t.startsWith('//') && !t.startsWith('/*');
@@ -85,7 +88,7 @@ test('--새학생 은 --운영승인 으로도 안 뚫린다(운영 명부에 �
    * tests/왕복골격.test.js 가 금지한다). **부정(`!`)까지** 본다 — 뒤집힌 게이트는 항상 통과다. */
   const 게이트 = 실행줄.split('\n').find((줄) => /새학생\s*&&\s*!리허설이다/.test(줄));
   assert.ok(게이트, '--새학생 전용 리허설 게이트(새학생 && !리허설이다)가 없다 — 운영 명부에 시험 학생이 생긴다');
-  assert.ok(!/운영승인/.test(게이트), '그 게이트에 --운영승인 예외가 붙으면 뚫린다');
+  assert.ok(!/운영승인/.test(코드만(게이트)), '그 게이트에 --운영승인 예외가 붙으면 뚫린다');
 });
 
 test('--새학생 은 동의를 SQL 로 심지 않고 운영자 도구를 실제로 부른다', () => {

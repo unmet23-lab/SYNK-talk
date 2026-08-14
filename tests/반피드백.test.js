@@ -33,6 +33,10 @@ const 동봉 = JSON.parse(fs.readFileSync(
 /* 주석을 벗긴 소스 — 「금지된 것이 코드에 없다」를 볼 땐 주석의 그 낱말이 거짓 적색을 낸다.
  * (이 파일의 주석에도 `corrections` 가 여러 번 나온다 — 벗기지 않으면 검사가 자기 설명에 걸린다.) */
 const 주석뺀소스 = 코드만(소스);
+/* 마이그 조각의 부정 단언도 같은 병 — 단 언어가 SQL 이라 `코드만`(JS 렉서)이 못 진다.
+ * SQL 제거기는 공용에 «안 합치는» 규약(가드계수 SQL사본)이라 여기서 한 벌 든다(가드계수 ㉠). */
+const SQL주석없이 = (q) => q.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ');
+const 조각정제 = SQL주석없이(조각);
 
 /** SQL CHECK 의 값목록을 뽑는다 — `check (열 in ('a', 'b'))`. */
 function SQL값목록(열) {
@@ -212,18 +216,18 @@ test('🔴 남의 한 마디는 못 덮는다 — 한 반에 강사 둘이 정�
 
 test('삭제는 막고 개서는 연다 — 트리거가 있어야 그 말이 프로즈가 아니다', () => {
   assert.match(조각, /create trigger teacher_notes_protect\s+before delete on engine\.teacher_notes/);
-  assert.ok(!/before (update|insert or update) on engine\.teacher_notes/.test(조각),
+  assert.ok(!/before (update|insert or update) on engine\.teacher_notes/.test(조각정제),
     '개서까지 막으면 남는 통로가 0이 되고 그때 우회가 정상 통로가 된다(F103)');
   assert.match(조각, /updated_at\s+timestamptz/, '개서를 열되 조용하지는 않게 — 고친 사실이 행에 남는다');
 });
 
 test('engine 취급 그대로 — RLS 켜고 정책 0(나중에 노출하는 날 잊어도 닫힌 채로 실패한다)', () => {
   assert.match(조각, /alter table engine\.teacher_notes enable row level security/);
-  assert.ok(!/create policy[^\n]*teacher_notes/.test(조각), '정책이 붙으면 전면 거부가 아니다');
+  assert.ok(!/create policy[^\n]*teacher_notes/.test(조각정제), '정책이 붙으면 전면 거부가 아니다');
 });
 
 test('산출물·강사가 사라져도 한 마디가 고아로 남지 않는다 — 고리 둘 + 삭제 차단', () => {
   assert.match(조각, /submission_id uuid not null references engine\.submissions\(submission_id\) on delete restrict/);
   assert.match(조각, /staff_id\s+uuid not null references engine\.staff\(staff_id\)/);
-  assert.ok(!/on delete cascade/.test(조각), 'cascade 면 산출물 한 줄 삭제가 강사의 말까지 끌고 간다');
+  assert.ok(!/on delete cascade/.test(조각정제), 'cascade 면 산출물 한 줄 삭제가 강사의 말까지 끌고 간다');
 });

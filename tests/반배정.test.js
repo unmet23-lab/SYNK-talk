@@ -27,6 +27,10 @@ const 소스 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'roster-
 const 주석뺀소스 = 코드만(소스);
 const 조각 = fs.readFileSync(
   path.join(ROOT, 'supabase', 'migrations', '20260812200000_class_c11.sql'), 'utf8');
+/* 부정 단언은 SQL 주석을 걷은 판으로 잰다 — 「cascade 는 쓰지 않는다」 같은 설명 주석이
+ * 그대로 위반으로 잡히는 자리다(가드계수 ㉠ · 언어가 SQL 이라 공용 `코드만` 이 못 진다 — SQL사본 규약). */
+const SQL주석없이 = (q) => q.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ');
+const 조각정제 = SQL주석없이(조각);
 
 /* 운영 시트 머리글 그대로 — `Code.js:955-957` 의 열 지도다. */
 const 머리 = ['user_id', '이름', '이름_몽골', 'role', 'class_name', '생일', 'email', '연락처'];
@@ -132,12 +136,12 @@ test('🔴 부분 유일 인덱스가 **둘 다** 있다 — 하나만 있으면
 
 test('🔴 `learners.class_id` 는 not null 이 아니다 — 배정 전 학생이 통째로 잠긴다', () => {
   assert.match(조각, /add column class_id uuid references engine\.classes\(class_id\)/);
-  assert.ok(!/add column class_id uuid[^;]*not null/.test(조각),
+  assert.ok(!/add column class_id uuid[^;]*not null/.test(조각정제),
     'not null 로 조이면 반이 없는 학생은 행 자체가 못 서고, 그건 앱을 못 쓴다는 뜻이다');
 });
 
 test('지난 시즌 반은 지우는 게 아니라 닫는다 — `active` 칸이 있어야 그 말이 물리다', () => {
   assert.match(조각, /active\s+boolean not null default true/);
-  assert.ok(!/on delete cascade/.test(조각),
+  assert.ok(!/on delete cascade/.test(조각정제),
     'cascade 면 반 한 줄 삭제가 학생 행까지 끌고 간다 — 과거 행의 FK 가 살아야 한다');
 });

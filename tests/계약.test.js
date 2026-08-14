@@ -18,6 +18,8 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 
+const { 코드만 } = require('./lib/소스검사.js');
+
 const ROOT = path.join(__dirname, '..');
 const 계약경로 = path.join(ROOT, '계약', '수집_교정_계약.json');
 const 계약 = JSON.parse(fs.readFileSync(계약경로, 'utf8'));
@@ -108,7 +110,8 @@ test('판정불가는 분모에서 빠지고 따로 보고된다 (감추면 「�
   assert.ok(/판정불가/.test(main), 'main이 판정불가를 아예 모른다 — 채점 대상에 섞여 분모를 늘린다');
   assert.ok(/채점대상/.test(main) && /전체통과: 채점대상/.test(main),
     '전체통과를 전체 행에서 센다 — 판정불가가 통과로도 실패로도 안 세어지면서 분모만 채운다');
-  assert.equal(/요약\.전체통과 === rows\.length/.test(main), false,
+  /* 부정 단언은 주석 걷은 판으로 — 「옛 판은 rows.length 와 비교했다」류 설명이 걸리는 자리(가드계수 ㉠). */
+  assert.equal(/요약\.전체통과 === rows\.length/.test(코드만(main)), false,
     '종료 코드가 rows.length와 비교한다 — 판정불가가 하나라도 있으면 영원히 1(실패)이 된다');
 });
 

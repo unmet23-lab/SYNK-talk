@@ -68,9 +68,11 @@ function 뷰정의() {
 
 /** 뷰가 실제로 **내보내는 이름** — 별칭이 있으면 별칭이 그 열의 이름이다. */
 function 뷰열() {
-  const 몸 = 뷰정의();
-  const 셀렉트 = 몸.slice(0, 몸.indexOf('from engine.submissions'));
-  const 줄들 = 셀렉트.split('\n')
+  /* 지역명을 test 쪽 `몸`·`셀렉트` 와 가른다 — 한 이름이 원문·정제 두 뜻이면 계수기의
+   * 파일 스코프 근사가 정제 쪽까지 원문으로 물들인다(⑧회차 학습 ① 그 병 · 거짓 위험). */
+  const 정의전문 = 뷰정의();
+  const 셀렉트절 = 정의전문.slice(0, 정의전문.indexOf('from engine.submissions'));
+  const 줄들 = 셀렉트절.split('\n')
     .map((l) => l.replace(/--.*$/u, '').trim())
     .map((l) => l.replace(/^select\s+/u, ''))
     .filter(Boolean);
@@ -178,7 +180,9 @@ test('확인 쿼리가 뷰 유무와 옛 정책 유무를 **둘 다** 센다', (
 /* ── ④ 뷰가 자기 소비자를 죽이지 않는가 ────────────────────────────── */
 
 test('뷰에 역할 판정을 넣지 않았다 (service_role 은 auth.uid() 가 null 이다)', () => {
-  const 몸 = 뷰정의();
+  /* SQL 주석을 걷고 잰다 — 「status 로 소속을 정하지 않는다」를 설명하는 주석의 그 글자가
+   * 아래 부정 단언에 그대로 걸리는 자리다(가드계수 ㉠ · 아래 SQL주석없이 규약 그 층). */
+  const 몸 = SQL주석없이(뷰정의());
   assert.ok(!/current_staff|auth\.uid/.test(몸),
     '뷰가 역할을 판정한다 — `service_role` 호출에서 0행이 되어 화면이 통째로 빈다.\n' +
     '  역할 확정은 L0 §4-5 ② 대로 Edge Function 이 `engine.staff` 에서 한다.');
@@ -410,7 +414,7 @@ function 반뷰정의() {
 }
 
 test('반 판은 기본 판에서 파생한다 — 원표에서 다시 시작하면 좁힘이 무효다', () => {
-  const 몸 = 반뷰정의();
+  const 몸 = SQL주석없이(반뷰정의());   // 부정 단언이 설명 주석에 안 걸리게(가드계수 ㉠)
   assert.match(몸, /from engine\.review_queue\s+v/u,
     '반 판이 review_queue 를 안 지난다 — 원표에서 시작하면 22열 밖(원문 셋 포함)이 딸려 온다');
   assert.ok(!/from engine\.submissions|join engine\.submissions/u.test(몸),
@@ -418,7 +422,9 @@ test('반 판은 기본 판에서 파생한다 — 원표에서 다시 시작하
 });
 
 test('반 판이 더 여는 것은 정체 4열뿐이다 — 이름·조·좌석·반, 그 이상은 판정 없이 못 나간다', () => {
-  const 몸 = 반뷰정의();
+  /* SQL 주석을 걷고 잰다 — 주석 속 `l.contact 는 안 싣는다` 류가 ①select 추출(더한열)과
+   * ②부정 단언(e.* · 원문 3열 · 역할 판정) 양쪽에 다 거짓으로 걸리는 자리다(가드계수 ㉠). */
+  const 몸 = SQL주석없이(반뷰정의());
   /* 🔑 세는 것은 **select 목록**이다 — 조인 조건(`on l.learner_id = e.learner_id`)의 참조까지
    *   세면 다리 자체가 위반으로 잡혀 거짓 적색이 된다(내보내는 것과 지나가는 것은 다르다). */
   const 셀렉트 = 몸.slice(0, 몸.indexOf('from engine.review_queue'));

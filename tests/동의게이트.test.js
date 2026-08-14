@@ -92,16 +92,17 @@ test('🔴 events 는 「그때유효」다 — 두 뜻을 한 술어로 합치�
 for (const 이름 of ['tasks', 'corrections']) {
   test(`🔴 조회 통로(${이름})는 정본 함수를 부른다 — 술어를 자기 파일에 다시 적지 않았다`, () => {
     const 글 = 함수(이름);
+    const 코드 = 코드만(글);   // 부정 단언은 주석 걷은 판으로(가드계수 ㉠ · 아래 「주석은 걷는다」 그 이유)
     assert.match(글, /지금유효\(/, `${이름} 가 정본 함수를 안 부른다`);
-    assert.ok(!/engine\.consents/.test(글),
+    assert.ok(!/engine\.consents/.test(코드),
       `${이름} 가 술어를 자기 파일에 적었다 — 다섯 번째 사본이다`);
     const 동봉 = JSON.parse(함수(이름, '동봉.json'));
     assert.equal(동봉['동의게이트.mjs'], 'lib/동의게이트.js',
       '동봉 표에 정본이 없다 — 배포는 성공하고 함수는 첫 호출의 import 에서 죽는다');
     /* 🔑 **막힘을 응답에 싣는가**까지 본다. 게이트를 불러 놓고 값을 안 실으면 앱은 그대로
      *   사건을 보내고, 이 검사만 초록이 된다 — 새는 방향은 언제나 「통과」다.
-     *   주석은 걷는다 — 이 규칙을 설명하는 자리라 글자가 그대로 나온다(설명이 구현을 위장한다). */
-    const 코드 = 코드만(글);
+     *   주석은 걷는다 — 이 규칙을 설명하는 자리라 글자가 그대로 나온다(설명이 구현을 위장한다).
+     *   (`코드` 는 위에서 이미 걷어 뒀다 — engine.consents 부정 단언과 같은 판을 쓴다.) */
     assert.match(코드, /blocked/, `${이름} 가 blocked 를 응답에 안 싣는다 — 앱이 큐를 못 멈춘다`);
   });
 }
@@ -214,8 +215,11 @@ test('시계여유 — SQL 정본과 events 글자 사본의 숫자가 같다', 
   assert.ok(글.includes(`agreed_at <= \${occurred_at}::timestamptz + make_interval(mins => ${시계여유_분})`),
     `events 의 시계 여유가 정본(${시계여유_분}분)과 갈렸다`);
 
-  /* 🔴 여유는 **앞 조건에만** — 철회 쪽에 붙으면 철회 뒤 그만큼 수집이 계속된다. */
-  assert.ok(!/revoked_at > \$\{occurred_at\}::timestamptz \+ make_interval/.test(글),
+  /* 🔴 여유는 **앞 조건에만** — 철회 쪽에 붙으면 철회 뒤 그만큼 수집이 계속된다.
+   *   부정 단언은 주석 걷은 판으로 — 걷기가 «먼저»다(납작이 줄바꿈을 접으면 `//` 를 못 걷는다). */
+  const 걷은글 = 코드만(함수('events'));
+  const 걷은납작 = 납작(걷은글);
+  assert.ok(!/revoked_at > \$\{occurred_at\}::timestamptz \+ make_interval/.test(걷은납작),
     '철회 조건에 여유가 붙었다 — 철회한 학생의 수집이 그만큼 더 통과한다');
 });
 
@@ -245,7 +249,8 @@ test('시계여유 — 「지금유효」 쪽에는 여유가 없다 (now() 끼�
   for (const [이름, 글] of [
     ['지금유효', 지금유효.toString()], ['지금유효술어', 지금유효술어], ['지금유효id식', 지금유효id식],
   ]) {
-    assert.ok(!/make_interval/.test(글),
+    /* `toString()` 은 정본 함수의 주석까지 담는다 — 부정 단언은 걷은 판으로(가드계수 ㉠). */
+    assert.ok(!/make_interval/.test(코드만(글)),
       `${이름} 에 시계 여유가 붙었다 — 두 시계가 없는 자리라 게이트만 느슨해진다`);
   }
 });

@@ -141,6 +141,28 @@ function 수신자들(노드) {
   return 모음;
 }
 
+/** 이 수신자가 «과녁 안 콜백의 매개변수»인가 — 파일 스코프 근사가 확실히 틀리는 자리.
+ *
+ * 🔴 [2026-08-14 · #Q70 ㉡ 실측] `r.오류들.some((m) => m.includes(…))` 의 `m` 은 런타임 값인데,
+ *   같은 파일 위쪽의 `const m = /…/.exec(원문)` 이 원문변수로 서 있으면 그 이름이 물들어
+ *   위험으로 셌다(`사건위조:101` 오탐). 매개변수는 파일 스코프가 아니라 그 함수의 것이고,
+ *   콜백으로 무엇이 흐르는지는 이 근사가 원리상 못 가른다 — 그래서 ❔모름으로 «드러낸다»
+ *   (위험으로 세면 처방이 「런타임 배열을 감싸라」가 되고, 따를 수 없는 처방은 우회를 낳는다 F103).
+ *   ⚠ 대가: 배열 원소가 진짜 파일 원문인 자리(`소스들.some((s) => …)`)도 모름으로 물러난다 —
+ *   미탐이 아니라 «모름»이라 분모에 남고, 그 방향이 「조용한 통과」보다 정직하다. */
+function 매개변수그늘(과녁, r) {
+  if (r.type !== 'Identifier') return false;
+  let 그늘 = false;
+  훑기(과녁, (fn) => {
+    if (!/Function/.test(fn.type) || !Array.isArray(fn.params)) return;
+    if (r.start < fn.start || r.end > fn.end) return;   // 그 함수 «안»에 있는 수신자만
+    for (const p of fn.params) {
+      훑기(p, (m) => { if (m.type === 'Identifier' && m.name === r.name) 그늘 = true; });
+    }
+  });
+  return 그늘;
+}
+
 /* ── 모양 어휘 × 축표 — 이 도구가 «같은 병»에 네 번 걸린 자리 (F414 뿌리) ──────────
  * 네 번 다 모양이 같았다: 한 축에서 «함수 모양»을 하나 배우고 **옆 축에 안 옮겼다**.
  *   1차 base64url 3벌 · 2차 「식도 사본이다」 · 3차 「별표는 주석이 아니다」 ·
@@ -340,12 +362,28 @@ function 내보내는생산자(파일) {
     try { ast = acorn.parse(소스, { ecmaVersion: 'latest', sourceType: 'script', allowReturnOutsideFunction: true }); }
     catch (_2) { return 결과; }   // ③ 못 읽으면 아무것도 안 더한다
   }
-  /* 그 파일 «자신의» 정제 통로 — 여기 없이 판정하면 ④ 가 깨진다. */
+  /* 그 파일 «자신의» 정제 통로 — 여기 없이 판정하면 ④ 가 깨진다.
+   * SQL 제거기도 넣는다 — ㉠축 별건 판정(08-14 · 재기 쪽 그 주석) 과 같은 판정 하나다. */
   const 정제함수 = new Set(['코드만', '구간']);
   훑기(ast, (n) => {
-    if (모양.함수선언(n) && 주석지우나(n) === 'js') 정제함수.add(n.id.name);
+    if (모양.함수선언(n) && 주석지우나(n)) 정제함수.add(n.id.name);
     if (n.type === 'VariableDeclarator' && n.id && n.id.type === 'Identifier'
-        && 주석제거기갈래(n.init) === 'js') 정제함수.add(n.id.name);
+        && 주석제거기갈래(n.init)) 정제함수.add(n.id.name);
+  });
+  /* 🔴 [2026-08-14 · ⑧회차 ㉠ 실측] 공용 통로를 «별칭으로 들여와 다시 내보내는» 파일 —
+   *   as `tools/실행층점검.js` 의 `const { 줄맞춰코드만: 주석지우기 } = require('…/소스검사.js')`.
+   *   이 인식이 없으면 그 재수출을 받은 소비자가 **통로 그 자체를 위험으로** 센다(같은 병 5차 —
+   *   「이 파일만 봤다」의 남은 반쪽: 들여온 파일 «안»의 들여옴). 재귀를 여는 것이 아니라
+   *   정본 통로 하나(경로에 «소스검사»)를 알아보는 것뿐이다 — main 루프의 그 판정과 같은 판정.
+   *   ⚠ 대가: 별칭이 «또 다른 이름으로» 재수출되면(`{ 지우개: 주석지우기 }`) 못 본다 — 실측 0건,
+   *   나오면 그때 수출층을 본다(지금 넓히면 못 재는 것을 재는 척이 된다). */
+  훑기(ast, (n) => {
+    if (n.type === 'VariableDeclarator' && n.id && n.id.type === 'ObjectPattern' && n.init
+        && n.init.type === 'CallExpression' && /소스검사/.test(소스.slice(n.init.start, n.init.end))) {
+      for (const p of n.id.properties) {
+        if (p.value && p.value.type === 'Identifier') { 정제함수.add(p.value.name); 결과.정제.add(p.value.name); }
+      }
+    }
   });
   /* 그 파일 «안»에서 읽기로 생긴 이름 — 반환식이 그것의 파생인지 보려면 필요하다. */
   const 원문변수 = new Set();
@@ -447,13 +485,25 @@ for (const 파일 of 파일들(뿌리)) {
   });
 
   /* 함수 «선언» 모양의 사본 — `function 주석없이(s) { return s.replace(…) }`.
-   * 08-13 실측: `tests/검수큐.test.js`·`tests/스폰통로.test.js` 가 이 모양이라 통째로 사각이었다. */
+   * 08-13 실측: `tests/검수큐.test.js`·`tests/스폰통로.test.js` 가 이 모양이라 통째로 사각이었다.
+   *
+   * 🔑 [2026-08-14 · #Q70 ㉠ 별건 판정] **SQL 제거기도 ㉠축(정제 경유)에서는 «정제»로 센다.**
+   *   ㉡축(사본 합치기)의 「언어가 달라 합치는 대상이 아니다」는 그대로다 — 두 축은 질문이 다르다:
+   *   ㉡는 「통로를 하나로 합칠 수 있나」, ㉠는 「이 부정 단언이 주석에 눈머나」. SQL 텍스트를 재는
+   *   단언이 SQL 제거기(`--`·`/* *​/`)를 지나면 주석에 안 먼다 — 그것을 위험으로 세면 처방이 없다
+   *   (JS 렉서 `코드만` 은 SQL `--` 를 모른다 · F103: 따를 수 없는 처방은 우회를 낳는다). 그리고
+   *   옳게 감쌌는데 숫자가 안 움직이면 「틀리게 감싸도 아무도 모른다」의 반대쪽 절반이 죽는다.
+   *   ⚠ 대가: 계수기는 주어의 «언어»를 모른다 — JS 원문을 SQL 제거기로 감싸도 안전으로 센다
+   *   (반대 방향 — sql`` 몸을 `코드만` 으로 감싼 자리 — 은 원래부터 그랬다). 센다, 판정하지 않는다.
+   *   ⚠ «식» 모양(`식사본변수`)은 이미 SQL 도 정제로 이어받고 있었다 — 이 판정은 함수 모양
+   *   둘(선언·값)과 들여온 생산자를 그 기존 동작에 «맞추는» 것이기도 하다(갈라진 판정 하나로). */
   훑기(ast, (n) => {
     if (!모양.함수선언(n)) return;
     const 갈래 = 주석지우나(n);
     if (!갈래) return;
     const 자리 = { 파일: 상대, 줄: 줄번호(n.start), 이름: n.id.name, 본문: 소스.slice(n.start, n.end).replace(/\s+/g, ' ').slice(0, 120) };
-    if (갈래 === 'js') { 정제함수.add(n.id.name); 결과.사본.push(자리); } else 결과.SQL사본.push(자리);
+    정제함수.add(n.id.name);
+    if (갈래 === 'js') 결과.사본.push(자리); else 결과.SQL사본.push(자리);
   });
 
   훑기(ast, (n) => {
@@ -461,7 +511,8 @@ for (const 파일 of 파일들(뿌리)) {
     const 갈래 = 주석제거기갈래(n.init);
     if (갈래) {
       const 자리 = { 파일: 상대, 줄: 줄번호(n.start), 이름: n.id.name, 본문: 소스.slice(n.init.start, n.init.end).replace(/\s+/g, ' ').slice(0, 120) };
-      if (갈래 === 'js') { 정제함수.add(n.id.name); 결과.사본.push(자리); } else 결과.SQL사본.push(자리);
+      정제함수.add(n.id.name);   // SQL 도 ㉠축에선 정제다 — 위 별건 판정(08-14) 그대로
+      if (갈래 === 'js') 결과.사본.push(자리); else 결과.SQL사본.push(자리);
       return;
     }
     /* 🔴 «식» 모양의 사본 — `const 주석뺀소스 = 소스.replace(/\/\*…/g, ' ')…`.
@@ -610,6 +661,8 @@ for (const 파일 of 파일들(뿌리)) {
     for (const r of 받는것) {
       if (r.type === 'Literal' || r.type === 'TemplateLiteral') continue; // 상수를 재는 단언 — 이 축이 아니다
       if (r.type === 'Identifier') {
+        /* 콜백 매개변수가 파일 스코프의 같은 이름을 그늘지게 한다 — 런타임 값이라 못 가른다(위 헬퍼). */
+        if (매개변수그늘(과녁, r)) { 모름닿음 = true; continue; }
         if (구조변수.has(r.name)) continue;            // JSON 구조 — 이 축이 아니다
         if (모호변수.has(r.name)) { 모름닿음 = true; continue; }  // 같은 이름이 두 뜻 — 못 갈랐다
         if (정제변수.has(r.name)) { 정제닿음 = true; continue; }
