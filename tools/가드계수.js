@@ -141,6 +141,65 @@ function 수신자들(노드) {
   return 모음;
 }
 
+/* ── 모양 어휘 × 축표 — 이 도구가 «같은 병»에 네 번 걸린 자리 (F414 뿌리) ──────────
+ * 네 번 다 모양이 같았다: 한 축에서 «함수 모양»을 하나 배우고 **옆 축에 안 옮겼다**.
+ *   1차 base64url 3벌 · 2차 「식도 사본이다」 · 3차 「별표는 주석이 아니다」 ·
+ *   4차 「함수 «선언»형 원문 생산자」(㉡에서 08-13 에 고쳐 놓고 ㉠엔 08-14 까지 안 옮겼다).
+ * 앞의 처방은 매번 «그 축»만 고쳤다. 그래서 뿌리가 한 겹 위에 남았다 — 옮겼는지를
+ * **사람이 기억**해야 했다. 여기서 그걸 기계로 내린다:
+ *   ① 모양은 `모양` 에서만 열거한다(축이 손으로 `n.type === '…'` 를 쓰지 않는다).
+ *   ② 축은 «어느 모양을 받는지»를 `축표` 에 적는다 — ✗ 는 **사유가 필수**다.
+ *   ③ 어휘에 새 모양을 더하면 축표의 모든 축에 빈 칸이 생겨 회귀가 적색이 된다.
+ *      즉 새 모양을 들이는 사람은 **축마다 「이 축은 어떤가」를 대답해야** 통과한다.
+ * 발동 조건은 `tests/가드계수축표.test.js` 가 진다(장치와 발동을 같은 커밋에).
+ *
+ * ⚠ 대가(틀릴 때의 모습 — 안 도는 쪽보다 이쪽으로 더 자주 샌다):
+ *   ㉠ 어휘를 **안 거치고** 손으로 타입을 비교하면 그 자리는 축표에도 안 서고 회귀도 못 본다.
+ *      → 그래서 회귀가 이 파일 안의 raw 타입 비교를 **금지**한다(옛 통로 차단).
+ *      단 금지는 **이 파일 안에서만**이다 — 다른 도구의 같은 글자까지 막으면 따를 수 없는
+ *      처방이 되고, 따를 수 없는 처방은 우회를 정상 통로로 만든다(F103).
+ *   ㉡ 타입 이름을 변수에 담아 비교하면(`const T = 'FunctionDeclaration'; n.type === T`)
+ *      회귀의 눈이 멀고 «통과»로 샌다. 이건 미탐을 택한 것이다 — 막으려면 파일 전체를
+ *      상수 전개해야 하는데 그 비용이 이 장치가 막는 병보다 크다.
+ *   ㉢ 축표는 **받는지 여부**만 말한다. 그 축이 그 모양을 «옳게» 판정하는지는 안 본다
+ *      (그건 탐지력 픽스처 몫이다 — 표가 초록인데 판정이 틀릴 수 있다).
+ *
+ * 🔑 `VariableDeclarator` 는 이 어휘에 없다 — 그건 «담는 그릇»이지 함수 모양이 아니고,
+ *    모양을 안 가리고 전부 받는 자리(③ 변수 축·모호변수)에도 그대로 쓰인다. 어휘에 넣으면
+ *    표가 「모양을 가리는 축」과 「안 가리는 축」을 같은 칸으로 뭉개 뜻을 잃는다. */
+const 모양 = {
+  함수선언: (n) => (n && n.type === 'FunctionDeclaration' && n.id ? n : null),
+  화살표:   (n) => (n && n.type === 'ArrowFunctionExpression' ? n : null),
+  함수식:   (n) => (n && n.type === 'FunctionExpression' ? n : null),
+  /* 함수가 아니라 «값» — `const 주석뺀소스 = 소스.replace(…)`. 2차에 ㉡이 배운 모양이다. */
+  식:       (n) => (n && n.type !== 'ArrowFunctionExpression' && n.type !== 'FunctionExpression' ? n : null),
+};
+/** 화살표 ∪ 함수식 — 「변수에 담긴 함수」. 파생이라 축표의 칸이 아니다(둘이 이미 칸이다). */
+모양.함수값 = (n) => 모양.화살표(n) || 모양.함수식(n);
+
+/** 축 × 모양 — `[받는가, 사유]`. ✗ 는 사유가 **비면 회귀가 적색**이다.
+ *  ✓ 의 사유는 비어도 된다(받는 것은 설명이 필요 없다 — 안 받는 것만 설명이 필요하다). */
+const 축표 = {
+  '㉡사본': {
+    함수선언: [true, '`function 주석없이(s){ return s.replace(…) }` — 08-13 2차에 여기서 배웠다'],
+    화살표:   [true, ''],
+    함수식:   [true, ''],
+    식:       [true, '`const 주석뺀소스 = 소스.replace(…)` — 함수가 아니라 값인 사본(2차)'],
+  },
+  '㉠원문생산자': {
+    함수선언: [true, '③-b — 08-14 4차에 ㉡에서 **옮겨 온** 모양이다(이 표가 막으려는 바로 그 누락)'],
+    화살표:   [true, ''],
+    함수식:   [true, ''],
+    식:       [false, '식은 «생산자»가 아니라 값이다 — 모양을 안 가리는 ③ 변수 축이 그대로 받는다(중복 판정 금지)'],
+  },
+  '내보내는생산자': {
+    함수선언: [true, ''],
+    화살표:   [true, ''],
+    함수식:   [true, ''],
+    식:       [false, '내보낸 «값»은 호출부에서 함수로 안 쓰인다 — 미탐을 택했다(값을 생산자로 세면 모듈 객체를 오분류한다 · F414 첫 처방이 낸 오탐 3건이 그 모양이었다)'],
+  },
+};
+
 /* ── ㉡ 주석 제거기 사본 판별 ─────────────────────────────────────────────────
  * 🔴 첫 판이 급조 계수기와 «같은 병»에 걸렸다 (2026-08-13 실측): 함수 본문을 글자로 훑어
  *   `\/` 가 보이면 셌더니 base64url 인코더(`.replace(/\//g,'_')`)가 3벌 섞여 들어왔다.
@@ -197,7 +256,7 @@ function 주석지우나(노드) {
  *   👉 이제 세 모양을 다 본다: 화살표·함수식(여기) · 함수선언 · **식**(아래 `식사본`).
  */
 function 주석제거기갈래(init) {
-  if (!init || (init.type !== 'ArrowFunctionExpression' && init.type !== 'FunctionExpression')) return null;
+  if (!init || !모양.함수값(init)) return null;
   return 주석지우나(init);
 }
 
@@ -284,7 +343,7 @@ function 내보내는생산자(파일) {
   /* 그 파일 «자신의» 정제 통로 — 여기 없이 판정하면 ④ 가 깨진다. */
   const 정제함수 = new Set(['코드만', '구간']);
   훑기(ast, (n) => {
-    if (n.type === 'FunctionDeclaration' && n.id && 주석지우나(n) === 'js') 정제함수.add(n.id.name);
+    if (모양.함수선언(n) && 주석지우나(n) === 'js') 정제함수.add(n.id.name);
     if (n.type === 'VariableDeclarator' && n.id && n.id.type === 'Identifier'
         && 주석제거기갈래(n.init) === 'js') 정제함수.add(n.id.name);
   });
@@ -305,9 +364,9 @@ function 내보내는생산자(파일) {
     if (돌려주는것.some((r) => 원문글인가(r, 원문변수, 빈함수))) 결과.원문.add(nm);
   };
   훑기(ast, (n) => {
-    if (n.type === 'FunctionDeclaration' && n.id) 판정(n, n.id.name);
-    else if (n.type === 'VariableDeclarator' && n.id && n.id.type === 'Identifier' && n.init
-             && (n.init.type === 'ArrowFunctionExpression' || n.init.type === 'FunctionExpression')) 판정(n.init, n.id.name);
+    if (모양.함수선언(n)) 판정(n, n.id.name);
+    else if (n.type === 'VariableDeclarator' && n.id && n.id.type === 'Identifier'
+             && 모양.함수값(n.init)) 판정(n.init, n.id.name);
   });
   return 결과;
 }
@@ -390,7 +449,7 @@ for (const 파일 of 파일들(뿌리)) {
   /* 함수 «선언» 모양의 사본 — `function 주석없이(s) { return s.replace(…) }`.
    * 08-13 실측: `tests/검수큐.test.js`·`tests/스폰통로.test.js` 가 이 모양이라 통째로 사각이었다. */
   훑기(ast, (n) => {
-    if (n.type !== 'FunctionDeclaration' || !n.id) return;
+    if (!모양.함수선언(n)) return;
     const 갈래 = 주석지우나(n);
     if (!갈래) return;
     const 자리 = { 파일: 상대, 줄: 줄번호(n.start), 이름: n.id.name, 본문: 소스.slice(n.start, n.end).replace(/\s+/g, ' ').slice(0, 120) };
@@ -409,7 +468,7 @@ for (const 파일 of 파일들(뿌리)) {
      *   함수가 아니라 **값**이라 위 갈래에 안 걸렸다(이 도구의 사각 · 머리말 2차 실측).
      *   여기서 잡아 두면 아래 ③ 이 이 이름을 «정제변수»로 이어받는다 — 그 자리들은
      *   원문을 직접 재는 것이 «아니»므로 위험이 아니고, 그러나 **사본이므로 보고된다.** */
-    if (n.init && n.init.type !== 'ArrowFunctionExpression' && n.init.type !== 'FunctionExpression') {
+    if (모양.식(n.init)) {
       const 식갈래 = 주석지우나(n.init);
       if (식갈래) {
         const 자리 = { 파일: 상대, 줄: 줄번호(n.start), 이름: n.id.name, 본문: 소스.slice(n.init.start, n.init.end).replace(/\s+/g, ' ').slice(0, 120) };
@@ -418,7 +477,7 @@ for (const 파일 of 파일들(뿌리)) {
         return;
       }
     }
-    if ((n.init && (n.init.type === 'ArrowFunctionExpression' || n.init.type === 'FunctionExpression')) && 읽기가있나(n.init, 원문함수)) {
+    if (모양.함수값(n.init) && 읽기가있나(n.init, 원문함수)) {
       /* ⚠ 읽기만으로 「원문 생산자」라 부르면 `() => 코드만(readFileSync(...))` 를 오분류한다 —
        *   그 함수가 내주는 것은 이미 정제된 글이다(실측 08-13: 사본을 공용으로 돌린 직후
        *   위험이 67→69 로 «올라갔다». 코드가 좋아졌는데 숫자가 나빠지면 계수기가 틀린 것이다). */
@@ -455,7 +514,7 @@ for (const 파일 of 파일들(뿌리)) {
      * ⚠ 루프 «안»이라야 한다 — `section` 이 원문인지는 `code` 가 원문변수로 선 뒤에야 안다.
      *   밖에 두면 선언 순서에 기대게 되고, 그 기대는 파일마다 다르게 깨진다. */
     훑기(ast, (n) => {
-      if (n.type !== 'FunctionDeclaration' || !n.id) return;
+      if (!모양.함수선언(n)) return;
       const nm = n.id.name;
       if (정제함수.has(nm) || 원문함수.has(nm)) return;
       const 돌려주는것 = 제반환식(n);
@@ -579,7 +638,9 @@ for (const 파일 of 파일들(뿌리)) {
 return 결과;
 }
 
-module.exports = { 재기, 잴수있나 };
+/* `모양`·`축표` 를 내주는 이유는 하나다 — `tests/가드계수축표.test.js` 가 **표와 실물을
+ * 대조**해야 하기 때문이다(표만 있고 아무도 안 읽으면 그건 프로즈다 · F414 뿌리). */
+module.exports = { 재기, 잴수있나, 모양, 축표 };
 
 if (require.main !== module) return;
 
