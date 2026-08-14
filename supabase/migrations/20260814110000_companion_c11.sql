@@ -1,11 +1,135 @@
--- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
+-- companion 빈칸 로그의 물리 — 마스코트 배선 §7 1단계 서버층 조각
 --
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 정본 = talk `docs/컴패니언_내부계약.md` §4 (사슬: appsscript `마스코트_말할순간_설계.md` v1.1 →
+--   `마스코트_배선_설계.md` v1 → 그 계약). 강사가 마스코트에게 묻고, 마스코트가 동봉된 학원
+--   문서로 답하거나 원장에게 넘긴다 — 이 조각은 그 **묻고 답한 것이 남는 자리**를 세운다.
+--
+-- ■ 🔴 왜 새 표인가 — `staff_access_log` 를 안 넓힌다
+--   실측: `engine.staff_access_log` 는 `(action, target_ids)` 뿐이라 질문·답·출처를 못 싣는다.
+--   배선 §1 의 「새 테이블 0」은 **발화 기록·수집**에 대한 계약이었고(학생 사건은 기존 표로 간다),
+--   B층 빈칸 로그는 그 표가 애초에 자리를 안 팠다. 억지로 넓히면 감사표가 두 일을 하게 되고,
+--   그 표는 지금 다섯 문이 공유한다 — 한 문의 사정으로 넓힌 열은 나머지 넷에게 영원히 null 이다.
+--
+-- ■ 🔴 이 표가 **산출물**이다 (배선 §4 「Fn 이 자기 감사로 남긴다」의 실물)
+--   「출처 0 으로 답한 질문」과 「인계한 질문」이 곧 «문서에 아직 없는 것»의 목록이다.
+--   그래서 companion Fn 은 qa 행과 감사 행을 **한 트랜잭션**에 쓰고, 못 쓰면 답도 안 낸다 —
+--   나누면 답은 나갔는데 목록엔 없는 질문이 생기고, 그 손실은 증상이 없다
+--   (「그 질문은 안 왔다」와 「로그가 실패했다」가 같은 모양으로 보인다).
+--
+-- ■ append-only 인 이유 — 개서까지 막는다(`teacher_notes` 와 갈린다)
+--   한 마디는 사람이 쓴 글이라 고치는 것이 정상 통로였다(그래서 삭제만 막았다). 여기는 반대다:
+--   이 표는 **그때 모델이 뭐라고 답했나**의 기록이고, 고칠 수 있으면 「그날 뭐라고 답했길래
+--   강사가 그렇게 말했나」를 영원히 못 묻는다. 고칠 것이 있으면 새로 물어 새 행을 쌓는다.
+--
+-- ■ 정책 0 — 아무 토큰에게도 안 연다 (감사표 선례)
+--   여기엔 강사가 **자기 말로 쓴 질문**이 그대로 앉는다. 강사가 학생 이름을 적어 물어도 우리는
+--   막을 수 없다(강사의 입력이다) — 우리가 «더하는» 식별자가 0인 것까지가 ㉣의 이 층 몫이고,
+--   그 위에 「아무도 못 읽는다」를 하나 더 얹는다. 원장이 읽는 통로는 2단계가 낸다.
+--
+-- ■ 채우는 코드는 이 조각에 0줄이다 — 정직 표기
+--   생산자 = talk `supabase/functions/companion`(같은 커밋). 🔴 운영 붓기는 기존 c11 조각들과
+--   **같은 ⏳유호님 승인 자리**에 얹힌다 — 그 전까지 운영·리허설 어디에도 미적용이고 이 표는
+--   어디에도 없다. 「판이 섰다」를 「마스코트가 답한다」로 읽지 않는다.
+--
+-- 되돌림:
+--   drop trigger if exists companion_qa_immutable on engine.companion_qa;
+--   drop table if exists engine.companion_qa;
+--   delete from engine.schema_migrations where version = '20260814110000';
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260814110000';
+  migration_name constant text := '20260814110000_companion_c11.sql';
+  expected_checksum constant text := '0502ada7ba7490044cea9874dcf8a58b395bd7e3e9d02a729269da805dee10fd'; -- migration-checksum
+  base_version constant text := '20260814100000';
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 c11 위에서만 돈다 — engine.schema_migrations가 없다(빈 DB면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      '이 조각은 기준선 % 위에서만 돈다 — 이력에 그 판이 없다(부분·혼합·불명이라 중단한다)',
+      base_version;
+  end if;
+
+  if to_regclass('engine.staff') is null then
+    raise exception
+      'engine.staff 가 없다 — 이 로그의 주체는 직원이다(20260806234000_staff_c7 이 먼저 서야 한다)';
+  end if;
+
+  -- 강사가 마스코트에게 물은 것과 받은 답. 한 질문 = 한 행.
+  --   `answer` 가 빈 문자열이면 **인계**다(계약 §2: reply 빈 문자열 = 인계).
+  --   `cited_refs` 는 Fn 이 동봉 문서명 화이트리스트로 거른 뒤의 값이다 — 목록 밖 이름은
+  --   여기 도착하기 전에 버려진다. 그래서 이 열은 「모델이 주장한 출처」가 아니라 「실재하는 출처」다.
+  create table if not exists engine.companion_qa (
+    qa_id          uuid primary key default gen_random_uuid(),
+    staff_id       uuid not null references engine.staff(staff_id),
+    at             timestamptz not null default now(),
+    -- 강사가 보고 있던 앱 화면 이름. 맥락일 뿐이라 없어도 된다(자유 문자열 · 계약 §2).
+    screen         text,
+    question       text not null constraint companion_qa_question_nonblank_c11
+                     check (btrim(question) <> ''),
+    -- 빈 문자열 = 인계. null 이 아니라 빈 문자열인 이유: 「답이 없다」와 「칸을 안 썼다」를
+    --   가르지 않으려는 것이다 — 이 표에서 그 둘은 같은 사건이고, 갈래를 늘리면 소비자가 둘 다 본다.
+    answer         text not null default '',
+    cited_refs     text[] not null default '{}',
+    handoff        boolean not null,
+    handoff_reason text,
+    -- 어느 모델·어느 프롬프트판이 낸 답인가. 없으면 「그때 왜 그렇게 답했나」를 소급 못 한다.
+    model          text not null,
+    prompt_ver     text not null,
+    -- 🔴 답도 인계도 없는 행을 막는다 — 그건 「답한 척」이 로그로 남는 자리다.
+    --   빈칸 발견기가 이 표를 세는데, 그 행이 섞이면 분모가 조용히 오염된다.
+    constraint companion_qa_answer_paired_c11 check (handoff or btrim(answer) <> '')
+  );
+
+  comment on table engine.companion_qa is
+    '강사가 마스코트에게 물은 것과 받은 답(컴패니언_내부계약 §4). 「출처 0으로 답한 질문」·「인계한 질문」이 문서 일감 큐의 재료다. 🚫학생 사건 아님 — learning_events 로 안 간다.';
+
+  -- 「이번 주 넘어간 질문」·「출처 0인 질문」이 이 인덱스를 탄다(빈칸 발견기의 조회 모양).
+  create index if not exists companion_qa_handoff_at
+    on engine.companion_qa (handoff, at);
+
+  -- append-only. 고칠 수 있으면 「그날 뭐라고 답했나」를 영원히 못 묻는다(머리말 참조).
+  drop trigger if exists companion_qa_immutable on engine.companion_qa;
+  create trigger companion_qa_immutable
+    before update or delete on engine.companion_qa
+    for each row execute function engine.reject_mutation();
+
+  -- engine 취급 그대로 — RLS 켜고 정책 0(전면 거부) · service_role 만 쓰기 · PostgREST 비노출.
+  -- 나중에 노출하는 날 잊어도 **닫힌 채로 실패한다**.
+  alter table engine.companion_qa enable row level security;
+
+  insert into engine.schema_migrations(version, name, checksum)
+  values (migration_version, migration_name, expected_checksum);
+end
+$migration$;
+
+commit;
+
 -- ============================================================================
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
+-- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -330,3 +454,42 @@ select case when 테이블수=18 and RLS켜짐=18 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
 from 셈;
+*/
+
+-- 확인
+-- ⓪ 🔴 **순서** — 이 조각은 `20260814100000` «뒤»에만 선다(base_version). 앞의 c11 조각들과
+--    `roster-ingest` 신판이 아직 유호님 승인 대기라, 이 조각도 **같은 승인에 얹혀** 부어진다.
+--    먼저 부으면 base_version 검사가 「이력에 그 판이 없다」로 중단시킨다(안전 방향).
+-- ① 표 **+1**(`companion_qa`) · 뷰 0 · 열 0(기존 표는 안 건드린다) · 트리거 **+1**
+--    (`companion_qa_immutable`) · RLS **+1**(새 표 · 정책 0·grant 0 이라 닫힌 채로 태어난다 —
+--    `새는테이블권한` 이 열리는 날 빨개진다).
+-- ② 새 칸 둘 = `컴패니언열`(11) · `컴패니언정책`(0). 열을 **수로** 재는 이유는 「덜 넓힌 판」과
+--    「안 선 판」이 존재 검사에서 같은 모양이기 때문이다(반 모드 판의 그 사유 그대로).
+--    정책을 따로 세는 이유는 다르다 — 이 표는 감사표 선례로 **아무 토큰에게도 안 여는 것**이
+--    설계인데, `정책수=7` 은 전체 합이라 여기에 하나 붙고 다른 데서 하나 빠지면 상쇄된다.
+-- ③ 이 조각은 **행을 하나도 안 만든다**. 채우는 것은 `functions/companion`(같은 커밋)이고,
+--    그 Fn 은 운영 재배포 ⏳유호님 승인 자리다 — 지금 0행이 정상이다.
+--    「판이 섰다」를 「마스코트가 답한다」로 읽지 않는다.
+-- ④ 🔴 아직 **없는 것** — 원장이 이 목록을 읽는 통로(빈칸 목록 화면·주간 수확)는 2단계다.
+--    그래서 계약 §6 의 ④ 게이트는 이 커밋 시점에 **✓✗✗** 가 정직한 표기다
+--    (모였나 ✓ = 적재 배선이 섰다 / 닿았나 ✗ / 늘었나 ✗).
+-- ⑤ CHECK 제약은 현행 접미사만 남아야 한다(이 조각이 c11 CHECK 둘을 더한다).
+--    ⚠ 이 줄은 **마지막 조각**이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    ⚠ `teacher_notes_once_c11`·`companion_qa_*_fkey` 는 여기 없다 — UNIQUE·FK 라 CHECK 목록의
+--      대상이 아니다(기대제약 목록에는 FK 도 들어가지만 이 줄은 CHECK 만 센다).
+--    기대: broadcast_segment_kind_c11 · classes_key_nonblank_c11
+--         · companion_qa_answer_paired_c11 · companion_qa_question_nonblank_c11
+--         · corrections_promotion_intent_c11
+--         · corrections_supersedes_not_self_c11 · corrections_verdict_c11
+--         · learners_gender_c11 · learners_goal_track_c11 · learners_group_no_c11
+--         · learners_home_aimag_c11 · learners_seat_no_c11
+--         · learners_signup_attempts_nonneg_c11 · learners_temp_password_paired_c11
+--         · learning_events_correction_target_c11 · learning_events_event_type_c11
+--         · learning_events_task_type_c11 · pipeline_jobs_discard_reason_c11
+--         · season_compass_answers_c11 · season_dates_c11
+--         · season_review_decided_c11 · season_review_self_c11 · season_review_verdict_c11
+--         · staff_role_c11 · submissions_due_paired_c11 · submissions_task_format_c11
+--         · submissions_translation_source_c11 · teacher_notes_body_nonblank_c11
+--         · teacher_notes_disposition_c11 · teacher_notes_origin_c11
