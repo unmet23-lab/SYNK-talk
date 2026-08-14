@@ -108,8 +108,13 @@ async function 노출수읽기(): Promise<Record<string, number>> {
  *   `라디오편성.승격요약` 하나가 지고, 여기는 재료만 걷는다.
  */
 async function 승격행걷기(창일수: number) {
+  /* ⚠ `occurred_at` 은 **ISO 문자열로** 받는다 — 드라이버가 timestamptz 를 JS Date 로 주면
+   * `승격요약` 의 `Date.parse(행.occurred_at)` 이 ToString 을 거치며 **ms 를 조용히 깎는다**
+   * (실측: .123 → .000). 창 경계에서만 드러나는 어긋남이라 증상이 거의 없다 — 그래서 문다.
+   * (`radio-promote` 가 커서 sent_at 을 text 로 받는 것과 같은 계열의 처방이다.) */
   return await sql`
-    select e.occurred_at, e.task_type, e.skill_ids, e.payload, s.task_snapshot
+    select to_char(e.occurred_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as occurred_at,
+           e.task_type, e.skill_ids, e.payload, s.task_snapshot
       from engine.learning_events e
       join engine.submissions s on s.event_id = e.event_id
      where e.event_type = 'quiz.answered' and e.task_type = ${퀴즈통로}
@@ -204,10 +209,13 @@ Deno.serve(async (req) => {
     /* 멱등 — 같은 제안표의 행이 이미 있으면 그것을 돌려준다. `where not exists` 를 insert 와
      * **한 문장**에 두어 왕복 사이의 창을 없앤다(그래도 유일 인덱스가 아니라 동시 두 건이면
      * 둘 다 앉는다 — 잔여로 적었다). */
+    /* 🔴 `insert … select` 의 매개변수는 **전부 명시 캐스트**다. `values` 절과 달리 대상 열
+     * 타입이 추론에 항상 닿는다고 볼 수 없고, 어긋나면 그 실패는 **첫 호출에서만** 난다
+     * (배포는 성공한다 — 이 저장소가 반복해 겪은 그 모양). */
     const 넣기 = await sql`
       insert into radio.quiz_round (task_ref, task_snapshot, shown_at, retry_of_round_id, schema_ver)
-      select ${해석.task_ref}, ${sql.json(해석.스냅샷)}, ${해석.shown_at}::timestamptz,
-             ${해석.부모round_id}::bigint, ${ver}
+      select ${해석.task_ref}::text, ${sql.json(해석.스냅샷)}::jsonb, ${해석.shown_at}::timestamptz,
+             ${해석.부모round_id}::bigint, ${ver}::text
        where not exists (
          select 1 from radio.quiz_round where task_snapshot->>'제안id' = ${String(몸.제안id)})
       returning round_id, shown_at`;
