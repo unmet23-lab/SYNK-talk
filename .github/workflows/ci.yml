@@ -13,9 +13,17 @@ name: CI
 #    즉 push 마다 크레딧을 태우면서 아무도 안 읽는 답을 만들고 있었다. 필요할 때 부른다:
 #      gh workflow run CI --repo unmet23-lab/SYNK-talk   (또는 Actions 탭 → Run workflow)
 #    ⚠ 되돌리려면 build 의 `if:` 한 줄만 지우면 된다.
+# ⏸ 2026-08-14: `push:` 트리거 일시 중지 (복원 줄 = appsscript 대기열 #Q77 · 지도 github-actions-billing-outage).
+#    Actions 3,000분 소진(리셋 9/1 · 유호 「돈 안 쓴다」 08-09) — 소진 상태에선 run 이 기동 없이
+#    실패하며 실패 알림만 하루 ~16통 나간다(텔레그램 답 수거를 죽이던 자리). 분을 태운 주범이
+#    이 저장소 supabase job 이다(push 마다 Docker Postgres · 9일에 3,000분 ≈ 하루 330분).
+#    복원할 때 supabase job 에 경로 조건(supabase/ · tools/검증_마이그레이션.sh · tests/supabase/)을
+#    **한 벌로** 붙인다 — 그래야 리셋 뒤 3,000분이 오래 간다. 그동안 원격 확인이 필요하면:
+#      gh workflow run CI --repo unmet23-lab/SYNK-talk
+#    ⚠ 이 중지가 틀릴 때의 모습: 복원을 잊으면 「push 해도 CI 0건」이 정상 얼굴로 굳는다 — 그래서 #Q77.
 on:
-  push:
-    branches: [master]
+  # push:                ← ⏸ 리셋(9/1) 뒤 되살린다 (#Q77 · supabase 경로 조건과 한 벌)
+  #   branches: [master]
   pull_request:
   workflow_dispatch:
 
