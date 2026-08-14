@@ -26,6 +26,7 @@ const API = 'https://api.supabase.com/v1/projects';
 
 const 자격증명 = require('../lib/자격증명.js');   // .env 읽기 + 토큰 만료 게이트(공용 통로)
 const { 공용플래그, 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
+const 배포빚 = require('./배포빚.js');   // 배포 도장 — 「이 HEAD 가 이 판에 실렸다」를 남긴다(F455)
 
 /* 이 도구가 아는 낱말 — `공용플래그`(=`--운영`)는 어느 도구에서든 뜻을 가지므로 펴 넣는다.
  * 빠뜨리면 되던 명령이 죽는다(F103) — `tests/플래그게이트.test.js` 가 소스 전량과 대조한다. */
@@ -255,6 +256,15 @@ function 배포묶음(디렉터리, 파일검사 = 미커밋검사) {
   return Object.assign(out, 동봉묶기(디렉터리, 파일검사));
 }
 
+/** 배포 성공 → 장부에 남길 줄(못 가르면 `null`). **순수 함수**다 — 네트워크 자리에 판정을 적으면
+ *  회귀가 못 닿고, 못 닿는 판정은 조용히 갈린다(이 파일이 `동봉묶기` 에서 이미 겪은 자리).
+ *  🔑 head 를 **인자로** 받는다: 안에서 읽으면 회귀가 그날 저장소 상태에 끌려간다. */
+function 도장거리(f, ref, 운영REF, head) {
+  const 판 = 배포빚.판이름(ref, 운영REF);
+  if (!판 || !f || !f.slug || !head) return null;
+  return { 판, 함수: f.slug, head, 출처: '배포', 판번호: f.version || null };
+}
+
 /** 이 함수의 **나갈 파일 전량**을 마지막으로 바꾼 커밋 시각(ISO) — 없으면 null.
  *  본체는 바이트로 대조할 수 없어서(배포 시 TS 가 벗겨진다) 시각 축이 대신 진다 · `배포대조.시각뒤처짐`. */
 function 마지막커밋(디렉터리) {
@@ -439,9 +449,18 @@ async function main() {
   const f = JSON.parse(본문);
   console.log(`[원격배포] ✅ ${f.slug} v${f.version} ${f.status} — 파일 ${상대들.length}개`);
   console.log(`   URL https://${ref}.supabase.co/functions/v1/${f.slug}`);
+
+  /* 🔑 **도장은 배포와 같은 걸음이다**(F455). 나갈 것을 HEAD 에서 읽는다는 이 파일의 규약이
+   *   곧 「이 HEAD 가 이 판에 실렸다」는 뜻이므로, 그 사실을 여기 말고 적을 자리가 없다.
+   *   나중에 손으로 적게 하면 그건 사람이 누르는 칸이 하나 느는 것이고(철학 ㉡),
+   *   실제로 F455 는 그 칸이 «없어서»가 아니라 «stdout 에만 있어서» 났다.
+   * ⚠ 실패해도 배포를 흔들지 않는다 — 이건 알림 장부지 가드가 아니다. */
+  const 거리 = 도장거리(f, ref, 자격증명.운영REF, 배포빚.지금HEAD());
+  if (거리) 배포빚.도장(거리);
+  else console.error('[원격배포] ⚠ 과녁 ref 를 판 이름으로 못 갈랐다 — 배포빚 장부에 안 적었다.');
 }
 
 /* `require풀기` 는 회귀 이음매다 — `동봉묶기` 는 HEAD 에서 읽어(git show) 픽스처 소스를 못
  * 먹이므로, 재작성 규칙(상위 경로 포함)의 탐지력은 이 함수를 직접 태워 잰다. */
-module.exports = { 파일들, 동봉읽기, 동봉목록, 동봉묶기, 배포묶음, 마지막커밋, 작업본다름, 저장소판, 판뒤처짐, require풀기, REQUIRE문 };
+module.exports = { 파일들, 동봉읽기, 동봉목록, 동봉묶기, 배포묶음, 마지막커밋, 도장거리, 작업본다름, 저장소판, 판뒤처짐, require풀기, REQUIRE문 };
 if (require.main === module) main().catch((err) => die(String(err && err.message || err)));
