@@ -39,6 +39,9 @@ const { 정규형, 이메일, 비밀번호 } = require('../lib/로그인코드.j
 const { 지금유효id식 } = require('../lib/동의게이트.js');   // 동의 귀속 — 술어를 여기 다시 적지 않는다
 // --새학생 이 쓰는 통로. 로그인 코드 계정과 **다른 이메일 규칙**이라 정본에서 따로 가져온다.
 const { 이메일: 학생이메일 } = require('../lib/학생계정.js');
+/* ⑰ 이 쓰는 조립기 — 화면이 쓰는 **그 파일**을 그대로 태운다(흉내를 지으면 흉내가
+ * 계약보다 착해져 초록이 거짓이 된다 · 「가짜 시트가 라이브보다 착했다」와 같은 축). */
+const { 차원들, 보기세우기, 선택payload } = require('../lib/선택로그.js');
 const { execFileSync } = require('child_process');
 
 /* --새학생 픽스처. 인증왕복시험과 같은 모양을 쓰되 번호만 매 회차 새로 딴다 —
@@ -550,6 +553,78 @@ async function main() {
   확인(`끊겼다 다시 올려도 다섯 다 duplicate 로 접힌다 (${접힘}/5)`, 접힘 === 5, 재전송);
   확인('그래도 행 수는 다섯이다',
     (await sql(`select count(*)::int n from engine.learning_events where idempotency_key in (${키목록})`))[0].n === 5);
+
+  /* ── ⑰ S1-5 「골라서 답하기」 — 성향 축 ⑤의 **유일한 입구**가 실제 DB 로 열려 있나
+   * 🔴 왜 왕복이어야 하나: 이 화면은 고정 보기 2개라 **아무것도 안 민다** — `recommended_option`
+   *   이 늘 `null` 이다. 그 칸을 값으로 재던 시절엔 이 사건이 **한 건도** 계약을 못 지났고,
+   *   그동안 파일 층 검사는 전부 초록이었다(화면을 다 지어도 행이 0 · 2026-08-10). 그 판정은
+   *   서버 검증기 **안에서만** 성립하니 코드를 읽어서는 아무것도 증명되지 않는다.
+   * 🔑 「안 골랐다」 두 갈래(`skipped`·`rejected_all`)도 같은 이유로 여기서 잰다 — 성향 축에서
+   *   「무관심」과 「뚜렷한 거절」은 정반대 신호인데 `position` 이 값 필수이던 동안 둘 다 통로가
+   *   0이었다. 열렸다는 것은 **행이 앉는 것**으로만 증명된다.
+   * 🔑 가드가 사라진 게 아니라 자리를 옮겼다는 것까지 잰다(아래 ㄹ·ㅁ) — 「열렸다」만 재고
+   *   「그래도 막는다」를 안 재면, 다음에 누가 널을 넓혀도 이 시험은 초록이다. */
+  console.log('\n⑰ 선택 사건 — 성향 축 ⑤ 입구 (S1-5)');
+  const S1보기 = 보기세우기(
+    [{ option_id: 'cs1', label: '오늘 하루 어땠어요?' }, { option_id: 'cs2', label: '어제 뭐 했어요?' }],
+    null,   // S1-5 는 아무것도 밀지 않는다 — 없는 추천을 지어 넣지 않는다
+  );
+  확인('조립기가 보기를 세웠고 추천은 null 이다', !!S1보기 && S1보기.recommended_option === null, S1보기);
+
+  const 선택사건 = (p = {}, 덮기 = {}) => ({
+    idempotency_key: crypto.randomUUID(),
+    event_type: 'choice.selected',
+    task_type: '숙제제출',
+    occurred_at: new Date().toISOString(),
+    level_snapshot: 'Lv3',
+    correlation_id: crypto.randomUUID(),
+    payload: { ver: 1, ...선택payload({ 차원: 차원들.도입평일, 보기: S1보기, ...p }) },
+    ...덮기,
+  });
+  const 저장됐나 = async (ev) =>
+    (await sql(`select count(*)::int n from engine.learning_events
+                 where idempotency_key='${ev.idempotency_key}'`))[0].n;
+
+  // ㄱ 밀지 않은 날 — 여기가 막히면 성향 축 ⑤ 는 입구가 통째로 없다
+  const 고름 = 선택사건({ 고른것: 'cs2' });
+  let s = await 부르기({ events: [고름] });
+  확인('추천 없이 고른 행이 저장된다(recommended_option=null)',
+    s.body.results?.[0]?.status === 'stored', s.body.results?.[0]);
+  확인('그 행이 DB 에 실재한다', (await 저장됐나(고름)) === 1);
+
+  // ㄴ·ㄷ 안 골랐다 두 갈래 — position 이 null 인 행
+  const 건너뜀 = 선택사건({ 고른것: null });
+  s = await 부르기({ events: [건너뜀] });
+  확인('「안 골랐다」(skipped · position=null)가 저장된다',
+    s.body.results?.[0]?.status === 'stored', s.body.results?.[0]);
+  const 전량거절 = 선택사건({ 고른것: null, 전량거절: true });
+  s = await 부르기({ events: [전량거절] });
+  확인('「전량 거절」(rejected_all · position=null)이 저장된다',
+    s.body.results?.[0]?.status === 'stored', s.body.results?.[0]);
+  /* 무관심과 거절이 **서로 다른 행**으로 남아야 축이 둘을 가른다 — 한쪽이 조용히
+   * 다른 쪽 모양으로 접히면 저장은 되는데 신호는 사라진다. */
+  const 두갈래 = await sql(
+    `select (payload->>'skipped')::bool sk, (payload->>'rejected_all')::bool ra
+       from engine.learning_events
+      where idempotency_key in ('${건너뜀.idempotency_key}','${전량거절.idempotency_key}')`);
+  확인('둘이 서로 다른 모양으로 남았다(무관심 ≠ 거절)',
+    두갈래.length === 2 && 두갈래.some((r) => r.sk && !r.ra) && 두갈래.some((r) => r.ra && !r.sk), 두갈래);
+
+  // ㄹ 키까지 없으면 여전히 거부 — 「안 밀었다」와 「앱이 칸을 빠뜨렸다」가 갈린다
+  const 칸없음 = 선택사건({ 고른것: 'cs1' });
+  delete 칸없음.payload.recommended_option;
+  s = await 부르기({ events: [칸없음] });
+  확인('추천 칸을 통째로 빠뜨리면 거부된다(널 허용은 «키 존재» 까지다)',
+    s.body.results?.[0]?.error?.code === 'CONTRACT_VIOLATION', s.body.results?.[0]);
+  확인('그 행은 저장되지 않았다', (await 저장됐나(칸없음)) === 0);
+
+  // ㅁ 골랐다고 적었으면 자리는 보여준 그 자리여야 한다 — 가드는 옮겨졌지 사라지지 않았다
+  const 어긋남 = 선택사건({ 고른것: 'cs2' });
+  어긋남.payload.position = 어긋남.payload.position === 1 ? 2 : 1;
+  s = await 부르기({ events: [어긋남] });
+  확인('고른 자리가 options_shown 과 어긋나면 거부된다',
+    s.body.results?.[0]?.error?.code === 'CONTRACT_VIOLATION', s.body.results?.[0]);
+  확인('그 행도 저장되지 않았다', (await 저장됐나(어긋남)) === 0);
 
   보고();
 }
