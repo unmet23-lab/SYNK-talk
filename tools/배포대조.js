@@ -245,7 +245,10 @@ async function main() {
   const 토큰 = e.SUPABASE_ACCESS_TOKEN;
   if (!ref || !토큰) die('.env 에 SUPABASE_PROJECT_REF·SUPABASE_ACCESS_TOKEN 이 필요하다');
   const 헤더 = { Authorization: `Bearer ${토큰}` };
-  if (과녁.운영) console.error('[배포대조] ⚠ `--운영` 으로 과녁을 갈아탔다 — `.env` 가 아니라 **운영 REF** 를 «읽는다»(GET 전용).');
+  /* 갈아탄 사실 자체는 **공용 통로가 말한다**(`lib/자격증명.js 읽기()` · F436 으로 조준이 거기로
+   * 올라갔다). 여기서 같은 말을 또 하면 판정이 두 곳에 적히고, 한쪽만 고쳐지는 날 갈라진다.
+   * 이 줄이 더하는 것은 **이 도구만 아는 것** 하나 — 갈아타도 GET 만 친다는 것이다. */
+  if (과녁.운영) console.error('[배포대조] ⚠ 갈아탄 과녁이지만 «읽기»다 — GET 만 친다.');
 
   // 대상이 리허설인지 운영인지 **이름으로** 알린다(원격배포.js 와 같은 이유 — 환경변수 하나로 조용히 바뀐다).
   try {

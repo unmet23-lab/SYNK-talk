@@ -11,7 +11,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
-const { 만료판정, 과녁판정, 대상알림, 새날짜, 만료칸, 운영REF, 리허설REF } = require('../lib/자격증명.js');
+const { 읽기, 만료판정, 과녁판정, 대상알림, 새날짜, 만료칸, 운영REF, 리허설REF } = require('../lib/자격증명.js');
 
 const TOOLS = path.join(__dirname, '..', 'tools');
 const LIB = path.join(__dirname, '..', 'lib');
@@ -110,6 +110,59 @@ test('과녁 — 리허설·미설정·모르는 ref 는 마찰 0', () => {
   }
   assert.equal(과녁판정({}, []).상태, '통과');
   assert.equal(과녁판정(null, null).상태, '통과');
+});
+
+/* ── 조준 — `--운영` 이 과녁까지 갈아탄다 (2026-08-14 신설 · F436) ─────────────
+ * 🔴 실사건 셋: `--운영` 을 **판정에만** 쓰고 조준은 도구마다 따로 이었더니, 안 이은 도구는
+ *   그 낱말을 조용히 흘렸다 — F400(배포대조·읽기) → F435(원격SQL·읽기) →
+ *   **F436(원격SQL·쓰기: `--적용 --운영` 을 붙인 마이그레이션이 리허설에 떨어졌다).**
+ *   막은 것은 도구가 아니라 「마침 멱등이었다」였다.
+ * 🔑 그래서 조준을 `읽기()` 로 올렸다 — 판정(과녁판정)이 아니라 **통로**가 진다. 아래 검사는
+ *   반환된 `env.SUPABASE_PROJECT_REF` 를 본다: 도구 10개가 전부 그 칸에서 ref 를 꺼내므로
+ *   이 한 칸이 맞으면 전부 맞는다(호출부마다 검사하지 않는 이유). */
+
+const 조준 = (args, ref) => {
+  const 원래 = process.env.SUPABASE_PROJECT_REF;
+  if (ref === undefined) delete process.env.SUPABASE_PROJECT_REF;
+  else process.env.SUPABASE_PROJECT_REF = ref;
+  try { return 읽기('시험', { args, 오늘: '2000-01-01' }).SUPABASE_PROJECT_REF; }
+  finally {
+    if (원래 === undefined) delete process.env.SUPABASE_PROJECT_REF;
+    else process.env.SUPABASE_PROJECT_REF = 원래;
+  }
+};
+
+test('조준 — `--운영` 이면 리허설을 가리키고 있어도 운영으로 갈아탄다', async () => {
+  let 결과;
+  await 찍힌것(() => { 결과 = 조준(['--적용', '--운영'], 리허설REF); });
+  assert.equal(결과, 운영REF, '승인 키만 먹고 과녁이 안 바뀌면 그게 F436 이다');
+});
+
+test('조준 — 갈아탄 사실을 소리 내어 말한다 (조용한 전환은 08-07 사고의 모양이다)', async () => {
+  const 줄들 = await 찍힌것(() => 조준(['--운영'], 리허설REF));
+  assert.ok(줄들.some((l) => l.includes('과녁을 갈아탔다')), `말이 없다 — 찍힌 것: ${JSON.stringify(줄들)}`);
+});
+
+/* ⚠ 기대값을 **절대값으로 못 박지 않는다** — ref 를 안 주면 `파일읽기()` 가 실저장소 `.env` 를
+ *   물어오고, CI 엔 그 파일이 없어 같은 검사가 층마다 다른 답을 낸다(F296 · 이 검사를 처음
+ *   그렇게 썼다가 로컬에서 빨개져 잡았다). 그래서 재는 것은 값이 아니라 **차이**다: 같은 입력에
+ *   `--운영` 만 뺐을 때 결과가 안 움직이는가. */
+test('조준 — `--운영` 이 없으면 아무것도 안 바꾼다 (플래그가 습관이 되는 쪽으로 열지 않는다)', async () => {
+  for (const ref of [리허설REF, '', undefined]) {
+    let 기준선; let 결과;
+    await 찍힌것(() => { 기준선 = 조준([], ref); 결과 = 조준(['--적용'], ref); });
+    assert.equal(결과, 기준선, `ref=${ref} 인데 --적용 만으로 과녁이 움직였다`);
+    assert.notEqual(기준선, 운영REF, `ref=${ref} 인데 플래그 없이 운영을 가리킨다`);
+  }
+});
+
+test('조준 — `--운영승인`(왕복골격의 다른 낱말)은 안 걸린다 · 이미 운영이면 멱등', async () => {
+  let 승인만; let 이미운영;
+  await 찍힌것(() => { 승인만 = 조준(['--운영승인'], 리허설REF); });
+  assert.equal(승인만, 리허설REF, '접두가 같다고 조준이 바뀌면 왕복시험이 운영으로 나간다');
+  const 줄들 = await 찍힌것(() => { 이미운영 = 조준(['--운영'], 운영REF); });
+  assert.equal(이미운영, 운영REF);
+  assert.ok(!줄들.some((l) => l.includes('과녁을 갈아탔다')), '안 갈아탔는데 갈아탔다고 말한다');
 });
 
 /* ── 대상 알림 (2026-08-09 신설) ──────────────────────────────────────────────
