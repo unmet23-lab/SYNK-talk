@@ -36,6 +36,7 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const 자격증명 = require('../lib/자격증명.js');
+const { 공용플래그, 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
 const { 배포묶음, 마지막커밋 } = require('./원격배포.js');   // 🔑 조립은 배포와 같은 함수에서
 
 const API = 'https://api.supabase.com/v1/projects';
@@ -207,19 +208,17 @@ async function 왕복전게이트(도구, e, opt = {}) {
  *   그래서 처방이 둘이다: 모르는 플래그는 die 하고, `--운영` 은 **실제 운영 과녁으로 잇는다**.
  *   잇는 쪽이 안전한 근거 = 이 파일은 GET 만 친다(파일 머리 「읽기 전용」 절). 쓰기 갈래가
  *   생기는 순간 `tests/자격증명.test.js` 가 소스로 잡는다. */
-const 아는플래그 = ['--진단', '--운영'];
+/* ⚠ 2026-08-14: 이 목록과 걸러내는 줄이 **이 파일에만** 있던 동안, 같은 낱말을 받는 형제 열이
+ *   모르는 낱말을 조용히 흘렸다(F435 · 실측 11 중 die 하는 것 1). 판정은 `lib/플래그.js` 로
+ *   올렸고 여기 남는 것은 **이 도구의 낱말**뿐이다 — 목록은 도구 것, 판정은 공용. */
+const 아는플래그 = [...공용플래그, '--진단'];
 
 /** 인자 + `.env` → 과녁. **순수 함수**다 — 자격증명·네트워크 없이 회귀가 여기를 문다(F296:
  *  repo 밖 환경에 기대는 검사는 CI 에서 깨진다. 탐지력은 이 함수가 진다). */
 function 인자판정(args, env) {
   const 준것 = args || [];
-  const 모름 = 준것.filter((a) => a.startsWith('--') && !아는플래그.includes(a));
-  if (모름.length) {
-    return {
-      오류: `모르는 플래그 ${모름.join(' ')} — 아는 것은 ${아는플래그.join(' ')} 뿐이다.`
-        + ' 조용히 무시하면 「딴 과녁을 재고 초록」이 된다(F400).',
-    };
-  }
+  const 오류 = 인자게이트('배포대조', 준것, 아는플래그);
+  if (오류) return { 오류 };
   const 운영 = 준것.includes('--운영');
   return {
     진단: 준것.includes('--진단'),

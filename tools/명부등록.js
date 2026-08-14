@@ -140,6 +140,11 @@ function 미리보기글(넣을것, 건너뛴것, 대상아닌행) {
 }
 
 const 자격증명 = require('../lib/자격증명.js');   // .env 읽기 + 토큰 만료 + 과녁 게이트 + 대상 알림(공용 통로)
+const { 공용플래그, 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
+
+/* 이 도구가 아는 낱말 — `공용플래그`(=`--운영`)는 어느 도구에서든 뜻을 가지므로 펴 넣는다.
+ * 빠뜨리면 되던 명령이 죽는다(F103) — `tests/플래그게이트.test.js` 가 소스 전량과 대조한다. */
+const 아는플래그 = [...공용플래그, '--적용', '--파일', '--이름', '--전화'];
 
 /** 계약 버전은 정본에서 읽는다 — 여기 박으면 계약이 올라갈 때 조용히 낡는다. */
 function 계약버전() {
@@ -163,6 +168,8 @@ async function sql(e, query) {
 
 async function main() {
   const args = process.argv.slice(2);
+  const 플래그오류 = 인자게이트('명부등록', args, 아는플래그);   // 모르는 낱말은 여기서 죽는다(F435)
+  if (플래그오류) die(플래그오류);
   const 적용 = args.includes('--적용');
   const 값 = (이름) => {
     const i = args.indexOf(이름);

@@ -25,6 +25,11 @@ const ROOT = path.join(__dirname, '..');
 const API = 'https://api.supabase.com/v1/projects';
 
 const 자격증명 = require('../lib/자격증명.js');   // .env 읽기 + 토큰 만료 게이트(공용 통로)
+const { 공용플래그, 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
+
+/* 이 도구가 아는 낱말 — `공용플래그`(=`--운영`)는 어느 도구에서든 뜻을 가지므로 펴 넣는다.
+ * 빠뜨리면 되던 명령이 죽는다(F103) — `tests/플래그게이트.test.js` 가 소스 전량과 대조한다. */
+const 아는플래그 = [...공용플래그, '--목록', '--판무시', '--적용', '--호출', '--삭제'];
 
 const die = (msg) => { console.error('[원격배포] ' + msg); process.exit(1); };
 
@@ -283,6 +288,10 @@ function 파일들(디렉터리, 기준 = 디렉터리) {
 
 async function main() {
   const args = process.argv.slice(2);
+  /* 🔴 **모르는 낱말은 여기서 죽는다**(F435) — 이 도구는 비가역 갈래(`--삭제`)를 진다.
+   *   오타 하나가 조용히 무시되면 「지운 줄 알았는데 안 지워졌다」가 성공의 얼굴로 남는다. */
+  const 플래그오류 = 인자게이트('원격배포', args, 아는플래그);
+  if (플래그오류) die(플래그오류);
   const 목록 = args.includes('--목록');
   const 판무시 = args.includes('--판무시');
   const 적용 = args.includes('--적용');

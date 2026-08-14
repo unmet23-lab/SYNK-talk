@@ -33,6 +33,11 @@ const ROOT = path.join(__dirname, '..');
 const API = 'https://api.supabase.com/v1/projects';
 
 const 자격증명 = require('../lib/자격증명.js');   // .env 읽기 + 토큰 만료 게이트(공용 통로)
+const { 공용플래그, 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
+
+/* 이 도구가 아는 낱말 — `공용플래그`(=`--운영`)는 어느 도구에서든 뜻을 가지므로 펴 넣는다.
+ * 빠뜨리면 되던 명령이 죽는다(F103) — `tests/플래그게이트.test.js` 가 소스 전량과 대조한다. */
+const 아는플래그 = [...공용플래그, '--적용'];
 
 /* 주석 안의 단어가 판정을 흔들지 않게 먼저 지운다 — 실제 SQL 에 `-- 학생=자기 행 insert` 같은
  * 설명이 있고, 그걸 그대로 세면 읽기 쿼리가 영원히 쓰기로 잡힌다. */
@@ -100,6 +105,10 @@ async function 대상알림(ref, 토큰, 쓰기) {
 
 async function main() {
   const args = process.argv.slice(2);
+  /* 🔴 **모르는 낱말은 여기서 죽는다** — 이 줄이 없던 판이 F435 다: 배포대조에서 배운 `--운영` 을
+   *   여기 쳤더니 오류 없이 무시돼 리허설을 재고 「운영 상태」로 읽을 뻔했다. */
+  const 플래그오류 = 인자게이트('원격SQL', args, 아는플래그);
+  if (플래그오류) die(플래그오류);
   const 적용 = args.includes('--적용');
   const 파일 = args.find((a) => !a.startsWith('--'));
   if (!파일) die('실행할 .sql 파일 경로를 달라. 예: node tools/원격SQL.js supabase/확인_적용전상태.sql');

@@ -47,6 +47,11 @@ class 중단 extends Error {}
 const die = (m) => { console.error('[교정확정] ' + m); process.exitCode = 1; throw new 중단(m); };
 
 const 자격증명 = require('../lib/자격증명.js');   // .env 읽기 + 토큰 만료 게이트(공용 통로)
+const { 공용플래그, 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
+
+/* 이 도구가 아는 낱말 — `공용플래그`(=`--운영`)는 어느 도구에서든 뜻을 가지므로 펴 넣는다.
+ * 빠뜨리면 되던 명령이 죽는다(F103) — `tests/플래그게이트.test.js` 가 소스 전량과 대조한다. */
+const 아는플래그 = [...공용플래그, '--대기', '--적용', '--학생', '--교정문', '--태그', '--확정자'];
 
 /** 계약은 정본에서 읽는다 — 여기 박으면 계약이 올라갈 때 조용히 낡는다(발급기와 같은 규칙). */
 function 계약() {
@@ -159,7 +164,10 @@ function 인자파싱(argv) {
 }
 
 async function main() {
-  const opt = 인자파싱(process.argv.slice(2));
+  const args = process.argv.slice(2);
+  const 플래그오류 = 인자게이트('교정확정', args, 아는플래그);   // 모르는 낱말은 여기서 죽는다(F435)
+  if (플래그오류) die(플래그오류);
+  const opt = 인자파싱(args);
   const e = 자격증명.읽기('교정확정');
   if (!e.SUPABASE_ACCESS_TOKEN || !e.SUPABASE_PROJECT_REF) {
     die('.env 에 SUPABASE_ACCESS_TOKEN·SUPABASE_PROJECT_REF 가 필요하다 (tools/원격SQL.js 안내 참조)');

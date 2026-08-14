@@ -38,6 +38,11 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const API = 'https://api.supabase.com/v1/projects';
 const 자격증명 = require('../lib/자격증명.js');
+const { 공용플래그, 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
+
+/* 이 도구가 아는 낱말 — `공용플래그`(=`--운영`)는 어느 도구에서든 뜻을 가지므로 펴 넣는다.
+ * 빠뜨리면 되던 명령이 죽는다(F103) — `tests/플래그게이트.test.js` 가 소스 전량과 대조한다. */
+const 아는플래그 = [...공용플래그, '--건수', '--출력', '--미디어', '--자가검사'];
 
 const die = (msg) => { console.error('[엔진뷰어] ' + msg); process.exit(1); };
 
@@ -221,6 +226,8 @@ ${행그리기(사건, '사건', 미디어지도)}
 
 async function main() {
   const args = process.argv.slice(2);
+  const 플래그오류 = 인자게이트('엔진뷰어', args, 아는플래그);   // 모르는 낱말은 여기서 죽는다(F435)
+  if (플래그오류) die(플래그오류);
   const 값 = (이름, 기본) => { const i = args.indexOf(이름); return i >= 0 && args[i+1] ? args[i+1] : 기본; };
   const 건수 = Math.min(Number(값('--건수', 25)) || 25, 200);
   const 출력 = 출력검사(값('--출력', path.join(os.tmpdir(), 'synk-엔진뷰어')));

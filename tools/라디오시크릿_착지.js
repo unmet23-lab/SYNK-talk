@@ -30,12 +30,20 @@ const API = 'https://api.supabase.com/v1/projects';
 const die = (m) => { console.error(`[라디오시크릿] ${m}`); process.exit(1); };
 
 const 자격증명 = require('../lib/자격증명.js');
+const { 공용플래그, 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
+
+/* 이 도구가 아는 낱말 — `공용플래그`(=`--운영`)는 어느 도구에서든 뜻을 가지므로 펴 넣는다.
+ * 빠뜨리면 되던 명령이 죽는다(F103) — `tests/플래그게이트.test.js` 가 소스 전량과 대조한다. */
+const 아는플래그 = [...공용플래그, '--적용', '--회전'];
 
 const 시크릿이름 = 'RADIO_INGEST_SECRET';
 
 async function main() {
-  const 적용 = process.argv.includes('--적용');
-  const 회전 = process.argv.includes('--회전');
+  const args = process.argv.slice(2);
+  const 플래그오류 = 인자게이트('라디오시크릿', args, 아는플래그);   // 모르는 낱말은 여기서 죽는다(F435)
+  if (플래그오류) die(플래그오류);
+  const 적용 = args.includes('--적용');
+  const 회전 = args.includes('--회전');
   const e = 자격증명.읽기('라디오시크릿');
   const 토큰 = e.SUPABASE_ACCESS_TOKEN;
   const ref = e.SUPABASE_PROJECT_REF;

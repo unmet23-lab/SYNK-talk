@@ -46,6 +46,11 @@ const os = require('os');
 const path = require('path');
 
 const 자격증명 = require('../lib/자격증명.js');
+const { 공용플래그, 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
+
+/* 이 도구가 아는 낱말 — `공용플래그`(=`--운영`)는 어느 도구에서든 뜻을 가지므로 펴 넣는다.
+ * 빠뜨리면 되던 명령이 죽는다(F103) — `tests/플래그게이트.test.js` 가 소스 전량과 대조한다. */
+const 아는플래그 = [...공용플래그, '--기간', '--상한', '--기준', '--출력'];
 const { 출력검사 } = require('./엔진뷰어.js');
 const {
   성과회수, 회수창, 쓰는사건, 닻사건, 기준선창, 회수판,
@@ -343,6 +348,8 @@ function 수읽기(이름, 값, 기본, 최소, 최대) {
 
 async function main() {
   const args = process.argv.slice(2);
+  const 플래그오류 = 인자게이트('성과계기판', args, 아는플래그);   // 모르는 낱말은 여기서 죽는다(F435)
+  if (플래그오류) die(플래그오류);
   const 값 = (이름, 기본) => { const i = args.indexOf(이름); return i >= 0 && args[i + 1] ? args[i + 1] : 기본; };
   const 기간일 = 수읽기('--기간', 값('--기간', null), 90, 1, 3650);
   const 상한 = 수읽기('--상한', 값('--상한', null), 20000, 1, 100000);

@@ -48,6 +48,11 @@
 const path = require('path');
 
 const 자격증명 = require('../lib/자격증명.js');
+const { 공용플래그, 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
+
+/* 이 도구가 아는 낱말 — `공용플래그`(=`--운영`)는 어느 도구에서든 뜻을 가지므로 펴 넣는다.
+ * 빠뜨리면 되던 명령이 죽는다(F103) — `tests/플래그게이트.test.js` 가 소스 전량과 대조한다. */
+const 아는플래그 = [...공용플래그, '--주', '--json', '--지금'];
 const { 정규화 } = require('../lib/검수확정.js');
 const { 풀술어, 표본, 주범위, 키, iso주, 주당건수 } = require('../lib/골든표본.js');
 
@@ -247,6 +252,8 @@ function 찍기(계수, 완료, { ref, 주수 }) {
 
 async function main() {
   const args = process.argv.slice(2);
+  const 플래그오류 = 인자게이트('성적표', args, 아는플래그);   // 모르는 낱말은 여기서 죽는다(F435)
+  if (플래그오류) die(플래그오류);
   const 값 = (이름, 기본) => {
     const i = args.indexOf(이름);
     return i >= 0 && args[i + 1] ? args[i + 1] : 기본;
