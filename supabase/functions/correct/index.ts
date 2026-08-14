@@ -44,6 +44,7 @@ import 토큰모듈 from './토큰.mjs';
 import 교정모듈 from './교정엔진.mjs';
 import 계약 from './계약.mjs';
 import 지시문 from './교정프롬프트.mjs';
+import 계약판모듈 from './계약판.mjs';
 
 const { 서비스역할 } = 토큰모듈 as { 서비스역할: (req: Request) => boolean };
 
@@ -99,7 +100,7 @@ const 회수상한 = 5;
 /* 목록을 몇 개까지 보나. 도는 배치가 있는지 판단하는 근거라 넉넉히 본다. */
 const 목록상한 = 20;
 
-const 계약판 = /^c(\d+)$/;
+const { 행들에서판 } = 계약판모듈 as { 행들에서판: (행들: unknown) => string | null };
 
 function 봉투(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -253,10 +254,10 @@ Deno.serve(async (req: Request) => {
   }
 
   // 계약판은 **DB 에게 묻는다** — 손 상수를 두면 마이그레이션마다 사람이 같이 올려야 한다.
-  const [판행] = await sql`select name from engine.schema_migrations order by version desc limit 1`;
-  const ver = 계약판.exec(String(판행?.name ?? '').match(/_(c\d+)\.sql$/)?.[1] ?? '')?.[0];
+  const 판행 = await sql`select name from engine.schema_migrations order by version desc limit 1`;
+  const ver = 행들에서판(판행);
   if (!ver) {
-    console.error('[correct] DB 계약판을 못 읽었다', 판행?.name);
+    console.error('[correct] DB 계약판을 못 읽었다', 판행.length ? 판행[0].name : '(이력 0행)');
     return 봉투(500, { 대기: 대기수, 적음: 0, 이유: 'no_contract_ver' });
   }
 

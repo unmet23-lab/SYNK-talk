@@ -33,6 +33,9 @@ import 상태모듈 from './학습자상태.mjs';
 import 회수모듈 from './성과회수.mjs';
 import 게임모듈 from './게임배정.mjs';
 import 라디오태스크모듈 from './라디오태스크.mjs';
+import 계약판모듈 from './계약판.mjs';
+
+const { 행들에서판 } = 계약판모듈 as { 행들에서판: (행들: unknown) => string | null };
 
 /* 게임 갈래 — 판정은 전부 lib 이 지고(발주 §6-6 ⑩·⑪) 여기는 행만 만든다.
  * `재제출의사`·챌린지·앵커 목록은 H3 조인의 술어 값이다 — 리터럴을 여기 적으면 계약·팩과
@@ -351,10 +354,10 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
     return 봉투(404, { ok: false, date: 오늘, mode: '단건', error: { code: 'NOT_FOUND', message: '그 학생이 없습니다' } });
   }
 
-  /* 0행 가드(반박 ⑮ 동축) — 빈 이력에서 구조분해가 TypeError 로 죽으면 500 의 이유가 로그에 안 남는다. */
+  /* 0행 가드(반박 ⑮ 동축)는 `lib/계약판.js` 가 진다 — 빈 이력에서 죽으면 500 의 이유가 로그에 안 남는다. */
   const 판행 = await sql`
     select name as 최신조각 from engine.schema_migrations order by version desc limit 1`;
-  const ver = 판행.length ? String(판행[0].최신조각 ?? '').match(/_(c\d+)\.sql$/)?.[1] : undefined;
+  const ver = 행들에서판(판행);
   if (!ver) {
     // events 와 같은 근거로 DB 에게 판을 묻는다 — 함수가 DB 보다 앞설 수 없게.
     console.error('[deliver] DB 계약판을 못 읽었다', 판행.length ? 판행[0].최신조각 : '(이력 0행)');

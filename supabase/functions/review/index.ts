@@ -53,6 +53,7 @@ import 토큰모듈 from './토큰.mjs';
 import 커서모듈 from './검수커서.mjs';
 import 경로모듈 from './업로드경로.mjs';
 import 확정모듈 from './검수확정.mjs';
+import 계약판모듈 from './계약판.mjs';
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
 const { 버킷 } = 경로모듈 as { 버킷: string };
@@ -83,7 +84,11 @@ const { 판정, 청취문턱, 폐기어휘, 승인요청, 폐기요청 } = 확�
   폐기요청: (본문: unknown) => 요청검증;
 };
 
-const 계약판 = /^c(\d+)$/;
+const { 판번호, 행들에서판, 앞선판인가 } = 계약판모듈 as {
+  판번호: (판: unknown) => number | null;
+  행들에서판: (행들: unknown) => string | null;
+  앞선판인가: (앞: unknown, 뒤: unknown) => boolean;
+};
 const uuid꼴 = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 /* 🔑 **허용 목록**이다(차단 목록이 아니다 — 못 적은 역할이 새는 방향은 언제나 「통과」다).
@@ -138,8 +143,7 @@ const 큐열 = [
 Deno.serve(async (req: Request) => {
   const 선언 = req.headers.get('X-Contract-Ver') ?? '';
   if (!선언) return 실패(400, { code: 'CONTRACT_VER_MISSING', message: 'X-Contract-Ver 헤더가 없습니다', retryable: false }, 선언);
-  const 선언판 = 계약판.exec(선언);
-  if (!선언판) {
+  if (판번호(선언) === null) {
     return 실패(426, { code: 'CONTRACT_VER_UNSUPPORTED', message: `계약판 형식이 아닙니다: ${선언}`, retryable: false }, 선언);
   }
 
@@ -171,14 +175,13 @@ Deno.serve(async (req: Request) => {
                and role = any(${검수역할}::text[])) as staff_id,
            (select name from engine.schema_migrations order by version desc limit 1) as 최신조각`;
 
-  const db판 = 계약판.exec(String(행?.최신조각 ?? '').match(/_(c\d+)\.sql$/)?.[1] ?? '');
-  if (!db판) {
+  const ver = 행들에서판(행);
+  if (!ver) {
     console.error('[review] DB 계약판을 못 읽었다', 행?.최신조각);
     return 실패(500, { code: 'INTERNAL', message: '서버 설정 오류입니다', retryable: true }, 선언);
   }
-  const ver = db판[0];
 
-  if (Number(선언판[1]) > Number(db판[1])) {
+  if (앞선판인가(선언, ver)) {
     return 실패(426, {
       code: 'CONTRACT_VER_UNSUPPORTED', retryable: false,
       message: `서버가 아직 ${선언} 을 모릅니다(현재 ${ver}) — 잠시 뒤 다시 시도해 주세요`,

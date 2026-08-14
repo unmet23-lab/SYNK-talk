@@ -29,6 +29,7 @@ import postgres from 'npm:postgres@3.4.4';
 import 토큰모듈 from './토큰.mjs';
 import 과제모듈 from './오늘과제.mjs';
 import 동의모듈 from './동의게이트.mjs';
+import 계약판모듈 from './계약판.mjs';
 
 /* 진단 한 칸(`blocked`)을 위해서만 쓴다 — 이 함수는 막는 게이트가 아니다(아래 주석). */
 const { 지금유효, 거절몸통 } = 동의모듈 as {
@@ -105,7 +106,11 @@ const { 발급시각, 살아있는학생 } = 토큰모듈 as {
   살아있는학생: (질의: typeof sql, 주체: string, iat: number | null) => ReturnType<typeof sql>;
 };
 
-const 계약판 = /^c(\d+)$/;
+const { 판번호, 행들에서판, 앞선판인가 } = 계약판모듈 as {
+  판번호: (판: unknown) => number | null;
+  행들에서판: (행들: unknown) => string | null;
+  앞선판인가: (앞: unknown, 뒤: unknown) => boolean;
+};
 const 날짜꼴 = /^\d{4}-\d{2}-\d{2}$/;
 
 type 오류 = { code: string; message: string; retryable: boolean; field?: string };
@@ -121,8 +126,7 @@ const 실패 = (status: number, e: 오류, ver: string) => 봉투(status, { ok: 
 Deno.serve(async (req: Request) => {
   const 선언 = req.headers.get('X-Contract-Ver') ?? '';
   if (!선언) return 실패(400, { code: 'CONTRACT_VER_MISSING', message: 'X-Contract-Ver 헤더가 없습니다', retryable: false }, 선언);
-  const 선언판 = 계약판.exec(선언);
-  if (!선언판) {
+  if (판번호(선언) === null) {
     return 실패(426, { code: 'CONTRACT_VER_UNSUPPORTED', message: `계약판 형식이 아닙니다: ${선언}`, retryable: false }, 선언);
   }
   if (req.method !== 'GET') return 실패(405, { code: 'CONTRACT_VIOLATION', message: 'GET 만 받는다', retryable: false }, 선언);
@@ -152,14 +156,13 @@ Deno.serve(async (req: Request) => {
     select (select learner_id from engine.learners where ${살아있는학생(sql, 주체, 발급시각(req))}) as learner_id,
            (select name from engine.schema_migrations order by version desc limit 1) as 최신조각`;
 
-  const db판 = 계약판.exec(String(행?.최신조각 ?? '').match(/_(c\d+)\.sql$/)?.[1] ?? '');
-  if (!db판) {
+  const ver = 행들에서판(행);
+  if (!ver) {
     console.error('[tasks] DB 계약판을 못 읽었다', 행?.최신조각);
     return 실패(500, { code: 'SERVER_ERROR', message: '서버 설정 오류입니다', retryable: true }, 선언);
   }
-  const ver = db판[0];
 
-  if (Number(선언판[1]) > Number(db판[1])) {
+  if (앞선판인가(선언, ver)) {
     return 실패(426, {
       code: 'CONTRACT_VER_UNSUPPORTED', retryable: false,
       message: `서버가 아직 ${선언} 을 모릅니다(현재 ${ver}) — 잠시 뒤 다시 시도해 주세요`,

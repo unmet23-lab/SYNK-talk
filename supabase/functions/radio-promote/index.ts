@@ -37,6 +37,7 @@ import postgres from 'npm:postgres@3.4.4';
 import 승격모듈 from './라디오승격.mjs';
 import 출처모듈 from './사건출처.mjs';
 import 토큰모듈 from './토큰.mjs';
+import 계약판모듈 from './계약판.mjs';
 
 const { 승격계획, 승격표, 승격판, 선호정서키 } = 승격모듈 as {
   승격판: string;
@@ -50,6 +51,10 @@ const { 승격계획, 승격표, 승격판, 선호정서키 } = 승격모듈 as 
 };
 const { 사건출처 } = 출처모듈 as { 사건출처: (event_type: string) => string | null };
 const { 서비스역할 } = 토큰모듈 as { 서비스역할: (req: Request) => boolean };
+const { 판번호, 행들에서판 } = 계약판모듈 as {
+  판번호: (판: unknown) => number | null;
+  행들에서판: (행들: unknown) => string | null;
+};
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
 
@@ -82,16 +87,16 @@ Deno.serve(async (req) => {
 
   /* 계약판은 DB 에게 묻는다(events·deliver·radio-ingest 와 같은 근거). 🔴 c11 게이트:
    * c11 전 DB 에 '라디오퀴즈' 등을 넣으면 CHECK 가 거절한다 — 절반 승격보다 멈춤이 낫다.
-   * ⚠ 0행 가드(반박 ⑮) — 빈 이력에서 구조분해가 TypeError 로 죽으면 500 의 이유가 로그에
+   * ⚠ 0행 가드(반박 ⑮)는 `lib/계약판.js` 가 진다 — 빈 이력에서 죽으면 500 의 이유가 로그에
    * 안 남는다. 못 읽은 것은 못 읽었다고 말한다. */
   const 판행 = await sql`
     select name as 최신조각 from engine.schema_migrations order by version desc limit 1`;
-  const ver = 판행.length ? String(판행[0].최신조각 ?? '').match(/_(c\d+)\.sql$/)?.[1] : undefined;
+  const ver = 행들에서판(판행);
   if (!ver) {
     console.error('[radio-promote] schema_migrations 에서 계약판을 못 읽었다');
     return 봉투(500, { error: 'schema_ver_unreadable' });
   }
-  if (Number(ver.slice(1)) < 11) return 봉투(503, { error: 'contract_below_c11', ver });
+  if ((판번호(ver) ?? 0) < 11) return 봉투(503, { error: 'contract_below_c11', ver });
 
   const 지금 = new Date().toISOString();
 

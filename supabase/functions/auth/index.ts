@@ -47,6 +47,9 @@
 import postgres from 'npm:postgres@3.4.4';
 import 학생계정 from './학생계정.mjs';
 import 가입문항 from './가입문항.mjs';
+import 계약판모듈 from './계약판.mjs';
+
+const { 행들에서판 } = 계약판모듈 as { 행들에서판: (행들: unknown) => string | null };
 
 const { 학생번호맞나, 이메일, 뒷자리맞나, 시도상한 } = 학생계정 as {
   학생번호맞나: (v: unknown) => boolean;
@@ -142,9 +145,14 @@ function 토큰주장(req: Request): { sub: string; iat: number } | null {
   }
 }
 
+/* 여기서만 `''` 로 접는다 — 이 함수의 값은 **봉투 표기**이지 게이트가 아니라(위 ■), 못 읽었다고
+ * 로그인을 막으면 막으려던 것보다 큰 사고가 된다. 대신 «못 읽었다»를 로그로는 말한다 —
+ * 안 그러면 「판이 없는 응답」과 「판을 못 읽은 응답」이 밖에서 같은 모양이다. */
 async function 계약판읽기() {
-  const [판] = await sql`select name from engine.schema_migrations order by version desc limit 1`;
-  return String(판?.name ?? '').match(/_(c\d+)\.sql$/)?.[1] ?? '';
+  const 판행 = await sql`select name from engine.schema_migrations order by version desc limit 1`;
+  const 판 = 행들에서판(판행);
+  if (!판) console.error('[auth] DB 계약판을 못 읽었다', 판행.length ? 판행[0].name : '(이력 0행)');
+  return 판 ?? '';
 }
 
 /** 임시번호가 사는 시간 (L0 §4-2-2). 이 값이 참이 되려면 우리 코드가 로그인 길목에 있어야 한다. */

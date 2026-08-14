@@ -6,5 +6,6 @@
   "동의게이트.mjs": "lib/동의게이트.js",
   "몽골날짜.mjs": "lib/몽골날짜.js",
   "사건출처.mjs": "lib/사건출처.js",
-  "토큰.mjs": "lib/토큰.js"
+  "토큰.mjs": "lib/토큰.js",
+  "계약판.mjs": "lib/계약판.js"
 }

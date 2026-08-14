@@ -51,6 +51,7 @@ import 회고모듈 from './회고.mjs';
 import 상태모듈 from './학습자상태.mjs';
 import 라디오태스크모듈 from './라디오태스크.mjs';
 import 반피드백모듈 from './반피드백.mjs';
+import 계약판모듈 from './계약판.mjs';
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
 
@@ -130,7 +131,11 @@ const { 지금유효, 그때유효, 거절몸통 } = 동의모듈 as {
   거절몸통: { code: string; field: string; retryable: boolean };
 };
 
-const 계약판 = /^c(\d+)$/;
+const { 판번호, 행들에서판, 앞선판인가 } = 계약판모듈 as {
+  판번호: (판: unknown) => number | null;
+  행들에서판: (행들: unknown) => string | null;
+  앞선판인가: (앞: unknown, 뒤: unknown) => boolean;
+};
 
 /* 🔑 **경로·메서드·안내문을 한 곳에서 파생시킨다**(가드 맹점 ④ — 같은 판정을 두 곳에 적으면
  *   갈라지고, 갈라진 쪽은 조용히 틀린다). 옛 판은 목록 하나(`아는경로`)와 삼항 하나
@@ -210,8 +215,7 @@ const 상태 = { 열림: 'open', 판정됨: 'judged', 막힘: 'blocked' } as con
 Deno.serve(async (req: Request) => {
   const 선언 = req.headers.get('X-Contract-Ver') ?? '';
   if (!선언) return 실패(400, { code: 'CONTRACT_VER_MISSING', message: 'X-Contract-Ver 헤더가 없습니다', retryable: false }, 선언);
-  const 선언판 = 계약판.exec(선언);
-  if (!선언판) {
+  if (판번호(선언) === null) {
     return 실패(426, { code: 'CONTRACT_VER_UNSUPPORTED', message: `계약판 형식이 아닙니다: ${선언}`, retryable: false }, 선언);
   }
 
@@ -243,14 +247,13 @@ Deno.serve(async (req: Request) => {
                and role = any(${강사역할}::text[])) as staff_id,
            (select name from engine.schema_migrations order by version desc limit 1) as 최신조각`;
 
-  const db판 = 계약판.exec(String(행?.최신조각 ?? '').match(/_(c\d+)\.sql$/)?.[1] ?? '');
-  if (!db판) {
+  const ver = 행들에서판(행);
+  if (!ver) {
     console.error('[teach] DB 계약판을 못 읽었다', 행?.최신조각);
     return 실패(500, { code: 'INTERNAL', message: '서버 설정 오류입니다', retryable: true }, 선언);
   }
-  const ver = db판[0];
 
-  if (Number(선언판[1]) > Number(db판[1])) {
+  if (앞선판인가(선언, ver)) {
     return 실패(426, {
       code: 'CONTRACT_VER_UNSUPPORTED', retryable: false,
       message: `서버가 아직 ${선언} 을 모릅니다(현재 ${ver}) — 잠시 뒤 다시 시도해 주세요`,
