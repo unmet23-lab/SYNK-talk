@@ -841,13 +841,14 @@ async function 회고열기(url: URL, staff_id: string, ver: string) {
         select coalesce(jsonb_agg(jsonb_build_object(
                  'event_id', x.event_id, 'event_type', x.event_type, 'occurred_at', x.occurred_at,
                  'retry_of_event_id', x.retry_of_event_id, 'correction_id', x.correction_id,
-                 'task_type', x.task_type, 'payload', x.payload, 'due_at', x.due_at)), '[]'::jsonb) as 행들
+                 'task_type', x.task_type, 'task_schema_ver', x.task_schema_ver,
+                 'payload', x.payload, 'due_at', x.due_at)), '[]'::jsonb) as 행들
           from (
             select y.event_id, y.event_type, y.occurred_at, y.retry_of_event_id,
-                   y.correction_id, y.task_type, y.payload, y.due_at
+                   y.correction_id, y.task_type, y.task_schema_ver, y.payload, y.due_at
               from (
                 select e.event_id, e.event_type, e.occurred_at, e.retry_of_event_id,
-                       e.correction_id, e.task_type, e.payload, s.due_at,
+                       e.correction_id, e.task_type, s.task_schema_ver, e.payload, s.due_at,
                        row_number() over (partition by e.event_type
                                           order by e.occurred_at desc) as 몇째
                   from engine.learning_events e

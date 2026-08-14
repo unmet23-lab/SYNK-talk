@@ -308,6 +308,13 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
        * · 목록·창은 lib 이 정본이라 여기에 다시 안 적는다 — 갈라지면 축이 조용히 죽는다.
        * · 마감(due_at)은 submissions 에 사니 같이 걷는다. 배정 행에만 있고 나머지는 null 이다.
        * · task_type 을 싣는 것은 리듬·끈기축의 라디오 제외(lib v6 · 반박 ①)의 재료다.
+       * · task_schema_ver 도 **같은 제외의 재료**다(lib v10 · 발전 트랙 ④ 낭독). 라디오 낭독은
+       *   학생이 앱에서 녹음해 task_type 이 「발화녹음」(앱 어휘)이라 위 목록으로는 원리상 안
+       *   걸린다 — 판(radio-*)이 그 축이다. 이 칸을 안 실으면 lib 필터는 조용히 무력해지고
+       *   새는 방향은 「앱 제출로 센다」라, 숙제를 안 낸 날이 낸 날로 뒤집힌다.
+       * · 🔑 아래 where 의 라디오 «드롭»에는 판을 안 얹었다 — 그 드롭은 종별 상한을 지키려는
+       *   것이고(반박 ⑥), 낭독은 하루 한 장이라 창을 밀지 않는다. 판정을 SQL 에도 적으면 같은
+       *   판정이 두 곳에 살아 갈라진다(제외의 정본은 lib/라디오태스크 하나다).
        * · 상한은 **사건 종류별**이다(반박 ⑥) — 전체 한 칸이면 하루 상한 없는 라디오 명령이
        *   창을 채울 때 오래된 배정·제출이 잘려 리듬 분모가 조용히 준다. 종류마다 최신 우선.
        * ⚠ 이 주석은 SQL 템플릿 리터럴 «안»이다 — 백틱을 쓰면 문자열이 여기서 끝나고 함수가
@@ -316,7 +323,8 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
         select coalesce(jsonb_agg(jsonb_build_object(
                  'event_id', x.event_id, 'event_type', x.event_type, 'occurred_at', x.occurred_at,
                  'retry_of_event_id', x.retry_of_event_id, 'correction_id', x.correction_id,
-                 'task_type', x.task_type, 'payload', x.payload, 'due_at', x.due_at,
+                 'task_type', x.task_type, 'task_schema_ver', x.task_schema_ver,
+                 'payload', x.payload, 'due_at', x.due_at,
                  /* 관측 짝의 **유일한 고리**(계약 c9 — 「무엇을 봤나」). 이 칸이 없으면 회수는
                   * 개입을 세고도 관측을 하나도 못 잇고, 증상은 「아무도 안 본다」 하나뿐이다. */
                  'parent_event_id', x.parent_event_id,
@@ -328,11 +336,11 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
                  'intervention_id', x.intervention_id)), '[]'::jsonb) as 행들
           from (
             select y.event_id, y.event_type, y.occurred_at, y.retry_of_event_id,
-                   y.correction_id, y.task_type, y.payload, y.due_at,
+                   y.correction_id, y.task_type, y.task_schema_ver, y.payload, y.due_at,
                    y.parent_event_id, y.policy_ver, y.estimator_version, y.intervention_id
               from (
                 select e.event_id, e.event_type, e.occurred_at, e.retry_of_event_id,
-                       e.correction_id, e.task_type, e.payload, s.due_at,
+                       e.correction_id, e.task_type, s.task_schema_ver, e.payload, s.due_at,
                        e.parent_event_id, e.policy_ver, e.estimator_version, e.intervention_id,
                        row_number() over (partition by e.event_type
                                           order by e.occurred_at desc) as 몇째
