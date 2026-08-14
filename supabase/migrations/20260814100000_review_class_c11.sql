@@ -1,11 +1,117 @@
--- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
+-- 검수 콘솔 「오늘 수업 반」 뷰의 물리 — 숙제 서클 §10-3 조각
 --
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 정본 = SYNK-appsscript `docs/숙제서클_설계.md` §10-3 (유호님 확정 2026-08-13 「수업 첫 20분 =
+--   서클(4인조 발화) ∥ 몽골쌤 순회 검수」 · 집행 지시 08-14) + `docs/검수_내부계약.md` §3-2(같은
+--   커밋에서 개정). 교사는 조 옆에 앉아 손으로는 **그 조 4명의 AI 초안**을 넘기고 귀로는 브리핑을
+--   듣는다(설계 §4) — 그 화면이 서려면 서버가 「이 제출물이 어느 반·어느 조·누구 것인가」를
+--   낼 수 있어야 한다. 이 조각은 그 두 가지를 세운다: 조·좌석 거울 2칸 + 반 모드 전용 판.
+--
+-- ■ 🔴 왜 `review_queue` 를 넓히지 않고 **판을 따로** 세우나
+--   기본 큐는 검수자에게 학생 정체를 **일부러 안 준다**(`20260807190000` — 검수자 = 전사 축).
+--   그 판을 넓히면 모든 소비자가 이름을 받고, 「검수자가 봐도 되나」의 판정 지점(§3)이 소리 없이
+--   지나간다. 반 모드는 다르다 — 순회 검수는 교사가 학생 **눈앞에** 앉아 있는 자리라, 이름 없이는
+--   어느 초안이 그 학생 것인지 원리상 못 가른다(종이 서클 시트에도 같은 이름이 이미 인쇄돼 있다).
+--   그래서 정체 열은 이 판에만 열고, 기본 큐는 바이트 그대로 둔다 — 어느 통로가 정체를 내는지가
+--   판 이름으로 갈린다.
+--
+-- ■ 왜 `learners` 에 거울 2칸이고 새 표가 아닌가
+--   조·좌석의 정본은 시트 `groups`(시즌×반 1벌 · `assignGroupsAll` 이 채운다)다. 여기는 그
+--   **표시용 거울**이고, 아침 명부 스윕(`명부스윕_` → `roster-ingest`)이 매일 전체 스냅샷을 다시
+--   부어 스스로 낫는다(명부가 이미 그 방식이다). 계보 표(`classes` 방식)로 안 세우는 이유:
+--   `corrections`·사건 어느 것도 조를 참조하지 않는다 — 조는 화면 묶음 전용이라 «지금 값» 하나면
+--   족하고, 시즌이 바뀌면 스윕이 그날 아침 덮는다. ⚠ null 이 정상 상태다(편성 전 · 배정 전).
+--
+-- ■ 채우는 코드는 이 조각에 0줄이다 — 정직 표기
+--   생산자 = `명부스윕_`(appsscript)의 `조편성` 동봉 + `roster-ingest` 신판이고 **같은 트랙**에
+--   선다. 🔴 `roster-ingest` 신판은 반피드백 §10-4 와 같은 ⏳유호님 승인 자리라, 이 조각도 그
+--   승인에 얹혀 부어진다 — 그 전까지 운영·리허설 어디에도 미적용이고 두 칸은 어디에도 없다.
+--   「판이 섰다」를 「반 모드가 돈다」로 읽지 않는다.
+--
+-- 되돌림: drop view if exists engine.review_queue_class;
+--        alter table engine.learners drop column if exists group_no;
+--        alter table engine.learners drop column if exists seat_no;
+--        delete from engine.schema_migrations where version = '20260814100000';
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260814100000';
+  migration_name constant text := '20260814100000_review_class_c11.sql';
+  expected_checksum constant text := '875ab1717d864025ef1e24c0445b3c72a975101f5950ade10f6d55798ccea340'; -- migration-checksum
+  base_version constant text := '20260812210000';
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 c11 위에서만 돈다 — engine.schema_migrations가 없다(빈 DB면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      '이 조각은 기준선 % 위에서만 돈다 — 이력에 그 판이 없다(부분·혼합·불명이라 중단한다)',
+      base_version;
+  end if;
+
+  if to_regclass('engine.classes') is null then
+    raise exception
+      'engine.classes 가 없다 — 반 모드는 반 위에서만 선다(20260812200000_class_c11 이 먼저 서야 한다)';
+  end if;
+
+  if to_regclass('engine.review_queue') is null then
+    raise exception
+      'engine.review_queue 가 없다 — 반 판은 기본 판에서 파생한다(20260809050000_review_c10 이 먼저 서야 한다)';
+  end if;
+
+  -- ① 조·좌석 거울 — null 이 정상(편성 전). 상한 20 은 규모 못이 아니라 쓰레기 못이다:
+  --    시트에서 좌표가 밀려 학번·전화가 이 칸으로 흘러든 날, 조용히 앉는 대신 여기서 죽는다
+  --    (지금 조는 4개·좌석은 4이지만 편성 규모는 시트가 정하므로 느슨하게 둔다).
+  alter table engine.learners
+    add column group_no smallint constraint learners_group_no_c11 check (group_no between 1 and 20),
+    add column seat_no  smallint constraint learners_seat_no_c11  check (seat_no  between 1 and 20);
+
+  -- ② 반 모드 전용 판 — 기본 판 22열 + 정체 4열. `learning_events` 를 지나는 이유는
+  --    `submissions` 가 learner_id 복제를 거부해서다(c10 머리말) — 제출의 주인은 사건이 안다.
+  --    반이 없는 학생(class_id null)도 행은 나온다 — 자르는 것은 읽는 쪽의 where 다
+  --    (판은 무엇을 보여줄지만 정한다 · `20260809050000` 머리말과 같은 축).
+  create view engine.review_queue_class as
+    select v.*,
+           l.class_id,
+           l.display_name,
+           l.group_no,
+           l.seat_no
+      from engine.review_queue v
+      join engine.learning_events e on e.event_id = v.event_id
+      join engine.learners l on l.learner_id = e.learner_id;
+
+  comment on view engine.review_queue_class is
+    '검수 큐의 반 모드 판(숙제서클 §10-3 · 검수_내부계약 §3-2). 기본 판과 달리 학생 정체(이름·조·좌석)를 연다 — 순회 검수는 교사가 학생 눈앞에 앉는 자리라 정체 없이는 초안을 못 가른다. 소비자는 review Fn 의 ?class= 갈래 하나다.';
+
+  insert into engine.schema_migrations(version, name, checksum)
+  values (migration_version, migration_name, expected_checksum);
+end
+$migration$;
+
+commit;
+
 -- ============================================================================
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
+-- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -316,3 +422,37 @@ select case when 테이블수=17 and RLS켜짐=17 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
 from 셈;
+*/
+
+-- 확인
+-- ⓪ 🔴 **순서** — 이 조각은 `20260812210000` «뒤»에만 선다(base_version). 앞의 c11 조각들과
+--    `roster-ingest` 신판이 아직 유호님 승인 대기라, 이 조각도 **같은 승인에 얹혀** 부어진다.
+--    먼저 부으면 base_version 검사가 「이력에 그 판이 없다」로 중단시킨다(안전 방향).
+-- ① 표 **0** · 뷰 **+1**(`review_queue_class`) · 열 **+2**(`learners.group_no`·`seat_no`) ·
+--    트리거 0 · RLS 변화 0(뷰는 RLS 대상이 아니고 정책 0·grant 0 이라 닫힌 채로 태어난다 —
+--    `새는테이블권한` 이 뷰까지 세므로 열리는 날 빨개진다).
+-- ② 새 칸 셋 = `반검수뷰`(1) · `반검수판열`(26) · `반검수판원문`(0). 수로 재는 이유는
+--    「덜 넓힌 판」과 「안 선 판」이 존재 검사에서 같은 모양이기 때문이다.
+-- ③ 이 조각은 **행을 하나도 안 바꾼다**. 두 칸은 `명부스윕_` 의 `조편성` 동봉 +
+--    `roster-ingest` 신판이 채운다 — 지금 전원 null 이 정상이다(편성 전).
+--    「판이 섰다」를 「반 모드가 돈다」로 읽지 않는다.
+-- ④ 🔴 아직 **없는 것** — 이 판을 읽는 통로(`review` Fn 의 `?class=` 갈래·`classes` 경로)는
+--    같은 트랙의 코드 커밋에 선다. 운영 재배포는 ⏳유호님 승인 자리다(반피드백 §10-4 와 같다).
+-- ⑤ CHECK 제약은 현행 접미사만 남아야 한다(이 조각이 c11 CHECK 둘을 더한다).
+--    ⚠ 이 줄은 **마지막 조각**이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    ⚠ `teacher_notes_once_c11` 은 여기 없다 — UNIQUE 라 CHECK 목록의 대상이 아니다.
+--    기대: broadcast_segment_kind_c11 · classes_key_nonblank_c11
+--         · corrections_promotion_intent_c11
+--         · corrections_supersedes_not_self_c11 · corrections_verdict_c11
+--         · learners_gender_c11 · learners_goal_track_c11 · learners_group_no_c11
+--         · learners_home_aimag_c11 · learners_seat_no_c11
+--         · learners_signup_attempts_nonneg_c11 · learners_temp_password_paired_c11
+--         · learning_events_correction_target_c11 · learning_events_event_type_c11
+--         · learning_events_task_type_c11 · pipeline_jobs_discard_reason_c11
+--         · season_compass_answers_c11 · season_dates_c11
+--         · season_review_decided_c11 · season_review_self_c11 · season_review_verdict_c11
+--         · staff_role_c11 · submissions_due_paired_c11 · submissions_task_format_c11
+--         · submissions_translation_source_c11 · teacher_notes_body_nonblank_c11
+--         · teacher_notes_disposition_c11 · teacher_notes_origin_c11

@@ -255,17 +255,54 @@ test('§4-2 는 원표를 읽지만 **아무것도 응답에 싣지 않는다**'
 
 /* ── ⑥ 경로·동봉 ──────────────────────────────────────────────────── */
 
-test('경로는 다섯이고 메서드가 갈린다 — 그 밖은 404 다', () => {
+test('경로는 여섯이고 메서드가 갈린다 — 그 밖은 404 다', () => {
   const m = /const 아는경로 = \[([^\]]*)\]/u.exec(소스);
   assert.ok(m, '`아는경로` 목록을 못 찾았다 — 뒷마디를 안 보면 `/review/아무거나` 가 큐 조회로 동작한다');
   assert.deepEqual([...m[1].matchAll(/'([a-z]+)'/gu)].map((x) => x[1]).sort(),
-    ['approve', 'audio', 'discard', 'played', 'queue'],
-    '경로 목록이 계약(§3·§4·§4-2·§5)과 다르다');
-  assert.match(소스, /경로 === 'queue' \? 'GET' : 'POST'/u, '경로별 메서드가 안 갈린다');
+    ['approve', 'audio', 'classes', 'discard', 'played', 'queue'],
+    '경로 목록이 계약(§3·§3-2·§4·§4-2·§5)과 다르다');
+  assert.match(소스, /경로 === 'queue' \|\| 경로 === 'classes' \? 'GET' : 'POST'/u,
+    '경로별 메서드가 안 갈린다 — 읽기 둘(queue·classes)만 GET 이다');
   /* 🔑 목록에 있는 것과 **실제로 라우팅되는 것**은 다르다 — 목록에만 넣고 분기를 빠뜨리면
    *   그 경로는 405 도 404 도 아닌 「승인·폐기 갈래」로 흘러 들어간다(마지막 삼항이 받는다). */
   assert.match(소스, /경로 === 'played'\) return await 열어봄\(/u,
     '`played` 가 목록에만 있고 분기가 없다 — 그 요청이 폐기 갈래로 떨어진다');
+  assert.match(소스, /경로 === 'classes'\) return await 반목록읽기\(/u,
+    '`classes` 가 목록에만 있고 분기가 없다 — 그 요청이 폐기 갈래로 떨어진다');
+});
+
+/* ── ⑧ §3-2 반 모드 (숙제서클 §10-3) ──────────────────────────────── */
+
+test('반 큐가 싣는 것 = 기본 큐열 + 정체 3열 — event_id 는 여기서도 안 나간다', () => {
+  const m = /const 반큐열 = \[\.\.\.큐열, ([^\]]*)\]/u.exec(소스);
+  assert.ok(m, '`반큐열` 이 큐열에서 파생하지 않는다 — 두 목록이 각자 살면 언젠가 갈린다');
+  assert.deepEqual([...m[1].matchAll(/'([\w]+)'/gu)].map((x) => x[1]).sort(),
+    ['display_name', 'group_no', 'seat_no'],
+    '반 모드가 더 싣는 열이 정체 3열이 아니다 — class_id·event_id 가 이 길로 새면 조용하다');
+});
+
+test('반 큐 갈래는 uuid 검증을 지나 반 판을 읽는다 — 기본 큐 SQL 은 바이트 그대로다', () => {
+  assert.match(소스, /uuid꼴\.test\(반\)/u,
+    '`class` 값을 검증 없이 SQL 로 내려보낸다 — 400 이어야 할 것이 500 이 된다');
+  assert.match(소스, /from engine\.review_queue_class/u, '반 판을 안 읽는다 — 앵커가 낡았다');
+  assert.match(소스, /where class_id = \$\{반\}::uuid/u,
+    '반 필터가 없다 — 전교생 큐가 반 모드 얼굴로 나간다');
+});
+
+test('반 큐·반 목록도 감사가 응답의 조건이다 — 트랜잭션 안 tx 로 건다', () => {
+  const 반큐 = 구간(소스, 'async function 반큐읽기', 'async function 반목록읽기');
+  assert.match(반큐, /await tx`\s*\n\s*insert into engine\.staff_access_log/u,
+    '반 큐의 감사가 tx 로 안 걸려 있다 — 같은 트랜잭션이 아니다(§2)');
+  assert.match(반큐, /'review\.queue', \$\{실린것\}/u,
+    '반 큐 감사의 action 이 review.queue 가 아니다 — 조회 분모가 모드로 갈라진다(§3-2)');
+  const 반목록 = 구간(소스, 'async function 반목록읽기', '/* ── §4 POST');
+  assert.match(반목록, /await tx`\s*\n\s*insert into engine\.staff_access_log/u,
+    '반 목록의 감사가 tx 로 안 걸려 있다(§2 — 모든 경로가 진다)');
+  assert.match(반목록, /'review\.classes'/u,
+    '반 목록 감사의 action 이 review.classes 가 아니다 — 큐 분모에 섞이면 뜻이 흐려진다(§3-2)');
+  assert.ok(!/\bsql`/u.test(구간(소스, 'async function 반큐읽기', '/* ── §4 POST')
+    .replace(/await sql\.begin/gu, '')),
+    '반 모드 트랜잭션 블록 안에서 `sql` 태그를 쓴다 — 그 문장만 다른 커넥션으로 샌다(§2)');
 });
 
 /* ── ⑦ §5 승인·폐기 ──────────────────────────────────────────────── */
@@ -369,8 +406,9 @@ test('게이트에 **시간 리터럴을 안 박는다** — 창은 서명 수�
     '승인 게이트가 시간 상수를 든다 — 첫 확정까지 같이 조인다(§5 🚫)');
 });
 
-test('감사 행위 이름 다섯이 계약대로다', () => {
-  for (const 이름 of ['review.queue', 'review.audio', 'review.audio.played', 'review.approve', 'review.discard']) {
+test('감사 행위 이름 여섯이 계약대로다', () => {
+  for (const 이름 of ['review.queue', 'review.audio', 'review.audio.played', 'review.approve',
+    'review.discard', 'review.classes']) {
     assert.ok(소스.includes(`'${이름}'`), `감사 이름 '${이름}' 이 없다 — 그 경로는 장부를 안 남긴다(§2)`);
   }
 });

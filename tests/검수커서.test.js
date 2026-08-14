@@ -15,7 +15,10 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { 쪽크기, 커서읽기, 커서만들기, 커서키, 기본쪽, 최소쪽, 최대쪽 } = require('../lib/검수커서.js');
+const {
+  쪽크기, 커서읽기, 커서만들기, 커서키, 기본쪽, 최소쪽, 최대쪽,
+  반커서읽기, 반커서만들기, 반커서키,
+} = require('../lib/검수커서.js');
 
 /* ── ① 쪽 크기 ────────────────────────────────────────────────────── */
 
@@ -147,4 +150,91 @@ test('동점은 submission_id 가 가른다 — 없으면 쪽 경계에서 한 �
   const 뒤 = 행({ ...같음, submission_id: id('2') });
   assert.equal(비교(앞, 뒤), -1, '세 축이 같을 때 순서가 안 정해진다 — 그러면 쪽마다 순서가 흔들린다');
   assert.equal(비교(앞, 앞), 0);
+});
+
+/* ── ④ 반 모드 커서 (검수_내부계약 §3-2 · 숙제서클 §10-3) ─────────────
+ * 축이 다르다: 조 → 좌석 → 시각(교사 동선). 기본 커서와 같은 방식으로 탐지력을 픽스처에 건다. */
+
+const 반행 = (o) => ({
+  submission_id: '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
+  group_no: 2,
+  seat_no: 3,
+  occurred_at: new Date('2026-08-14T01:00:00.000Z'),
+  ...o,
+});
+
+test('반 커서는 왕복한다 — 만든 것을 그대로 되읽는다', () => {
+  for (const 후보 of [반행({}), 반행({ group_no: null, seat_no: null }),
+    반행({ group_no: 1, seat_no: null }), 반행({ occurred_at: '2026-08-01T00:00:00.000Z' })]) {
+    const s = 반커서만들기(후보);
+    const { 값, 이유 } = 반커서읽기(s);
+    assert.equal(이유, null, `${s} 를 못 읽었다`);
+    assert.equal(값.조, 후보.group_no ?? null);
+    assert.equal(값.좌석, 후보.seat_no ?? null);
+    assert.equal(값.id, 후보.submission_id);
+    assert.equal(Date.parse(값.시각), new Date(후보.occurred_at).getTime());
+  }
+});
+
+test('🔴 편성 전(null)과 「0조」는 다른 값이다 — 0 으로 접으면 nulls last 를 커서가 되돌린다', () => {
+  const 없음 = 반커서읽기(반커서만들기(반행({ group_no: null, seat_no: null }))).값;
+  assert.equal(없음.조, null);
+  assert.equal(반커서키(없음).조널키, true, 'null 조가 「0조」로 접혀 맨 앞으로 올라온다');
+  const 있음 = 반커서읽기(반커서만들기(반행({}))).값;
+  assert.equal(반커서키(있음).조널키, false);
+});
+
+test('망가진 반 커서는 400 이 되게 한다 — 기본 커서 꼴도 여기서는 오류다', () => {
+  for (const raw of ['어제', '', '2|3|아무때나|9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
+    '2|3|2026-08-14T01:00:00.000Z|짧은id',
+    // 기본 커서 꼴(감사|신뢰|시각|id) — 신뢰도 소수점이 반 커서의 정수 칸에 오면 걸려야 한다.
+    '1|0.5|2026-08-14T01:00:00.000Z|9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
+    '2|3|2026-08-14T01:00:00.000Z|9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d|덤']) {
+    const r = 반커서읽기(raw);
+    assert.equal(r.값, null, `${JSON.stringify(raw)} 가 통과했다`);
+    assert.match(r.이유, /next_cursor/u);
+  }
+});
+
+/** 반 커서 튜플의 사전식 비교 — SQL 행 비교와 같은 규칙. */
+function 반비교(a, b) {
+  const 키 = (r) => {
+    const k = 반커서키(반커서읽기(반커서만들기(r)).값);
+    return [k.조널키 ? 1 : 0, k.조키, k.좌석널키 ? 1 : 0, k.좌석키, Date.parse(k.시각), k.id];
+  };
+  const [x, y] = [키(a), 키(b)];
+  for (let i = 0; i < x.length; i += 1) {
+    if (x[i] < y[i]) return -1;
+    if (x[i] > y[i]) return 1;
+  }
+  return 0;
+}
+
+test('반 모드 정렬 = 조 → 좌석 → 오래된 순 · 편성 전은 맨 뒤 (교사 동선)', () => {
+  const 표 = {
+    A: 반행({ 이름: 'A', submission_id: id('a'), group_no: 1, seat_no: 4 }),
+    B: 반행({ 이름: 'B', submission_id: id('b'), group_no: 2, seat_no: 1 }),
+    C: 반행({ 이름: 'C', submission_id: id('c'), group_no: 1, seat_no: 2, occurred_at: '2026-08-14T02:00:00Z' }),
+    D: 반행({ 이름: 'D', submission_id: id('d'), group_no: 1, seat_no: 2, occurred_at: '2026-08-14T01:00:00Z' }),
+    E: 반행({ 이름: 'E', submission_id: id('e'), group_no: null, seat_no: null }),
+  };
+  const 실제 = ['E', 'B', 'A', 'C', 'D'].map((n) => 표[n]).sort(반비교).map((r) => r.이름);
+  /* 손으로 적은 기대 순서다: 1조 2번(오래된 D → C) → 1조 4번 A → 2조 B → 편성 전 E */
+  assert.deepEqual(실제, ['D', 'C', 'A', 'B', 'E'],
+    '반 모드 순서가 계약(§3-2)과 다르다 — 교사가 눈앞의 조와 다른 초안을 보게 된다');
+});
+
+test('탐지력 — 편성 전을 앞으로 접으면 위 순서가 깨진다', () => {
+  const 나쁜키 = (r) => [r.group_no ?? 0, r.seat_no ?? 0, Date.parse(r.occurred_at)];
+  const 나쁜비교 = (a, b) => {
+    const [x, y] = [나쁜키(a), 나쁜키(b)];
+    for (let i = 0; i < x.length; i += 1) { if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1; }
+    return 0;
+  };
+  const 표 = [반행({ 이름: '있음', submission_id: id('1'), group_no: 1, seat_no: 1 }),
+    반행({ 이름: '없음', submission_id: id('2'), group_no: null, seat_no: null })];
+  assert.equal([...표].sort(나쁜비교)[0].이름, '없음',
+    'null 을 0 으로 접었는데도 편성 전이 뒤로 간다 — 이 탐지력 픽스처가 죽었다');
+  assert.equal([...표].sort(반비교)[0].이름, '있음',
+    '정본 비교에서 편성 전이 앞으로 왔다 — nulls last 가 깨졌다');
 });

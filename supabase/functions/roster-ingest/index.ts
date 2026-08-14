@@ -203,6 +203,62 @@ Deno.serve(async (req) => {
     반갱신 = (결과 as unknown as Array<{ student_code: string }>).map((r) => r.student_code);
   }
 
+  /* ── 조·좌석 (숙제서클 §10-3 · 20260814100000) ──────────────────────────
+   * `조편성` 은 시트 `groups` 의 **현 시즌 전체 스냅샷**이다([[학생번호, 조, 좌석]]).
+   * 있으면 스냅샷 의미로 받는다: 실린 학생은 그 값으로, 안 실린 학생은 **비운다** —
+   * 재편성에서 빠진 학생의 옛 조가 남으면 검수 콘솔이 그 학생을 남의 조에 계속 그린다.
+   * 키가 아예 없으면 옛 스윕이다 — 아무것도 안 한다(호환의 방향은 「무동작」이지
+   * 「전부 비움」이 아니다 · 빈 배열만이 「편성이 없다」다).
+   * ⛔ 연락처 어긋남(`막힌것`)은 반과 같은 이유로 뺀다 — 같은 사람인지 모르는 행의 조는
+   *   적지 않는다. 빠진 학생은 스냅샷 미언급과 같은 길로 비워져 화면에 「조 미편성」으로
+   *   **보인다**(조용히 남의 조에 앉는 것보다 낫다). */
+  let 조갱신: string[] = [];
+  let 조해제 = 0;
+  const 조편성문제: Array<{ 줄: number; 번호: string; 사유: string }> = [];
+  if (Array.isArray(몸.조편성)) {
+    const 짝지도 = new Map<string, { g: number; s: number }>();
+    (몸.조편성 as unknown[]).forEach((원행, i) => {
+      const [sid, 조글, 좌석글] = (Array.isArray(원행) ? 원행 : [])
+        .map((c) => String(c == null ? '' : c).trim());
+      const 줄 = i + 1;
+      if (!sid) { 조편성문제.push({ 줄, 번호: '', 사유: '학생 번호가 비었다' }); return; }
+      const 조 = Number(조글);
+      const 좌석 = Number(좌석글);
+      if (!Number.isInteger(조) || 조 < 1 || 조 > 20 || !Number.isInteger(좌석) || 좌석 < 1 || 좌석 > 20) {
+        /* DB CHECK(1~20)와 같은 못 — 여기서 걸러야 한 행의 쓰레기가 판 전체 갱신을 못 막는다. */
+        조편성문제.push({ 줄, 번호: sid, 사유: `조·좌석이 1~20 정수가 아니다(조=${조글} 좌석=${좌석글})` });
+        return;
+      }
+      if (막힌번호.has(정규형(sid))) {
+        조편성문제.push({ 줄, 번호: sid, 사유: '연락처 대조가 막힌 학생 — 조를 적지 않는다' });
+        return;
+      }
+      짝지도.set(학생번호표기(sid), { g: 조, s: 좌석 }); // 같은 학생 두 줄 = 뒤가 이긴다(시트 최신판)
+    });
+    const 코드들 = [...짝지도.keys()];
+    if (코드들.length) {
+      /* `is distinct from` 으로 바뀐 행만 센다 — 반갱신과 같은 이유(매 스윕 전원 갱신이 되면
+       * 이 수는 아무것도 못 알려준다). */
+      const 갱신 = await sql`
+        update engine.learners l
+           set group_no = v.g, seat_no = v.s
+          from (select unnest(${코드들}::text[]) as student_code,
+                       unnest(${코드들.map((c) => 짝지도.get(c)!.g)}::smallint[]) as g,
+                       unnest(${코드들.map((c) => 짝지도.get(c)!.s)}::smallint[]) as s) v
+         where l.student_code = v.student_code
+           and (l.group_no is distinct from v.g or l.seat_no is distinct from v.s)
+        returning l.student_code`;
+      조갱신 = (갱신 as unknown as Array<{ student_code: string }>).map((r) => r.student_code);
+    }
+    const 해제 = await sql`
+      update engine.learners
+         set group_no = null, seat_no = null
+       where (group_no is not null or seat_no is not null)
+         and ${코드들.length ? sql`student_code not in ${sql(코드들)}` : sql`true`}
+      returning student_code`;
+    조해제 = 해제.length;
+  }
+
   /* 다음 한 걸음 = 동의 (유호 확정: 등록 직후). 여기서 만들지 않는다 — 세어서 부르기만 한다.
    * 이름을 다 부른다: 숫자만 주면 원장이 누구인지 찾으러 DB 를 열고, 그 왕복이 곧 「나중에」가 된다. */
   let 무동의: string[] = [];
@@ -233,6 +289,10 @@ Deno.serve(async (req) => {
     반미배정: 반미배정(정상),
     새반,
     반갱신,
+    /* 조·좌석(숙제서클 §10-3) — `조편성` 키가 없던 판에서는 셋 다 0·빈 배열이다. */
+    조갱신,
+    조해제,
+    조편성문제,
     schema_ver: (계약 as { 버전: string }).버전,
   });
 });

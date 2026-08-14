@@ -69,6 +69,31 @@ test('큐받기는 GET 이고 review/queue 를 부른다', async () => {
   assert.equal(r.다음커서, 'c1');
 });
 
+test('§3-2 반 옵션은 class= 로 실린다 — 없으면 기본 큐 그대로다', async () => {
+  const { 모듈, 요청들 } = 세운판({ ok: true, data: [], next_cursor: null });
+  await 모듈.큐받기('T', { 반: SID });
+  assert.ok(요청들[0].url.includes(`class=${SID}`), '반 id 가 질의에 안 실린다 — 전교생 큐가 반 모드 얼굴로 온다');
+  const { 모듈: 기본모듈, 요청들: 기본요청들 } = 세운판({ ok: true, data: [], next_cursor: null });
+  await 기본모듈.큐받기('T', {});
+  assert.ok(!기본요청들[0].url.includes('class='), '반을 안 골랐는데 class= 가 실린다');
+});
+
+test('§3-2 반목록받기는 GET review/classes 를 부르고 waiting 을 대기로 편다', async () => {
+  const { 모듈, 요청들 } = 세운판({
+    ok: true,
+    classes: [{ class_id: SID, class_key: '평일11A', display_name: null, waiting: 3 }],
+  });
+  const 반들 = await 모듈.반목록받기('T');
+  assert.ok(요청들[0].url.endsWith('review/classes'), '경로가 review/classes 가 아니다');
+  assert.equal(요청들[0].메서드, 'GET');
+  assert.deepEqual(반들, [{ id: SID, 열쇠: '평일11A', 이름: null, 대기: 3 }]);
+});
+
+test('§3-2 classes 가 없어도 빈 배열이다 — 「반 0개」의 뜻은 화면이 가른다', async () => {
+  const { 모듈 } = 세운판({ ok: true });
+  assert.deepEqual(await 모듈.반목록받기('T'), []);
+});
+
 test('커서는 URL 인코딩해 싣는다 — 정렬키 짝이라 구분자가 섞여 온다', async () => {
   const { 모듈, 요청들 } = 세운판({ ok: true, data: [] });
   await 모듈.큐받기('T', { 커서: 'a b|c/d' });

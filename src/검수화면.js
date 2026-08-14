@@ -57,7 +57,8 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { 색, 폰트, 모노트래킹, 몽골어 } from './테마';
 import {
-  큐받기, 오디오서명받기, 열어봤다알리기, 승인하기, 폐기하기, 폐기사유, 오류태그, 기본쪽크기,
+  큐받기, 반목록받기, 오디오서명받기, 열어봤다알리기, 승인하기, 폐기하기, 폐기사유, 오류태그,
+  기본쪽크기,
 } from './검수API.js';
 import { 청취문턱, 세그먼트펴기 } from '../lib/검수확정.js';
 import { 새계측, 재기, 들은ms } from '../lib/청취계측.js';
@@ -117,6 +118,31 @@ export function 여는값(항목, 재검수) {
   return { ...편집초기값(항목), 승격: false };
 }
 
+/**
+ * 반 모드 행의 조 번호 — null·쓰레기는 **0(「조 없음」)** 으로 접는다(화면 밖으로 내 회귀가 닿게).
+ * 편성 전 학생을 조용히 떨어뜨리면 그 발화는 아무 조에도 안 보인다 — 서버가 nulls last 로
+ * 뒤로 미루되 빼지는 않는 것과 같은 판단이라, 화면도 「조 없음」 칸으로 모아 **보이게** 둔다.
+ */
+export function 조번호(항목) {
+  const g = Number(항목 && 항목.group_no);
+  return Number.isFinite(g) && g > 0 ? Math.floor(g) : 0;
+}
+
+/**
+ * 조 칩의 재료 — 받아 온 목록을 조 번호로 센다(반 모드 전용).
+ * 반환 = `[{ 조, 수 }]` · 조 오름차순 · 0(조 없음)은 **맨 뒤**.
+ */
+export function 조묶기(목록) {
+  const 셈 = new Map();
+  for (const it of Array.isArray(목록) ? 목록 : []) {
+    const g = 조번호(it);
+    셈.set(g, (셈.get(g) ?? 0) + 1);
+  }
+  return [...셈.entries()]
+    .sort((a, b) => (a[0] || Infinity) - (b[0] || Infinity) || 0)
+    .map(([조, 수]) => ({ 조, 수 }));
+}
+
 export default function 검수화면({ 토큰, 돌아가기 }) {
   const [목록, set목록] = useState([]);
   const [다음커서, set다음커서] = useState(null);
@@ -127,6 +153,12 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
   const [태그펼침, set태그펼침] = useState(false);
   const [폐기열림, set폐기열림] = useState(false);
   const [보내는중, set보내는중] = useState(false);
+
+  /* §3-2 반 모드 — 「오늘 수업 반」(숙제서클 §10-3). `반 === null` = 기본 큐 그대로. */
+  const [반목록, set반목록] = useState(null);   // null = 아직 못 읽음 · [] = 반 0개(다리 전)
+  const [반목록오류, set반목록오류] = useState('');
+  const [반, set반] = useState(null);           // { id, 이름 } — 고른 반
+  const [조필터, set조필터] = useState(null);   // null = 전체 · 숫자 = 그 조만(0 = 조 없음)
 
   /* 편집 칸 — 항목이 바뀔 때 그 항목에서 새로 채운다. */
   const [검증전사, set검증전사] = useState('');
@@ -159,7 +191,13 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
   const 재생기 = useAudioPlayer();
   const 상태 = useAudioPlayerStatus(재생기);
 
-  const 항목 = 재검수 ? 재검수.항목 : (목록[0] ?? null);
+  /* 조 칩이 켜져 있으면 그 조의 항목만 흐른다 — 서버 순서(조 → 좌석)는 그대로 두고
+     화면이 자기 손의 목록을 거를 뿐이다(같은 판정을 두 곳에 적지 않는다). */
+  const 보이는목록 = useMemo(
+    () => (반 && 조필터 !== null ? 목록.filter((x) => 조번호(x) === 조필터) : 목록),
+    [반, 조필터, 목록],
+  );
+  const 항목 = 재검수 ? 재검수.항목 : (보이는목록[0] ?? null);
   const sid = 항목 ? 항목.submission_id : null;
 
   const 세그먼트 = useMemo(() => 세그먼트펴기(항목 && 항목.stt_segments), [항목]);
@@ -172,7 +210,9 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
   const 큐읽기 = useCallback(async (커서) => {
     set오류('');
     try {
-      const { 목록: 온것, 다음커서: 다음 } = await 큐받기(토큰, { 개수: 기본쪽크기, 커서 });
+      const { 목록: 온것, 다음커서: 다음 } = await 큐받기(토큰, {
+        개수: 기본쪽크기, 커서, 반: 반 ? 반.id : null,
+      });
       set목록((앞) => (커서 ? [...앞, ...온것] : 온것));
       set다음커서(다음);
     } catch (e) {
@@ -182,9 +222,20 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
     } finally {
       set불러오는중(false);
     }
-  }, [토큰]);
+  }, [토큰, 반]);
 
-  useEffect(() => { 큐읽기(null); }, [큐읽기]);
+  /* 반을 바꾸면 커서·조 필터를 **버리고** 처음부터 읽는다 — 두 모드의 커서는 꼴이 달라
+     섞으면 400 이고(§3-2), 남의 조 필터가 새 반에 붙으면 첫 화면이 이유 없이 빈다. */
+  useEffect(() => { set불러오는중(true); set조필터(null); 큐읽기(null); }, [큐읽기]);
+
+  /* 반 카드 목록 — 앉을 때 한 번. 실패해도 기본 큐는 그대로 돈다(반 모드만 잠긴다). */
+  useEffect(() => {
+    let 살아있음 = true;
+    반목록받기(토큰)
+      .then((온것) => { if (살아있음) { set반목록(온것); set반목록오류(''); } })
+      .catch((e) => { if (살아있음) set반목록오류(문구(e)); });
+    return () => { 살아있음 = false; };
+  }, [토큰]);
 
   /* ── 항목이 바뀌면 편집 칸을 그 항목에서 새로 채운다 ─────────────── */
   useEffect(() => {
@@ -272,12 +323,13 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
   /* ── 프리로드 — 게이트를 통과한 뒤 **다음 하나만** (머리말 🔑) ───── */
   useEffect(() => {
     if (!게이트통과 || 재검수) return;
-    const 다음 = 목록[1];
+    /* 조 필터가 켜져 있으면 「다음」도 그 조에서 온다 — 교사가 실제로 다음에 열 항목이다. */
+    const 다음 = 보이는목록[1];
     if (!다음 || 서명맵.has(다음.submission_id)) return;
     오디오서명받기(토큰, 다음.submission_id)
       .then((받은) => 서명맵.set(다음.submission_id, 받은))
       .catch(() => { /* 프리로드 실패는 조용하다 — 열 때 다시 부른다 */ });
-  }, [게이트통과, 재검수, 목록, 토큰, 서명맵]);
+  }, [게이트통과, 재검수, 보이는목록, 토큰, 서명맵]);
 
   /* ── 조작 ───────────────────────────────────────────────────────── */
 
@@ -331,7 +383,9 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
         보낸값: { 검증전사, 교정문, 해설, 태그: [...태그], 승격 },
       });
       if (재검수) set재검수(null);
-      else set목록((앞) => 앞.slice(1));
+      /* 🔑 자리(slice(1))가 아니라 **id 로** 뺀다 — 조 필터가 켜져 있으면 지금 항목이
+         목록의 0번이 아닐 수 있고, 자리로 빼면 남의 항목이 조용히 사라진다. */
+      else set목록((앞) => 앞.filter((x) => x.submission_id !== 항목.submission_id));
     } catch (e) {
       set오류(문구(e));
     } finally {
@@ -349,7 +403,7 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
       /* 폐기는 재열기 대상이 아니다 — `Z` 는 확정만 되돌린다(§5-1 재검수는 `verified` 만). */
       set직전(null);
       if (재검수) set재검수(null);
-      else set목록((앞) => 앞.slice(1));
+      else set목록((앞) => 앞.filter((x) => x.submission_id !== 항목.submission_id));
     } catch (e) {
       set오류(문구(e));
     } finally {
@@ -402,11 +456,75 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
         </View>
       )}
 
+      {/* §3-2 오늘 수업 반 — 순회 검수의 입구(숙제서클 §10-3). 반을 고르면 큐가
+          조 → 좌석 순으로 갈리고, 조 칩으로 지금 앉은 조만 남긴다. */}
+      <View style={s.카드}>
+        <Text style={s.접이머리}>오늘 수업 반</Text>
+        {반목록오류 ? (
+          <Text style={s.메모}>반 목록을 못 읽었어요 — {반목록오류}</Text>
+        ) : null}
+        {반목록 !== null && 반목록.length === 0 && (
+          /* 🔴 「반이 0개」와 「전부 처리됨」을 같은 모양으로 두지 않는다(§3-2) */
+          <Text style={s.메모}>반 정보가 아직 없어요 — 명부 다리가 서면 여기에 반이 떠요.</Text>
+        )}
+        {반목록 !== null && 반목록.length > 0 && (
+          <View style={s.칩줄}>
+            <Pressable
+              onPress={() => set반(null)}
+              style={({ pressed }) => [s.칩, !반 && s.칩_고름, pressed && s.눌림]}
+            >
+              <Text style={s.칩글}>전체 큐</Text>
+            </Pressable>
+            {반목록.map((c) => (
+              <Pressable
+                key={c.id}
+                onPress={() => set반({ id: c.id, 이름: c.이름 || c.열쇠 })}
+                style={({ pressed }) => [s.칩, 반 && 반.id === c.id && s.칩_고름, pressed && s.눌림]}
+              >
+                <Text style={s.칩글}>{c.이름 || c.열쇠} · {c.대기}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+        {반 && !불러오는중 && 목록.length > 0 && (
+          <View style={s.칩줄}>
+            <Pressable
+              onPress={() => set조필터(null)}
+              style={({ pressed }) => [s.칩, 조필터 === null && s.칩_고름, pressed && s.눌림]}
+            >
+              <Text style={s.칩글}>전체</Text>
+            </Pressable>
+            {조묶기(목록).map(({ 조, 수 }) => (
+              <Pressable
+                key={조}
+                onPress={() => set조필터(조)}
+                style={({ pressed }) => [s.칩, 조필터 === 조 && s.칩_고름, pressed && s.눌림]}
+              >
+                <Text style={s.칩글}>{조 === 0 ? '조 없음' : `${조}조`} {수}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+        {반 && !불러오는중 && 목록.length > 0 && 조묶기(목록).every((g) => g.조 === 0) && (
+          /* 「조 정보가 없다」와 「편성이 없다」를 검수자 눈에 보이게 — 조용히 평평하게 그리면
+             다리가 안 선 것과 편성 전이 같은 모양이 된다. */
+          <Text style={s.메모}>조 정보가 아직 없어요 — 편성 전이거나 명부 다리가 서기 전이에요.</Text>
+        )}
+      </View>
+
       {불러오는중 && <Text style={s.메모}>검수할 목록을 읽는 중이에요…</Text>}
 
-      {!불러오는중 && !항목 && (
+      {!불러오는중 && !항목 && 목록.length > 0 && (
+        /* 조 필터가 그 조를 다 비웠을 뿐 반의 큐는 남아 있다 — 「없다」로 그리면 거짓이다. */
         <View style={s.카드}>
-          <Text style={s.빈머리}>검수할 것이 없어요</Text>
+          <Text style={s.빈머리}>이 조는 다 봤어요</Text>
+          <Text style={s.메모}>다른 조 칩을 누르면 남은 항목이 이어져요.</Text>
+        </View>
+      )}
+
+      {!불러오는중 && !항목 && 목록.length === 0 && (
+        <View style={s.카드}>
+          <Text style={s.빈머리}>{반 ? '이 반에는 지금 검수할 것이 없어요' : '검수할 것이 없어요'}</Text>
           <Text style={s.메모}>
             이 목록에는 「제출 + AI 교정」이 둘 다 있는 발화만 떠요.
             {'\n'}AI 교정이 아직 안 도는 동안에는 비어 있는 것이 정상이에요.
@@ -417,6 +535,17 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
       {항목 && (
         <View style={s.카드}>
           {재검수 && <Text style={s.재검수띠}>재검수 — 직전 확정을 대신합니다</Text>}
+
+          {/* 반 모드의 매칭 키 — 순회 검수는 눈앞의 학생과 초안을 잇는 일이라 이름·조·좌석이
+              머리에 선다(§3-2). 전체 큐에는 이 열이 아예 안 와서(판이 다르다) 줄 자체가 없다. */}
+          {반 && 항목.display_name !== undefined && (
+            <Text style={s.이름줄}>
+              {항목.display_name || '이름 없음'}
+              {조번호(항목) > 0
+                ? ` · ${조번호(항목)}조${Number(항목.seat_no) > 0 ? ` ${Number(항목.seat_no)}번` : ''}`
+                : ' · 조 미편성'}
+            </Text>
+          )}
 
           <Text style={s.메타}>
             {[항목.task_type, 항목.task_format].filter(Boolean).join(' · ')}
@@ -669,6 +798,8 @@ const s = StyleSheet.create({
 
   빈머리: { fontFamily: 폰트.강조, fontSize: 16, lineHeight: 24, color: 색.잉크 },
   재검수띠: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크 },
+  /* 반 모드의 매칭 키 — 이 화면에서 이름은 장식이 아니라 「누구 초안인가」의 판정 재료다. */
+  이름줄: { fontFamily: 폰트.강조, fontSize: 16, lineHeight: 24, color: 색.잉크 },
   메타: { fontFamily: 폰트.캡션, fontSize: 12, lineHeight: 19, color: 색.잉크_메타 },
   지시문: { fontFamily: 폰트.본문, fontSize: 15, lineHeight: 24, color: 색.잉크_서브 },
 

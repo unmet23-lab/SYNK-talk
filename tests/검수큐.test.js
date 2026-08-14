@@ -396,3 +396,48 @@ test('실저장소 — 오늘 직원 통로는 원문을 직접 안 읽는다', 
     걸린것.map((x) => `${path.basename(path.dirname(x.p))}: ${x.왜}`).join('\n') +
     '\n  → `engine.review_queue` 를 읽어라. 그 판에 없는 열이 정말 필요하면 뷰와 이 검사를 같이 고친다.');
 });
+
+/* ── ⑥ 반 모드 판 `review_queue_class` (20260814100000 · 검수_내부계약 §3-2) ──
+ * 기본 판이 좁혀 둔 것을 파생 판이 도로 여는 방향이 이 판의 새는 길이다. 그래서
+ * ①기본 판「에서」 파생하는가(원표에서 다시 시작하면 22열 밖이 딸려 온다)
+ * ②더하는 열이 정체 4열 **정확히 그것뿐**인가 를 판 정의 텍스트로 못박는다. */
+
+/** 살아 있는 반 판 정의 — 기본 판과 같은 이유로 **마지막** 것이다. */
+function 반뷰정의() {
+  const 전부 = [...스키마.matchAll(/create (?:or replace )?view engine\.review_queue_class as([\s\S]*?);\n/g)];
+  assert.ok(전부.length, 'engine.review_queue_class 뷰를 합본에서 못 찾았다 — 조각이 안 실렸다');
+  return 전부[전부.length - 1][1];
+}
+
+test('반 판은 기본 판에서 파생한다 — 원표에서 다시 시작하면 좁힘이 무효다', () => {
+  const 몸 = 반뷰정의();
+  assert.match(몸, /from engine\.review_queue\s+v/u,
+    '반 판이 review_queue 를 안 지난다 — 원표에서 시작하면 22열 밖(원문 셋 포함)이 딸려 온다');
+  assert.ok(!/from engine\.submissions|join engine\.submissions/u.test(몸),
+    '반 판이 submissions 원표를 직접 읽는다 — 기본 판의 허용 목록이 우회된다');
+});
+
+test('반 판이 더 여는 것은 정체 4열뿐이다 — 이름·조·좌석·반, 그 이상은 판정 없이 못 나간다', () => {
+  const 몸 = 반뷰정의();
+  /* 🔑 세는 것은 **select 목록**이다 — 조인 조건(`on l.learner_id = e.learner_id`)의 참조까지
+   *   세면 다리 자체가 위반으로 잡혀 거짓 적색이 된다(내보내는 것과 지나가는 것은 다르다). */
+  const 셀렉트 = 몸.slice(0, 몸.indexOf('from engine.review_queue'));
+  const 더한열 = [...셀렉트.matchAll(/l\.([\w가-힣]+)/gu)].map((m) => m[1]);
+  assert.deepEqual([...new Set(더한열)].sort(), ['class_id', 'display_name', 'group_no', 'seat_no'],
+    '반 판이 learners 에서 정체 4열 밖을 실었다 — student_code·contact 가 이 길로 새면 조용하다');
+  assert.ok(!/e\.[\w가-힣]+/u.test(셀렉트),
+    '반 판이 learning_events 의 열을 실었다 — 그 표는 조인 다리로만 쓴다');
+  for (const 열 of ['body_original', 'task_snapshot', 'redaction_result']) {
+    assert.ok(!몸.includes(열), `${열} 이 반 판에 실렸다 — 기본 판이 뺀 바로 그 열이다`);
+  }
+  assert.ok(!/current_staff|auth\.uid/.test(몸),
+    '반 판이 역할을 판정한다 — service_role 호출에서 0행이 되어 화면이 통째로 빈다');
+});
+
+test('확인 쿼리가 반 판을 **수로** 센다 — 「덜 넓힌 판」과 「안 선 판」은 존재 검사에서 같은 모양이다', () => {
+  assert.match(확인, 계수('반검수뷰'), '확인 쿼리가 반 판 유무를 안 센다');
+  assert.match(확인, 계수('반검수판열'), '확인 쿼리가 반 판 열 수를 안 센다');
+  assert.match(확인, 계수('반검수판원문'), '확인 쿼리가 반 판의 원문 열을 안 센다');
+  assert.match(확인, /반검수뷰=1 and 반검수판열=26 and 반검수판원문=0/,
+    '판정 조건에 반 판 세 칸이 안 걸려 있다');
+});

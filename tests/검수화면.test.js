@@ -22,7 +22,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { 코드만, 코드만픽스처 } = require('./lib/소스검사.js');
 const { ROOT } = require('./lib/화면세우기.js'); // ← 먼저 불러 react-native 치환을 켠다
-const { 편집초기값, 여는값 } = require(path.join(ROOT, 'src', '검수화면.js'));
+const { 편집초기값, 여는값, 조번호, 조묶기 } = require(path.join(ROOT, 'src', '검수화면.js'));
 
 const 항목 = (덮을것) => ({
   submission_id: 's1',
@@ -152,4 +152,36 @@ test('알림은 **재생 상태**에서 보낸다 — 버튼마다 보내면 셋
     '재생 상태가 아니라 다른 자리에서 알린다 — 재생 경로가 늘면 갈라진다');
   const 호출수 = [...화면소스.matchAll(/열어봤다알리기\(/gu)].length;
   assert.equal(호출수, 1, `\`열어봤다알리기\` 호출이 ${호출수}곳이다 — 통로는 하나여야 한다`);
+});
+
+/* ── 반 모드 (§3-2 · 숙제서클 §10-3) — 조 칩·항목 제거의 틀려도 조용한 자리 ── */
+
+test('조번호 — 편성 전(null)·쓰레기는 0(조 없음)으로 접되 떨어뜨리지 않는다', () => {
+  assert.equal(조번호({ group_no: 2 }), 2);
+  assert.equal(조번호({ group_no: null }), 0);
+  assert.equal(조번호({}), 0);
+  assert.equal(조번호({ group_no: '3' }), 3, '시트 경유 문자열 숫자를 못 읽는다');
+  assert.equal(조번호({ group_no: 'abc' }), 0);
+  assert.equal(조번호(null), 0);
+});
+
+test('조묶기 — 조 오름차순 · 「조 없음」은 맨 뒤 · 수를 센다', () => {
+  const 목록 = [
+    { group_no: 2 }, { group_no: 1 }, { group_no: null },
+    { group_no: 1 }, { group_no: 4 }, {},
+  ];
+  assert.deepEqual(조묶기(목록), [
+    { 조: 1, 수: 2 }, { 조: 2, 수: 1 }, { 조: 4, 수: 1 }, { 조: 0, 수: 2 },
+  ], '조 없음(0)이 앞으로 오거나 수가 틀리다 — 교사가 없는 조를 찾아 헤맨다');
+  assert.deepEqual(조묶기([]), []);
+  assert.deepEqual(조묶기(null), []);
+});
+
+test('🔴 확정·폐기는 자리(slice)가 아니라 id 로 뺀다 — 조 필터가 켜져 있으면 0번이 아닐 수 있다', () => {
+  /* slice(1) 이던 시절엔 조 필터가 켜진 채 확정하면 **다른 학생의 항목**이 목록에서 빠졌다 —
+     화면은 멀쩡하고 그 학생의 발화만 이 앉음에서 조용히 사라진다(틀려도 조용한 자리). */
+  assert.ok(!/set목록\(\(앞\) => 앞\.slice\(1\)\)/u.test(화면소스),
+    '목록을 자리로 뺀다 — 조 필터 아래서 남의 항목이 사라진다');
+  const 제거들 = [...화면소스.matchAll(/앞\.filter\(\(x\) => x\.submission_id !== 항목\.submission_id\)/gu)];
+  assert.equal(제거들.length, 2, `id 제거가 ${제거들.length}곳이다 — 확정·폐기 두 곳이어야 한다`);
 });

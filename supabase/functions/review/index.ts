@@ -68,11 +68,17 @@ const { 발급시각, 살아있는직원 } = 토큰모듈 as {
 };
 
 type 커서값 = { 감사: boolean; 신뢰: string | null; 시각: string; id: string };
-const { 쪽크기, 커서읽기, 커서만들기, 커서키 } = 커서모듈 as {
+type 반커서값 = { 조: number | null; 좌석: number | null; 시각: string; id: string };
+const { 쪽크기, 커서읽기, 커서만들기, 커서키, 반커서읽기, 반커서만들기, 반커서키 } = 커서모듈 as {
   쪽크기: (raw: string | null) => { 값: number | null; 이유: string | null };
   커서읽기: (raw: string | null) => { 값: 커서값 | null; 이유: string | null };
   커서만들기: (행: Record<string, unknown> | undefined) => string | null;
   커서키: (값: 커서값 | null) => { 감사키: boolean; 널키: boolean; 신뢰키: string; 시각: string; id: string } | null;
+  반커서읽기: (raw: string | null) => { 값: 반커서값 | null; 이유: string | null };
+  반커서만들기: (행: Record<string, unknown> | undefined) => string | null;
+  반커서키: (값: 반커서값 | null) => {
+    조널키: boolean; 조키: number; 좌석널키: boolean; 좌석키: number; 시각: string; id: string;
+  } | null;
 };
 
 type 요청검증 = { 값: Record<string, never> | null; 이유: string | null; 칸: string | null };
@@ -151,14 +157,14 @@ Deno.serve(async (req: Request) => {
    * 전부 큐 조회로 동작하고, §5 가 서는 날 옛 오타 경로가 **이미 돌던 것**이 된다. */
   const url = new URL(req.url);
   const 경로 = url.pathname.replace(/\/+$/, '').split('/').pop() ?? '';
-  const 아는경로 = ['queue', 'audio', 'played', 'approve', 'discard'];
+  const 아는경로 = ['queue', 'classes', 'audio', 'played', 'approve', 'discard'];
   if (!아는경로.includes(경로)) {
     return 실패(404, {
       code: 'CONTRACT_VIOLATION', retryable: false,
-      message: '없는 경로입니다 — GET /v1/review/queue · POST /v1/review/{audio,played,approve,discard}',
+      message: '없는 경로입니다 — GET /v1/review/{queue,classes} · POST /v1/review/{audio,played,approve,discard}',
     }, 선언);
   }
-  const 기대메서드 = 경로 === 'queue' ? 'GET' : 'POST';
+  const 기대메서드 = 경로 === 'queue' || 경로 === 'classes' ? 'GET' : 'POST';
   if (req.method !== 기대메서드) {
     return 실패(405, { code: 'CONTRACT_VIOLATION', message: `${기대메서드} 만 받는다`, retryable: false }, 선언);
   }
@@ -197,6 +203,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     if (경로 === 'queue') return await 큐읽기(url, staff_id, ver);
+    if (경로 === 'classes') return await 반목록읽기(staff_id, ver);
     if (경로 === 'audio') return await 오디오서명(req, staff_id, ver);
     if (경로 === 'played') return await 열어봄(req, staff_id, ver);
     const 본문 = await 본문읽기(req);
@@ -218,6 +225,15 @@ async function 큐읽기(url: URL, staff_id: string, ver: string) {
   const 쪽 = 쪽크기(url.searchParams.get('limit'));
   if (쪽.이유) {
     return 실패(400, { code: 'CONTRACT_VIOLATION', field: 'limit', message: 쪽.이유, retryable: false }, ver);
+  }
+  /* §3-2 반 모드 — `?class=` 가 오면 판·정렬·커서가 통째로 갈린다(교사 동선 축).
+   * 여기서 가르고 아래는 손대지 않는다 — 기본 큐의 정렬·커서는 바이트 그대로다. */
+  const 반 = url.searchParams.get('class');
+  if (반 !== null) {
+    if (!uuid꼴.test(반)) {
+      return 실패(400, { code: 'CONTRACT_VIOLATION', field: 'class', message: 'class 는 반의 uuid 입니다', retryable: false }, ver);
+    }
+    return await 반큐읽기(url, 반, staff_id, ver);
   }
   const 커서 = 커서읽기(url.searchParams.get('cursor'));
   if (커서.이유) {
@@ -263,6 +279,91 @@ async function 큐읽기(url: URL, staff_id: string, ver: string) {
   });
 
   return 봉투(200, { ok: true, data, next_cursor }, ver);
+}
+
+/* ── §3-2 반 모드 (숙제서클 §10-3) ───────────────────────────────────── */
+
+/* 반 모드가 여는 열 = 기본 22 + 정체 3. `class_id` 는 **안 되돌린다** — 요청이 이미 들고
+ * 왔고, 되돌리면 화면이 서버 값과 자기 값 중 무엇을 믿을지 갈린다. 정체 3열을 여는 판정의
+ * 근거는 판 쪽 머리말이다(`20260814100000` — 순회 검수는 교사가 학생 눈앞에 앉는 자리다). */
+const 반큐열 = [...큐열, 'display_name', 'group_no', 'seat_no'];
+
+/** §3-2 `GET /v1/review/queue?class=` — 그 반 학생들의 큐를 **교사 동선 순**으로.
+ *  정렬 = 조 → 좌석 → 시각(nulls last 둘 · `lib/검수커서.js` 반 모드 머리말). 감사 표본·저신뢰
+ *  우선은 여기 없다 — 수업 첫 20분의 축은 「눈앞의 조」이지 「의심스러운 발화」가 아니다.
+ *  감사는 기본 큐와 **같은 장부·같은 action** 이다: 조회 1회 = `review.queue` 1행이라는 분모를
+ *  모드가 가르지 않는다(가르면 게이트 ②의 입력이 두 갈래가 된다). */
+async function 반큐읽기(url: URL, 반: string, staff_id: string, ver: string) {
+  const 쪽 = 쪽크기(url.searchParams.get('limit'));
+  if (쪽.이유) {
+    return 실패(400, { code: 'CONTRACT_VIOLATION', field: 'limit', message: 쪽.이유, retryable: false }, ver);
+  }
+  const 커서 = 반커서읽기(url.searchParams.get('cursor'));
+  if (커서.이유) {
+    return 실패(400, { code: 'CONTRACT_VIOLATION', field: 'cursor', message: 커서.이유, retryable: false }, ver);
+  }
+  const k = 반커서키(커서.값);
+  const 크기 = 쪽.값 as number;
+
+  /* 읽기와 감사가 한 트랜잭션 — 기본 큐와 같은 이유(§2). */
+  const { data, next_cursor } = await sql.begin(async (tx) => {
+    const 행들 = await tx`
+      select ${tx(반큐열)}
+        from engine.review_queue_class
+       where class_id = ${반}::uuid
+         and ${k === null ? tx`true` : tx`
+             ((group_no is null), coalesce(group_no, 0), (seat_no is null), coalesce(seat_no, 0),
+              occurred_at, submission_id)
+             > (${k.조널키}::boolean, ${k.조키}::smallint, ${k.좌석널키}::boolean, ${k.좌석키}::smallint,
+                ${k.시각}::timestamptz, ${k.id}::uuid)`}
+       order by (group_no is null), coalesce(group_no, 0), (seat_no is null), coalesce(seat_no, 0),
+                occurred_at, submission_id
+       limit ${크기 + 1}`;
+
+    const data = 행들.slice(0, 크기);
+    const 실린것 = data.map((r: Record<string, unknown>) => r.submission_id);
+
+    /* 0건도 1행 — 「그 반에 기다리는 것이 없다」도 읽은 것이다(기본 큐와 같은 판단). */
+    await tx`
+      insert into engine.staff_access_log (staff_id, action, target_ids)
+      values (${staff_id}::uuid, 'review.queue', ${실린것}::uuid[])`;
+
+    return {
+      data,
+      next_cursor: 행들.length > 크기 ? 반커서만들기(data[data.length - 1]) : null,
+    };
+  });
+
+  return 봉투(200, { ok: true, data, next_cursor }, ver);
+}
+
+/** §3-2 `GET /v1/review/classes` — 반 카드 목록 + 반마다 「기다리는 것 n」.
+ *  🔴 「반이 0개」와 「전부 처리됨」은 다른 상태다 — 목록 자체가 비면 화면이 그 사실을 말해야
+ *  하므로(반 다리가 안 섰다) 여기서 거르지 않고 다 내준다. `waiting` 은 목록을 그리는 순간의
+ *  스냅샷이고, 그 반을 여는 순간 큐가 다시 세므로 두 수가 어긋나는 것은 정상이다.
+ *  감사 = `review.classes` 1행(대상 = 실린 반들) — 큐 분모(`review.queue`)와 갈라 둔다:
+ *  이 조회가 내주는 것은 제출물이 아니라 **반의 존재와 개수**뿐이라, 큐 장부에 섞으면
+ *  「무엇을 보여 줬나」의 뜻이 흐려진다. */
+async function 반목록읽기(staff_id: string, ver: string) {
+  const { classes } = await sql.begin(async (tx) => {
+    const 행들 = await tx`
+      select c.class_id, c.class_key, c.display_name,
+             count(v.submission_id)::int as waiting
+        from engine.classes c
+        left join engine.review_queue_class v on v.class_id = c.class_id
+       where c.active
+       group by c.class_id, c.class_key, c.display_name
+       order by c.class_key, c.class_id`;
+
+    await tx`
+      insert into engine.staff_access_log (staff_id, action, target_ids)
+      values (${staff_id}::uuid, 'review.classes',
+              ${행들.map((r: Record<string, unknown>) => r.class_id)}::uuid[])`;
+
+    return { classes: 행들 };
+  });
+
+  return 봉투(200, { ok: true, classes }, ver);
 }
 
 /* ── §4 POST /v1/review/audio ────────────────────────────────────────── */

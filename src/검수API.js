@@ -84,11 +84,32 @@ export async function 큐받기(토큰, 옵션 = {}) {
   const 질의 = [];
   if (옵션.개수) 질의.push(`limit=${encodeURIComponent(String(옵션.개수))}`);
   if (옵션.커서) 질의.push(`cursor=${encodeURIComponent(옵션.커서)}`);
+  /* §3-2 반 모드 — 반 id 를 실으면 판·정렬·커서가 통째로 갈린다(교사 동선 순).
+   * ⚠ 두 모드의 커서는 꼴이 달라 섞으면 400 이다 — 화면은 반을 바꿀 때 커서를 버린다. */
+  if (옵션.반) 질의.push(`class=${encodeURIComponent(String(옵션.반))}`);
   const 본문 = await 부르기(`review/queue${질의.length ? `?${질의.join('&')}` : ''}`, 토큰);
   return {
     목록: Array.isArray(본문.data) ? 본문.data : [],
     다음커서: 본문.next_cursor ?? null,
   };
+}
+
+/**
+ * §3-2 `GET /v1/review/classes` — 반 카드 목록 + 반마다 「기다리는 것 n」.
+ *
+ * 🔴 **빈 목록은 「전부 처리됨」이 아니다** — 반 다리(`roster-ingest` 신판)가 안 선 상태다.
+ *   화면은 그 둘을 같은 모양으로 그리지 않는다(§3-2).
+ * 🔑 `waiting` 은 목록을 그리는 순간의 스냅샷이다 — 반을 연 뒤의 수와 어긋나는 것이 정상이라
+ *   화면이 두 수를 대조해 「고장」으로 읽지 않는다.
+ */
+export async function 반목록받기(토큰) {
+  const 본문 = await 부르기('review/classes', 토큰);
+  return (Array.isArray(본문.classes) ? 본문.classes : []).map((c) => ({
+    id: String(c.class_id),
+    열쇠: c.class_key ?? '',
+    이름: c.display_name ?? null,
+    대기: Number(c.waiting) || 0,
+  }));
 }
 
 /**

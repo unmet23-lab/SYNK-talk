@@ -103,6 +103,42 @@ test('schema_ver 는 CLI 와 같은 정본(계약 JSON)에서 온다 — DB 이�
   assert.ok(!/schema_migrations/.test(주석뺀소스), 'DB 마이그레이션 이름으로 세면 CLI 도장과 갈라진다');
 });
 
+/* ── ②-2 조·좌석 스냅샷 (숙제서클 §10-3 · 20260814100000) ── */
+
+test('조편성은 키가 있을 때만 움직인다 — 호환의 방향은 「무동작」이지 「전부 비움」이 아니다', () => {
+  assert.match(주석뺀소스, /if \(Array\.isArray\(몸\.조편성\)\)/u,
+    '조편성 처리가 키 유무로 안 갈린다 — 옛 스윕(키 없음)이 전 학생의 조를 비우게 된다');
+  /* 해제(스냅샷 미언급 비움)가 그 가드 **안**에 있는가 — 밖이면 위 가드가 무의미하다. */
+  const 가드시작 = 주석뺀소스.indexOf('if (Array.isArray(몸.조편성))');
+  const 해제자리 = 주석뺀소스.indexOf('set group_no = null, seat_no = null');
+  const 다음절 = 주석뺀소스.indexOf('무동의', 가드시작);
+  assert.ok(해제자리 !== -1, '스냅샷 미언급 학생을 안 비운다 — 재편성에서 빠진 학생의 옛 조가 영원히 남는다');
+  assert.ok(가드시작 !== -1 && 가드시작 < 해제자리 && 해제자리 < 다음절,
+    '해제 update 가 조편성 가드 밖이다 — 키 없는 옛 스윕이 전 학생의 조를 비운다');
+});
+
+test('조 갱신은 바뀐 행만 센다 · 연락처 막힘은 조도 안 적는다', () => {
+  assert.match(주석뺀소스, /l\.group_no is distinct from v\.g or l\.seat_no is distinct from v\.s/u,
+    '갱신이 전원에게 매 스윕 도장을 찍는다 — 「무엇이 달라졌나」를 셈이 못 알려준다');
+  assert.match(주석뺀소스, /막힌번호\.has\(정규형\(sid\)\)/u,
+    '연락처 대조가 막힌 행에 조를 적는다 — 같은 사람인지 모르는 행이 남의 조에 앉는다(반과 같은 축)');
+});
+
+test('결속 — Fn 의 조·좌석 범위 못이 DB CHECK 와 같은 수다', () => {
+  /* 한쪽만 조이면 다른 쪽에서 500 이 난다(Fn 이 넓으면 DB 가 죽이고, DB 가 넓으면 쓰레기가 앉는다). */
+  const 스키마 = fs.readFileSync(path.join(ROOT, 'supabase', 'L0_스키마.sql'), 'utf8');
+  assert.match(스키마, /check \(group_no between 1 and 20\)/u, 'DB 쪽 조 CHECK 앵커가 낡았다');
+  assert.match(스키마, /check \(seat_no {2}between 1 and 20\)/u, 'DB 쪽 좌석 CHECK 앵커가 낡았다');
+  assert.match(주석뺀소스, /조 < 1 \|\| 조 > 20 \|\| !Number\.isInteger\(좌석\) \|\| 좌석 < 1 \|\| 좌석 > 20/u,
+    'Fn 쪽 범위 못이 1~20 이 아니다 — DB CHECK 와 갈라지면 한 행의 쓰레기가 500 으로 판 전체를 막는다');
+});
+
+test('응답이 조 갱신·해제·문제를 센다 — 0건과 안 잰 것이 같은 모양이면 안 된다(F207)', () => {
+  for (const 칸 of ['조갱신', '조해제', '조편성문제']) {
+    assert.ok(주석뺀소스.includes(칸), `응답에 ${칸} 이 없다 — 스윕 알림이 그 갈래를 영영 모른다`);
+  }
+});
+
 /* ── ③ 동봉 완결성 ── */
 
 test('동봉 표 — 규칙 lib·의존·계약 JSON 이 전부 실린다', () => {
