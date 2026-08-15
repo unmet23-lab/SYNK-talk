@@ -196,3 +196,57 @@ test('재현 — 49d4feb 직전을 기준으로 두면 그 커밋이 낡힌 다�
   }
   assert.equal(판정.모름.length, 0, '기준을 전부 준 판인데 «모름» 이 남았다');
 });
+
+// ── ⑥ 기계 판독 (`--json`) — 형제 저장소가 읽는 자리 (대기열 #Q87) ──────────
+/* 왜 층을 나눴나: `기계요약` 은 git 을 타서 회귀가 값을 못 고정한다(실저장소 장부는 세션마다
+ * 바뀐다 · 맹점 ②). 그래서 이 장치가 **샐 수 있는 규칙**만 순수 함수 `요약칸` 에 모았고,
+ * 탐지력은 전부 아래 픽스처가 진다. CLI 는 모양(=파싱되나)만 묻는다. */
+
+test('요약칸 — «모름» 은 제 칸에 남는다 (최신에 합치면 F455 와 같은 출력이 된다)', () => {
+  const 칸 = 빚.요약칸({ 낡음: [], 최신: ['a', 'b'], 모름: ['radio-round'] });
+  assert.deepEqual(칸.모름, ['radio-round']);
+  assert.equal(칸.최신, 2, '모름이 최신에 흘러들었다 — 이 장치가 거짓말할 수 있는 유일한 자리다');
+  assert.deepEqual(칸.낡음, []);
+});
+
+test('요약칸 — 분모 등식: 전체 = 낡음 + 최신 + 모름', () => {
+  /* 「0은 분모와 함께 쓴다」(유호 확정 08-14). 전체를 따로 세면 갈래 합과 어긋나도 안 보인다. */
+  const 칸 = 빚.요약칸({
+    낡음: [{ 함수: 'deliver', 바뀐: ['lib/x.js'] }, { 함수: 'tasks', 바뀐: [] }],
+    최신: ['a', 'b', 'c'],
+    모름: ['z'],
+  });
+  assert.equal(칸.전체, 6);
+  assert.equal(칸.전체, 칸.낡음.length + 칸.최신 + 칸.모름.length);
+  assert.deepEqual(칸.낡음, ['deliver', 'tasks'], '낡음은 «이름»으로 나가야 부르는 쪽이 부를 수 있다');
+});
+
+test('--json — stdout 이 통째로 파싱되고 판마다 칸이 선다', () => {
+  /* 🔑 stdout 에 사람글 한 줄만 섞여도 부르는 쪽 `JSON.parse` 가 터지고, 터진 쪽은 「모름」으로
+   *   접혀 **조용해진다** — 그래서 「경고가 stderr 인가」를 여기서 함께 못박는다. */
+  const out = execFileSync(process.execPath, [path.join(ROOT, 'tools', '배포빚.js'), '--json'],
+    { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  const o = JSON.parse(out);
+  assert.equal(o.도구, '배포빚');
+  assert.deepEqual(Object.keys(o.판).sort(), [...빚.판들].sort());
+  for (const 판 of 빚.판들) {
+    const v = o.판[판];
+    assert.ok(Array.isArray(v.낡음) && Array.isArray(v.모름), `${판}: 낡음·모름은 이름 배열이다`);
+    assert.equal(typeof v.최신, 'number');
+    assert.equal(v.전체, v.낡음.length + v.최신 + v.모름.length, `${판}: 분모가 갈래 합과 다르다`);
+  }
+});
+
+test('--json --판 운영 — 고른 판만 낸다 (사람글 갈래와 같은 규칙)', () => {
+  const out = execFileSync(process.execPath,
+    [path.join(ROOT, 'tools', '배포빚.js'), '--json', '--판', '운영'],
+    { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  assert.deepEqual(Object.keys(JSON.parse(out).판), ['운영']);
+});
+
+test('--json 없이는 사람글이다 — 기계 통로가 사람 통로를 덮지 않았다', () => {
+  const out = execFileSync(process.execPath, [path.join(ROOT, 'tools', '배포빚.js')],
+    { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  assert.match(out, /^\[배포빚\] /m);
+  assert.throws(() => JSON.parse(out), '사람글 자리에서 JSON 이 나왔다 — 갈래가 뒤집혔다');
+});
