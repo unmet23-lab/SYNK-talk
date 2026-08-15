@@ -22,6 +22,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
+const { 띄우기 } = require('./lib/띄우기.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const 빚 = require('../tools/배포빚.js');
@@ -224,8 +225,8 @@ test('요약칸 — 분모 등식: 전체 = 낡음 + 최신 + 모름', () => {
 test('--json — stdout 이 통째로 파싱되고 판마다 칸이 선다', () => {
   /* 🔑 stdout 에 사람글 한 줄만 섞여도 부르는 쪽 `JSON.parse` 가 터지고, 터진 쪽은 「모름」으로
    *   접혀 **조용해진다** — 그래서 「경고가 stderr 인가」를 여기서 함께 못박는다. */
-  const out = execFileSync(process.execPath, [path.join(ROOT, 'tools', '배포빚.js'), '--json'],
-    { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  const out = 띄우기([path.join(ROOT, 'tools', '배포빚.js'), '--json'],
+    { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).stdout;
   const o = JSON.parse(out);
   assert.equal(o.도구, '배포빚');
   assert.deepEqual(Object.keys(o.판).sort(), [...빚.판들].sort());
@@ -238,15 +239,15 @@ test('--json — stdout 이 통째로 파싱되고 판마다 칸이 선다', () 
 });
 
 test('--json --판 운영 — 고른 판만 낸다 (사람글 갈래와 같은 규칙)', () => {
-  const out = execFileSync(process.execPath,
+  const out = 띄우기(
     [path.join(ROOT, 'tools', '배포빚.js'), '--json', '--판', '운영'],
-    { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).stdout;
   assert.deepEqual(Object.keys(JSON.parse(out).판), ['운영']);
 });
 
 test('--json 없이는 사람글이다 — 기계 통로가 사람 통로를 덮지 않았다', () => {
-  const out = execFileSync(process.execPath, [path.join(ROOT, 'tools', '배포빚.js')],
-    { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  const out = 띄우기([path.join(ROOT, 'tools', '배포빚.js')],
+    { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).stdout;
   assert.match(out, /^\[배포빚\] /m);
   assert.throws(() => JSON.parse(out), '사람글 자리에서 JSON 이 나왔다 — 갈래가 뒤집혔다');
 });
