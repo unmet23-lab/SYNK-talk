@@ -219,7 +219,7 @@ test('🔑 URL 조립을 잡 몸통에 그대로 둔다 — 함수 안으로 감
 // 형제 저장소(SYNK-appsscript)의 세션시작 부패 점검이 6시간마다 이 한 줄을 읽어 먼저 말한다.
 // 🔑 네트워크는 안 탄다 — `fetch` 를 대역으로 갈아끼워 **성공 경로까지** 실제로 밟는다.
 //    구조 검사로 접으면 「낱말이 파일에 있나」로 되돌아간다(②가 변이 2건을 흘린 그 실수).
-const { spawnSync } = require('node:child_process');
+const { 띄우기 } = require('./lib/띄우기.js');
 
 const 도구경로 = path.join(ROOT, 'tools', '회차장부.js');
 const 도구소스 = fs.readFileSync(도구경로, 'utf8');
@@ -290,8 +290,11 @@ test('사람 통로는 그대로다 — --json 이 없으면 표를 찍고 JSON 
 test('🔑 터진 자리에서도 한 줄을 낸다 — 자격증명이 없을 때 (네트워크 0)', () => {
   /* 부르는 쪽에서 「판을 아직 안 부었다」(조용해도 되는 상태)와 「자격증명·네트워크가 죽었다」는
    * 처방이 다르다. 빈 stdout 이면 둘이 한 칸으로 뭉친다. */
-  const r = spawnSync(process.execPath, [도구경로, '--json'], {
-    encoding: 'utf8', timeout: 20000,
+  /* 🔑 통로는 `띄우기` 다 — 직접 spawn 하면 **못 띄운 것**이 `status=null` 로 와서
+   *   `!== 0` 검사를 그대로 통과한다(미실행이 판정으로 번역되는 자리 · tests/스폰통로.test.js).
+   *   여기선 2 를 «기대값»으로 못박아 두므로, 0 이든 1 이든 못 띄움이든 전부 터진다. */
+  const r = 띄우기([도구경로, '--json'], {
+    encoding: 'utf8', timeout: 20000, 통과코드: [2],
     env: { ...process.env, SUPABASE_ACCESS_TOKEN: '', SUPABASE_PROJECT_REF: '' },
   });
   assert.equal(r.status, 2);
@@ -306,7 +309,7 @@ test('🔑 모르는 플래그는 «그 사유로» 막힌다 — status≠0 만
    *   어떤 실행이든 2로 끝난다. 「막혔다」와 「원래 2였다」가 같은 모양이었다(F207 계열).
    *   자격증명을 비워 네트워크 갈래를 끊고, 차단 «사유»를 직접 본다. */
   const 없이 = { ...process.env, SUPABASE_ACCESS_TOKEN: '', SUPABASE_PROJECT_REF: '' };
-  const r = spawnSync(process.execPath, [도구경로, '--없는플래그'], { encoding: 'utf8', timeout: 20000, env: 없이 });
+  const r = 띄우기([도구경로, '--없는플래그'], { encoding: 'utf8', timeout: 20000, env: 없이, 통과코드: [2] });
   assert.notEqual(r.status, 0);
   assert.match(String(r.stderr), /모르는 플래그 --없는플래그/,
     '게이트의 답을 버렸다 — 모르는 낱말이 조용히 무시되면 딴 과녁을 재고 초록이 된다(F400·F435)');
