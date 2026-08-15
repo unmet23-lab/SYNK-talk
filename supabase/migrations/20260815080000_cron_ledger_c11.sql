@@ -1,11 +1,299 @@
+/* 회차 단위 장부 — cron 이 «무엇을 냈는지»를 오래 사는 표에 남긴다 (조용한 실패 장부 ④)
+ *
+ * ■ 왜 이 조각인가 — 계기는 추측이 아니라 실측이다(2026-08-15 07:30Z · 운영 qiwxeddwwnzkwalpsuty):
+ *   · `cron.job_run_details` : **972건 · 6일치**(08-09~)가 살아 있고 **전부 `succeeded`**.
+ *     `net.http_post` 는 **비동기 발사**라 SQL 은 함수가 죽어도 성공한다 — 이 표는
+ *     「회차가 돌았나」까지만 말하고 「무엇을 냈나」는 **원리상 못 본다**.
+ *   · `net._http_response` : **42건 · 5시간 50분치**뿐(`pg_net.ttl = 6 hours` 실측). 그리고 열이
+ *     `id·status_code·content_type·headers·content·timed_out·error_msg·created` 라 **url 이 없다**.
+ *     응답만 걷어서는 「어느 cron 이었나」를 **가릴 재료가 없다**.
+ *   · 겹치는 구간 = 972 중 42 = **4.3%**. 회차의 95.7% 는 「돌았다」만 남고 결과는 영영 모른다.
+ *
+ * 🔴 그래서 장부에 적혀 있던 처방(「응답 표를 걷어 표에 옮기면 된다 — cron 4개 한꺼번에」)은
+ *   **그것만으로 안 선다.** 부르는 쪽이 발사 번호를 스스로 적어야 귀속이 산다. 그 자리가 여기다.
+ *
+ * 🔑 **SQL 층에서 죽는 갈래가 따로 있다** — 리허설 실측: radio 잡이 `url` NULL(vault 시크릿 빈칸)로
+ *   **16회 전부** 죽어 HTTP 호출이 0회였고, 15시간 동안 아무도 몰랐다. 그 실패는 응답 표에
+ *   **도달조차 못 한다**. `ops.발사()` 가 그 예외를 잡아 «발사실패» 로 적는다.
+ *
+ * ⛔ 엣지 함수는 한 줄도 안 바꾼다. 잡 이름·주기·URL·헤더·본문 전부 그대로다 —
+ *   바뀌는 것은 「누가 http_post 를 부르는가」 하나뿐(직접 → `ops.발사` 경유).
+ *   URL 조립을 **잡 몸통에 그대로 둔 것은 일부러다**: `tests/조용한실패.test.js` 가 마이그레이션에서
+ *   「이어붙인 함수 경로」를 훑어 cron 함수 목록을 뽑는다. 함수 안으로 감추면 그 분모가 조용히 낡는다.
+ *   ⚠ 그래서 이 파일의 **주석에도** 그 꼴을 예시로 적지 않는다 — 주석 한 줄이 그 목록에 유령을
+ *     하나 더한다(초판이 그랬고 `tests/회차장부.test.js` 가 잡았다).
+ *
+ * ⚠ **대가 — 장부가 본업을 막으면 안 된다.** `ops.발사()` 는 http_post 를 **먼저** 하고, 장부 기입은
+ *   따로 감싸 실패해도 삼킨다(부르는 일은 이미 끝났으므로). 장부가 통째로 깨져도 cron 은 계속 부른다.
+ *   틀릴 때의 모습: 장부는 비었는데 함수는 정상 동작 — 그래서 `ops.회차_대조` 가
+ *   `cron.job_run_details` 와 건수를 맞대 「돈 횟수 > 적힌 횟수」를 드러낸다(자기 침묵을 자기가 못 봄 방지).
+ *
+ * 🔑 제약 이름은 `_c11` 을 **붙인다**. 처음엔 「ops 는 계약 밖이니 접미사도 빼자」고 지었는데,
+ *   `tests/L0스키마.test.js` 가 **저장소의 모든 CHECK** 에 계약 접미사를 요구한다(실측으로 빨개졌다).
+ *   그 규칙이 옳다 — 접미사 없는 제약은 계약이 올라갈 때 「고쳐야 하나」를 아무도 안 묻게 된다.
+ *   대신 이 조각은 engine·radio 를 한 칸도 안 건드리므로 판정 블록의 기대값은 앞 조각 것 그대로다.
+ *
+ * 되돌림:
+ *   select cron.unschedule('ops-harvest');
+ *   -- 잡 넷을 옛 몸통으로: 20260809070000 / 20260812130000 조각의 cron.schedule 블록 재실행
+ *   drop schema ops cascade;
+ *   delete from engine.schema_migrations where version='20260815080000'; */
+
+begin;
+
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
+
+do $migration$
+declare
+  migration_version constant text := '20260815080000';
+  migration_name constant text := '20260815080000_cron_ledger_c11.sql';
+  expected_checksum constant text := 'f469945ef1f94713ef9636fdb66181aa4e0e50cb61ba3dcdaae8c3d3f2261166'; -- migration-checksum
+  base_version constant text := '20260814110000';
+  recorded_checksum text;
+  걸린잡수 int;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 c11 위에서만 돈다 — engine.schema_migrations가 없다(빈 DB면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      '이 조각은 기준선 % 위에서만 돈다 — 이력에 그 판이 없다(부분·혼합·불명이라 중단한다)',
+      base_version;
+  end if;
+
+  /* ── ① 관측층 스키마 ─────────────────────────────────────────────────────
+   * engine·radio 와 나란히 두지 않는다 — 학습 계약(c11)의 표가 아니라 운영 관측 표다.
+   * 계약 표에 섞으면 c11 판정·왕복시험·권한 검사가 전부 이 표까지 재게 된다. */
+  create schema if not exists ops;
+
+  /* ── ② 회차 장부 본체 ────────────────────────────────────────────────────
+   * 한 행 = 「cron 이 함수를 한 번 불렀다」. `pipeline_jobs` 로는 못 앉는 단위다
+   * (거긴 `submission_id unique` 라 제출 단위이고, 회차·재시도가 구조적으로 안 들어간다). */
+  create table if not exists ops.cron_runs (
+    id           bigserial primary key,
+    jobname      text        not null,
+    /* net.http_post 가 준 발사 번호. null = 발사 자체가 못 나갔다(리허설 16건의 모양). */
+    request_id   bigint,
+    queued_at    timestamptz not null default now(),
+    outcome      text        not null,
+    status_code  integer,
+    timed_out    boolean,
+    error_msg    text,
+    /* 봉투 본문 — ②가 talk 에 붙인 «왜»(사유 칸)가 여기로 흘러 들어와 오래 산다. */
+    body         text,
+    harvested_at timestamptz,
+    /* 🔑 닫힌 어휘로 못박는다 — 오타 하나가 조용히 새 갈래를 만들면 분모가 갈라진다.
+     *   그건 이 장부가 없애려던 실패 모양 그 자체다. */
+    constraint cron_runs_outcome_c11 check (outcome in
+      ('대기', '성공', '실패', '타임아웃', '전송오류', '상태없음', '유실', '발사실패'))
+  );
+
+  /* 수확이 매번 훑는 자리는 «대기» 뿐이다 — 부분 인덱스라 표가 커져도 비용이 안 는다. */
+  create index if not exists cron_runs_대기_idx on ops.cron_runs (request_id) where outcome = '대기';
+  create index if not exists cron_runs_시각_idx on ops.cron_runs (queued_at desc);
+
+  /* 🔒 학생 토큰에게는 존재하지 않는 표다(철학 ㉣ 계열 — 운영 관측치는 밖으로 안 나간다).
+   *   RLS 를 켜고 정책은 **하나도 안 만든다** = service_role 만 본다(그건 RLS 를 우회한다). */
+  alter table ops.cron_runs enable row level security;
+  revoke all on schema ops from anon, authenticated;
+  revoke all on ops.cron_runs from anon, authenticated;
+
+  /* ── ③ 발사 — 부르고, 번호를 적는다 ──────────────────────────────────────
+   * 순서가 곧 안전 설계다: http_post 가 **먼저**, 장부는 그 뒤. 장부가 터져도 호출은 이미 나갔다. */
+  create or replace function ops.발사(p_job text, p_url text) returns bigint
+  language plpgsql
+  as $fn$
+  declare
+    rid bigint;
+  begin
+    select net.http_post(
+             url     := p_url,
+             headers := jsonb_build_object(
+                          'Content-Type',  'application/json',
+                          'Authorization', 'Bearer ' ||
+                            (select decrypted_secret from vault.decrypted_secrets
+                              where name = 'service_role_key')),
+             body    := '{}'::jsonb)
+      into rid;
+
+    begin
+      insert into ops.cron_runs(jobname, request_id, outcome) values (p_job, rid, '대기');
+    exception when others then
+      /* 장부가 본업을 못 막는다 — 부르는 일은 위에서 이미 끝났다. */
+      null;
+    end;
+    return rid;
+  exception when others then
+    /* 여기까지 왔다 = http_post 가 **못 나갔다**(URL NULL · 시크릿 빈칸 · 확장 없음 · 권한).
+     * 리허설에서 16회 전부 이 모양이었고, 응답 표에는 흔적이 하나도 안 남았다. */
+    insert into ops.cron_runs(jobname, request_id, outcome, error_msg)
+         values (p_job, null, '발사실패', left(sqlerrm, 500));
+    return null;
+  end
+  $fn$;
+
+  /* ── ④ 수확 — 6시간 안에 응답을 옮겨 적는다 ──────────────────────────────
+   * `pg_net.ttl = 6 hours`(실측)라, 이 함수가 도는 주기가 곧 「무엇을 냈는지」의 보존 기간이다. */
+  create or replace function ops.수확() returns jsonb
+  language plpgsql
+  as $fn$
+  declare
+    v수확 int := 0;
+    v유실 int := 0;
+  begin
+    update ops.cron_runs r
+       set status_code  = resp.status_code,
+           timed_out    = resp.timed_out,
+           error_msg    = resp.error_msg,
+           body         = left(resp.content, 2000),
+           harvested_at = now(),
+           outcome      = case
+                            when coalesce(resp.timed_out, false)      then '타임아웃'
+                            when resp.error_msg is not null           then '전송오류'
+                            when resp.status_code is null             then '상태없음'
+                            when resp.status_code between 200 and 299 then '성공'
+                            else '실패'
+                          end
+      from net._http_response resp
+     where resp.id = r.request_id
+       and r.outcome = '대기';
+    get diagnostics v수확 = row_count;
+
+    /* 끝내 응답이 안 온 것 = 유실. 요청 타임아웃이 5초라 30분이면 넉넉하다 —
+     * 이 칸이 0이 아닌 날은 pg_net 자체가 밀렸다는 뜻이고, 그것도 알아야 할 사실이다. */
+    update ops.cron_runs
+       set outcome = '유실', harvested_at = now()
+     where outcome = '대기'
+       and queued_at < now() - interval '30 minutes';
+    get diagnostics v유실 = row_count;
+
+    return jsonb_build_object('수확', v수확, '유실', v유실);
+  end
+  $fn$;
+
+  /* ── ⑤ 읽는 자리 ─────────────────────────────────────────────────────────
+   * 🔑 ③(건 단위 사유)이 «writer 만 세우고 reader 0» 으로 끝난 자리를 여기서 반복하지 않는다.
+   *   두 뷰가 각각 다른 질문에 답한다 — 하나로 합치면 어느 쪽이 침묵인지 안 보인다. */
+
+  /* 「무엇을 냈나」 — 분모를 갈래로 쪼갠다(합계만 보면 좋은 0과 안 재본 0이 같은 모양이다). */
+  create or replace view ops.회차_요약 as
+  select jobname,
+         count(*)                                          as 전체,
+         count(*) filter (where outcome = '성공')            as 성공,
+         count(*) filter (where outcome = '실패')            as 실패,
+         count(*) filter (where outcome = '타임아웃')         as 타임아웃,
+         count(*) filter (where outcome = '전송오류')         as 전송오류,
+         count(*) filter (where outcome = '상태없음')         as 상태없음,
+         count(*) filter (where outcome = '발사실패')         as 발사실패,
+         count(*) filter (where outcome = '유실')            as 유실,
+         count(*) filter (where outcome = '대기')            as 대기,
+         max(queued_at)                                    as 마지막발사,
+         max(queued_at) filter (where outcome <> '성공')     as 마지막이상
+    from ops.cron_runs
+   where queued_at > now() - interval '7 days'
+   group by jobname;
+
+  /* 「장부 자신이 침묵하고 있나」 — cron 은 돌았는데 행이 없으면 여기서 드러난다.
+   * 가드는 자기 전처리에 눈이 먼다: `ops.발사` 가 통째로 안 불리면 위 요약은 **조용히 비어 있다**. */
+  create or replace view ops.회차_대조 as
+  with 돈것 as (
+    select j.jobname, count(*) as 돈횟수, max(d.start_time) as 마지막회차,
+           count(*) filter (where d.status <> 'succeeded') as SQL층실패
+      from cron.job_run_details d
+      join cron.job j on j.jobid = d.jobid
+     where d.start_time > now() - interval '24 hours'
+     group by j.jobname
+  ), 적힌것 as (
+    select jobname, count(*) as 적힌횟수
+      from ops.cron_runs
+     where queued_at > now() - interval '24 hours'
+     group by jobname
+  )
+  select coalesce(돈것.jobname, 적힌것.jobname)                  as jobname,
+         coalesce(돈횟수, 0)                                    as 돈횟수,
+         coalesce(적힌횟수, 0)                                   as 적힌횟수,
+         coalesce(돈횟수, 0) - coalesce(적힌횟수, 0)              as 안적힌횟수,
+         coalesce(SQL층실패, 0)                                 as SQL층실패,
+         마지막회차
+    from 돈것 full join 적힌것 on 돈것.jobname = 적힌것.jobname;
+
+  /* ── ⑥ 잡 넷을 장부 경유로 다시 건다(이름·주기·URL 불변) ────────────────
+   * ⛔ **잡을 «새로» 만들지 않는다 — 이미 걸린 것만 다시 건다.**
+   *   20260809070000·20260812130000 두 조각은 「리허설엔 일부러 안 붓는다」를 정책으로 적어 뒀다
+   *   (스케줄러가 돌면 옆 세션 왕복시험의 원장·엔진 상태를 흔든다). 그 정책을 이 조각이 조용히
+   *   깨면 안 된다 — 리허설은 `cron.job` 0행이라(실측 08-15) 아래 분기가 통째로 안 돈다.
+   * 🔑 판정을 «환경 이름»이 아니라 «지금 상태»로 한다. 이름으로 가르면 프로젝트가 늘어나는 날
+   *   조용히 틀리고, 그 틀림은 「잡이 안 걸렸다」가 아니라 「잡이 더 걸렸다」로 나온다. */
+  select count(*) into 걸린잡수
+    from cron.job
+   where jobname in ('deliver-daily', 'deliver-check', 'transcribe-batch', 'radio-promote-hourly');
+
+  if 걸린잡수 = 0 then
+    raise notice '[cron_ledger] 잡이 하나도 안 걸린 DB 다 — 표·함수·뷰만 세우고 스케줄은 건드리지 않는다(리허설 정책).';
+  else
+
+  perform cron.unschedule(jobname)
+    from cron.job
+   where jobname in ('deliver-daily', 'deliver-check', 'transcribe-batch',
+                     'radio-promote-hourly', 'ops-harvest');
+
+  perform cron.schedule('deliver-daily', '5 16 * * *', $job$
+    select ops.발사('deliver-daily',
+      (select decrypted_secret from vault.decrypted_secrets where name = 'functions_base_url') || '/deliver');
+  $job$);
+
+  perform cron.schedule('deliver-check', '35 16 * * *', $job$
+    select ops.발사('deliver-check',
+      (select decrypted_secret from vault.decrypted_secrets where name = 'functions_base_url') || '/deliver?%EC%A0%90%EA%B2%80');
+  $job$);
+
+  perform cron.schedule('transcribe-batch', '*/10 * * * *', $job$
+    select ops.발사('transcribe-batch',
+      (select decrypted_secret from vault.decrypted_secrets where name = 'functions_base_url') || '/transcribe');
+  $job$);
+
+  perform cron.schedule('radio-promote-hourly', '21 * * * *', $job$
+    select ops.발사('radio-promote-hourly',
+      (select decrypted_secret from vault.decrypted_secrets where name = 'functions_base_url') || '/radio-promote');
+  $job$);
+
+  /* 수확은 5분마다 — TTL 6시간의 1/72 이라 pg_net 이 크게 밀려도 놓칠 창이 없다.
+   * ⚠ 이 잡은 URL 이 없다(순수 SQL) — `tests/조용한실패.test.js` 의 slug 추출에 안 잡힌다.
+   *   그래서 그 회귀에 「URL 없는 cron 도 센다」를 같은 커밋에서 함께 넣는다(등록층 사각). */
+  perform cron.schedule('ops-harvest', '*/5 * * * *', $job$
+    select ops.수확();
+  $job$);
+
+  end if;
+
+  insert into engine.schema_migrations(version, name, checksum)
+  values (migration_version, migration_name, expected_checksum);
+end
+$migration$;
+
+commit;
+
 -- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
---
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
 -- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -330,3 +618,59 @@ select case when 테이블수=18 and RLS켜짐=18 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
 from 셈;
+*/
+
+-- 확인
+-- ⓪ 🔴 **순서** — 이 조각은 `20260814110000`(companion) «뒤»에만 선다(base_version).
+--    앞 조각이 아직 유호님 승인 대기라, 이 조각도 **같은 승인에 얹혀** 부어진다.
+--    먼저 부으면 base_version 검사가 「이력에 그 판이 없다」로 중단시킨다(안전 방향).
+--
+-- ① 이 조각은 engine·radio 의 표·열·제약·트리거·정책을 **하나도 안 바꾼다**.
+--    그래서 위 판정 블록의 기대값은 앞 조각의 것이 그대로 현행이다.
+--    새로 생기는 것은 전부 `ops` 스키마 안이다 — 표 1 · 함수 2 · 뷰 2 · 인덱스 2 · RLS 1(정책 0).
+--
+-- ② 잡 다섯 실측 (부은 뒤 한 줄로 · **잡이 이미 걸려 있던 DB 에서만** 5 가 된다):
+--      select jobname, schedule, active from cron.job order by jobname;
+--    기대(운영): deliver-check · deliver-daily · ops-harvest · radio-promote-hourly · transcribe-batch
+--    ⚠ 리허설은 잡이 0개인 것이 정책이다(옛 cron 조각 둘의 ⛔ 그대로) — 이 조각은 «이미 걸린 것만»
+--      다시 걸므로 리허설에선 스케줄을 한 칸도 안 건드린다. 0 이 나오면 고장이 아니라 그 정책이다.
+--
+-- ③ 🔴 **첫 수확까지 최대 5분** — 부은 직후 `ops.cron_runs` 가 0행인 것은 정상이다.
+--    「판이 섰다」를 「장부가 찼다」로 읽지 않는다. 처음 채워지는 것은 transcribe(10분마다)다:
+--      node tools/회차장부.js            (운영은 SUPABASE_PROJECT_REF 덮어쓰기 · F462)
+--
+-- ④ 🔴 **대조를 먼저 본다.** `안적힌 > 0` 이면 cron 은 돌았는데 장부가 침묵한 것이고,
+--    그건 이 조각 «자신»의 결함이다. 요약만 보면 그 침묵이 「조용하다 = 문제없다」로 읽힌다.
+--    도구는 그 자리에서 종료 1 을 내고, 판이 아예 없으면 **종료 2(못 쟀다)** 로 갈라 낸다.
+--
+-- ⑤ 이 조각이 실제로 그 판으로 들어갔는지는 **위 판정 블록이 이미 본다**(`현재이력` 의 checksum 대조).
+--    여기에 같은 검사를 또 적지 않는다 — 같은 판정을 두 곳에 적으면 갈라지고, 갈리는 쪽은
+--    언제나 「덜 쓰이는 쪽」이라 낡은 채로 초록을 낸다.
+--
+-- ⑥ 계약 §6 ④ 게이트 — 이 커밋 시점의 정직한 표기는 **✓✓✗** 다:
+--    모였나 ✓(발사마다 행이 남는다 · 리허설 실탄으로 두 갈래 실증) ·
+--    닿았나 ✓(뷰 둘 + `tools/회차장부.js` 가 사람 손 없이 읽는다) ·
+--    늘었나 ✗(이해 대장의 칸이 아니라 운영 관측층이다).
+--    ⚠ 「스스로 «알리는»」 층은 아직 0이다 — 뷰는 부르면 답할 뿐 먼저 말하지 않는다.
+--
+-- ⑦ CHECK 제약은 현행 접미사만 남아야 한다(이 조각이 c11 CHECK 하나를 더한다).
+--    ⚠ 이 줄은 **마지막 조각**이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    ⚠ `teacher_notes_once_c11`·`companion_qa_*_fkey` 는 여기 없다 — UNIQUE·FK 라 CHECK 목록의
+--      대상이 아니다(기대제약 목록에는 FK 도 들어가지만 이 줄은 CHECK 만 센다).
+--    기대: broadcast_segment_kind_c11 · classes_key_nonblank_c11
+--         · companion_qa_answer_paired_c11 · companion_qa_question_nonblank_c11
+--         · corrections_promotion_intent_c11
+--         · corrections_supersedes_not_self_c11 · corrections_verdict_c11
+--         · cron_runs_outcome_c11
+--         · learners_gender_c11 · learners_goal_track_c11 · learners_group_no_c11
+--         · learners_home_aimag_c11 · learners_seat_no_c11
+--         · learners_signup_attempts_nonneg_c11 · learners_temp_password_paired_c11
+--         · learning_events_correction_target_c11 · learning_events_event_type_c11
+--         · learning_events_task_type_c11 · pipeline_jobs_discard_reason_c11
+--         · season_compass_answers_c11 · season_dates_c11
+--         · season_review_decided_c11 · season_review_self_c11 · season_review_verdict_c11
+--         · staff_role_c11 · submissions_due_paired_c11 · submissions_task_format_c11
+--         · submissions_translation_source_c11 · teacher_notes_body_nonblank_c11
+--         · teacher_notes_disposition_c11 · teacher_notes_origin_c11
