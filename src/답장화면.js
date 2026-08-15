@@ -250,6 +250,8 @@ export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = nu
             .map((값) => (
               <Pressable
                 key={값}
+                /* 손잡이는 **코드값**에서 짓는다 — `답문구[값]` 은 카피라 바뀌지만 `값` 은 계약이다. */
+                testID={`답장-${값}`}
                 disabled={도는중 || !id}
                 onPress={() => 답하기(값)}
                 style={({ pressed }) => [

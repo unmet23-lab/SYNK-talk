@@ -698,6 +698,7 @@ function 듣기카드({ 편지, 라벨 = '편지가 왔어요', 다음, 들었�
         <Text style={s.보조버튼글}>{읽는중 ? '읽는 중…' : '♪ 들어보기'}</Text>
       </Pressable>
       <Pressable
+        testID="말하기-다들었어요"
         onPress={다음}
         style={({ pressed }) => [s.주버튼, !들었다 && s.주버튼_대기, pressed && s.눌림]}
       >
@@ -1140,7 +1141,7 @@ function 녹음카드({
               여기까지만 담겼어요 — 앱을 잠깐 나가서 녹음이 멈췄어요. 들어 보고 다시 말해도 돼요.
             </Text>
           )}
-          <Pressable onPress={내목소리} style={({ pressed }) => [s.보조버튼, pressed && s.눌림]}>
+          <Pressable testID="말하기-내목소리" onPress={내목소리} style={({ pressed }) => [s.보조버튼, pressed && s.눌림]}>
             <Text style={s.보조버튼글}>{듣는중 ? '재생 중…' : '내 목소리 듣기'}</Text>
           </Pressable>
           {텍스트병기 && (
@@ -1157,11 +1158,11 @@ function 녹음카드({
             {/* 재시도 상한(가산 · G3 §4-3 ⑤) — 상한을 다 쓴 확인 카드엔 「다시」가 없다.
                 기본값(무제한)에서는 늘 그려진다 = 현행. */}
             {다시가능 && (
-              <Pressable onPress={다시} style={({ pressed }) => [s.보조버튼, s.늘림, pressed && s.눌림]}>
+              <Pressable testID="말하기-다시" onPress={다시} style={({ pressed }) => [s.보조버튼, s.늘림, pressed && s.눌림]}>
                 <Text style={s.보조버튼글}>다시 말하기</Text>
               </Pressable>
             )}
-            <Pressable onPress={제출} style={({ pressed }) => [s.주버튼, s.늘림, pressed && s.눌림]}>
+            <Pressable testID="말하기-보내기" onPress={제출} style={({ pressed }) => [s.주버튼, s.늘림, pressed && s.눌림]}>
               <Text style={s.주버튼글}>보내기</Text>
             </Pressable>
           </View>
@@ -1227,6 +1228,7 @@ function 녹음버튼({ 녹음중, onPress }) {
         <Animated.View style={[s.맥박링, { transform: [{ scale: 맥박 }] }]} />
       )}
       <Pressable
+        testID={녹음중 ? '녹음-끝' : '녹음-시작'}
         onPress={onPress}
         style={({ pressed }) => [s.코랄원, pressed && { transform: [{ scale: 0.96 }] }]}
         accessibilityLabel={녹음중 ? '녹음 마치기' : '녹음 시작'}

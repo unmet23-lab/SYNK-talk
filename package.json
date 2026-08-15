@@ -16,6 +16,7 @@
     "guard": "node tools/precommit.js"
   },
   "dependencies": {
+    "@sentry/react-native": "~7.11.0",
     "expo": "~57.0.9",
     "expo-audio": "~57.0.3",
     "expo-file-system": "~57.0.1",

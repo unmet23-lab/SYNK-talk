@@ -3,6 +3,21 @@ import { Platform, ScrollView, StyleSheet, Text, View, Pressable } from 'react-n
 import * as Updates from 'expo-updates';
 import { 색, 폰트, 모노트래킹 } from './테마';
 import { 못보낸수, 기기비우기 } from './저장';
+import { 관측상태 } from './관측';
+
+/**
+ * 관측이 **정말 켜졌는지**를 이 화면이 말한다.
+ * 🔴 이 한 줄이 있는 이유: DSN 을 안 넣은 빌드도 겉으로는 멀쩡히 돌기 때문에, 이 창이 없으면
+ *   「Sentry 붙였다」와 「붙였다고 믿는다」가 기기 위에서 구별되지 않는다(`src/관측.js` 머리말).
+ *   DSN 값 자체는 절대 안 그린다 — 화면에 뜨는 순간 그건 유출이다.
+ */
+function 관측표시() {
+  const { 켜짐, 사유, 합성 } = 관측상태();
+  if (켜짐) return 합성 ? '켜짐 · 합성밟기' : '켜짐 · 실사용';
+  if (사유 === 'dsn_없음') return '꺼짐 — DSN 없음';
+  if (사유 === 'not_initialized') return '꺼짐 — 세우기 안 부름';
+  return `꺼짐 — ${사유}`;
+}
 
 /**
  * 배포 도착 확인 화면 — 기능이 아니라 「내가 민 것이 여기 왔는가」를 보는 창.
@@ -60,6 +75,7 @@ export default function 도착확인({ 돌아가기, 가기 }) {
     ['업데이트 ID', show(Updates.updateId)],
     ['내장 번들로 실행', Updates.isEmbeddedLaunch ? '예' : '아니오'],
     ['플랫폼', `${Platform.OS} ${show(Platform.Version)}`],
+    ['관측(Sentry)', 관측표시()],
   ];
 
   return (

@@ -1,0 +1,51 @@
+appId: lab.synk.talk
+name: 녹음 → 확인 → 보내기 (앱의 급소)
+env:
+  학생번호: ${MAESTRO_학생번호}
+  비밀번호: ${MAESTRO_비밀번호}
+---
+# 🔴 **이 흐름 하나가 Maestro 도입의 근거다.**
+#   녹음은 `expo-audio` + 실기기 마이크 권한이 걸려 있어서, node 회귀로는 원리적으로 못 잡는다
+#   (모킹하면 «내가 만든 가짜»를 재게 된다). 실제로 눌러 보는 것 말고 방법이 없다.
+- runFlow: 01_인증.yaml
+
+# ── 듣기 단계를 지난다 (편지가 있는 날에만 뜬다 — 없으면 그냥 넘어간다)
+- runFlow:
+    when:
+      visible:
+        id: "말하기-다들었어요"
+    commands:
+      - tapOn:
+          id: "말하기-다들었어요"
+
+- extendedWaitUntil:
+    visible:
+      id: "녹음-시작"
+    timeout: 15000
+
+- tapOn:
+    id: "녹음-시작"
+
+# 녹음 중 표시가 «실제로» 바뀌는지 본다 — 버튼은 눌렸는데 녹음이 안 시작되는 자리가 있다.
+- assertVisible:
+    id: "녹음-끝"
+
+# 사람이 말하는 만큼 기다린다. 너무 짧으면 무발화로 떨어져 다른 가지를 타게 된다.
+- waitForAnimationToEnd:
+    timeout: 6000
+
+- tapOn:
+    id: "녹음-끝"
+
+# 확인 카드 — 담긴 것을 되들을 수 있어야 한다
+- extendedWaitUntil:
+    visible:
+      id: "말하기-내목소리"
+    timeout: 15000
+
+- tapOn:
+    id: "말하기-보내기"
+
+# 🔑 보낸 «뒤»를 안 재면 이 흐름은 절반이다 — 제출이 서버에 닿았는지는
+#   `도착확인` 화면의 「못 보낸 것」 수가 증언한다(그 화면 머리말 참조).
+#   그 단계는 화면 경로를 직접 확인한 뒤에 잇는다(아래 README 「아직 안 지은 것」).
