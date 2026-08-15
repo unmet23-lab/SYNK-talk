@@ -378,6 +378,9 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
 
   const results: Record<string, unknown>[] = [];
   const 회수들: { 개입: number; 닿음: number; 고리없음: number }[] = [];
+  /* 🔴 회수가 죽으면 아래 `사슬` 의 **분모가 조용히 줄어든다** — 「개입이 적었다」와 「세다가
+   *   죽었다」가 같은 수로 접히고, 연결률은 그 위에서 계산된다. 세어서 봉투에 올려야 그 둘이 갈린다. */
+  let 회수실패 = 0;
   for (const 학생 of 대상) {
     results.push(await 한명(학생 as Record<string, unknown>, 오늘, ver));
     /* 🔑 배달의 **부속이 아니라 나란한 일**이다 — 회수가 재는 것은 오늘 나가는 개입이 아니라
@@ -391,6 +394,7 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
     } catch (e) {
       console.error('[deliver] 성과 회수 실패(배달은 계속한다)',
         (학생 as Record<string, unknown>).learner_id, String((e as Error)?.message ?? e));
+      회수실패 += 1;
     }
   }
 
@@ -411,7 +415,10 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
     건너뜀: results.filter((r) => r.status === 'skipped'),
     실패: results.filter((r) => r.status === 'failed'),
     /* 사슬 ⑦칸의 계수 — 이 칸이 응답에 있어야 왕복시험이 「사슬이 끝까지 도는가」를 밖에서 잰다. */
-    사슬: { ...사슬, 연결률 },
+    사슬: { ...사슬, 연결률, 회수실패 },
+    /* 🔑 성공했는데 근거 스탬프가 빈 배달의 수. 0 이 정상이고, 0 이 아니면 그날 배달은 나갔지만
+     *   그 학생들의 「그때 상태」는 **영영 안 남는다**(소급 불가). status 로는 안 드러난다. */
+    상태없음: results.filter((r) => r.상태없음).length,
   };
   if (몸.배정 < 몸.재적) console.error(`[deliver] 🔴 배정 미달 — ${오늘} ${몸.배정}/${몸.재적}`);
   console.log(`[deliver] 사슬 회수 — 개입 ${사슬.개입} · 관측 ${사슬.닿음} · 연결률 ${연결률 ?? '분모0'}`);
@@ -659,6 +666,10 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
       return {
         learner_id, status: 'assigned', event_id: 배정[0].event_id,
         intervention_id: 개입id, degraded: 결정.degraded, 출처: 결정.출처,
+        /* 🔴 스탬프가 빈 채로 나간 배달이다(위 `상태` catch). 배달 자체는 **성공**이라 어느
+         *   status 로도 안 드러나는데, 못 적은 근거는 **소급 불가**다("근거 없이 지나간 날은
+         *   되살릴 수 없다" — 위 주석). 그래서 성공 응답에 표식을 남긴다. */
+        상태없음: 상태 === null,
       };
     });
   } catch (e) {

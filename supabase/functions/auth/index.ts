@@ -48,8 +48,10 @@ import postgres from 'npm:postgres@3.4.4';
 import 학생계정 from './학생계정.mjs';
 import 가입문항 from './가입문항.mjs';
 import 계약판모듈 from './계약판.mjs';
+import 사유모듈 from './벤더사유.mjs';
 
 const { 행들에서판 } = 계약판모듈 as { 행들에서판: (행들: unknown) => string | null };
+const { 벤더사유 } = 사유모듈 as { 벤더사유: (글: unknown, 상한?: number) => string | null };
 
 const { 학생번호맞나, 이메일, 뒷자리맞나, 시도상한 } = 학생계정 as {
   학생번호맞나: (v: unknown) => boolean;
@@ -481,8 +483,10 @@ Deno.serve(async (req: Request) => {
       ok: true,
       student_code: 이음[0].student_code,
       display_name: 이음[0].display_name,
-      // 조용히 실패하지 않게 결과를 싣는다 — 앱은 안 쓰지만 이 값이 없으면 첫날 소실이 로그에만 남는다.
-      첫배정: await 첫배정세우기(String(이음[0].learner_id)),
+      /* 조용히 실패하지 않게 결과를 싣는다 — 앱은 안 쓰지만 이 값이 없으면 첫날 소실이 로그에만 남는다.
+       * 🔑 `첫배정` 은 **불리언 그대로 둔다**(앱이 언젠가 읽을 때 모양이 안 바뀌게) — 「왜」는
+       *   형제 칸 `첫배정사유` 로 덧붙인다. 응답 필드 추가는 판올림이 아니다. */
+      ...(await 첫배정세우기(String(이음[0].learner_id))),
     }, ver);
   } catch (e) {
     console.error('[auth] 예외', e instanceof Error ? e.message : String(e));
@@ -508,20 +512,26 @@ Deno.serve(async (req: Request) => {
  *   ⚠ 동의가 없는 학생은 `deliver` 가 `skipped`(consent_missing)로 건너뛴다. 그때도 응답은
  *     `true`(호출 성공)라 이 값만으로 「배정이 섰다」를 단정하지 않는다 — 분모는 `deliver` 의
  *     §6-5 점검 모드가 진다. */
-async function 첫배정세우기(learner_id: string): Promise<boolean> {
+async function 첫배정세우기(learner_id: string): Promise<{ 첫배정: boolean; 첫배정사유: string | null }> {
   try {
     const r = await fetch(`${함수기지}/deliver?learner_id=${encodeURIComponent(learner_id)}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${서비스키}`, 'Content-Type': 'application/json' },
     });
     if (!r.ok) {
+      /* 🔑 `글` 은 지금까지 **이 줄 안에서 만들어져 로그로만 갔다**(2026-08-15 · 손에 쥔 것을 버리는
+       *   자리였다). 상태만으로는 처방이 안 나온다 — 502(배달이 죽음)와 401(우리 키)이 학생 눈엔
+       *   똑같이 「첫배정 false」이고, 고칠 사람이 누구인지가 거기서 사라진다. */
+      const 글 = (await r.text()).slice(0, 200);
       console.error('[auth] 🔴 첫 배정 실패 — 오늘 앱을 켜면 폴백이라 첫 목소리를 잃는다',
-        learner_id, r.status, (await r.text()).slice(0, 200));
-      return false;
+        learner_id, r.status, 글);
+      const 말 = 벤더사유(글);
+      return { 첫배정: false, 첫배정사유: `deliver:${r.status}${말 ? ` ${말}` : ''}` };
     }
-    return true;
+    return { 첫배정: true, 첫배정사유: null };
   } catch (e) {
-    console.error('[auth] 🔴 첫 배정 호출 예외', learner_id, e instanceof Error ? e.message : String(e));
-    return false;
+    const 말 = e instanceof Error ? e.message : String(e);
+    console.error('[auth] 🔴 첫 배정 호출 예외', learner_id, 말);
+    return { 첫배정: false, 첫배정사유: `예외:${벤더사유(말) ?? '(빈 메시지)'}` };
   }
 }

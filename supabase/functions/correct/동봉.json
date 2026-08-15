@@ -1,6 +1,7 @@
 {
   "토큰.mjs": "lib/토큰.js",
   "교정엔진.mjs": "lib/교정엔진.js",
+  "벤더사유.mjs": "lib/벤더사유.js",
   "옛글자.mjs": "lib/옛글자.js",
   "계약.mjs": "계약/수집_교정_계약.json",
   "교정프롬프트.mjs": "prompts/교정.md",

@@ -30,6 +30,7 @@ import 토큰모듈 from './토큰.mjs';
 import 과제모듈 from './오늘과제.mjs';
 import 동의모듈 from './동의게이트.mjs';
 import 계약판모듈 from './계약판.mjs';
+import 사유모듈 from './벤더사유.mjs';
 
 /* 진단 한 칸(`blocked`)을 위해서만 쓴다 — 이 함수는 막는 게이트가 아니다(아래 주석). */
 const { 지금유효, 거절몸통 } = 동의모듈 as {
@@ -38,6 +39,7 @@ const { 지금유효, 거절몸통 } = 동의모듈 as {
 };
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
+const { 벤더사유 } = 사유모듈 as { 벤더사유: (글: unknown, 상한?: number) => string | null };
 /* 🔴 `시간대` 도 여기서 가져온다 — 리터럴을 다시 적으면 배치와 조회가 갈린다(절단문서 ①-14). */
 const { 몽골날짜, 시간대, 학생판스냅샷, 구제할까 } = 과제모듈 as {
   몽골날짜: (때?: Date) => string;
@@ -77,10 +79,12 @@ const 서비스키 = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
  *   「빈 상태는 오류가 아니다」(C0 §4-3)가 이 함수의 계약이다. 구제 시도가 실패했다고 500 을 내면
  *   정상 경로가 오류 경로로 바뀌고, 앱은 고장 화면을 띄운다. 실패는 로그로만 남긴다.
  */
-async function 지금세우기(learner_id: string): Promise<'세움' | '설정없음' | '실패'> {
+type 구제결과 = { 결과: '세움' | '설정없음' | '실패'; 사유: string | null };
+
+async function 지금세우기(learner_id: string): Promise<구제결과> {
   if (!서비스키 || !함수기지.startsWith('http')) {
     console.error('[tasks] 🔴 배정 0인데 구제를 못 부른다 — SUPABASE_URL·SERVICE_ROLE_KEY 미설정', learner_id);
-    return '설정없음';
+    return { 결과: '설정없음', 사유: '설정없음:SUPABASE_URL·SERVICE_ROLE_KEY' };
   }
   try {
     const r = await fetch(`${함수기지}/deliver?learner_id=${encodeURIComponent(learner_id)}`, {
@@ -88,14 +92,21 @@ async function 지금세우기(learner_id: string): Promise<'세움' | '설정�
       headers: { Authorization: `Bearer ${서비스키}`, 'Content-Type': 'application/json' },
     });
     if (!r.ok) {
+      /* 🔑 위 머리말의 「실패는 로그로만 남긴다」에서 **로그«만»을 뺀다**(2026-08-15).
+       *   깨지 말라던 것은 **200 이라는 상태**이지 사유의 소재가 아니었다 — 상태는 그대로 두고
+       *   「왜」만 봉투에 싣는다. 이 갈래가 학생에게 뜻하는 것은 「오늘 발화가 사건으로 안 남는다」라
+       *   소급이 안 되는데, 지금까지 그 사유는 하루 뒤 사라지는 로그에만 있었다. */
+      const 글 = (await r.text()).slice(0, 200);
       console.error('[tasks] 🔴 배정 0 구제 실패 — 오늘 발화가 사건으로 안 남는다',
-        learner_id, r.status, (await r.text()).slice(0, 200));
-      return '실패';
+        learner_id, r.status, 글);
+      const 말 = 벤더사유(글);
+      return { 결과: '실패', 사유: `deliver:${r.status}${말 ? ` ${말}` : ''}` };
     }
-    return '세움';
+    return { 결과: '세움', 사유: null };
   } catch (e) {
-    console.error('[tasks] 🔴 배정 0 구제 호출 예외', learner_id, e instanceof Error ? e.message : String(e));
-    return '실패';
+    const 말 = e instanceof Error ? e.message : String(e);
+    console.error('[tasks] 🔴 배정 0 구제 호출 예외', learner_id, 말);
+    return { 결과: '실패', 사유: `예외:${벤더사유(말) ?? '(빈 메시지)'}` };
   }
 }
 
@@ -211,14 +222,22 @@ Deno.serve(async (req: Request) => {
      *   조건 셋(배정 0 · 동의 있음 · 오늘)의 정본은 `lib/오늘과제.js` 의 `구제할까` 다.
      * ⚠ 한 번만 부르고 한 번만 다시 읽는다. 그래도 비면 빈 채로 낸다(루프 금지 — 위 주석).
      *   횟수는 이 **구조**가 지고 판정은 저 함수가 진다 — 한쪽에 둘 다 넣으면 갈라진다. */
+    /* 🔑 **안 부른 것과 불렀는데 실패한 것을 가른다** — 둘 다 「data 가 비었다」로 끝나므로,
+     *   구제 칸이 없으면 빈 응답의 사유가 응답 어디에도 안 남는다(그리고 로그는 하루 뒤 없다). */
+    let 구제: 구제결과 | null = null;
     if (구제할까({ 배정수: 행들.length, 막힘: blocked, 날짜, 오늘: 몽골날짜() })) {
-      if (await 지금세우기(행.learner_id as string) === '세움') {
+      구제 = await 지금세우기(행.learner_id as string);
+      if (구제.결과 === '세움') {
         /* 다시 읽기가 죽어도 **빈 응답으로 돌아간다** — 첫 조회는 이미 성공했으니 여기서 500 을
          * 내면 「빈 상태는 오류가 아니다」를 구제 시도가 깨뜨리는 꼴이다. */
         try {
           행들 = await 배정읽기();
         } catch (e) {
-          console.error('[tasks] 구제 뒤 재조회 실패 — 빈 채로 낸다', String((e as Error)?.message ?? e));
+          const 말 = String((e as Error)?.message ?? e);
+          console.error('[tasks] 구제 뒤 재조회 실패 — 빈 채로 낸다', 말);
+          /* 구제는 «섰는데» 재조회가 죽은 자리다 — 결과를 덮어써 「세움인데 빈 응답」이라는
+           * 앞뒤 안 맞는 조합이 응답에 안 남게 한다(다음 요청이 다시 읽으면 보인다). */
+          구제 = { 결과: '실패', 사유: `재조회:${벤더사유(말) ?? '(빈 메시지)'}` };
         }
       }
     }
@@ -279,7 +298,7 @@ Deno.serve(async (req: Request) => {
      * 🔑 `동의`·`blocked` 는 위에서 이미 읽었다(구제 판정이 그것을 먼저 필요로 한다). */
 
     // 하루 1건이 멱등으로 보장되므로 `next_cursor` 는 항상 null 이다(C0 §4-3 ①).
-    return 봉투(200, { ok: true, date: 날짜, data, blocked, next_cursor: null }, ver);
+    return 봉투(200, { ok: true, date: 날짜, data, blocked, next_cursor: null, 구제 }, ver);
   } catch (e) {
     console.error('[tasks] 조회 실패', String((e as Error)?.message ?? e));
     return 실패(500, { code: 'SERVER_ERROR', message: '잠시 뒤 다시 시도해 주세요', retryable: true }, ver);

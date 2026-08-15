@@ -19,8 +19,10 @@ import postgres from 'npm:postgres@3.4.4';
 import 전사모듈 from './전사.mjs';
 import 경로모듈 from './업로드경로.mjs';
 import 토큰모듈 from './토큰.mjs';
+import 사유모듈 from './벤더사유.mjs';
 
 const { 서비스역할 } = 토큰모듈 as { 서비스역할: (req: Request) => boolean };
+const { 벤더사유 } = 사유모듈 as { 벤더사유: (글: unknown, 상한?: number) => string | null };
 const { 버킷 } = 경로모듈 as { 버킷: string };
 const { 상태, 전사값, 세그먼트값, 전사실패 } = 전사모듈 as {
   상태: Record<string, string>;
@@ -52,6 +54,19 @@ const 왕복제한밀리 = 120_000;
 
 function 봉투(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+}
+
+/* 🔴 **왜 세어서 봉투에 싣나** (2026-08-15)
+ *   이 함수는 실패 갈래가 넷인데 넷 다 `미룸`·`못박음` 이라는 **정수 하나로 접혔다**. 그래서
+ *   「대기 40, 전사 0, 미룸 40」 을 받아도 저장소가 죽은 건지·키가 틀린 건지·벤더가 형식을
+ *   바꾼 건지 갈리지 않았고, 갈라 줄 유일한 글(`console.error`)은 **무료 플랜 로그 보존 1일**이라
+ *   하루 뒤 사라졌다. 게다가 이 함수는 `pg_cron` 이 **10분마다(하루 144회)** 부르고 그 응답은
+ *   `net.http_post` 라 아무도 안 읽는다 — 즉 봉투에 안 실으면 그 사유는 어디에도 안 남는다.
+ *   #Q83(교정 배치가 400 으로 전량 튕긴 것)이 며칠 늦은 자리가 정확히 같은 모양이었다.
+ * 🔑 **수를 세되 원문도 한 줄 남긴다** — 갈래별 수는 「무엇이 몇 건」을, `벤더사유` 는 「왜」를
+ *   진다. 수만 있으면 처방이 안 나오고(400 이 「어디를」을 안 말한다), 글만 있으면 규모를 모른다. */
+function 센다(칸: Record<string, number>, 이름: string) {
+  칸[이름] = (칸[이름] ?? 0) + 1;
 }
 
 /** Storage 원본을 통째로 읽는다 — 전사는 앞머리로 안 된다(`events` 의 헤더 측정과 다른 자리다). */
@@ -101,12 +116,17 @@ Deno.serve(async (req) => {
    *   형식이 바뀐 날엔 전사만 들어오고 검수 게이트는 조용히 하한으로 되돌아간다 — 그 차이가
    *   응답 두 수의 차이로 그 자리에서 보여야 한다. */
   let 성공 = 0; let 구간실림 = 0; let 못박음 = 0; let 미룸 = 0;
+  /* 갈래별 수 + 벤더가 말한 첫 한 줄. **첫 건만** 싣는다 — 배치가 통째로 같은 이유로 죽는 것이
+   * 흔한 모양이라(#Q83 은 396건 전량이 한 이유였다) 25건을 다 실으면 봉투가 로그가 된다. */
+  const 사유: Record<string, number> = {};
+  let 첫벤더말: string | null = null;
   for (const 행 of 행들) {
     try {
       const 받음 = await 원본받기(행.audio_ref);
       if ('오류' in 받음) {
         /* Storage 가 안 주는 것은 **우리 쪽**이다 — 못박지 않는다(다음 배치가 다시 집는다). */
         console.error('[transcribe] 원본 실패', 행.event_id, 받음.오류);
+        센다(사유, `원본:${받음.오류}`);
         미룸 += 1;
         continue;
       }
@@ -127,6 +147,11 @@ Deno.serve(async (req) => {
         const 글 = (await r.text()).slice(0, 300);
         const 판정 = 전사실패(r.status);
         console.error('[transcribe] 벤더 실패', 행.event_id, r.status, 글);
+        /* 🔑 `글` 은 **이미 손에 있었다** — 지금까지 `console.error` 에만 넣고 버렸다.
+         *   `못박음`/`미룸` 과 갈래를 따로 세는 이유는, 401(우리 키 문제)과 400(그 파일 문제)이
+         *   둘 다 「미룸 N」 으로 접히면 고칠 사람이 누구인지가 응답에서 사라지기 때문이다. */
+        센다(사유, `벤더:${r.status}`);
+        첫벤더말 ??= 벤더사유(글);
         if (판정.state) {
           await sql`update engine.submissions set transcript_state = ${판정.state} where event_id = ${행.event_id}::uuid`;
           못박음 += 1;
@@ -140,6 +165,7 @@ Deno.serve(async (req) => {
         /* 우리가 아는 모양이 아니다 — 벤더가 형식을 바꿨거나 딴것을 줬다. 못박으면 그 배포
          * 구간의 발화가 전부 죽으므로 미룬다(고칠 사람은 우리다). */
         console.error('[transcribe] 응답 형식 밖', 행.event_id);
+        센다(사유, '응답형식밖');
         미룸 += 1;
         continue;
       }
@@ -149,7 +175,10 @@ Deno.serve(async (req) => {
        * 🔑 형식 밖이면 **그 칸을 안 건드린다** — `[]` 로 적으면 「쟀는데 구간이 없었다」가 되고,
        *   무발화(진짜 `[]`)와 벤더 형식 변경이 같은 모양으로 접힌다. */
       const 구간 = 세그먼트값(본문);
-      if (!구간) console.error('[transcribe] 세그먼트 형식 밖 — 그 칸은 안 건드린다', 행.event_id);
+      /* 🔴 이 갈래는 **행을 실패로 안 만든다** — 전사는 들어가고 구간만 빈다. 그래서 위 세 갈래보다
+       *   더 조용하다: 「전사 5 · 구간 0」 이 정상처럼 보이고, 검수 게이트만 조용히 하한으로 내려간다.
+       *   세는 이유가 그것이다(수치 둘의 차이는 사람이 눈치채야 하지만, 갈래 이름은 안 그렇다). */
+      if (!구간) { console.error('[transcribe] 세그먼트 형식 밖 — 그 칸은 안 건드린다', 행.event_id); 센다(사유, '구간형식밖'); }
       /* 🔴 `transcript is null` — 자물쇠와 **같은 방향**이다. 이게 없으면 두 배치가 겹친 날
        *   DB 트리거가 예외를 던지고 그 예외가 배치를 통째로 세운다. */
       const 쓴것 = await sql`
@@ -159,12 +188,22 @@ Deno.serve(async (req) => {
              : sql``}
          where event_id = ${행.event_id}::uuid and transcript is null
          returning event_id`;
-      if (쓴것.length) { 성공 += 1; if (구간 && 구간.stt_segments.length) 구간실림 += 1; } else 미룸 += 1;
+      /* 0행 = 다른 배치가 먼저 썼다(`transcript is null` 이 막았다). 실패가 아니라 **겹침**이라
+       *   갈래를 따로 둔다 — 이게 늘면 배치 주기가 왕복보다 짧다는 신호지 고장이 아니다. */
+      if (쓴것.length) { 성공 += 1; if (구간 && 구간.stt_segments.length) 구간실림 += 1; } else { 센다(사유, '겹침'); 미룸 += 1; }
     } catch (e) {
-      console.error('[transcribe] 예외', 행.event_id, String((e as Error)?.message ?? e));
+      const 말 = String((e as Error)?.message ?? e);
+      console.error('[transcribe] 예외', 행.event_id, 말);
+      센다(사유, '예외');
+      첫벤더말 ??= 벤더사유(말);
       미룸 += 1;
     }
   }
 
-  return 봉투(200, { 대기: 대기수, 집음: 행들.length, 전사: 성공, 구간: 구간실림, 못박음, 미룸 });
+  /* 🔑 `사유` 는 **비어 있어도 싣는다** — 「사유 칸이 없다」와 「사유가 0건이다」가 같은 모양이면
+   *   이 배선이 배포됐는지조차 응답으로 못 가른다(F207 · 미실행은 통과와 같은 얼굴로 온다). */
+  return 봉투(200, {
+    대기: 대기수, 집음: 행들.length, 전사: 성공, 구간: 구간실림, 못박음, 미룸,
+    사유, 벤더사유: 첫벤더말,
+  });
 });
