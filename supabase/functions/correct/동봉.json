@@ -5,5 +5,6 @@
   "옛글자.mjs": "lib/옛글자.js",
   "계약.mjs": "계약/수집_교정_계약.json",
   "교정프롬프트.mjs": "prompts/교정.md",
-  "계약판.mjs": "lib/계약판.js"
+  "계약판.mjs": "lib/계약판.js",
+  "처리장부.mjs": "lib/처리장부.js"
 }

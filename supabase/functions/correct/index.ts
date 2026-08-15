@@ -27,6 +27,13 @@
  *   그래서 세지 못한 이유를 응답에 적고 끝낸다. 🔑 **분모를 먼저 센다** — 「0건 처리」가
  *   「대기가 0」인지 「집다가 죽었다」인지 갈려야 한다(F207: 미실행은 통과와 같은 모양으로 온다).
  *
+ * ■ 🔑 **건 단위** 실패는 봉투에 더해 `engine.pipeline_jobs.last_error` 에도 적는다 (조용한 실패 ③)
+ *   위 문단은 여전히 옳다 — 다만 그것은 **설정 실패**(회차 전체가 못 도는 자리)의 규칙이다.
+ *   「이 발화 하나가 왜 못 갔나」는 회차와 수명이 달라서 봉투로는 안 남는다: cron 은 `net.http_post`
+ *   라 응답을 아무도 안 읽고, 로그 보존은 무료 플랜 **1일**이다. 그래서 건별 사유는 표에 적는다.
+ *   🔴 적는 것은 `last_error`·`attempt_count` **둘뿐이고 `status` 는 안 건드린다** — 이유(두 차단
+ *   목록 실측)는 `lib/처리장부.js` 머리말에 있다. 결과는 `장부` 계수기로 봉투에 드러난다.
+ *
  * ■ 🔴 동의는 **`engine.consents` 를 직접 본다** — `pipeline_jobs.status='revoked'` 를 안 믿는다
  *   그 값은 값목록에만 있고 **아무도 쓰지 않는다**(실측: writer 0). 그것으로 철회를 막으면
  *   가드는 늘 통과하고, 새는 방향은 학생 발화가 **벤더로 나가는** 쪽이다. 술어의 정본은
@@ -45,6 +52,7 @@ import 교정모듈 from './교정엔진.mjs';
 import 계약 from './계약.mjs';
 import 지시문 from './교정프롬프트.mjs';
 import 계약판모듈 from './계약판.mjs';
+import 장부모듈 from './처리장부.mjs';
 
 const { 서비스역할 } = 토큰모듈 as { 서비스역할: (req: Request) => boolean };
 
@@ -103,6 +111,14 @@ const 회수상한 = 5;
 const 목록상한 = 20;
 
 const { 행들에서판 } = 계약판모듈 as { 행들에서판: (행들: unknown) => string | null };
+
+/* 건 단위 실패의 «왜» 를 `engine.pipeline_jobs.last_error` 에 남기는 **공용 통로**(조용한 실패 ③).
+ * 🔴 `status` 는 안 건드린다 — 이유 전문은 `lib/처리장부.js` 머리말(두 차단 목록 실측). */
+const { 실패적기, 성공적기 } = 장부모듈 as {
+  실패적기: (sql: unknown, id: string | null | undefined, 갈래: string, 벤더말?: string | null)
+    => Promise<string>;
+  성공적기: (sql: unknown, id: string | null | undefined) => Promise<string>;
+};
 
 function 봉투(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -250,6 +266,20 @@ Deno.serve(async (req: Request) => {
   const 버림: Record<string, number> = {};
   const 성적들: 성적[] = [];
 
+  /* 🔑 장부에 **적으려 한 결과**를 갈래별로 센다(`적힘`·`잡없음`·`대상없음`·`장부실패`).
+   *   장부가 조용히 죽는 것을 막는 자리다 — 「사유를 DB 에 남긴다」를 지어 놓고 그 쓰기가
+   *   매번 실패하면, 봉투는 여전히 예쁘고 흔적은 그대로 0이다(맹점 ④: 장치가 새는 방향은
+   *   안 도는 쪽이 아니라 «맞는 얼굴로 틀린 값» 쪽이다).
+   * ⚠ `버림` 과 갈래 이름을 **일부러 안 겹치게** 뒀다 — 겹치면 「무엇이 죽었나」와
+   *   「그걸 적었나」가 한 숫자로 접힌다. */
+  const 장부: Record<string, number> = {};
+  const 장부에 = async (id: string | undefined | null, 갈래: string, 벤더말?: string | null) => {
+    센다(장부, await 실패적기(sql, id, 갈래, 벤더말 ?? null));
+  };
+  const 장부정리 = async (id: string | undefined | null) => {
+    센다(장부, await 성공적기(sql, id));
+  };
+
   if (!키) {
     console.error('[correct] ANTHROPIC_API_KEY 미설정 — 행을 건드리지 않고 끝낸다');
     return 봉투(200, { 대기: 대기수, 적음: 0, 이유: 'no_api_key' });
@@ -313,15 +343,38 @@ Deno.serve(async (req: Request) => {
          *   처방이 반대다(요청을 고쳐라 / 그냥 다시 내보내라). 앞머리만 세면 그 둘이 한 숫자가
          *   된다. 아래 `교정값()` 쪽은 반대로 자른다 — 거긴 뒤에 태그 목록이 통째로 붙어서
          *   안 자르면 사유 칸이 값목록으로 부푼다. */
-        if (해석.사유) { console.error('[correct] 회수 버림', b.id, 해석.사유); 센다(버림, 해석.사유); 미룸 += 1; continue; }
+        /* 🔑 장부엔 **안 자른 사유**를 적는다. 계수기는 갈래별로 접어야 읽히지만, 장부는 건별이라
+         *   접을 이유가 없다 — 여기 칸이 답하는 질문은 「이 발화가 왜 못 갔나」 하나다.
+         * ⚠ `결과형식밖`·`키형식밖` 은 `custom_id` 를 못 푼 갈래라 `submission_id` 가 없다.
+         *   그때 장부는 `대상없음` 으로 세고 넘어간다 — 어느 건에도 못 붙이는 실패다. */
+        if (해석.사유) {
+          console.error('[correct] 회수 버림', b.id, 해석.사유);
+          센다(버림, 해석.사유);
+          await 장부에(해석.submission_id, 해석.사유);
+          미룸 += 1; continue;
+        }
         if (해석.사용량) 성적들.push(캐시성적(해석.사용량));
         const 값 = 교정값(해석.글!, 태그목록);
-        if (값.사유) { console.error('[correct] 버림', 해석.submission_id, 값.사유); 센다(버림, 값.사유.split(':')[0]); 미룸 += 1; continue; }
+        if (값.사유) {
+          console.error('[correct] 버림', 해석.submission_id, 값.사유);
+          센다(버림, 값.사유.split(':')[0]);
+          await 장부에(해석.submission_id, 값.사유);
+          미룸 += 1; continue;
+        }
         try {
-          if (await 적기(해석.submission_id!, 값, 해석.모델!, 해석.판!, ver)) 적음 += 1; else 미룸 += 1;
+          if (await 적기(해석.submission_id!, 값, 해석.모델!, 해석.판!, ver)) {
+            적음 += 1;
+            /* 🔑 **성공했을 때 지운다.** 안 지우면 어제 죽었다가 오늘 살아난 행이 영원히
+             *   실패로 보인다. 부르는 자리를 INSERT 가 실제로 쓴 갈래로 좁혀서, 재실행의
+             *   no-op(0행)에는 이 쓰기가 안 붙는다. */
+            await 장부정리(해석.submission_id);
+          } else 미룸 += 1;
         } catch (e) {
-          console.error('[correct] 적기 예외', 해석.submission_id, String((e as Error)?.message ?? e));
-          센다(버림, '예외'); 미룸 += 1;
+          const 말 = String((e as Error)?.message ?? e);
+          console.error('[correct] 적기 예외', 해석.submission_id, 말);
+          센다(버림, '예외');
+          await 장부에(해석.submission_id, '예외', 말);
+          미룸 += 1;
         }
       }
     }
@@ -335,7 +388,7 @@ Deno.serve(async (req: Request) => {
   const 판 = 프롬프트판(지시문 as string);
   if (!판) {
     console.error('[correct] prompts/교정.md 에서 「현재 vN」을 못 읽었다');
-    return 봉투(200, { 대기: 대기수, 적음, 미룸, 버림, 이유: 'no_prompt_ver', 회수 });
+    return 봉투(200, { 대기: 대기수, 적음, 미룸, 버림, 장부, 이유: 'no_prompt_ver', 회수 });
   }
 
   /* 🔴 프롬프트의 통제 어휘와 계약 값목록이 갈라지면 **내보내기 전에** 멈춘다.
@@ -345,14 +398,14 @@ Deno.serve(async (req: Request) => {
   const 어긋남 = 태그어긋남(지시문 as string, 태그목록);
   if (어긋남.프롬프트에없음.length || 어긋남.계약에없음.length) {
     console.error('[correct] 🔴 값목록이 갈라졌다', JSON.stringify(어긋남));
-    return 봉투(200, { 대기: 대기수, 적음, 미룸, 버림, 이유: 'tag_drift', 어긋남, 회수 });
+    return 봉투(200, { 대기: 대기수, 적음, 미룸, 버림, 장부, 이유: 'tag_drift', 어긋남, 회수 });
   }
 
   /* ── ③ 내보내기 ───────────────────────────────────────────────────────
    * 방금 걷은 것 때문에 대기가 줄었을 수 있으므로 **조회는 지금 다시 한다**(위의 `대기수`는
    * 분모를 위한 스냅샷이다). 두 번 나가면 두 번 청구된다. */
   if (!즉시 && 도는배치 > 0) {
-    return 봉투(200, { 대기: 대기수, 적음, 미룸, 버림, 이유: 'batch_in_flight', 회수, 캐시: 성적합(성적들) });
+    return 봉투(200, { 대기: 대기수, 적음, 미룸, 버림, 장부, 이유: 'batch_in_flight', 회수, 캐시: 성적합(성적들) });
   }
 
   const 행들 = await sql<{ submission_id: string; 문장: string; 급수: string | null }[]>`
@@ -365,7 +418,7 @@ Deno.serve(async (req: Request) => {
 
   if (!즉시) {
     if (!행들.length) {
-      return 봉투(200, { 대기: 대기수, 적음, 미룸, 버림, 이유: 'nothing_to_submit', 회수, 캐시: 성적합(성적들) });
+      return 봉투(200, { 대기: 대기수, 적음, 미룸, 버림, 장부, 이유: 'nothing_to_submit', 회수, 캐시: 성적합(성적들) });
     }
     /* 🔴 `custom_id` 규격은 **내보내기 전에** 본다 — `tag_drift` 와 같은 자리다. 어기면 벤더가
      *   배치 한 벌을 통째로 400 으로 튕기는데, 그 실패는 아래에서 `봉투(200, …)` 으로 나가므로
@@ -376,7 +429,7 @@ Deno.serve(async (req: Request) => {
       console.error('[correct] 🔴 custom_id 규격 밖', 키어긋남.length, 키어긋남.slice(0, 3).join(','));
       센다(버림, '키규격밖');
       return 봉투(200, {
-        대기: 대기수, 적음, 미룸, 버림, 이유: 'batch_key_invalid',
+        대기: 대기수, 적음, 미룸, 버림, 장부, 이유: 'batch_key_invalid',
         규격밖: 키어긋남.length, 보기: 키어긋남.slice(0, 3), 회수,
       });
     }
@@ -395,13 +448,13 @@ Deno.serve(async (req: Request) => {
        *   Edge 로그를 따로 열어야 나온다 — 그 한 칸이 없어서 #Q83 이 며칠 늦었다. 로그에 이미
        *   같은 글이 나가므로 새로 드러나는 것은 없고(노출 층이 안 늘어난다), 길이만 자른다. */
       return 봉투(200, {
-        대기: 대기수, 적음, 미룸, 버림, 이유: 'batch_submit_failed',
+        대기: 대기수, 적음, 미룸, 버림, 장부, 이유: 'batch_submit_failed',
         status: r.status, 벤더사유: 벤더사유(글), 회수,
       });
     }
     const 만든것 = (await r.json()) as { id?: string };
     return 봉투(200, {
-      대기: 대기수, 적음, 미룸, 버림, 회수,
+      대기: 대기수, 적음, 미룸, 버림, 장부, 회수,
       제출: 행들.length, 배치id: 만든것.id ?? null,
       캐시: 성적합(성적들), 모델, prompt_ver: 판,
     });
@@ -420,10 +473,17 @@ Deno.serve(async (req: Request) => {
       if (!r.ok) {
         const 글 = (await r.text()).slice(0, 300);
         console.error('[correct] 벤더 실패', 행.submission_id, r.status, 글);
-        /* 🔴 영구 실패도 **못박을 칸이 없다**(`corrections` 에 상태 열이 없다) — 다음 배치가
-         *   다시 집는다. 지금 할 수 있는 것은 그 사실을 세어 드러내는 것뿐이고, 이 수가 배치
-         *   크기에 가까워지면 앞머리가 막힌 것이다(`lib/교정엔진.js 재시도가능` 머리말). */
-        센다(버림, 재시도가능(r.status) ? `벤더_재시도:${r.status}` : `벤더_영구:${r.status}`);
+        /* 🔴 **행은 여전히 실패로 못박지 않는다** — 다음 회차가 다시 집는 자기치유가 기본값이고,
+         *   영구 실패는 대신 같은 자리를 매번 먹는다. 그 수가 배치 크기에 가까워지면 앞머리가
+         *   막힌 것이다(`lib/교정엔진.js 재시도가능` 머리말).
+         * ⚠ 여기 옛 주석은 「영구 실패도 **못박을 칸이 없다**」였는데 그건 **틀렸다.**
+         *   `corrections` 에 상태 열이 없는 것은 맞지만, `engine.pipeline_jobs` 는 08-06 부터
+         *   `last_error`·`attempt_count` 를 들고 있었고 저장소 전체에서 **writer 0** 이었다
+         *   (조용한 실패 ③ 실측). 옆 표를 안 본 단정이 사유를 하루짜리 로그에 가둬 왔다.
+         *   그래서 지금은 **세고 + 적는다** — 못박기(`status`)와 적기(`last_error`)는 다른 일이다. */
+        const 갈래 = 재시도가능(r.status) ? `벤더_재시도:${r.status}` : `벤더_영구:${r.status}`;
+        센다(버림, 갈래);
+        await 장부에(행.submission_id, 갈래, 벤더사유(글));
         미룸 += 1;
         continue;
       }
@@ -434,6 +494,7 @@ Deno.serve(async (req: Request) => {
       if (!글) {
         console.error('[correct] 응답 형식 밖', 행.submission_id);
         센다(버림, '응답형식밖');
+        await 장부에(행.submission_id, '응답형식밖');
         미룸 += 1;
         continue;
       }
@@ -445,20 +506,26 @@ Deno.serve(async (req: Request) => {
          *   막으려던 그 모양이다. 안 적으면 다음 배치가 다시 집는다. */
         console.error('[correct] 버림', 행.submission_id, 값.사유);
         센다(버림, 값.사유.split(':')[0]);
+        await 장부에(행.submission_id, 값.사유);
         미룸 += 1;
         continue;
       }
 
-      if (await 적기(행.submission_id, 값, 모델, 판, ver)) 적음 += 1; else 미룸 += 1;
+      if (await 적기(행.submission_id, 값, 모델, 판, ver)) {
+        적음 += 1;
+        await 장부정리(행.submission_id);
+      } else 미룸 += 1;
     } catch (e) {
-      console.error('[correct] 예외', 행.submission_id, String((e as Error)?.message ?? e));
+      const 말 = String((e as Error)?.message ?? e);
+      console.error('[correct] 예외', 행.submission_id, 말);
       센다(버림, '예외');
+      await 장부에(행.submission_id, '예외', 말);
       미룸 += 1;
     }
   }
 
   return 봉투(200, {
-    대기: 대기수, 집음: 행들.length, 적음, 미룸, 버림,
+    대기: 대기수, 집음: 행들.length, 적음, 미룸, 버림, 장부,
     캐시: 성적합(성적들), 모델, prompt_ver: 판,
   });
 });
