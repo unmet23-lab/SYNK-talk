@@ -213,3 +213,113 @@ test('🔑 URL 조립을 잡 몸통에 그대로 둔다 — 함수 안으로 감
     `잡 몸통의 URL 조립이 바뀌었다(건수 포함) — 옆 회귀(조용한실패)가 세는 분모가 여기서 갈린다.\n`
     + `  실제: ${slug.join(' · ')}`);
 });
+
+// ── ④-㉡ 기계 판독 통로 `--json` ────────────────────────────────────────────
+// 장부는 «부르면 답할 뿐»이라 아무도 안 부르면 조용하다 — 그 침묵은 「이상 0」과 같은 모양이다.
+// 형제 저장소(SYNK-appsscript)의 세션시작 부패 점검이 6시간마다 이 한 줄을 읽어 먼저 말한다.
+// 🔑 네트워크는 안 탄다 — `fetch` 를 대역으로 갈아끼워 **성공 경로까지** 실제로 밟는다.
+//    구조 검사로 접으면 「낱말이 파일에 있나」로 되돌아간다(②가 변이 2건을 흘린 그 실수).
+const { spawnSync } = require('node:child_process');
+
+const 도구경로 = path.join(ROOT, 'tools', '회차장부.js');
+const 도구소스 = fs.readFileSync(도구경로, 'utf8');
+
+const 표본 = {
+  요약: [{ jobname: 'transcribe-batch', 전체: 10, 성공: 8, 실패: 2, 타임아웃: 0, 전송오류: 0, 상태없음: 0, 발사실패: 0, 유실: 0, 대기: 0, 마지막발사: 'x' }],
+  대조: [{ jobname: 'transcribe-batch', 돈횟수: 10, 적힌횟수: 10, 안적힌횟수: 0, SQL층실패: 0 }],
+  이상: [{ jobname: 'transcribe-batch', outcome: '실패', status_code: 500, queued_at: 't', 사유: '벤더 500', 봉투: '{"몰래":"새면안됨"}' }],
+};
+
+/** 대역 fetch + 주입 자격증명으로 `main()` 을 한 판 돌리고 **stdout 전량**을 돌려준다. */
+async function 한판(args, { 섰나 = true } = {}) {
+  const 응답 = [[{ 섰나 }], [{ 값: { 섰나, ...표본 } }]];
+  const 원래 = { fetch: globalThis.fetch, write: process.stdout.write, log: console.log, argv: process.argv, env: { ...process.env } };
+  let n = 0;
+  let out = '';
+  globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => JSON.stringify(응답[n++]) });
+  process.stdout.write = (s) => { out += s; return true; };
+  console.log = (...a) => { out += `${a.join(' ')}\n`; };
+  process.env.SUPABASE_ACCESS_TOKEN = 'test-token';
+  process.env.SUPABASE_PROJECT_REF = 'testref0000000000000';
+  process.argv = [원래.argv[0], 도구경로, ...args];
+  try {
+    const 코드 = await require(도구경로).main();
+    return { 코드, out };
+  } finally {
+    globalThis.fetch = 원래.fetch; process.stdout.write = 원래.write;
+    console.log = 원래.log; process.argv = 원래.argv;
+    process.env.SUPABASE_ACCESS_TOKEN = 원래.env.SUPABASE_ACCESS_TOKEN || '';
+    process.env.SUPABASE_PROJECT_REF = 원래.env.SUPABASE_PROJECT_REF || '';
+  }
+}
+
+test('🔑 --json 은 stdout 에 JSON «한 줄만» 낸다 — 사람글이 한 글자라도 섞이면 형제가 못 읽는다', async () => {
+  const { 코드, out } = await 한판(['--json']);
+  const o = JSON.parse(out.trim());   // 사람 표가 섞이면 여기서 던진다 = 그게 이 검사다
+  assert.equal(코드, 1);
+  assert.equal(o.판, true);
+  assert.equal(o.판정, 1, 'exit 코드와 페이로드 판정이 갈리면 부르는 쪽이 어느 쪽을 믿을지 모른다');
+  assert.equal(o.이상, 2);
+  assert.equal(o.과녁, 'testref0000000000000');
+});
+
+test('🔑 봉투(응답 본문)는 기계 통로에 안 실린다 — 세션 시작 화면에 벤더 응답이 쏟아진다', async () => {
+  const { out } = await 한판(['--json']);
+  assert.ok(!out.includes('몰래'), '봉투가 --json 에 실렸다');
+  const o = JSON.parse(out.trim());
+  assert.equal(o.최근이상.length, 1);
+  assert.equal(o.최근이상[0].봉투, undefined);
+  assert.equal(o.최근이상[0].jobname, 'transcribe-batch', '어느 잡인지가 빠지면 한 줄 알림에 열 대상이 없다');
+});
+
+test('🔑 판이 없으면 «판:false · 판정:2» 를 낸다 — 빈 stdout 이면 「못 잼」과 구별이 안 된다', async () => {
+  const { 코드, out } = await 한판(['--json'], { 섰나: false });
+  assert.equal(코드, 2);
+  const o = JSON.parse(out.trim());
+  assert.equal(o.판, false, '판 미적용(⏳유호)과 도구 고장이 같은 모양이면 6시간마다 거짓 경보가 된다');
+  assert.equal(o.판정, 2);
+});
+
+test('사람 통로는 그대로다 — --json 이 없으면 표를 찍고 JSON 은 안 낸다', async () => {
+  const { out } = await 한판([]);
+  assert.match(out, /■ 대조 —/);
+  assert.match(out, /■ 요약 —/);
+  assert.ok(!out.includes('"도구"'), 'json 게이트가 새서 사람 출력에 JSON 이 섞였다');
+});
+
+test('🔑 터진 자리에서도 한 줄을 낸다 — 자격증명이 없을 때 (네트워크 0)', () => {
+  /* 부르는 쪽에서 「판을 아직 안 부었다」(조용해도 되는 상태)와 「자격증명·네트워크가 죽었다」는
+   * 처방이 다르다. 빈 stdout 이면 둘이 한 칸으로 뭉친다. */
+  const r = spawnSync(process.execPath, [도구경로, '--json'], {
+    encoding: 'utf8', timeout: 20000,
+    env: { ...process.env, SUPABASE_ACCESS_TOKEN: '', SUPABASE_PROJECT_REF: '' },
+  });
+  assert.equal(r.status, 2);
+  const o = JSON.parse(String(r.stdout).trim());
+  assert.equal(o.판, null, '판을 열지도 못했는데 false(=열어 봤더니 없다)로 적었다');
+  assert.equal(o.판정, 2);
+  assert.match(o.사유, /SUPABASE/, '왜 못 쟀는지가 안 실렸다 — 사유 없는 미측정은 처방이 없다');
+});
+
+test('🔑 모르는 플래그는 «그 사유로» 막힌다 — status≠0 만 보면 판 미적용(2)과 구별이 안 된다', () => {
+  /* 🔴 이 검사의 초판은 `status !== 0` 만 봐서 **거짓 초록**이었다 — 이 DB 는 판이 아직 없어
+   *   어떤 실행이든 2로 끝난다. 「막혔다」와 「원래 2였다」가 같은 모양이었다(F207 계열).
+   *   자격증명을 비워 네트워크 갈래를 끊고, 차단 «사유»를 직접 본다. */
+  const 없이 = { ...process.env, SUPABASE_ACCESS_TOKEN: '', SUPABASE_PROJECT_REF: '' };
+  const r = spawnSync(process.execPath, [도구경로, '--없는플래그'], { encoding: 'utf8', timeout: 20000, env: 없이 });
+  assert.notEqual(r.status, 0);
+  assert.match(String(r.stderr), /모르는 플래그 --없는플래그/,
+    '게이트의 답을 버렸다 — 모르는 낱말이 조용히 무시되면 딴 과녁을 재고 초록이 된다(F400·F435)');
+  assert.ok(!String(r.stdout).includes('"판정"'), '모르는 플래그인데 기계 통로가 판정을 냈다');
+});
+
+test('🔑 stdout 을 더럽힐 통로가 아예 없다 — 이 파일에 console.log 가 0회', () => {
+  /* 위 검사들은 «지금» 새는지만 본다. 새 출력 한 줄이 `console.log` 로 들어오면 그 순간
+   * --json 이 조용히 깨지는데, 그 증상은 형제 쪽에서 「못 잼」이라 이 파일에선 안 보인다.
+   * 그래서 통로 자체를 0으로 못박는다(사람글은 전부 `말()` 을 지난다). */
+  const 정의 = /const 말 = \(\.\.\.a\) => \{ if \(!조용\) console\.log\(\.\.\.a\); \};/;
+  assert.match(도구소스, 정의, '`말()` 정의가 바뀌었다 — 앵커가 낡으면 아래 세기가 무엇이든 통과시킨다');
+  const 횟수 = (도구소스.replace(정의, '').match(/console\.log\(/g) || []).length;
+  assert.equal(횟수, 0, `\`말()\` 밖의 console.log ${횟수}회 — 사람글은 \`말()\`, 기계글은 \`json내기()\` 둘뿐이어야 한다`);
+  assert.match(도구소스, /조용 = json/, '`--json` 이 사람글을 끄는 배선이 없다 — 플래그만 있고 발동이 없다');
+});
