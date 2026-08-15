@@ -320,6 +320,91 @@ test('읽기갈래 — 리허설은 선언과 무관하게 마찰 0 · --운영 
   assert.equal(과녁판정({ SUPABASE_PROJECT_REF: 운영REF }, ['--운영'], { 읽기: true }).상태, '통과');
 });
 
+/* ── 읽기에 「쓰기 승인 키」를 붙인 자리 (2026-08-15 신설 · F462) ────────────────────
+ * 🔴 실사건: 읽기(`배포대조 --운영` · `원격SQL <읽기.sql> --운영`)에 쓰기 승인 키를 붙인 세션이
+ *   그 습관 위에서 같은 낱말로 운영에 Edge Function 6벌을 밀었다. 금지문은 `과녁차단()` 안이라
+ *   **막힐 때만** 보이는데 `--운영` 은 통과하므로, 그 문장은 영영 안 읽히는 자리에 있었다.
+ * 🔑 **적용 전 실측이 이 회귀의 축이다.** 읽기+쓰기키가 찍던 줄은 진짜 쓰기가 찍는 줄과
+ *   **글자까지 같았고**, 정작 정본 통로(과녁 덮어쓰기)만 자기를 밝히고 있었다. 그래서 여기서
+ *   지는 것은 「말을 한다」가 아니라 **세 갈래가 서로 구분된다**는 것이다 —
+ *   ①읽기+쓰기키(말한다) ②진짜 쓰기(안 말한다) ③정본 읽기(안 말한다).
+ *   ②③ 이 빠지면 이 알림은 어디서나 뜨는 소음이 되고, 소음이 된 가드는 곧 안 읽힌다. */
+
+/** `읽기()` 를 과녁을 정해 놓고 몰아본다 — 알림은 **찍히는 것**이라 반환값만으론 못 잰다. */
+const 통로 = async (도구, opt, args, ref) => {
+  const 원래 = process.env.SUPABASE_PROJECT_REF;
+  if (ref === undefined) delete process.env.SUPABASE_PROJECT_REF;
+  else process.env.SUPABASE_PROJECT_REF = ref;
+  let env;
+  try {
+    const 줄들 = await 찍힌것(() => { env = 읽기(도구, { ...opt, args, 오늘: '2000-01-01' }); });
+    return { 줄들, env };
+  } finally {
+    if (원래 === undefined) delete process.env.SUPABASE_PROJECT_REF;
+    else process.env.SUPABASE_PROJECT_REF = 원래;
+  }
+};
+const 정본안내 = (줄들) => 줄들.filter((l) => l.includes('읽기의 정본'));
+
+test('F462 — 읽기에 `--운영` 을 붙이면 그 자리에서 정본 통로를 인쇄한다', async () => {
+  const { 줄들 } = await 통로('배포대조', { 읽기: true }, ['--운영'], 리허설REF);
+  const 안내 = 정본안내(줄들);
+  assert.equal(안내.length, 1, `말이 없다 — 찍힌 것: ${JSON.stringify(줄들)}`);
+  assert.ok(안내[0].includes(`SUPABASE_PROJECT_REF=${운영REF}`), '따라갈 명령이 없다(F103)');
+  assert.ok(안내[0].includes('PowerShell'), '이 저장소는 셸이 둘인데 한쪽만 준다');
+});
+
+test('F462 — 인쇄한 명령엔 `--운영` 이 없고 나머지 인자는 살아 있다 (따를 수 없는 처방 금지)', async () => {
+  /* 🔑 자기가 막는 낱말을 처방이 도로 시키면 그게 F103 이다 — 그 순간 우회가 정상 통로가 된다. */
+  const { 줄들 } = await 통로('배포대조', { 읽기: true }, ['--운영', '--진단', 'tasks'], 리허설REF);
+  const 명령줄 = 정본안내(줄들)[0].split('\n').filter((l) => l.includes('node tools/'));
+  assert.equal(명령줄.length, 2, `Bash·PowerShell 두 줄이어야 한다 — ${JSON.stringify(명령줄)}`);
+  for (const l of 명령줄) {
+    assert.ok(!l.includes('--운영'), `처방이 자기가 막는 키를 도로 시킨다: ${l}`);
+    assert.ok(l.includes('--진단') && l.includes('tasks'), `나머지 인자를 흘려 못 도는 명령이 됐다: ${l}`);
+    assert.ok(l.includes('tools/배포대조.js'), `부를 파일을 안 말한다: ${l}`);
+  }
+});
+
+test('F462 — **막지는 않는다** · 과녁은 그대로 운영이다', async () => {
+  /* ⚠ 막으면 「읽으려면 쓰기 키가 유일한 길」이던 F103 을 방향만 바꿔 되풀이한다. */
+  const { env } = await 통로('배포대조', { 읽기: true }, ['--운영'], 리허설REF);
+  assert.equal(env.SUPABASE_PROJECT_REF, 운영REF, '알림이 조준을 흔들었다 — 알림은 게이트가 아니다');
+});
+
+test('F462 — 진짜 쓰기(`--적용 --운영`)엔 이 말을 안 한다 (소음이 되면 곧 안 읽힌다)', async () => {
+  const { 줄들 } = await 통로('원격SQL', { 읽기: false }, ['--적용', '--운영'], 리허설REF);
+  assert.deepEqual(정본안내(줄들), [], '쓰기 승인이 정당한 자리에서 잔소리한다');
+});
+
+test('F462 — 정본 통로(과녁 덮어쓰기)로 읽으면 잔소리하지 않는다 · 읽기통과는 여전히 소리 낸다', async () => {
+  const { 줄들 } = await 통로('배포대조', { 읽기: true }, [], 운영REF);
+  assert.deepEqual(정본안내(줄들), [], '시킨 대로 했는데도 같은 말을 하면 그 처방은 못 따른다');
+  assert.ok(줄들.some((l) => l.includes('읽습니다')), '정본 통로가 조용해졌다 — 그건 F462 이전 상태다');
+});
+
+test('F462 — 리허설은 마찰 0 (읽을 때마다 뜨면 그건 알림이 아니라 소음이다)', async () => {
+  const { 줄들 } = await 통로('배포대조', { 읽기: true }, [], 리허설REF);
+  assert.deepEqual(정본안내(줄들), []);
+});
+
+test('F462 — 인쇄되는 `tools/<도구>.js` 가 실재한다 (안 도는 명령을 처방하면 그게 F103 이다)', () => {
+  /* 🔑 알림은 `도구` 이름으로 파일 경로를 **짓는다**. 그 가정이 깨지는 순간 처방은 「없는 파일을
+   *   부르라」가 되고, 그건 안 도는 처방이라 읽는 사람이 옛 습관(`--운영`)으로 돌아간다.
+   *   그래서 가정 자체를 소스로 못박는다 — 새 도구가 이름을 어긋나게 지으면 여기가 빨개진다. */
+  const 선언한것 = [];
+  for (const f of fs.readdirSync(TOOLS).filter((n) => n.endsWith('.js'))) {
+    const 글 = 주석빼기(fs.readFileSync(path.join(TOOLS, f), 'utf8'));
+    const m = 글.match(/자격증명\.읽기\s*\(\s*['"]([^'"]+)['"]\s*,[^)]*읽기\s*:/);
+    if (m) 선언한것.push([f, m[1]]);
+  }
+  // 🔴 분모부터 밝힌다 — 0건을 잰 것과 통과는 같은 모양이다(F207).
+  assert.ok(선언한것.length >= 2,
+    `읽기 선언 도구를 ${선언한것.length}개만 찾았다 — 정규식이 깨졌다(실측 2026-08-15 = 배포대조·원격SQL 둘)`);
+  const 어긋난것 = 선언한것.filter(([f, 도구]) => `${도구}.js` !== f).map(([f, 도구]) => `${f} ← '${도구}'`);
+  assert.deepEqual(어긋난것, [], `도구 이름과 파일 이름이 달라 인쇄되는 명령이 안 돈다: ${어긋난것.join(' · ')}`);
+});
+
 /** 소스에 **쓰기 경로**가 있는가 — 읽기라 선언한 도구가 나중에 쓰기를 얻는 순간을 잡는다.
  *  ⚠ HTTP 메서드만으로는 못 가른다: Management API 는 **읽기 SQL 도** `POST /database/query` 로
  *  보낸다(실측 — `엔진뷰어` 는 화면에 「읽기」를 찍으면서 POST 를 친다). 그래서 둘 다 센다. */
