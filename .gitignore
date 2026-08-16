@@ -33,6 +33,13 @@ web-build/
 .DS_Store
 Thumbs.db
 
+# 네이티브 생성물 — `npx expo prebuild` 가 app.json 에서 **매번 다시 만든다**(CNG).
+# 여기 없으면 prebuild 한 번에 미추적 파일 수백 개가 쏟아지고, 그건 유일한 무보호 상태다(F025).
+# ⚠ 무시되는 파일은 저장소 «안»이 가장 위험하다는 조항의 예외다 — 정본은 `app.json`·`eas.json`
+#   이고 이 두 폴더는 그것의 파생이라, 지워도 한 명령으로 되살아난다(node_modules 와 같은 부류).
+/android/
+/ios/
+
 # EAS / Supabase 로컬 상태
 .eas/
 supabase/.temp/
