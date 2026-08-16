@@ -21,8 +21,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const 자격증명 = require('../lib/자격증명.js');
 const { 이메일 } = require('../lib/학생계정.js');
+const { 공용플래그, 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(F435)
 
 const ROOT = path.join(__dirname, '..');
+/* 이 도구가 아는 낱말. `공용플래그`(=`--운영`)를 펴는 것은 규약이다 — `자격증명.읽기()` 가
+ * 도구를 안 가리고 그 값을 조준에 쓰기 때문이다(F436). 다만 이 도구에서 `--운영` 은
+ * **통과해도 아래 리허설 게이트에서 죽는다** — 합성 학생은 운영 명부에 서면 안 된다. */
+const 아는플래그 = [...공용플래그, '--적용'];
 const 적용 = process.argv.includes('--적용');
 
 /* 합성 학생의 고정값 — 명부(`tools/명부등록.js`)에 이미 선 행과 **같아야** 한다. */
@@ -37,6 +42,11 @@ const 비번 = process.env.MAESTRO_비밀번호 || 'Maestro-합성-900';
 const die = (m) => { console.error('[합성계정] ' + m); process.exit(1); };
 
 async function main() {
+  /* 🔑 게이트는 던지지 않고 «문장을 돌려준다» — 답을 안 받으면 모르는 낱말이 조용히 무시된다
+   *   (F400 계열 · `tests/플래그게이트.test.js` ③-2 가 이 자리를 기계로 본다). */
+  const 플래그오류 = 인자게이트('합성계정세우기', process.argv.slice(2), 아는플래그);
+  if (플래그오류) die(플래그오류);
+
   const env = 자격증명.읽기();
   const ref = env.SUPABASE_PROJECT_REF;
   const anon = env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
