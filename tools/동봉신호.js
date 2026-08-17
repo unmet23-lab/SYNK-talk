@@ -25,6 +25,13 @@
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { 동봉목록 } = require('./원격배포.js');
+const { 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
+
+/* 🎯 조준 축은 **없다** — 로컬 파일만 본다(네트워크 0 · 위 설계 제약). 그리고 이 도구가 읽는
+ *   인자는 **커밋 ref 하나(위치)** 뿐이라 선언은 빈 목록이다: 어떤 `--낱말` 도 뜻이 없다.
+ *   ⚠ `--name-only`·`--no-commit-id`·`--root` 는 git 에 넘기는 **자식 인자**다 — 넣지 않는다.
+ *     넣으면 그 낱말이 이 도구의 CLI 에서 통과한다(#Q112 ㉠ 함정 · F594). */
+const 아는플래그 = [];
 
 const ROOT = path.join(__dirname, '..');
 
@@ -107,7 +114,19 @@ function 빚요약() {
 }
 
 function main() {
-  const ref = process.argv.slice(2).find((a) => !a.startsWith('--')) || 'HEAD';
+  const args = process.argv.slice(2);
+  /* 🔑 여기서 **`process.exit` 을 쓰지 않는다** — 이 도구는 `post-commit` 에 걸려 있고
+   *   위 머리말이 못박은 계약이 「알림이지 가드가 아니다」다. 사유는 내되 흐름은 안 흔든다:
+   *   손으로 부른 사람은 `exitCode` 로 알고(git 은 post-commit 의 코드를 안 본다 — 훅 파일
+   *   머리말 참고), 커밋 뒤 경로는 그대로 지나간다. 조용히 삼키는 것과는 다르다 — 글이 나간다. */
+  const 플래그오류 = 인자게이트('동봉신호', args, 아는플래그);
+  if (플래그오류) {
+    console.error(`[동봉신호] ${플래그오류}`);
+    console.error('   ▶ 이 도구가 받는 것은 커밋 ref 하나뿐이다: node tools/동봉신호.js <커밋>');
+    process.exitCode = 1;
+    return;
+  }
+  const ref = args.find((a) => !a.startsWith('--')) || 'HEAD';
   const 영향 = 영향받은함수(커밋된경로들(ROOT, ref), 동봉목록(ROOT));
   if (영향.length) console.log(안내문(영향, 빚요약()));
 }
