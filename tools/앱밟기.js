@@ -26,6 +26,12 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const { 파일읽기, ENV파일 } = require('../lib/자격증명.js');
+const { 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
+
+/* 🎯 조준 축은 **없다** — `lib/자격증명.js` 를 들여오지만 쓰는 것은 `파일읽기` 뿐이라
+ *   `--운영` 이 갈아탈 과녁이 없다(#Q112 실측: 「들여왔다」로 세면 거짓양성 · F592).
+ *   그래서 선언은 **빈 목록**이다 — 이 도구가 읽는 인자는 흐름 파일 이름 하나(위치)뿐이다. */
+const 아는플래그 = [];
 
 const ROOT = path.join(__dirname, '..');
 const 흐름칸 = path.join(ROOT, '.maestro');
@@ -43,6 +49,13 @@ function 죽기(사유, 처방) {
   console.error('   ⚠ 이것은 「통과」가 아니다. 이 실행에서 검증된 흐름은 0건이다.\n');
   process.exit(1);
 }
+
+/* ⓪ 인자 — 모르는 `--` 낱말은 **CLI 확인보다 앞에서** 죽는다. 뒤에 두면 오타 하나에
+ *   Maestro 를 찾고 자격을 읽고 경고 세 줄을 찍은 뒤에야 죽어서, 사람은 그 실패를
+ *   「환경이 안 섰나」로 읽는다(사유가 층을 갈아탄다). */
+const args = process.argv.slice(2);
+const 플래그오류 = 인자게이트('앱밟기', args, 아는플래그);
+if (플래그오류) 죽기(플래그오류, '이 도구가 받는 것은 흐름 파일 이름 하나뿐이다: node tools/앱밟기.js 02_녹음제출.yaml');
 
 /* ① CLI — 없으면 여기서 끝난다. 「없어서 건너뛰었다」를 초록으로 만들지 않는다. */
 const 버전 = spawnSync('maestro', ['--version'], { encoding: 'utf8', shell: true });
@@ -97,7 +110,7 @@ console.log('⚠ 설치된 앱이 `--profile 합성밟기` 로 구워진 것인�
 console.log('  그 프로필이 아니면 여기서 나는 크래시가 Sentry 에 «실사용»으로 쌓인다(소급 불가).');
 console.log('  기기의 앱 → 설정 → 배포 도착 확인 → 「관측(Sentry)」 줄이 `켜짐 · 합성밟기` 여야 한다.\n');
 
-const 고른것 = process.argv[2];
+const 고른것 = args[0];
 const 대상 = 고른것 ? path.join(흐름칸, 고른것) : 흐름칸;
 if (!fs.existsSync(대상)) 죽기(`흐름을 못 찾았다: ${대상}`);
 

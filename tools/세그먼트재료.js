@@ -27,11 +27,25 @@
 const fs = require('fs');
 const 골격 = require('../lib/왕복골격.js');
 const { 세그먼트펴기, 청취문턱 } = require('../lib/검수확정.js');
+const { 공용플래그, 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
+
+/* 🎯 조준 축이 **있다** — `골격.열기()` 가 `자격증명.읽기()` 를 지난다(한 겹 건너). 그래서
+ *   선언은 **빈 목록이 아니다**: `--운영` 은 여기서 뜻을 갖는다(과녁을 갈아탄다). 안 넣으면
+ *   시스템이 시키는 낱말을 이 가드가 거절한다 — 따를 수 없는 처방이다(F103 · #Q112 가 첫 판
+ *   명단에서 이 도구에 「선언 = 빈 목록」을 적었다가 잡아낸 그 자리다).
+ *   그 밖의 `--낱말` 은 전부 거절한다 — 이 도구가 읽는 것은 위치 인자 셋뿐이다. */
+const 아는플래그 = [...공용플래그];
 
 const die = (m) => { console.error(`[세그먼트재료] ${m}`); process.exit(1); };
 
 async function main() {
-  const [auth_user_id, learner_id, wav경로] = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  const 플래그오류 = 인자게이트('세그먼트재료', args, 아는플래그);   // 모르는 낱말은 여기서 죽는다(F435)
+  if (플래그오류) die(플래그오류);
+  /* 🔴 `--` 낱말을 **위치 칸에서 걷어낸다.** 안 걷으면 `--운영` 이 auth_user_id 자리로 들어가고,
+   *   그건 무시보다 나쁘다 — 조준은 먹었는데 사용자 조회를 「--운영」이라는 id 로 친다.
+   *   조준 자체는 골격이 argv 를 따로 읽어 하므로 여기서 빼도 안 죽는다. */
+  const [auth_user_id, learner_id, wav경로] = args.filter((a) => !a.startsWith('--'));
   if (!auth_user_id || !learner_id || !wav경로) {
     die('사용: node tools/세그먼트재료.js <auth_user_id> <learner_id> <wav파일경로>');
   }

@@ -22,6 +22,12 @@ const 계약정본 = require('../계약/수집_교정_계약.json');
 const die = (m) => { console.error(`[업로드왕복] ${m}`); process.exit(1); };
 
 const 골격 = require('../lib/왕복골격.js');   // 공통 머리(환경→과녁→게이트→키→판정) — 왕복 5종 공용
+const { 공용플래그, 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
+
+/* 🎯 조준 축이 **있다**(골격 한 겹 건너 `자격증명.읽기()`). 선언이 **빈 목록이 아닌** 이유가
+ *   그것이다 — `--운영` 은 여기서 과녁을 갈아탄다. 그 밖의 `--낱말` 은 전부 거절한다
+ *   (이 도구가 읽는 것은 위치 인자 둘뿐이다 · #Q112 첫 판이 여기 「빈 목록」을 적었다 · F103). */
+const 아는플래그 = [...공용플래그];
 
 /** 16kHz·16bit·mono PCM WAV 한 조각 — 기본값이 규격 정본(C0 §4-2)과 같은 모양이다. */
 function wav(샘플수 = 1600, { 레이트 = 16000, 채널 = 1 } = {}) {
@@ -50,7 +56,12 @@ const 건너뜀 = [];
 const 건너뛴다 = (이유) => { 건너뜀.push(이유); console.log(`  ⏭ ${이유}`); };
 
 async function main() {
-  const [auth_user_id, learner_id] = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  const 플래그오류 = 인자게이트('업로드왕복', args, 아는플래그);   // 모르는 낱말은 여기서 죽는다(F435)
+  if (플래그오류) die(플래그오류);
+  /* 🔴 `--` 낱말을 위치 칸에서 걷어낸다 — 안 걷으면 `--운영` 이 auth_user_id 자리로 들어간다
+   *   (조준은 골격이 argv 를 따로 읽으므로 여기서 빼도 안 죽는다). */
+  const [auth_user_id, learner_id] = args.filter((a) => !a.startsWith('--'));
   if (!auth_user_id || !learner_id) die('사용: node tools/업로드왕복시험.js <auth_user_id> <learner_id>');
 
   const { ref, sql, anon, service_role: svc } = await 골격.열기('업로드왕복', {
