@@ -33,7 +33,10 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const { 공용플래그, 모름, 인자게이트 } = require('../lib/플래그.js');
-const { CLI도구들, 인자층, 조준축, 인자층픽스처, 산문픽스처, 조준축픽스처 } = require('./lib/CLI인자.js');
+const {
+  CLI도구들, 인자층, 조준축, 낱말들,
+  인자층픽스처, 산문픽스처, 조준축픽스처, 짝밀림픽스처,
+} = require('./lib/CLI인자.js');
 const { 코드만 } = require('./lib/소스검사.js');
 
 const TOOLS = path.join(__dirname, '..', 'tools');
@@ -290,6 +293,15 @@ test('🔑 ④ 조준축 픽스처 — 한 겹 추적과 «정의 파일» 예�
     else assert.ok(String(나온것).startsWith(c.기대), `조준축을 못 갈랐다(${나온것}): ${c.왜}`);
   }
   assert.ok(조준축픽스처.length >= 5, '픽스처가 줄었다 — 두 오판을 막는 근거가 사라진다');
+});
+
+test('🔑 ④ 짝 밀림 픽스처 — 토크나이저가 밀려도 손해는 «그 한 줄»에 갇힌다 (㉢)', () => {
+  /* 🔴 `local_31b3b9c3` 선행 실측: 파일 전체에 전역 토크나이저를 돌리면 앞에서 짝이 한 번만
+   *   어긋나도 그 뒤가 통째로 밀린다 — `엔진뷰어.js` 에서 조각 104개를 뽑고 `--건수` 는 0개였다.
+   *   새는 방향이 「선언을 **덜** 요구한다」라서 적색이 아니라 조용한 통과로 샌다. */
+  assert.deepEqual(낱말들(짝밀림픽스처.코드), 짝밀림픽스처.낱말, 짝밀림픽스처.왜);
+  /* 백틱도 본다 — 옛 판은 아예 안 봤다. */
+  assert.deepEqual(낱말들('const s = `--회전`;'), ['--회전'], '백틱 문자열의 낱말을 못 보면 그만큼 덜 요구한다');
 });
 
 test('🔑 ④ 산문 픽스처 — 주석 속 `process.argv` 는 분모가 아니다 (㉡ · `앱시작.js` 실측)', () => {
