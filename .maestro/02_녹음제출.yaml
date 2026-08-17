@@ -1,8 +1,8 @@
 appId: lab.synk.talk
 name: 녹음 → 확인 → 보내기 (앱의 급소)
 env:
-  학생번호: ${MAESTRO_학생번호}
-  비밀번호: ${MAESTRO_비밀번호}
+  학생번호: ${MAESTRO_STUDENT_CODE}
+  비밀번호: ${MAESTRO_PASSWORD}
 ---
 # 🔴 **이 흐름 하나가 Maestro 도입의 근거다.**
 #   녹음은 `expo-audio` + 실기기 마이크 권한이 걸려 있어서, node 회귀로는 원리적으로 못 잡는다

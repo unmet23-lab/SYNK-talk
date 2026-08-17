@@ -41,10 +41,13 @@ node tools/앱밟기.js
 먼저 세울 것:
 1. Maestro CLI (Windows 는 WSL 이 필요할 수 있다)
 2. 안드로이드 에뮬레이터 또는 USB 기기
-3. `MAESTRO_학생번호` · `MAESTRO_비밀번호` — **리허설 DB 의 합성 계정만**
+3. `MAESTRO_STUDENT_CODE` · `MAESTRO_PASSWORD` — **리허설 DB 의 합성 계정만**
+   (`.env` 에 적어도 되고 셸에서 세워도 된다 — `tools/앱밟기.js` 가 둘 다 보고 흐름에 넘긴다.
+   이름이 ASCII 인 이유는 관례가 아니라 문법이다: `export MAESTRO_학생번호=…` 는 bash 가
+   `not a valid identifier` 로 거절한다 · F501 · 2026-08-17)
 4. `eas build --profile 합성밟기 --platform android` 로 구운 앱
 
-> 🔴 **`합성밟기` 프로필이라야 한다.** 그 프로필만 `EXPO_PUBLIC_합성밟기=1` 을 번들에 박고,
+> 🔴 **`합성밟기` 프로필이라야 한다.** 그 프로필만 `EXPO_PUBLIC_SYNTHETIC_RUN=1` 을 번들에 박고,
 > 그 값이 Sentry 이벤트의 `출처` 태그를 가른다. 다른 프로필로 구운 앱을 밟으면 합성 크래시가
 > **실사용으로** 쌓이고 — 그건 나중에 소급으로 못 가른다.
 > 기기에서 확인: 설정 → 배포 도착 확인 → 「관측(Sentry)」 = `켜짐 · 합성밟기`

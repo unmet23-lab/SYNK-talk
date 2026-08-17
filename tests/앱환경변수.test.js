@@ -92,3 +92,125 @@ test('탐지력 — 값이 없거나, 프로필이 엉뚱한 프로젝트를 가
   const secret = 정상(); secret.build.production.env.SUPA = 'sb_secret_xxxx';
   assert.ok(검사(secret).length, 'sb_secret_ 을 못 잡았다');
 });
+
+/* ══════════════════════════════════════════════════════════════════════════════
+ * ② 환경변수 **이름** — 셸을 건너는 자리는 ASCII 여야 한다 (F501 · 2026-08-17)
+ *
+ * 🔴 왜 회귀가 필요한가 — 이 규칙은 이미 있었다. `lib/자격증명.js` 가 2026-08-06 에
+ *   「이름은 ASCII 여야 한다 · `SUPABASE_TOKEN_만료` 로 썼다가 깨졌다」고 못박아 뒀다.
+ *   그런데 **산문이라 안 지켜졌다**: 08-15 관측층이 `MAESTRO_학생번호`·`MAESTRO_비밀번호`
+ *   ·`EXPO_PUBLIC_합성밟기` 로 같은 자리를 다시 밟았고, 저장소는 전부 초록이었다.
+ *   두 번째 = 실수가 아니라 시스템 결함(CLAUDE.md 신뢰성) → 문장을 여기서 기계로 만든다.
+ *
+ * 🔑 재는 것은 하나뿐이다 — **「셸이 이 이름을 세울 수 있나」**(POSIX 식별자).
+ *   실측 2026-08-17: `export MAESTRO_학생번호=900` → bash exit 1 `not a valid identifier`.
+ *   대문자 관례를 재지 않는다 — `ComSpec`·`OneDrive` 는 OS 가 그렇게 쓰고, 넓히면 거짓양성이
+ *   진짜 위반을 덮는다(첫 측정판이 정확히 그랬다: 537종 중 거의 전부가 거짓양성이었다).
+ *
+ * 🚫 안 재는 것(정직하게):
+ *   · Maestro 흐름 **본문**의 `${학생번호}` — 그건 흐름이 자기 머리에서 치환하는 값이라
+ *     OS 를 안 건넌다. 머리(`env:`)만 본다.
+ *   · `contents/` — 문서를 통째로 담은 문자열 blob 이라 산문 속 낱말이 이름처럼 보인다.
+ *   · 형제 저장소(as) — 같은 병이 24종 있다(2026-08-17 실측). 거기 규칙은 거기가 진다.
+ * ══════════════════════════════════════════════════════════════════════════════ */
+const { 셸이세울수있나 } = require('../lib/자격증명.js');
+const { 코드만 } = require('./lib/소스검사.js');
+
+const ROOT = path.join(__dirname, '..');
+
+/** 순수 판정 — 부르는 쪽이 파일을 읽는다(픽스처로 탐지력을 못박기 위해). */
+function 이름위반(자리들) {
+  return 자리들.filter(({ 이름 }) => !셸이세울수있나(이름)).map(({ 이름, 어디 }) => `${어디}: ${이름}`);
+}
+
+/** ㉠ Maestro 흐름 **머리** — `env:` 는 밖에서 받는 값이라 셸을 건넌다. */
+function 흐름머리이름(원문, 어디) {
+  const 머리 = 원문.split(/^---\s*$/m)[0] || '';
+  return [...머리.matchAll(/\$\{([^}]+)\}/g)].map((m) => ({ 이름: m[1].trim(), 어디 }));
+}
+
+/** ㉡ EAS 빌드 env 키 — 값은 **리눅스 빌드 워커**의 환경변수로 들어간다. */
+function EAS이름(eas, 어디 = 'eas.json') {
+  const out = [];
+  for (const [프로필, 설정] of Object.entries((eas && eas.build) || {})) {
+    for (const 이름 of Object.keys((설정 && 설정.env) || {})) out.push({ 이름, 어디: `${어디} ▸ ${프로필}` });
+  }
+  return out;
+}
+
+/** ㉢ 소스가 부르는 이름 — `process.env.X` 와, 손잡이를 상수로 뺀 자리(`'MAESTRO_…'`). */
+function 소스이름(원문, 어디) {
+  const 코드 = 코드만(원문);
+  const out = [];
+  for (const m of 코드.matchAll(/process\.env\.([A-Za-z0-9_ㄱ-힣]+)/g)) out.push({ 이름: m[1], 어디 });
+  for (const m of 코드.matchAll(/process\.env\[\s*['"`]([^'"`]+)['"`]\s*\]/g)) out.push({ 이름: m[1], 어디 });
+  for (const m of 코드.matchAll(/['"`]((?:MAESTRO|EXPO_PUBLIC|SUPABASE|SYNK)_[A-Za-z0-9_ㄱ-힣]+)['"`]/g)) {
+    out.push({ 이름: m[1], 어디 });
+  }
+  return out;
+}
+
+function js파일들(뿌리) {
+  const out = [];
+  const 훑기 = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) 훑기(p);
+      else if (/\.(js|ts)$/.test(e.name)) out.push(p);
+    }
+  };
+  if (fs.existsSync(뿌리)) 훑기(뿌리);
+  return out;
+}
+
+// ── 실저장소: 거짓양성만 본다(탐지력은 아래 픽스처가 진다) ──
+test('환경변수 이름 — 셸을 건너는 자리가 전부 ASCII 다 (F501)', () => {
+  const 자리 = [];
+
+  const 흐름칸 = path.join(ROOT, '.maestro');
+  const 흐름들 = fs.existsSync(흐름칸) ? fs.readdirSync(흐름칸).filter((f) => f.endsWith('.yaml')) : [];
+  for (const f of 흐름들) {
+    자리.push(...흐름머리이름(fs.readFileSync(path.join(흐름칸, f), 'utf8'), `.maestro/${f}`));
+  }
+  자리.push(...EAS이름(JSON.parse(fs.readFileSync(EAS, 'utf8'))));
+  for (const 뿌리 of ['lib', 'src', 'tools', 'tests', 'supabase']) {
+    for (const p of js파일들(path.join(ROOT, 뿌리))) {
+      자리.push(...소스이름(fs.readFileSync(p, 'utf8'), path.relative(ROOT, p).replace(/\\/g, '/')));
+    }
+  }
+
+  /* 🔑 분모를 먼저 말한다 — 「0 위반」과 「아무것도 안 훑었다」는 같은 초록이다(F207).
+   *   흐름 파일이 통째로 사라져도 이 시험은 조용히 통과할 수 있어서, 그 자리를 막는다. */
+  assert.ok(흐름들.length >= 3, `Maestro 흐름을 ${흐름들.length}벌만 봤다 — 흐름이 사라졌거나 경로가 틀렸다`);
+  assert.ok(자리.length >= 20, `환경변수 자리를 ${자리.length}곳만 훑었다 — 스캐너가 눈이 멀었다`);
+
+  assert.deepEqual(이름위반(자리), [], '셸이 못 세우는 환경변수 이름이 있다(bash: not a valid identifier)');
+});
+
+// ── 픽스처: 깨진 모양을 실제로 잡는가 ──
+test('탐지력 — 비ASCII 이름을 자리마다 잡는다 (F501 원문 그대로 되넣어 본다)', () => {
+  /* 🔑 픽스처의 «나쁜 이름»은 **조립한다** — 리터럴로 두면 위 실저장소 시험이 이 파일을 읽어
+   *   자기 자신을 위반으로 잡는다(이 파일도 `tests/` 안이다). JWT 픽스처가 쓰는 관례 그대로다. */
+  const 나쁜학생 = 'MAESTRO_' + '학생번호';
+  const 나쁜태그 = 'EXPO_PUBLIC_' + '합성밟기';
+
+  assert.deepEqual(이름위반([{ 이름: 'MAESTRO_STUDENT_CODE', 어디: 'x' }]), [], '기준선이 이미 빨갛다');
+  assert.deepEqual(이름위반([{ 이름: 'ComSpec', 어디: 'x' }, { 이름: 'OneDrive', 어디: 'x' }]), [],
+    'OS 가 실제로 쓰는 혼합 대소문자 이름을 위반으로 셌다 — 그러면 진짜 위반이 소음에 묻힌다');
+
+  const 흐름 = `appId: lab.synk.talk\nenv:\n  학생번호: \${${나쁜학생}}\n---\n- tapOn:\n    id: "\${학생번호}"\n`;
+  assert.deepEqual(이름위반(흐름머리이름(흐름, 'f')), [`f: ${나쁜학생}`], '흐름 머리의 비ASCII 이름을 못 잡았다');
+  assert.deepEqual(이름위반(흐름머리이름(흐름.replace(나쁜학생, 'MAESTRO_STUDENT_CODE'), 'f')), [],
+    '흐름 **본문**의 `${학생번호}` 를 위반으로 셌다 — 그건 Maestro 가 자기 안에서 치환한다');
+
+  const eas = { build: { preview: { env: { [나쁜태그]: '1' } } } };
+  assert.deepEqual(이름위반(EAS이름(eas)), [`eas.json ▸ preview: ${나쁜태그}`], 'EAS env 키를 못 잡았다');
+
+  assert.deepEqual(이름위반(소스이름(`const 합성 = process.env.${나쁜태그} === '1';`, 's.js')),
+    [`s.js: ${나쁜태그}`], 'process.env.X 를 못 잡았다');
+  assert.deepEqual(이름위반(소스이름(`const 칸 = '${나쁜학생}';`, 's.js')), [`s.js: ${나쁜학생}`],
+    '상수로 빼낸 손잡이를 못 잡았다 — 이름을 변수 뒤에 숨기면 이 회귀가 눈이 먼다');
+  assert.deepEqual(이름위반(소스이름(`/* 옛날엔 process.env.${나쁜태그} 였다 */\nconst a = 1;`, 's.js')), [],
+    '주석 속 이력을 위반으로 셌다 — 그러면 실패를 지우려고 역사를 지우게 된다');
+});

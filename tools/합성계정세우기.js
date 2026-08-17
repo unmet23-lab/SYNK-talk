@@ -37,7 +37,7 @@ const 가입답 = { home_aimag: 'ulaanbaatar', gender: 'undisclosed', goal_track
 
 /* 비밀번호는 여기서 «만들지» 않고 환경에서 받는다 — 소스에 박으면 그 순간 git 에 실린다.
  * 없으면 기계적으로 하나 짓되 **.env 로만 흘린다**(아래). */
-const 비번 = process.env.MAESTRO_비밀번호 || 'Maestro-합성-900';
+const 비번 = process.env.MAESTRO_PASSWORD || 'Maestro-합성-900';
 
 const die = (m) => { console.error('[합성계정] ' + m); process.exit(1); };
 
@@ -95,10 +95,13 @@ function 자격흘리기() {
     if (new RegExp(`^${k}=`, 'm').test(원문)) 원문 = 원문.replace(new RegExp(`^${k}=.*$`, 'm'), `${k}=${v}`);
     else 원문 += (원문.endsWith('\n') || !원문 ? '' : '\n') + `${k}=${v}\n`;
   };
-  넣기('MAESTRO_학생번호', 학생번호);
-  넣기('MAESTRO_비밀번호', 비번);
+  /* 🔑 이름은 ASCII 다 — 이 두 줄은 `.maestro/` 흐름으로 **셸을 건너간다**(F501 · 2026-08-17).
+   *   옛 이름(`MAESTRO_학생번호`)은 bash 가 `not a valid identifier` 로 거절해서, 적어 놓고도
+   *   세울 수 없었다. 규칙 정본 = `lib/자격증명.js` 의 `셸이세울수있나`. */
+  넣기('MAESTRO_STUDENT_CODE', 학생번호);
+  넣기('MAESTRO_PASSWORD', 비번);
   fs.writeFileSync(p, 원문);
-  console.log('   자격을 .env 에 적었다 (MAESTRO_학생번호 · MAESTRO_비밀번호) — git 밖이다.');
+  console.log('   자격을 .env 에 적었다 (MAESTRO_STUDENT_CODE · MAESTRO_PASSWORD) — git 밖이다.');
 }
 
 async function 프로젝트이름(ref, 토큰) {

@@ -48,7 +48,7 @@ function 가짜도구(dir, 종료코드) {
  * 통로가 `띄우기` 인 이유: 옛 판정 `r.status !== 0` 은 스폰 실패(status=null)까지 「막혔다」로
  * 번역했다 — 미실행은 판정이 아니라 예외여야 한다(tests/lib/띄우기.js · 통과코드 0|1 만 결과다). */
 function 검사(dir, 도구) {
-  const env = { ...process.env, SYNK_계약도구: 도구 };
+  const env = { ...process.env, SYNK_CONTRACT_TOOL: 도구 };
   const r = 띄우기(훅, { cwd: dir, env, 통과코드: [0, 1] });
   return { 막혔나: r.status !== 0, 출력: String(r.stdout || '') + String(r.stderr || '') };
 }

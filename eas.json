@@ -33,7 +33,7 @@
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://baasvefzinrxaryksayl.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_UalaCpFtV6weCR1IvZkTLQ_NW5-dcFK",
-        "EXPO_PUBLIC_합성밟기": "1"
+        "EXPO_PUBLIC_SYNTHETIC_RUN": "1"
       }
     },
     "production": {

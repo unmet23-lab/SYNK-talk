@@ -1,8 +1,8 @@
 appId: lab.synk.talk
 name: 로그인 — 앱을 열고 학생이 들어간다
 env:
-  학생번호: ${MAESTRO_학생번호}
-  비밀번호: ${MAESTRO_비밀번호}
+  학생번호: ${MAESTRO_STUDENT_CODE}
+  비밀번호: ${MAESTRO_PASSWORD}
 ---
 # 🔴 이 흐름이 지키는 것: **앱이 뜨고 로그인이 통과한다.**
 #   node 회귀는 이 자리를 원리적으로 못 잰다 — `tests/lib/화면세우기.js` 머리말이 스스로

@@ -168,7 +168,7 @@ test('형제가 없는 기계에서는 막지 않고 «못 했다»고 말한다
     write(dir, 'prompts/교정.md', `금지 예시: ${옛글자}\n`);
     git(dir, ['add', 'prompts/교정.md']);
 
-    const r = runGuard(dir, { SYNK_옛글자도구: path.join(dir, '없는도구.js') });
+    const r = runGuard(dir, { SYNK_LEGACY_GLYPH_TOOL: path.join(dir, '없는도구.js') });
     assert.strictEqual(r.code, 0, `형제가 없다고 커밋을 막으면 그 세션은 아무것도 못 한다:\n${r.out}`);
     assert.match(r.out, /못 했다/, `확인을 못 했다는 말이 없다 — 미실행이 통과와 같은 모양이다:\n${r.out}`);
   });

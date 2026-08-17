@@ -30,8 +30,11 @@
    갈아 끼우므로, 여기서 구조분해하지 않고 **통째로 적어야** 치환이 걸린다. */
 const DSN = process.env.EXPO_PUBLIC_SENTRY_DSN || '';
 const 커밋 = process.env.EXPO_PUBLIC_COMMIT || '';
-/* 합성 밟기(Maestro)가 세우는 빌드만 이 값을 갖는다 — `.maestro/` 실행 도구가 넣는다. */
-const 합성 = process.env.EXPO_PUBLIC_합성밟기 === '1';
+/* 합성 밟기(Maestro)가 세우는 빌드만 이 값을 갖는다 — `eas.json` 의 `합성밟기` 프로필이 박는다.
+   🔑 이름이 ASCII 인 이유(2026-08-17 · F501): 이 값은 EAS 빌드 워커(리눅스)의 **환경변수**로
+      들어온다 — 셸이 못 세우는 이름이면 번들에 «조용히 안 박히고», 그러면 합성 크래시가
+      Sentry 에 실사용으로 쌓인다(소급으로 못 가른다 · tools/앱밟기.js 머리말 ②). */
+const 합성 = process.env.EXPO_PUBLIC_SYNTHETIC_RUN === '1';
 
 let 켜짐 = false;
 let 사유 = 'not_initialized';
