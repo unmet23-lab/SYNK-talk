@@ -37,6 +37,24 @@ async function main() {
   });
   const base = `https://${ref}.supabase.co`;
   const 발사 = process.argv.includes('--발사');
+  const 회수모드 = process.argv.includes('--회수');
+
+  /* 벤더 자격은 **한 곳에서** 만든다 — `correct` 는 앞단에서 anon 을 401 로 거절한다
+   * (`correct/index.ts` 인증 게이트 · 2026-08-17 실측: 「service_role 만 부를 수 있습니다」로
+   * 튕겨 **벤더에 닿지도 않는다**). cron 이 도는 자격도 그것이라 과녁이 맞다. */
+  const 부르기 = async (질의) => {
+    const r = await fetch(`${base}/functions/v1/correct?${질의}`, {
+      method: 'POST',
+      headers: {
+        apikey: service_role, Authorization: `Bearer ${service_role}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    const 원문 = await r.text();
+    let 몸 = {};
+    try { 몸 = JSON.parse(원문 || '{}'); } catch { 몸 = { 원문: 원문.slice(0, 400) }; }
+    return { status: r.status, 몸 };
+  };
 
   /* ── ⓪ 분모 — 몇 건이 기다리는가 ─────────────────────────────────
    * 술어를 여기 다시 적지 않는다(사본을 만들면 사본끼리 대조하고 「맞다」고 하게 된다).
@@ -59,25 +77,36 @@ async function main() {
     + `  보낼 건수     : ${한건} / 대기 ${대기수}  ← limit 을 빼면 ${대기수 > 100 ? 100 : 대기수}건이 나간다(배치기본=100)\n`
     + `  범위 밖       : 396건 일괄은 **별도 승인**이라 이 도구엔 통로가 없다`);
 
+  /* ── ①-b 회수만 (`--회수` · 0원) ────────────────────────────────
+   * 이미 값을 치른 배치의 결과만 걷고 **새 배치는 안 낸다**(`?회수=1` · 함수 v30 · 08-17).
+   * 여기가 «단가»를 보는 유일한 공짜 자리다 — 이 문이 없던 동안은 사용량을 보러 부르는 것이
+   * 곧 또 한 벌의 제출이었다(F452 와 같은 축). */
+  if (회수모드) {
+    console.log('\n■ ①-b 회수만 — POST ?회수=1 (걷기만 · 새 배치 0 · 0원)');
+    const { status, 몸 } = await 부르기('회수=1');
+    console.log(`  HTTP ${status}\n  봉투: ${JSON.stringify(몸, null, 2)}`);
+    확인('HTTP 200', status === 200, { status });
+    /* 🔴 갈래 이름을 확인한다 — 이 문이 «없는» 판(v29 이하)에 대고 부르면 `회수=1` 은 그냥
+     *   무시되고 **정상 배치 회차가 돌아 새 제출이 나간다**. 그때도 HTTP 는 200 이라, 이름을
+     *   안 보면 「공짜로 걷었다」와 「돈 내고 또 냈다」가 화면에서 같은 모양이다. */
+    확인("`이유: '회수만'` — 걷기만 한 회차다(이게 없으면 새 제출이 나갔다는 뜻)",
+      몸.이유 === '회수만', { 이유: 몸.이유 ?? null, 제출: 몸.제출 ?? null, 배치id: 몸.배치id ?? null });
+    console.log(`  ▸ 회수=${JSON.stringify(몸.회수 ?? null)}\n  ▸ 캐시(사용량)=${JSON.stringify(몸.캐시 ?? null)}`);
+    보고('회수만 · 0원');
+    return;
+  }
+
   if (!발사) {
-    console.log('\n[교정1건왕복] 조준만 하고 멈췄다 — 쏘려면 `--발사`. (여기까지 0원)');
+    console.log('\n[교정1건왕복] 조준만 하고 멈췄다 — 쏘려면 `--발사`(≈5원) · 걷기만 하려면 `--회수`(0원).');
     보고('조준만');
     return;
   }
 
   /* ── ② 발사 ──────────────────────────────────────────────────── */
   console.log('\n■ ② 발사 — POST (되돌릴 수 없다)');
-  /* 🔑 `service_role` 로 부른다 — 이 함수는 앞단에서 anon 을 401 로 거절한다
-   *   (`correct/index.ts` 인증 게이트 · 2026-08-17 실측: anon 이면 「service_role 만 부를 수
-   *   있습니다」로 튕겨 **벤더에 닿지도 않는다**). cron 이 도는 자격도 그것이라 과녁이 맞다. */
-  const r = await fetch(과녁, {
-    method: 'POST',
-    headers: { apikey: service_role, Authorization: `Bearer ${service_role}`, 'Content-Type': 'application/json' },
-  });
-  const 원문 = await r.text();
-  let 몸 = {};
-  try { 몸 = JSON.parse(원문 || '{}'); } catch { 몸 = { 원문: 원문.slice(0, 400) }; }
-  console.log(`  HTTP ${r.status}\n  봉투: ${JSON.stringify(몸, null, 2)}`);
+  const { status, 몸 } = await 부르기(`limit=${한건}`);
+  console.log(`  HTTP ${status}\n  봉투: ${JSON.stringify(몸, null, 2)}`);
+  const r = { status };
 
   /* ── ③ 판정 ──────────────────────────────────────────────────────
    * 🔴 `HTTP 200` 은 판정이 아니다 — 이 결함의 정체가 바로 「200 얼굴로 0건」이었다.
