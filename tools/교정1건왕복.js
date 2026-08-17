@@ -25,10 +25,24 @@
  *   낡음이 이 왕복을 막지 않게 하되, 이 도구가 부르는 함수는 정확히 그 하나다.
  */
 const 골격 = require('../lib/왕복골격.js');
+const { 공용플래그, 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
 
 const 한건 = 1;
 
+/* 🎯 조준 축이 **있다** — `골격.열기()` 가 `자격증명.읽기()` 를 지나므로 `--운영` 이 과녁을
+ *   갈아탄다(한 겹 건너 · #Q112 실측). 그래서 `공용플래그` 를 편다: 안 펴면 이 가드가
+ *   시스템이 시키는 낱말을 거절한다 — 따를 수 없는 처방이다(F103).
+ * ⚠ `--운영승인` 은 넣지 않는다 — 골격이 argv 에서 직접 읽지만 이 도구는 `운영승인가능:false`
+ *   라 그 낱말에 뜻이 없다. 받아 주면 「승인했다」고 믿은 사람에게 리허설 거절이 나간다. */
+const 아는플래그 = [...공용플래그, '--발사', '--회수'];
+
 async function main() {
+  const args = process.argv.slice(2);
+  /* 🔴 게이트가 «열기() 앞»이다 — 뒤에 두면 오타 하나에 자격증명·프로젝트 조회·배포대조가
+   *   먼저 다 돌고 그 다음에야 죽는다. 이 도구는 그 뒤에 **유료 제출**을 내는 통로다. */
+  const 플래그오류 = 인자게이트('교정1건왕복', args, 아는플래그);
+  if (플래그오류) { console.error(`[교정1건왕복] ${플래그오류}`); process.exit(1); }
+
   const { ref, 이름, sql, service_role, 확인, 치명확인, 보고 } = await 골격.열기('교정1건왕복', {
     키: true,
     운영승인가능: false,
@@ -36,8 +50,8 @@ async function main() {
     함수목록: ['correct'],
   });
   const base = `https://${ref}.supabase.co`;
-  const 발사 = process.argv.includes('--발사');
-  const 회수모드 = process.argv.includes('--회수');
+  const 발사 = args.includes('--발사');
+  const 회수모드 = args.includes('--회수');
 
   /* 벤더 자격은 **한 곳에서** 만든다 — `correct` 는 앞단에서 anon 을 401 로 거절한다
    * (`correct/index.ts` 인증 게이트 · 2026-08-17 실측: 「service_role 만 부를 수 있습니다」로

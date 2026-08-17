@@ -27,6 +27,10 @@ const path = require('node:path');
 
 const 팩 = require('../contents/토픽퀴즈문항.js');
 const 검수 = require('../lib/토픽퀴즈검수.js');
+const { 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
+
+/* 🎯 조준 축은 **없다** — 127.0.0.1 에만 붙는 로컬 서버고 학생 데이터를 안 읽는다. */
+const 아는플래그 = ['--현황'];
 
 const ROOT = path.dirname(__dirname);
 const 장부경로 = path.join(ROOT, 'contents', '토픽퀴즈검수장부.json');
@@ -110,7 +114,13 @@ function 보내기(res, 코드, 값) {
   res.end(몸);
 }
 
-if (process.argv.includes('--현황')) {
+const args = process.argv.slice(2);
+/* 🔴 게이트가 «서버 앞»이다 — 뒤에 두면 `--현항` 오타 하나에 포트 8438 이 열리고, 현황을
+ *   물어본 사람은 답 대신 떠 있는 서버를 본다(그리고 Ctrl-C 를 칠 때까지 안 끝난다). */
+const 플래그오류 = 인자게이트('문항검수', args, 아는플래그);
+if (플래그오류) { console.error(`[문항검수] ${플래그오류}`); process.exit(1); }
+
+if (args.includes('--현황')) {
   const r = 현황(장부읽기());
   const 사유 = Object.entries(r.분모.사유별).map(([k, v]) => `${k} ${v}`).join(' · ') || '없음';
   console.log(`검수 현황 — 팩 ${r.분모.팩} = 송출가능 ${r.분모.송출가능} + 막힘 ${r.분모.팩 - r.분모.송출가능}`);

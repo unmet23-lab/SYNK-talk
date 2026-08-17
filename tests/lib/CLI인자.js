@@ -75,7 +75,9 @@ const 정규식escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  *   ① `const args = process.argv.slice(2)`        — 13개 도구
  *   ② `main(process.argv.slice(2))` + `function main(argv)` — **매개변수 꼴**. 옛 판이 이걸
  *      못 봐서 `eval-score.js`·`독립채점.js` 가 「자기 플래그 0」으로 나왔다(거짓 안심).
- *   ③ `process.argv` 직접 — `process.argv.includes('--현황')` (`문항검수.js`)
+ *   ③ `process.argv` 직접 — `process.argv.includes('--적용')` (`합성계정세우기.js`)
+ *      ⚠ 첫 판의 예시는 `문항검수.js` 였는데 #Q113 갈래① 부착 때 그 도구가 ① 꼴로 갈렸다.
+ *        예시는 **살아 있는 자리**를 가리켜야 한다 — 죽은 인용은 「이 꼴은 이제 없다」로 읽힌다.
  */
 function argv이름들(코드) {
   const 이름 = new Set(['process.argv']);

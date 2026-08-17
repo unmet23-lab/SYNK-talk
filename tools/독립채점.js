@@ -33,6 +33,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
+
+/* 🎯 조준 축은 **없다** — 파일만 읽고 쓴다(자격증명·네트워크 0). `--운영` 을 안 받는다.
+ * ⚠ 값을 받는 낱말들이다(`--조각 6`). 값 쪽은 `--` 로 안 시작하니 이 판정에 안 걸린다. */
+const 아는플래그 = ['--조각', '--자리', '--매핑', '--응답', '--출력'];
 
 const ROOT = path.resolve(__dirname, '..');
 const FIXTURE = path.join(ROOT, 'evals', '픽스처.json');
@@ -241,6 +246,10 @@ function 인자값(argv, 이름) {
 }
 
 function main(argv) {
+  /* 🔴 명령(`패킷`·`수거`·`대조`)보다 앞이다 — 뒤에 두면 갈래마다 같은 판정을 세 벌 적게 되고,
+   *   세 벌은 갈라진다. 위치 인자(명령·경로)는 `--` 로 안 시작하니 여기 안 걸린다. */
+  const 플래그오류 = 인자게이트('독립채점', argv, 아는플래그);   // 모르는 낱말은 여기서 죽는다(F435)
+  if (플래그오류) { console.error(플래그오류); return 2; }
   const 명령 = argv[0];
   if (명령 === '패킷') {
     const 출력경로 = argv[1];

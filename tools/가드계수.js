@@ -24,6 +24,11 @@
 
 const fs = require('fs');
 const path = require('path');
+const { 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
+
+/* 🎯 조준 축은 **없다** — 이 도구는 소스를 파서로 셀 뿐이다(자격증명·네트워크 0).
+ *   위치 인자(뿌리 경로)는 `--` 로 시작하지 않으니 이 판정에 애초에 안 걸린다. */
+const 아는플래그 = ['--json'];
 
 /* 🔑 파서를 못 불러도 **여기서 죽지 않는다** — 부르는 쪽이 갈리기 때문이다. 도구는 종료코드 2 로
  *   죽어야 하고(0건과 구별), 회귀는 fail 이 아니라 **skip** 으로 드러내야 한다(F296 — repo 밖
@@ -697,8 +702,13 @@ module.exports = { 재기, 잴수있나, 모양, 축표 };
 
 if (require.main !== module) return;
 
-const 뿌리 = path.resolve(process.argv.slice(2).find((a) => !a.startsWith('-')) || '.');
-const JSON출력 = process.argv.includes('--json');
+const args = process.argv.slice(2);
+/* 🔴 종료코드 2 다(1 이 아니다) — 이 도구에서 0·1 은 «셌다»는 뜻이고, 인자 오류는 재지도
+ *   못한 상태다. 위 `잴수있나()` 와 같은 칸에 둔다: 「0건」과 「못 쟀다」를 안 섞는다(F207). */
+const 플래그오류 = 인자게이트('가드계수', args, 아는플래그);   // 모르는 낱말은 여기서 죽는다(F435)
+if (플래그오류) { console.error(`[가드계수] ${플래그오류}`); process.exit(2); }
+const 뿌리 = path.resolve(args.find((a) => !a.startsWith('-')) || '.');
+const JSON출력 = args.includes('--json');
 if (!잴수있나()) { console.error('[가드계수] acorn 을 못 불렀다 — 셀 수 없다(0건이 아니다).'); process.exit(2); }
 const 결과 = 재기(뿌리);
 

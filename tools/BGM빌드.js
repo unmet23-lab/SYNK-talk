@@ -29,6 +29,12 @@
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
+const { 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
+
+/* 🎯 조준 축은 **없다** — 이 도구는 파일을 굽기만 한다(자격증명·네트워크 0). 그러니
+ *   `공용플래그`(`--운영`)를 펴지 않는다. 받아 주고 아무것도 갈아타지 않는 것이 곧 F592 다
+ *   (#Q111 이 `배포빚.js` 에서 일부러 뺀 그 자리). */
+const 아는플래그 = ['--check'];
 
 /* ── 정본 상수 ─────────────────────────────────────────────── */
 const 측정템포BPM = 72;              // 🔴 측정 스테이지 템포 정본 — 이 한 곳(§3-2 ⓓ)
@@ -159,7 +165,12 @@ const 은퇴한후보 = [
 ];
 
 function main() {
-  const 검사 = process.argv.includes('--check');
+  const args = process.argv.slice(2);
+  const 플래그오류 = 인자게이트('BGM빌드', args, 아는플래그);   // 모르는 낱말은 여기서 죽는다(F435)
+  /* 🔴 게이트가 «렌더 앞»이다 — 뒤에 두면 `--chek` 오타 하나에 후보 2곡을 다 굽고 파일을
+   *   덮어쓴 뒤에야 죽는다. 대조하려던 사람이 대조 대상을 잃는다. */
+  if (플래그오류) { console.error(`[BGM빌드] ${플래그오류}`); process.exit(1); }
+  const 검사 = args.includes('--check');
   if (!검사) fs.mkdirSync(폴더, { recursive: true });
   let 실패 = 0;
   for (const { 파일, 이름 } of 산출) {

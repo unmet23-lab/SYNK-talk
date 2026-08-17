@@ -3,6 +3,10 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
+
+/* 🎯 조준 축은 **없다** — 파일을 합쳐 굽기만 한다(자격증명·네트워크 0). `--운영` 을 안 받는다. */
+const 아는플래그 = ['--check'];
 
 const ROOT = path.join(__dirname, '..');
 const MIGRATIONS_DIR = path.join(ROOT, 'supabase', 'migrations');
@@ -124,7 +128,14 @@ function generate({ check = false } = {}) {
 
 if (require.main === module) {
   const args = process.argv.slice(2);
-  if (args.some((arg) => arg !== '--check')) {
+  /* 🔴 옛 판정은 «손 사본»이었다: `args.some((arg) => arg !== '--check')`. 공용 통로로 옮기되
+   *   그 엄격함을 안 잃는다 — 그 한 줄은 위치 인자까지 거절했고, 이 도구는 위치 인자를 하나도
+   *   안 읽는다(경로는 전부 상수다). 그래서 두 칸으로 나눈다: ①모르는 `--` 낱말은 공용 판정이
+   *   ②위치 인자는 이 도구만의 엄격함이 진다. 합치면 사유가 뭉개져 어느 쪽인지 모른다. */
+  const 플래그오류 = 인자게이트('마이그레이션_합본', args, 아는플래그);
+  const 위치인자 = args.filter((a) => !a.startsWith('--'));
+  if (플래그오류 || 위치인자.length) {
+    console.error(플래그오류 || `위치 인자를 안 받는다: ${위치인자.join(' ')}`);
     console.error('사용법: node tools/마이그레이션_합본.js [--check]');
     process.exitCode = 2;
   } else {
