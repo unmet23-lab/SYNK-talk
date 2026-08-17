@@ -23,6 +23,9 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { 띄우기 } = require('./lib/띄우기.js');
+/* ④ 등록층은 **소스를 읽어 낱말이 있는지**를 묻는다 — 그 낱말이 주석에 있으면 코드에서
+ * 사라져도 영원히 초록이다(F602 · F401 첫 사례가 그 모양이다). 그래서 렉서를 지나 읽는다. */
+const { 코드만, 파일소스 } = require('./lib/소스검사.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const 빚 = require('../tools/배포빚.js');
@@ -144,13 +147,13 @@ test('등록층 — 원격배포의 배포 성공 자리가 그 거리를 실제
    *   `if (판)` 을 `if (false)` 로 바꿔 닿지 않게 만들어도 초록이었다. 소스 검사는 존재가
    *   아니라 **닿는 모양**을 물어야 한다. 실행으로 못 재는 자리라(진짜 배포가 필요) 여기까지가
    *   이 층의 한계이고, 그 한계를 적어 둔다. */
-  const src = fs.readFileSync(path.join(ROOT, 'tools', '원격배포.js'), 'utf8');
+  const src = 코드만(파일소스(path.join(ROOT, 'tools', '원격배포.js')));
   assert.match(src, /const 거리 = 도장거리\(f, ref, 자격증명\.운영REF, 배포빚\.지금HEAD\(\)\);/);
   assert.match(src, /\n\s*if \(거리\) 배포빚\.도장\(거리\);/, '도장이 닿지 않는 자리에 있다');
 });
 
 test('등록층 — 배포대조 --도장 은 «같다» 에만 찍는다', () => {
-  const src = fs.readFileSync(path.join(ROOT, 'tools', '배포대조.js'), 'utf8');
+  const src = 코드만(파일소스(path.join(ROOT, 'tools', '배포대조.js')));
   assert.match(src, /--도장/);
   assert.match(src, /상태 === '같다'\)\s*\n?\s*\.filter\(\(r\) => 배포빚\.도장/,
     '「같다」로 거르지 않고 도장을 찍으면 미측정이 최신으로 굳는다');

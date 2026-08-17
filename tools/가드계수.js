@@ -19,6 +19,18 @@
  *   못 읽은 파일·못 가른 단언을 **0으로 접지 않는다.** 분모(훑은 파일 수)와 ❔(모름)을
  *   항상 같이 낸다 — 「위험 0건」과 「아무것도 못 쟀다」는 다른 상태다.
  *
+ * ■ 🔴 [2026-08-18 · F602] **방향이 둘이고, 조용한 쪽을 오래 안 셌다**
+ *   이 도구는 처음부터 «부정 단언»(「이 낱말이 없어야 한다」)만 셌다. 그런데 두 방향은
+ *   눈멀 때의 증상이 정반대다:
+ *     · 부정형이 주석에 눈멀면 — 주석의 낱말을 위반으로 세어 **그날 빨개진다.**
+ *       (F594 는 주석 속 `자격증명.읽기(` 로 도구를 승격시켰고, F533 은 설계 주석을 위반으로
+ *        세어 master 를 막았다. 둘 다 «시끄러워서» 그날 잡혔다.)
+ *     · 존재형이 주석에 눈멀면 — **영원히 초록이다.** 코드에서 낱말이 사라져도 바로 위 주석이
+ *       그것을 설명하고 있으면 검사가 계속 통과한다. F401 의 «첫» 사례가 정확히 그것이다
+ *       (`for update` 를 코드에서 지웠는데 검사가 초록이었다 · `tests/lib/소스검사.js` 머리말).
+ *   👉 조용한 쪽을 시끄러운 쪽과 한 통에 담으면 묻힌다. 그래서 **통을 나눠 센다**
+ *      (`위험/안전/모름` = 부정 · `존재위험/존재안전/존재모름` = 존재).
+ *
  * 쓰기: node tools/가드계수.js [뿌리경로] [--json]
  */
 
@@ -129,6 +141,58 @@ function JSON구조인가(노드) {
 
 /* 문자열 내용을 재는 술어 — 이게 없으면 「소스를 대상으로 삼은 검사」가 아니다. */
 const 술어RE = /\.(includes|indexOf|match|search|test|exec|startsWith|endsWith|split)\s*\(/;
+
+/* ── 읽는 «언어» — 처방이 따를 수 있는 자리인지를 가르는 축 (2026-08-18 · F602) ────────────
+ *
+ * 🔴 왜 필요한가. 이 도구의 처방은 「`코드만()` 으로 감싸라」인데 `코드만` 은 **JS 렉서**다.
+ *   첫 실측(존재 축을 열자마자)이 talk 에서 193 자리를 냈고, 열어 보니 `.sql`·`.md` 를 읽는
+ *   자리가 절반 넘게 섞여 있었다 — SQL 주석은 `--` 라 JS 렉서가 모르고, 마크다운의 `**굵게**` 는
+ *   애초에 주석이 아니다. 그 자리에 「감싸라」고 말하면 **따를 수 없는 처방**이 되고,
+ *   따를 수 없는 처방은 우회를 정상 통로로 만든다(F103 · 이 파일이 이미 세 번 겪은 병이다).
+ *
+ * ⚠ 대가(틀릴 때의 모습):
+ *   ① 경로가 «리터럴»일 때만 안다 — 변수면 한 겹만 되짚고, 그래도 모르면 **모름**이다.
+ *      모름은 「JS 가 아니다」가 아니라 「안 갈렸다」라, 아래 소비자는 모름을 과녁에 안 넣는다.
+ *   ② 한 부분트리에 JS 와 비JS 가 섞이면(`path.join(x, 'a.js')` 와 `'b.sql'` 이 한 식에) 모름이다.
+ *      지어내는 것보다 모름이 낫다.
+ *   ③ 닫은 것: **없다.** 이건 탐지를 좁히는 조항이 아니라 **처방이 서는 자리**를 가르는 축이다 —
+ *      비JS 자리는 사라지지 않고 `언어` 칸에 그대로 남아 계속 세어진다. */
+const JS확장 = /\.(js|mjs|cjs|jsx|ts|tsx)$/i;
+const 비JS확장 = /\.(sql|md|json|txt|html|css|ya?ml|csv|svg|sh|toml|ini|xml)$/i;
+
+/** 이 부분트리가 «무슨 언어의 파일»을 가리키나. 반환 = 'js' | '아님' | '모름' */
+function 읽는언어(노드, 선언표, 남은홉 = 2, 본것 = new Set()) {
+  let js = false;
+  let 아님 = false;
+  const 되짚을이름 = [];
+  훑기(노드, (n) => {
+    if (n.type === 'Literal' && typeof n.value === 'string') {
+      if (JS확장.test(n.value)) js = true;
+      else if (비JS확장.test(n.value)) 아님 = true;
+      return;
+    }
+    /* 템플릿 리터럴의 «고정 조각»도 경로다 — `` `${뿌리}/index.ts` `` 가 그 모양이다. */
+    if (n.type === 'TemplateLiteral') {
+      for (const q of n.quasis) {
+        const v = String((q.value && q.value.cooked) || '');
+        if (JS확장.test(v)) js = true;
+        else if (비JS확장.test(v)) 아님 = true;
+      }
+      return;
+    }
+    if (n.type === 'Identifier' && 선언표 && 선언표.has(n.name) && !본것.has(n.name)) 되짚을이름.push(n.name);
+  });
+  if (js !== 아님) return js ? 'js' : '아님';
+  if (js && 아님) return '모름';                    // ② 섞였다 — 지어내지 않는다
+  if (남은홉 <= 0) return '모름';
+  /* ① 경로가 변수다 — 한 겹씩 되짚는다(`const 본체경로 = path.join(뿌리, 'lib', 'x.js')`). */
+  for (const nm of 되짚을이름) {
+    본것.add(nm);
+    const r = 읽는언어(선언표.get(nm), 선언표, 남은홉 - 1, 본것);
+    if (r !== '모름') return r;
+  }
+  return '모름';
+}
 
 /* 수신자(무엇을 재는가)를 뽑는 두 갈래. `RE.test(X)` 는 인자가, `X.includes(y)` 는 객체가 대상이다. */
 const 인자가대상 = new Set(['test', 'exec']);
@@ -426,6 +490,11 @@ const 결과 = {
   위험: [],       // ㉠ 부정 단언 × 원문 직접
   안전: [],       // ㉠ 부정 단언 × 정제 경유
   모름: [],       // 부정 단언 × 수신자를 못 가름
+  /* ㉠-b 존재형 — 「이 낱말이 **있어야** 한다」. 통을 따로 두는 이유는 머리말 F602 절에 있다:
+   *   부정형이 눈멀면 빨개지고, 존재형이 눈멀면 **영원히 초록**이라 아무도 안 본다. */
+  존재위험: [],   // 존재 단언 × 원문 직접  ← 주석이 낱말을 대신 갖고 있으면 조용히 통과한다
+  존재안전: [],   // 존재 단언 × 정제 경유
+  존재모름: [],   // 존재 단언 × 수신자를 못 가름
 };
 
 for (const 파일 of 파일들(뿌리)) {
@@ -454,6 +523,27 @@ for (const 파일 of 파일들(뿌리)) {
   const 원문함수 = new Set();
   /* ②-b 식 모양 사본이 내놓은 «이미 정제된» 변수 이름 — 아래 ③ 이 정제변수로 이어받는다. */
   const 식사본변수 = new Set();
+  /* ②-d 이름 → 그 이름이 «무슨 언어»를 읽는가(위 `읽는언어` 축). 값이 없으면 모름이다.
+   *   판정에는 안 쓴다 — `자리` 에 실어 보내 소비자가 «처방이 서는 자리»만 고르게 한다. */
+  const 언어표 = new Map();
+  /* 경로 변수를 한 겹 되짚기 위한 선언 목록(`const 본체경로 = path.join(…, 'x.js')`). */
+  const 선언표 = new Map();
+  훑기(ast, (n) => {
+    if (n.type !== 'VariableDeclarator' || !n.id || n.id.type !== 'Identifier' || !n.init) return;
+    if (!선언표.has(n.id.name)) 선언표.set(n.id.name, n.init);
+  });
+  /** 이 선언이 읽는 언어 — 직접 못 정하면 «원문 조상»에게서 물려받는다(파생은 같은 파일이다). */
+  const 언어정하기 = (노드) => {
+    const 직접 = 읽는언어(노드, 선언표);
+    if (직접 !== '모름') return 직접;
+    let 물려받음 = '모름';
+    훑기(노드, (m) => {
+      if (m.type !== 'Identifier' || 물려받음 !== '모름') return;
+      const v = 언어표.get(m.name);
+      if (v && v !== '모름') 물려받음 = v;
+    });
+    return 물려받음;
+  };
 
   /* 공용 통로를 import 로 들여왔으면 그 지역 이름도 정제로 센다.
    * ⚠ 이 수집이 **먼저**다 — 아래 원문 생산자 판정이 이 목록을 읽는다. 뒤에 두면
@@ -542,7 +632,7 @@ for (const 파일 of 파일들(뿌리)) {
       else 훑기(n.init.body, (m) => { if (m.type === 'ReturnStatement' && m.argument) 돌려주는것.push(m.argument); });
       const 정제해서준다 = 돌려주는것.length > 0 && 돌려주는것.every((r) => 정제로감쌌나(r, 정제함수));
       if (정제해서준다) 정제함수.add(n.id.name);
-      else 원문함수.add(n.id.name);
+      else { 원문함수.add(n.id.name); 언어표.set(n.id.name, 언어정하기(n.init)); }
     }
   });
   /* ③ 원문 변수 / 정제된 변수 — 파일 전체를 한 스코프로 근사한다(테스트 파일 관례).
@@ -579,7 +669,7 @@ for (const 파일 of 파일들(뿌리)) {
       if (돌려주는것.every((r) => 정제로감쌌나(r, 정제함수))) { 정제함수.add(nm); return; }
       /* 「읽었다고 «글»은 아니다」 경계를 여기도 그대로 쓴다 — 한 축에서 배운 것을 다른 축에
        *   안 옮기면 그 축이 눈이 먼다는 것이 바로 이 조임(③-b)이 고치는 병이다. */
-      if (돌려주는것.some((r) => 원문글인가(r, 원문변수, 원문함수))) 원문함수.add(nm);
+      if (돌려주는것.some((r) => 원문글인가(r, 원문변수, 원문함수))) { 원문함수.add(nm); 언어표.set(nm, 언어정하기(n)); }
     });
     훑기(ast, (n) => {
       if (n.type !== 'VariableDeclarator' || !n.id || n.id.type !== 'Identifier' || !n.init) return;
@@ -606,7 +696,7 @@ for (const 파일 of 파일들(뿌리)) {
         /* 🔑 «식 모양 사본»도 정제다 — 통로가 공용이 아닐 뿐, 그 자리는 원문을 직접 재지 않는다.
          *   위험으로 세면 처방이 「감싸라」로 나오는데 실제 처방은 「사본을 공용으로 돌려라」다. */
         if (정제로감쌌나(n.init, 정제함수) || 식사본변수.has(n.id.name)) 정제변수.add(n.id.name);
-        else 원문변수.add(n.id.name);
+        else { 원문변수.add(n.id.name); 언어표.set(n.id.name, 언어정하기(n.init)); }
       } else 정제변수.add(n.id.name);
     });
     if (원문변수.size + 정제변수.size + 원문함수.size + 정제함수.size === 이전) break;
@@ -631,8 +721,14 @@ for (const 파일 of 파일들(뿌리)) {
     if (!읽기가있나(n.init, 원문함수) && !파생) 모호변수.add(n.id.name);
   });
 
-  /* ④ 부정 단언 — 「그렇지 않다」를 말하는 단언만 센다. */
-  const 단언이름 = (nm) => nm === 'assert' || /^assert\.(ok|equal|strictEqual|deepEqual|deepStrictEqual|match|doesNotMatch)$/.test(nm);
+  /* ④ 단언의 «방향» — 부정(없어야 한다)과 존재(있어야 한다)를 **따로** 센다(F602 · 머리말).
+   *   `notEqual`/`notStrictEqual` 은 이 갈래를 열면서 들였다 — `indexOf(…) !== -1` 이
+   *   존재형의 관용구라, 그 이름이 없으면 존재 축이 자기 대표 모양 하나를 못 본다. */
+  const 단언이름 = (nm) => nm === 'assert'
+    || /^assert\.(ok|equal|strictEqual|deepEqual|deepStrictEqual|match|doesNotMatch|notEqual|notStrictEqual)$/.test(nm);
+  /** `-1` 리터럴인가 — `indexOf(…)` 관용구의 방향을 가르는 자리(부정: `=== -1` · 존재: `!== -1`). */
+  const 음수1 = (a) => !!a && a.type === 'UnaryExpression' && a.operator === '-'
+    && !!a.argument && a.argument.value === 1;
   훑기(ast, (n) => {
     if (n.type !== 'CallExpression') return;
     const nm = 이름(n.callee);
@@ -640,29 +736,55 @@ for (const 파일 of 파일들(뿌리)) {
     const [a0, a1] = n.arguments;
     if (!a0) return;
 
-    let 부정 = false;
+    /* `!` 는 **방향을 뒤집는다.** 이름이 정한 방향을 먼저 내고 그 위에 뒤집기를 얹는다 —
+     *   먼저 「`!` 면 부정」으로 접으면 `assert.equal(!x.includes(y), false)`(이중 부정 = 존재)를
+     *   부정으로 오분류한다. 옛 판이 그 모양이었다(존재 축이 없어 드러날 자리가 없었을 뿐이다). */
     let 과녁 = a0;
-    if (a0.type === 'UnaryExpression' && a0.operator === '!') { 부정 = true; 과녁 = a0.argument; }
-    else if (/doesNotMatch$/.test(nm)) 부정 = true;
-    else if (a1 && a1.type === 'Literal' && a1.value === false) 부정 = true;
-    else if (a1 && a1.type === 'ArrayExpression' && a1.elements.length === 0) 부정 = true;
-    else if (a1 && a1.type === 'UnaryExpression' && a1.operator === '-' && a1.argument
-             && a1.argument.value === 1 && 술어RE.test(소스.slice(a0.start, a0.end))) 부정 = true;
-    if (!부정) return;
-
+    let 뒤집힘 = false;
+    if (a0.type === 'UnaryExpression' && a0.operator === '!') { 과녁 = a0.argument; 뒤집힘 = true; }
     const 글 = 소스.slice(과녁.start, 과녁.end);
-    if (!술어RE.test(글)) return; // 문자열 내용을 재는 단언이 아니다
+
+    /* 🔴 `match`/`doesNotMatch` 는 **첫 인자가 곧 수신자**다 — 글에 `.match(` 가 안 보이므로
+     *   아래 술어 관문에서 통째로 떨어진다. 그 갈래가 없어서 `assert.match(원문, /…/)` 가
+     *   이 도구에 **원리상 안 보였다**(F602 실측: 존재형 누출 4자리가 전부 이 모양이다).
+     *   ⚠ 대가: 수신자가 런타임 값이면 ❔모름이 는다 — 미탐이 아니라 «모름»이라 분모에 남는다. */
+    let 방향 = null;
+    let 바로 = false;
+    if (/\.match$/.test(nm)) { 방향 = '존재'; 바로 = true; }
+    else if (/doesNotMatch$/.test(nm)) { 방향 = '부정'; 바로 = true; }
+    else if (nm === 'assert' || /\.ok$/.test(nm)) 방향 = '존재';
+    else if (/\.(equal|strictEqual)$/.test(nm)) {
+      if (a1 && a1.type === 'Literal' && a1.value === false) 방향 = '부정';
+      else if (a1 && a1.type === 'Literal' && a1.value === true) 방향 = '존재';
+      else if (음수1(a1) && 술어RE.test(글)) 방향 = '부정';
+    } else if (/\.(notEqual|notStrictEqual)$/.test(nm)) {
+      if (a1 && a1.type === 'Literal' && a1.value === false) 방향 = '존재';
+      else if (a1 && a1.type === 'Literal' && a1.value === true) 방향 = '부정';
+      else if (음수1(a1) && 술어RE.test(글)) 방향 = '존재';
+    } else if (/\.(deepEqual|deepStrictEqual)$/.test(nm)) {
+      /* 빈 배열 = 「걸린 것이 없다」. 비지 «않은» 기대값은 이 축이 아니다 — 재는 것이 낱말
+       *   존재가 아니라 목록의 «내용»이라, 방향을 붙이면 없는 판정을 지어내는 것이 된다. */
+      if (a1 && a1.type === 'ArrayExpression' && a1.elements.length === 0) 방향 = '부정';
+    }
+    if (!방향) return;
+    if (뒤집힘) 방향 = 방향 === '부정' ? '존재' : '부정';
+
+    if (!바로 && !술어RE.test(글)) return; // 문자열 내용을 재는 단언이 아니다
 
     /* 🔴 여기가 급조 계수기의 두 번째 병이었다 — 「부분트리에 원문 변수가 «보이면» 위험」으로
      *   세면 `서버모양.test('문자열 상수')` 처럼 **재는 대상이 소스가 아닌** 단언까지 들어온다
      *   (실측 08-13: 위험 44 중 그 모양이 섞였다). 그래서 이제 **수신자**만 본다 —
      *   무엇을 재는가가 곧 이 축의 질문이기 때문이다. */
-    const 받는것 = 수신자들(과녁);
+    const 받는것 = 바로 ? [과녁] : 수신자들(과녁);
     if (!받는것.length) return;
 
     let 원문닿음 = false;
     let 정제닿음 = false;
     let 모름닿음 = false;
+    /* 원문에 닿은 수신자의 «언어» — 처방(`코드만` = JS 렉서)이 서는 자리인지 소비자가 가른다.
+     *   첫 하나만 잡는다(한 단언이 두 언어를 재는 자리는 실측 0건 · 나오면 모름으로 남는다). */
+    let 언어 = '모름';
+    const 언어물기 = (v) => { if (언어 === '모름' && v && v !== '모름') 언어 = v; };
     for (const r of 받는것) {
       if (r.type === 'Literal' || r.type === 'TemplateLiteral') continue; // 상수를 재는 단언 — 이 축이 아니다
       if (r.type === 'Identifier') {
@@ -671,25 +793,34 @@ for (const 파일 of 파일들(뿌리)) {
         if (구조변수.has(r.name)) continue;            // JSON 구조 — 이 축이 아니다
         if (모호변수.has(r.name)) { 모름닿음 = true; continue; }  // 같은 이름이 두 뜻 — 못 갈랐다
         if (정제변수.has(r.name)) { 정제닿음 = true; continue; }
-        if (원문변수.has(r.name)) { 원문닿음 = true; continue; }
+        if (원문변수.has(r.name)) { 원문닿음 = true; 언어물기(언어표.get(r.name)); continue; }
         모름닿음 = true; continue;
       }
       if (r.type === 'CallExpression') {
         const c = 이름(r.callee);
         if (정제함수.has(c)) { 정제닿음 = true; continue; }
-        if (/(^|\.)readFileSync$/.test(c) || 원문함수.has(c)) { 원문닿음 = true; continue; }
+        if (/(^|\.)readFileSync$/.test(c) || 원문함수.has(c)) {
+          /* 호출 «자리»의 인자가 곧 경로다 — `읽기('supabase', 'functions', 'events', 'index.ts')`.
+           *   생산자 하나가 부르는 곳마다 다른 언어를 읽으므로, 선언보다 호출이 먼저다. */
+          원문닿음 = true; 언어물기(읽는언어(r, 선언표)); 언어물기(언어표.get(c)); continue;
+        }
         /* `코드만(읽기(x))` 처럼 감싼 모양은 바깥이 정제면 정제다. */
         if (정제로감쌌나(r, 정제함수)) { 정제닿음 = true; continue; }
-        if (읽기가있나(r, 원문함수)) { 원문닿음 = true; continue; }
+        if (읽기가있나(r, 원문함수)) { 원문닿음 = true; 언어물기(읽는언어(r, 선언표)); continue; }
         모름닿음 = true; continue;
       }
       모름닿음 = true;
     }
 
-    const 자리 = { 파일: 상대, 줄: 줄번호(n.start), 글: 글.replace(/\s+/g, ' ').slice(0, 110) };
-    if (원문닿음) 결과.위험.push(자리);          // 하나라도 원문을 직접 재면 그 단언은 눈이 먼다
-    else if (정제닿음) 결과.안전.push(자리);
-    else if (모름닿음 && (원문변수.size || 원문함수.size)) 결과.모름.push(자리);
+    const 자리 = { 파일: 상대, 줄: 줄번호(n.start), 글: 글.replace(/\s+/g, ' ').slice(0, 110), 언어 };
+    /* 통은 방향으로 고른다 — 판정(원문/정제/모름)은 **하나**이고 방향만 둘이다. 판정을 방향마다
+     *   따로 적으면 그 순간 갈라지고, 갈라진 쪽의 증상은 언제나 「통과」다(CLAUDE.md 신뢰성 ④). */
+    const 통 = 방향 === '부정'
+      ? { 위험: 결과.위험, 안전: 결과.안전, 모름: 결과.모름 }
+      : { 위험: 결과.존재위험, 안전: 결과.존재안전, 모름: 결과.존재모름 };
+    if (원문닿음) 통.위험.push(자리);            // 하나라도 원문을 직접 재면 그 단언은 눈이 먼다
+    else if (정제닿음) 통.안전.push(자리);
+    else if (모름닿음 && (원문변수.size || 원문함수.size)) 통.모름.push(자리);
   });
 }
 
@@ -728,5 +859,10 @@ console.log('');
 console.log(`㉠ 부정 단언 × 파일 원문 — 🔴위험 ${결과.위험.length} · ✅정제경유 ${결과.안전.length} · ❔모름 ${결과.모름.length}`);
 for (const v of 결과.위험) console.log(`   🔴 ${v.파일}:${v.줄}  ${v.글}`);
 for (const v of 결과.모름) console.log(`   ❔ ${v.파일}:${v.줄}  ${v.글}`);
+console.log('');
+console.log(`㉠-b 존재 단언 × 파일 원문 — 🔴위험 ${결과.존재위험.length} · ✅정제경유 ${결과.존재안전.length} · ❔모름 ${결과.존재모름.length}`);
+console.log('     (「이 낱말이 있어야 한다」 — 여기 위험은 «빨개지지 않는다». 코드에서 낱말이 사라져도 주석이 대신 갖고 있으면 영원히 초록이다)');
+for (const v of 결과.존재위험) console.log(`   🔴 ${v.파일}:${v.줄}  ${v.글}`);
+for (const v of 결과.존재모름) console.log(`   ❔ ${v.파일}:${v.줄}  ${v.글}`);
 console.log('');
 console.log('※ 이 도구는 «센다» — 위험이 곧 결함이라는 판정이 아니다(그 자리가 주석을 안 볼 이유가 있을 수 있다).');
