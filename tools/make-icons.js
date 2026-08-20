@@ -8,8 +8,8 @@
  *
  *   node tools/make-icons.js
  *
- * ── 브랜드 정본 (SYNK-appsscript `docs/디자인_컨셉_정본_v1.md` · `docs/브랜드_폰트_정본.md`)
- *   · 바탕 Navy 2 #0F1730 · 잉크 Cream #F6F1E8 · 신호 Coral #FF6B5C
+ * ── 브랜드 정본 (SYNK-appsscript `docs/디자인_토큰.json` 「시맨틱 · 다크」축 · `docs/브랜드_폰트_정본.md`)
+ *   · 바탕 Ink Deep #080605 · 잉크 Paper #FBF7F0 · 신호 Coral #F96859 (「양모 밤」· 유호 확정 2026-08-20 · 조항 ⓚ)
  *   · R1 2색 원칙 — 한 화면에 바탕 1 + 잉크 1 + **신호 1점(면적 5% 미만)**
  *   · R3 타이포 불가침 — 글자에 그림자·투명도·왜곡 금지. 100% 크리스프
  *   · 워드마크 = DM Mono **500**. DM Mono는 로마자·숫자·기호 **전용**(키릴·한글 글리프가 없다)
@@ -34,9 +34,9 @@ const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, 'assets');
 const FONT = path.join(OUT, 'fonts', 'DMMono-Medium.ttf');
 
-const NAVY2 = '#0F1730'; // 바탕
-const CREAM = '#F6F1E8'; // 잉크
-const CORAL = '#FF6B5C'; // 신호 1점
+const NAVY2 = '#080605'; // 바탕 — Ink Deep(「양모 밤」)
+const CREAM = '#FBF7F0'; // 잉크 — Paper
+const CORAL = '#F96859'; // 신호 1점 — Coral(양모 밤 값)
 
 const font = opentype.parse(fs.readFileSync(FONT).buffer);
 
@@ -102,7 +102,7 @@ async function 쓰기(name, size, opts) {
 }
 
 async function main() {
-  console.log('\n브랜드 아이콘 생성 — Navy 2 / Cream / Coral 1점\n');
+  console.log('\n브랜드 아이콘 생성 — Ink Deep / Paper / Coral 1점(양모 밤)\n');
 
   // 일반 아이콘(iOS·스토어). 배경 전면 Navy 2.
   await 쓰기('icon.png', 1024, { 배경: NAVY2, 차지: 0.56, 글자색: CREAM, 점색: CORAL });
@@ -130,7 +130,7 @@ async function main() {
   // 파비콘 — 작아서 배경을 깔아야 읽힌다.
   await 쓰기('favicon.png', 64, { 배경: NAVY2, 차지: 0.56, 글자색: CREAM, 점색: CORAL });
 
-  console.log('\n색 원천 = SYNK-appsscript docs/디자인_컨셉_정본_v1.md (v1.6.1 · 19색 키트)\n');
+  console.log('\n색 원천 = SYNK-appsscript docs/디자인_토큰.json (「양모 밤」 · 유호 확정 2026-08-20 · 조항 ⓚ)\n');
 }
 
 main().catch((e) => {

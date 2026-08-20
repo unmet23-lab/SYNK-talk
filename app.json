@@ -15,7 +15,7 @@
     "android": {
       "package": "lab.synk.talk",
       "adaptiveIcon": {
-        "backgroundColor": "#0F1730",
+        "backgroundColor": "#080605",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -35,7 +35,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
-          "backgroundColor": "#0F1730",
+          "backgroundColor": "#080605",
           "imageWidth": 180
         }
       ],

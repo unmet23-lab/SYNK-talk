@@ -8,7 +8,7 @@
  *
  * 함께 검사하는 것:
  *  · R1 2색 원칙 — 신호색(Coral) 면적이 5% 미만인가
- *  · app.json 이 가리키는 배경색이 정본 Navy 2 와 같은가(그림과 설정이 갈라지면 테두리가 뜬다)
+ *  · app.json 이 가리키는 배경색이 정본 Ink Deep 과 같은가(그림과 설정이 갈라지면 테두리가 뜬다)
  */
 
 const test = require('node:test');
@@ -19,10 +19,10 @@ const path = require('node:path');
 const ROOT = path.resolve(__dirname, '..');
 const A = (f) => path.join(ROOT, 'assets', f);
 
-// 브랜드 정본 (SYNK-appsscript docs/디자인_컨셉_정본_v1.md · 키트 v1.6.1)
-const NAVY2 = '#0F1730';
-const CREAM = '#F6F1E8';
-const CORAL = '#FF6B5C';
+// 브랜드 정본 (SYNK-appsscript docs/디자인_토큰.json 「시맨틱 · 다크」축 — 「양모 밤」 · 유호 확정 2026-08-20 · 조항 ⓚ)
+const NAVY2 = '#080605'; // Ink Deep(바탕)
+const CREAM = '#FBF7F0'; // Paper(잉크)
+const CORAL = '#F96859'; // Coral(신호)
 
 let sharp;
 try {
@@ -65,7 +65,7 @@ test('아이콘 6종이 모두 있다', () => {
   }
 });
 
-test('app.json 의 배경색이 정본 Navy 2 와 같다', () => {
+test('app.json 의 배경색이 정본 Ink Deep 과 같다', () => {
   const app = JSON.parse(fs.readFileSync(path.join(ROOT, 'app.json'), 'utf8'));
   assert.equal(app.expo.android.adaptiveIcon.backgroundColor, NAVY2);
   const splash = app.expo.plugins.find((p) => Array.isArray(p) && p[0] === 'expo-splash-screen');
