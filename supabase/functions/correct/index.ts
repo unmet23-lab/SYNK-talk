@@ -53,8 +53,12 @@ import 계약 from './계약.mjs';
 import 지시문 from './교정프롬프트.mjs';
 import 계약판모듈 from './계약판.mjs';
 import 장부모듈 from './처리장부.mjs';
+import 시즌맥락모듈 from './시즌맥락.mjs';
+import 몽골날짜모듈 from './몽골날짜.mjs';
 
 const { 서비스역할 } = 토큰모듈 as { 서비스역할: (req: Request) => boolean };
+const { 시즌줄 } = 시즌맥락모듈 as { 시즌줄: (v: unknown) => string | null };
+const { 시간대 } = 몽골날짜모듈 as { 시간대: string };
 
 type 성적 = { 입력: number; 캐시생성: number; 캐시읽음: number };
 type 교정칸 = {
@@ -432,13 +436,30 @@ Deno.serve(async (req: Request) => {
     return 봉투(200, { 대기: 대기수, 적음, 미룸, 버림, 장부, 이유: 'batch_in_flight', 회수, 캐시: 성적합(성적들) });
   }
 
-  const 행들 = await sql<{ submission_id: string; 문장: string; 급수: string | null }[]>`
+  const 조회행들 = await sql<{ submission_id: string; 문장: string; 급수: string | null; 시즌목표: string | null }[]>`
     select s.submission_id,
            btrim(coalesce(s.body_original, s.transcript)) as 문장,
-           e.level_snapshot as 급수
+           e.level_snapshot as 급수,
+           /* ㉢ 경로 A(2026-08-20) — 제출 «시각»을 덮는 시즌의, 그 학생 나침반 답 하나.
+            * current_date 가 아닌 이유: 첨삭은 비동기다(밤 배치가 어제 제출을 고친다) — 달력
+            * 기준이면 시즌 경계의 밤에 다음 시즌 목표로 어제 문장을 설명한다. 겹침은 DDL
+            * (season_no_overlap_c11)이 막아 덮는 시즌은 많아야 1 — limit 1 은 「고르기 규칙」이
+            * 아니라 그 사실의 표기다(둘째 판정을 안 만든다 · teach 이번시즌()과 술어가 다른
+            * 이유도 이것: 그쪽은 「오늘」, 여기는 「그 제출의 날」이다). */
+           (select c.answers->>'season_goal'
+              from engine.season sn
+              join engine.season_compass c
+                on c.season_id = sn.season_id and c.learner_id = e.learner_id
+             where sn.starts_on <= (e.occurred_at at time zone ${시간대})::date
+               and (sn.ends_on is null or sn.ends_on >= (e.occurred_at at time zone ${시간대})::date)
+             limit 1) as 시즌목표
     ${대기조건()}
      order by s.occurred_at
      limit ${뽑을수}`;
+  /* 맥락은 **여기 한 곳**에서 조립한다 — 즉시·배치가 같은 값을 들게(하나만 고치면 「즉시로 만든
+   * 것」과 「배치로 만든 것」이 갈린다 — 이 파일 머리 :16 의 그 경고). 없으면 null 이고, 그때
+   * 요청몸통은 v1 과 바이트 동일이다(맥락 없음 폴백의 정본 = lib/교정엔진.js :140). */
+  const 행들 = 조회행들.map((행) => ({ ...행, 맥락: 시즌줄(행.시즌목표) }));
 
   if (!즉시) {
     if (!행들.length) {
@@ -490,7 +511,7 @@ Deno.serve(async (req: Request) => {
       const r = await fetch(메시지경로, {
         method: 'POST',
         headers: 벤더헤더(키),
-        body: JSON.stringify(요청몸통({ 지시문: 지시문 as string, 문장: 행.문장, 급수: 행.급수 })),
+        body: JSON.stringify(요청몸통({ 지시문: 지시문 as string, 문장: 행.문장, 급수: 행.급수, 맥락: 행.맥락 })),
         signal: AbortSignal.timeout(왕복제한밀리),
       });
 
