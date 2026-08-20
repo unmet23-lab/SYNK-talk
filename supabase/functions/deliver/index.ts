@@ -333,15 +333,24 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
                   * ⚠ 이 주석은 sql 템플릿 리터럴 «안»이라 백틱 한 글자가 리터럴을 끊는다(F180 —
                   *   2026-08-12 에 이 자리에서 실제로 한 번 끊었다. 강조는 「」로 한다). */
                  'policy_ver', x.policy_ver, 'estimator_version', x.estimator_version,
+                 /* G4 강제산출 표식(challenge_id)의 원본. 이 칸이 안 실리던 동안 그 축은 서버
+                  * 계산에서 구조적으로 null 이었다(08-20 수리 — lib 주석이 「이 층에 안 온다」로
+                  * 자인하던 벽). «submission 으로 중첩»하는 이유: 소비자(G4행인가)가
+                  * e.submission.task_snapshot 을 읽는다 — 평평하게 실으면 배선은 초록인데 축은
+                  * 영원히 빈다. 없는 행은 null(지어내지 않는다 — 위 evidence_refs 와 같은 규율). */
+                 'submission', case when x.task_snapshot is null then null
+                                    else jsonb_build_object('task_snapshot', x.task_snapshot) end,
                  'intervention_id', x.intervention_id)), '[]'::jsonb) as 행들
           from (
             select y.event_id, y.event_type, y.occurred_at, y.retry_of_event_id,
                    y.correction_id, y.task_type, y.task_schema_ver, y.payload, y.due_at,
-                   y.parent_event_id, y.policy_ver, y.estimator_version, y.intervention_id
+                   y.parent_event_id, y.policy_ver, y.estimator_version, y.intervention_id,
+                   y.task_snapshot
               from (
                 select e.event_id, e.event_type, e.occurred_at, e.retry_of_event_id,
                        e.correction_id, e.task_type, s.task_schema_ver, e.payload, s.due_at,
                        e.parent_event_id, e.policy_ver, e.estimator_version, e.intervention_id,
+                       s.task_snapshot,
                        row_number() over (partition by e.event_type
                                           order by e.occurred_at desc) as 몇째
                   from engine.learning_events e

@@ -273,6 +273,20 @@ test('배선 — 사건 목록·창을 deliver 가 다시 적지 않았다(lib �
   assert.ok(배달본체.includes('창일수'), '창을 숫자로 박았다 — lib 과 갈라지면 축이 조용히 죽는다');
 });
 
+test('🔴 배선 — 원신호가 task_snapshot 을 «submission 으로 중첩해» 싣는다(평평하면 G4 축이 서버에서 조용히 null)', () => {
+  /* ⑩ G4행인가 는 e.submission.task_snapshot 을 읽는다(아래 G4행 픽스처와 같은 모양). 질의가
+   * 이 칸을 안 싣던 동안 강제산출축은 서버 계산에서 구조적으로 null 이었다(08-20 수리). 이 검사는
+   * 「읽는 코드가 있다」가 아니라 **싣는 모양**을 잰다 — 키가 있어도 중첩이 아니면 빨갛다.
+   * 🔑 원문(배달본체)이 아니라 코드만 통로로 읽는다 — 과녁이 SQL 템플릿 «안»(문자열)이라 렉서가
+   *   안 건드리고, 원문 단언 래칫(소스검사통로 잔여명단)을 늘리지 않는 것이 통로의 뜻이다. */
+  const { 코드만, 파일소스 } = require('./lib/소스검사.js');
+  const 배달코드 = 코드만(파일소스(path.join(ROOT, 'supabase', 'functions', 'deliver', 'index.ts')));
+  assert.match(배달코드, /'submission', case when x\.task_snapshot is null then null/,
+    '원신호 jsonb 에 submission 중첩이 없다 — G4 강제산출축이 서버에서 다시 굶는다');
+  assert.match(배달코드, /jsonb_build_object\('task_snapshot', x\.task_snapshot\)/,
+    'task_snapshot 이 submission «안»에 안 실렸다 — 소비자는 e.submission.task_snapshot 을 읽는다');
+});
+
 /* ── ⑧ 실저장소 대조 — 「베끼지 않았는가」 하나만 ────────────────
  * 🔑 탐지력은 위 픽스처가 지고 여기서는 거짓양성만 본다(맹점 ②). 검사 대상은 **값이 맞는가**가
  *   아니라 **목록을 통째로 옮겨 적었는가**다 — 베낀 목록은 계약이 값을 늘린 날 조용히 갈라진다. */
