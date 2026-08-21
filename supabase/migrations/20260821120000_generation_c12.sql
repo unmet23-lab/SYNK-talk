@@ -32,7 +32,7 @@ do $migration$
 declare
   migration_version constant text := '20260821120000';
   migration_name constant text := '20260821120000_generation_c12.sql';
-  expected_checksum constant text := '1716e7b0b2dbba22d3592435445b1a4c9764b564e0649df1cce409e84a17ca8c'; -- migration-checksum
+  expected_checksum constant text := '871edcfd4d9171ee404c710e89793c8502ab4ae77b37bf5501d944f477db4749'; -- migration-checksum
   base_version constant text := '20260821060000';
   recorded_checksum text;
 begin
@@ -1076,6 +1076,7 @@ declare
   게임행 boolean;
   fin record;
   draft키들 constant text[] := array['task_ref','task_snapshot','estimator_version','estimator_confidence','evidence_refs'];
+  draft허용 constant text[] := array['task_ref','task_snapshot','estimator_version','estimator_confidence','evidence_refs','요약'];
   dk text;
 begin
   select * into run from engine.generation_batch_runs where run_id = _run_id;
@@ -1150,8 +1151,13 @@ begin
             end if;
           end loop;
           if not 실패 and exists (
-            select 1 from jsonb_object_keys(draft) k where k <> all(draft키들)) then
+            select 1 from jsonb_object_keys(draft) k where k <> all(draft허용)) then
             실패 := true; 실패사유 := 'event_draft 미지 키(ⓒ-13 — degraded 가 이 문으로 되돌아온다)';
+          end if;
+          -- v5.13-a — 생성 «대상» 원소는 §6-2 요약 문자열까지 여섯(D2 수거 · 워커는 렌더만).
+          if not 실패 and (t ->> 'not_target_reason') is null
+             and nullif(btrim(coalesce(draft ->> '요약', '')), '') is null then
+            실패 := true; 실패사유 := 'event_draft 요약 누락 — 생성 대상은 §6-2 요약이 필수다(v5.13-a)';
           end if;
           if not 실패 and (draft ->> 'task_ref') is distinct from ('task-' || _assign_date) then
             실패 := true; 실패사유 := 'event_draft 결속 위반 — task_ref 날짜(A7 ②)';
@@ -1398,7 +1404,7 @@ do $migration2$
 declare
   migration_version constant text := '20260821120000';
   migration_name constant text := '20260821120000_generation_c12.sql';
-  expected_checksum constant text := '1716e7b0b2dbba22d3592435445b1a4c9764b564e0649df1cce409e84a17ca8c'; -- migration-checksum
+  expected_checksum constant text := '871edcfd4d9171ee404c710e89793c8502ab4ae77b37bf5501d944f477db4749'; -- migration-checksum
 begin
   if exists (select 1 from engine.schema_migrations where version = migration_version) then
     return;
@@ -1727,7 +1733,7 @@ select case when 테이블수=21 and RLS켜짐=21 and 정책수=7
               and (select v from 빠진제약) is null
               and (select v from 빠진트리거) is null
               and (select version from 현재이력)='20260821120000'
-              and (select checksum from 현재이력)='1716e7b0b2dbba22d3592435445b1a4c9764b564e0649df1cce409e84a17ca8c' -- migration-checksum
+              and (select checksum from 현재이력)='871edcfd4d9171ee404c710e89793c8502ab4ae77b37bf5501d944f477db4749' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 21·21·7·0·0·5·1·0·0·1·0·0·0·0·22·0·0·0·0·2·6·6·0·0·0·1·1·1·30·0·1·26·0·11·0·1 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
