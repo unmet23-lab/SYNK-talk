@@ -175,3 +175,41 @@ test('🔴 기준시각이 없으면 던진다 — 배치가 「지금」을 암
   assert.throws(() => 회수요약([], {}), /기준시각/);
   assert.throws(() => 회수요약([]), /기준시각/);
 });
+
+/* ── 기술 축(#7 · v2) — 겨냥 skill_ids × 후속 correction.* «닿았나» ── */
+const 교정관측 = (iid, 일, 종류 = 'correction.viewed') => ({
+  event_id: `co-${iid}-${일}`, event_type: 종류, occurred_at: t(일),
+  correction_id: `C-${iid}`, assigned_intervention_id: `IV-${iid}`,
+});
+
+test('기술 칸 — 겨냥이 실린 개입만 분모다(E3) · 후속 correction.* 을 intervention 고리로 잇는다', () => {
+  const 겨냥개입 = { ...개입행('g1', 10), skill_ids: ['skill-a', 'skill-b'] };
+  const r = 성과회수(겨냥개입, [겨냥개입, 교정관측('g1', 11), 교정관측('g1', 12, 'correction.responded')],
+    { 기준시각: t(13) });
+  assert.deepEqual(r.기술.겨냥, ['skill-a', 'skill-b']);
+  assert.equal(r.기술.관측수, 2, '같은 배정의 교정 관측은 전부 센다(F1 — 고르지 않는 것이 규칙)');
+  assert.deepEqual(r.기술.관측.map((o) => o.event_type),
+    ['correction.viewed', 'correction.responded']);
+
+  const 폴백개입 = { ...개입행('g2', 10), skill_ids: [] };
+  const r2 = 성과회수(폴백개입, [폴백개입], { 기준시각: t(13) });
+  assert.equal(r2.기술.겨냥, null, '폴백 행(빈 배열)은 겨냥이 아니다 — E3');
+  assert.match(r2.기술.사유, /E3/);
+});
+
+test('기술 칸 — 개입 «이전» 교정·남의 개입 교정은 안 센다 · 관측 0 은 사유가 든다', () => {
+  const 겨냥개입 = { ...개입행('g3', 10), skill_ids: ['skill-a'] };
+  const r = 성과회수(겨냥개입,
+    [겨냥개입, 교정관측('g3', 9.5), 교정관측('다른개입', 11)], { 기준시각: t(13) });
+  assert.equal(r.기술.관측수, 0, '이전 교정 또는 남의 고리가 이 개입의 후속으로 세어졌다');
+  assert.match(r.기술.사유, /못 가른다/, '교정 미착과 미열람을 이 층에서 단정하면 거짓 경보다');
+});
+
+test('회수요약 기술 집계 — 겨냥개입(분모)·관측있음·관측수를 따로 낸다', () => {
+  const a = { ...개입행('k1', 10), skill_ids: ['skill-a'] };
+  const b = { ...개입행('k2', 10), skill_ids: ['skill-b'] };
+  const c = 개입행('k3', 10);   // 겨냥 없음(라이브 경로) — 분모 밖
+  const r = 회수요약([a, b, c, 교정관측('k1', 11)], { 기준시각: t(13) });
+  assert.deepEqual(r.기술, { 겨냥개입: 2, 관측있음: 1, 관측수: 1 });
+  assert.match(r.회수판, /^성과회수\.v2$/, '반환 모양이 늘었으면 판이 올라야 소급 대조가 선다');
+});

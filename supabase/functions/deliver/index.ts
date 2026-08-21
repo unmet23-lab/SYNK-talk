@@ -346,6 +346,12 @@ async function 대상조회(스냅기준: string, 한사람: string | null) {
                   * ⚠ 이 주석은 sql 템플릿 리터럴 «안»이라 백틱 한 글자가 리터럴을 끊는다(F180 —
                   *   2026-08-12 에 이 자리에서 실제로 한 번 끊었다. 강조는 「」로 한다). */
                  'policy_ver', x.policy_ver, 'estimator_version', x.estimator_version,
+                 /* 겨냥 기술(#7 — 생성 성공 착지에만 실린다 · E3). 회수의 기술 축이 읽는 첫 칸. */
+                 'skill_ids', x.skill_ids,
+                 /* correction.* → 배정의 다단 조인 끝(#7 · §6-0 F1 — 그 생산자엔 parent_event_id
+                  * 가 0 이라 공급자가 홉을 걷는다: correction_id → corrections → 원 제출의
+                  * task_ref → 같은 학생·같은 task_ref 의 배정 → 그 intervention_id). */
+                 'assigned_intervention_id', x.assigned_intervention_id,
                  /* G4 강제산출 표식(challenge_id)의 원본. 이 칸이 안 실리던 동안 그 축은 서버
                   * 계산에서 구조적으로 null 이었다(08-20 수리 — lib 주석이 「이 층에 안 온다」로
                   * 자인하던 벽). «submission 으로 중첩»하는 이유: 소비자(G4행인가)가
@@ -361,12 +367,12 @@ async function 대상조회(스냅기준: string, 한사람: string | null) {
             select y.event_id, y.event_type, y.occurred_at, y.ingested_at, y.retry_of_event_id,
                    y.correction_id, y.task_type, y.task_schema_ver, y.payload, y.due_at,
                    y.parent_event_id, y.policy_ver, y.estimator_version, y.intervention_id,
-                   y.task_snapshot
+                   y.task_snapshot, y.skill_ids, 교정배정.assigned_intervention_id
               from (
                 select e.event_id, e.event_type, e.occurred_at, e.ingested_at, e.retry_of_event_id,
                        e.correction_id, e.task_type, s.task_schema_ver, e.payload, s.due_at,
                        e.parent_event_id, e.policy_ver, e.estimator_version, e.intervention_id,
-                       s.task_snapshot,
+                       s.task_snapshot, e.skill_ids,
                        /* 둘째 키 event_id — 동시각 사건에서 절단이 비결정이면 「원래 개수 재현」
                         * (evidence_refs·근거상한의 소급 재현)이 깨진다. 설계 C2 가 진단한 병의
                         * 같은 형태가 이 자리에 실재했다(9회차 심문 발견 4 · 2026-08-20). */
@@ -384,6 +390,19 @@ async function 대상조회(스냅기준: string, 한사람: string | null) {
                    and e.occurred_at >= ${스냅기준}::timestamptz - make_interval(days => ${창일수})
                    and e.occurred_at <= ${스냅기준}::timestamptz
                    and e.ingested_at <= ${스냅기준}::timestamptz) y
+              /* correction.* 행에만 값이 앉는 다단 조인(#7 · 위 jsonb 칸 주석의 그 홉). 다른
+               * 행은 correction_id 가 null 이라 lateral 이 0행 → null(비용도 그 행 수만큼만). */
+              left join lateral (
+                select 배정e.intervention_id as assigned_intervention_id
+                  from engine.corrections c4
+                  join engine.submissions 제출s on 제출s.submission_id = c4.submission_id
+                  join engine.submissions 배정s on 배정s.task_ref = 제출s.task_ref
+                  join engine.learning_events 배정e
+                    on 배정e.event_id = 배정s.event_id
+                   and 배정e.event_type = 'task.assigned'
+                   and 배정e.learner_id = l.learner_id
+                 where c4.correction_id = y.correction_id
+                 order by 배정e.occurred_at desc limit 1) 교정배정 on y.correction_id is not null
              where y.몇째 <= ${종별상한}) x) 원신호 on true
       ${좁히기}`;
 }
