@@ -27,7 +27,7 @@
  *   · M2 라벨 회로 설계 — talk:docs/M2_라벨회로_설계.md
  *     커밋 416088f902853df5283d8cd5ed22bd8c5656edc8 · 13,117자
  *   · 검수 내부 계약 — talk:docs/검수_내부계약.md
- *     커밋 bfb587d5de10a2b2325d8ec4a55a60c440e93476 · 17,152자
+ *     커밋 c46dfe2eeb1b27e51bc6f160398be224a596c06b · 17,152자
  *   · 교정 프롬프트 — talk:prompts/교정.md
  *     커밋 d0dd8c906a9c7757be2c4fca1be1027dfb21e50b · 8,882자
  *
@@ -130,7 +130,7 @@ const 출처대장 = [
     "이름": "검수 내부 계약",
     "저장소": "talk",
     "경로": "docs/검수_내부계약.md",
-    "커밋": "bfb587d5de10a2b2325d8ec4a55a60c440e93476",
+    "커밋": "c46dfe2eeb1b27e51bc6f160398be224a596c06b",
     "게이트": null
   },
   {
