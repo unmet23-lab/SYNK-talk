@@ -68,6 +68,16 @@ test('cron 원소 — 4잡·이름 오름차순·§3-2-a 크론식 그대로', (
     '워커 크론이 표와 다르다 — 시 경계 공백(B3)이 되살아난다');
 });
 
+test('RPC열(재료 10 대상) = 마이그의 engine 함수 중 열 RPC 전량 — 하나 늘고 목록이 안 늘면 판이 안 오른다', () => {
+  const 전부 = [...마이그.matchAll(/^create or replace function engine\.([a-z_]+)\(/gm)]
+    .map((m) => m[1]);
+  /* 열 RPC 밖 = 트리거 함수·도우미(gen_*·level_dist_ok·*_freeze·*_settled) — §3-5-b 전이표의
+   * 「전이는 이 열 밖에서 일어나지 않는다」가 가르는 그 경계다. */
+  const 열 = 전부.filter((n) => !/^gen_|_freeze$|_settled$|^level_dist_ok$/.test(n)).sort();
+  assert.deepEqual([...상수.RPC열].sort(), 열,
+    '생성상수.RPC열이 마이그의 RPC 실물과 갈렸다 — 판독기 재료 10 이 다른 함수 집합을 걷는다');
+});
+
 test('통합 — 실물 재료 전량으로 정책지문·품질지문이 조립된다(재료 13 · 12자)', () => {
   const 재료 = {
     요약조립: 판재료.파일해시.요약조립,

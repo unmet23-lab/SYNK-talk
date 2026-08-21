@@ -11712,7 +11712,7 @@ do $migration$
 declare
   migration_version constant text := '20260821120000';
   migration_name constant text := '20260821120000_generation_c12.sql';
-  expected_checksum constant text := '871edcfd4d9171ee404c710e89793c8502ab4ae77b37bf5501d944f477db4749'; -- migration-checksum
+  expected_checksum constant text := 'e09004eed6f5d65c882272f12b488c9ea30ef0dd0e565167ff1c62303b5990e5'; -- migration-checksum
   base_version constant text := '20260821060000';
   recorded_checksum text;
 begin
@@ -11777,15 +11777,26 @@ begin
    * ㉤ 대조 ⑥(산출 바이트: 사건 output_text·프롬프트 = 원응답의 그 값)의 재료. 벤더 봉투 모양
    * (Anthropic Messages: content[0].text 가 구조화 출력 JSON)은 lib/과제생성.js 파서와 «같은
    * 원천»이다 — 벤더를 갈면 둘을 같이 간다(§12 픽스처가 두 층의 동치를 잰다). 파싱이 안 되는
-   * 원응답으로 «성공» 착지가 오면 그 자체가 계보 결함이라 null 을 내고 ㉤ 가 예외로 죽인다. */
+   * 원응답으로 «성공» 착지가 오면 그 자체가 계보 결함이라 null 을 내고 ㉤ 가 예외로 죽인다.
+   * 🔴 v5.13-b — §8 정규화(NFC → 공백류 1칸 → 앞뒤 제거)를 «여기서도» 건다. §7 이 사건에
+   *   싣는 바이트를 「검문(정규화 후)이 본 것」으로 못박았으므로, 이 파서가 원문 그대로를 내면
+   *   모델이 앞뒤 공백 하나만 붙여도 대조 ⑥ 이 정상 착지를 죽인다(갈리는 두 정본). 공백 클래스는
+   *   JS `\s` 의 유니코드 목록을 명시로 편다 — PG `\s`(=[[:space:]]) 는 U+00A0 등을 안 물어
+   *   「같은 정규화」가 로케일에 따라 거짓이 된다. 동치는 §12 픽스처가 잰다. */
   create or replace function engine.gen_parse_sentence(_raw text)
     returns table (sentence text, question text)
     language sql immutable as $function$
     with 본 as (
       select case when _raw is null then null
                   else (_raw::jsonb -> 'content' -> 0 ->> 'text')::jsonb end as j
-    )
-    select j ->> 'sentence', j ->> 'question' from 본;
+    ),
+    값 as (select j ->> 'sentence' as s, j ->> 'question' as q from 본)
+    select
+      btrim(regexp_replace(normalize(s, NFC),
+        '[\f\n\r\t\v \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]+', ' ', 'g'), ' '),
+      btrim(regexp_replace(normalize(q, NFC),
+        '[\f\n\r\t\v \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]+', ' ', 'g'), ' ')
+    from 값;
   $function$;
 
   -- ══════════ ① 표 — jobs → attempts → batch_runs (FK 는 ② 에서) ══════════
@@ -13084,7 +13095,7 @@ do $migration2$
 declare
   migration_version constant text := '20260821120000';
   migration_name constant text := '20260821120000_generation_c12.sql';
-  expected_checksum constant text := '871edcfd4d9171ee404c710e89793c8502ab4ae77b37bf5501d944f477db4749'; -- migration-checksum
+  expected_checksum constant text := 'e09004eed6f5d65c882272f12b488c9ea30ef0dd0e565167ff1c62303b5990e5'; -- migration-checksum
 begin
   if exists (select 1 from engine.schema_migrations where version = migration_version) then
     return;
@@ -13413,7 +13424,7 @@ select case when 테이블수=21 and RLS켜짐=21 and 정책수=7
               and (select v from 빠진제약) is null
               and (select v from 빠진트리거) is null
               and (select version from 현재이력)='20260821120000'
-              and (select checksum from 현재이력)='871edcfd4d9171ee404c710e89793c8502ab4ae77b37bf5501d944f477db4749' -- migration-checksum
+              and (select checksum from 현재이력)='e09004eed6f5d65c882272f12b488c9ea30ef0dd0e565167ff1c62303b5990e5' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 21·21·7·0·0·5·1·0·0·1·0·0·0·0·22·0·0·0·0·2·6·6·0·0·0·1·1·1·30·0·1·26·0·11·0·1 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,

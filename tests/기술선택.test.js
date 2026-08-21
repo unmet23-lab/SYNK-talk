@@ -87,3 +87,9 @@ test('학생·날짜가 다르면 시작 위치가 도는 표본이 있다 — �
   }
   assert.ok(자리들.size > 1, '아흐레 연속 같은 자리면 해시가 죽은 것이다');
 });
+
+test('분류판(v5.13-b ②) — skill_taxonomy_ver 의 코드 정본이 여기 하나 산다', () => {
+  const { 분류판 } = require('../lib/기술선택.js');
+  assert.match(분류판, /^skills\.v\d+$/, '판 표기 꼴이 아니다');
+  assert.equal(분류판, 'skills.v1', 'c6 시드가 첫 판이다 — 시드를 갈면 이 값을 같이 올린다');
+});
