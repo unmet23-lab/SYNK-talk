@@ -7,7 +7,8 @@
  *
  * ■ 무엇을 재나 (설계 §12 — 구현층 픽스처 대군)
  *   A 적용층(§12-21): 재적용 멱등 · 스키마 동일성(칼럼·제약·값목록 = 마이그 파일과 대조) ·
- *     장부 권한 · RPC 시그니처 재독증 · c12 검증기 왕복 · §16-1 선행 n/4(§12-31).
+ *     장부 권한 · RPC 시그니처 재독증 · §16-1 선행 n/4(§12-31). c12 검증기 왕복(G1)은
+ *     판정 층이 이벤트 API 라 tests/계약c12왕복.test.js(순수)가 정본이다 — A6 참조.
  *   B 물리층(§12-6·7·12·16·18·23·26·28): §4-1 «행에 남는 15값» 전량이 각자 자기 행으로
  *     착지한다(값↔픽스처는 아래 `사유픽스처` 한 곳에서 파생 — tests/생성사유픽스처.test.js 가
  *     DDL CHECK 와 기계 대조한다) + 멱등·동시·원자·펜싱·좀비·회수·마감 스윕 경계 전량.
@@ -121,6 +122,14 @@ async function main() {
                           'engine.generation_batch_runs'::regclass)`)).map((r) => r.conname));
     const 제약빠짐 = [...파일제약].filter((c) => !실제제약.has(c));
     확인('A2 이름 있는 제약 전량이 DB 에 실재한다', !제약빠짐.length, 제약빠짐);
+    /* 정의 «표류» — `if not exists` 가드는 제자리 수정을 조용히 삼킨다(§12-21 「재적용의 성공은
+     * 동일성의 증거가 아니다」). 전 정의의 텍스트 동치는 카탈로그 정규화 때문에 못 재고, 이 판이
+     * 실제로 고친 자리(v5.13-c counts_order)를 갈래로 잰다 — 옛 판이면 target<=loaded 가 남아 있다. */
+    const 순서정의 = (await sql(`
+      select pg_get_constraintdef(oid) as d from pg_constraint
+       where conrelid='engine.generation_batch_runs'::regclass and conname='batch_runs_counts_order_c12'`))[0].d;
+    확인('A2 counts_order 가 v5.13-c 판이다(target≤loaded 부재 — 재실행을 안 죽인다)',
+      !/target_count\s*<=\s*loaded_count/.test(순서정의), 순서정의);
   }
 
   /* A3 값목록 기계 대조(B3) — DDL CHECK 리터럴 집합 == DB 제약 원문 == 픽스처 레지스트리. */
@@ -183,28 +192,14 @@ async function main() {
     }
   }
 
-  /* A6 c12 검증기 왕복(G1·D4) — 시험 전용 학생 하나로 직접 INSERT 를 던져 본다. */
-  {
-    const [{ learner_id: 검증학생 }] = await sql(`
-      insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver)
-      values ('${표}-v', '검증기', 'Lv3', null, '${판}') returning learner_id`);
-    await sql(`insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver, recorded_by)
-      values ('${검증학생}'::uuid, 'v18.9', now() - interval '30 days', '${판}', 'tools/생성왕복시험.js')`);
-    const 심기 = (payload, 꼬리) => `
-      insert into engine.learning_events (learner_id, event_type, task_type, actor_kind, occurred_at,
-        idempotency_key, intervention_id, consent_ver,
-        consent_id, source_kind, payload, schema_ver)
-      select '${검증학생}'::uuid, 'intervention.delivered', '발화녹음', 'ai', now(),
-        'genfix:${표}:${꼬리}', gen_random_uuid(), 'v18.9',
-        (select consent_id from engine.consents where learner_id='${검증학생}'::uuid limit 1),
-        'inferred'::engine.source_kind, ${제이슨(payload)}, '${판}'`;
-    const 값밖 = await 실행(심기({ ver: 2, output_text: 'x', generation_outcome: '말도안됨', generation_input_text: null }, 'bad'));
-    확인('A6 목록 밖 generation_outcome «값»은 거절(D4)', !값밖.ok, (값밖.메시지 || '').slice(0, 160));
-    const 키부재 = await 실행(심기({ ver: 2, output_text: 'x' }, 'nokey'));
-    확인('A6 키 부재는 거절이 아니다(D4 — 값 검증만)', 키부재.ok, (키부재.메시지 || '').slice(0, 160));
-    const 구판 = await 실행(심기({ ver: 1 }, 'v1'));
-    확인('A6 ver=1 payload 는 무결하다(기존 판 공존)', 구판.ok, (구판.메시지 || '').slice(0, 160));
-  }
+  /* A6 c12 검증기 왕복(G1·D4) — 층을 정직하게 가른다(1차 실측이 잡은 오표적의 정정):
+   * · payload 화이트리스트·값목록·짝 규칙의 판정 «층»은 이벤트 API(lib/이벤트검증)다 —
+   *   그 왕복은 tests/계약c12왕복.test.js 가 15검사로 이미 전부 진다(ver2+3칸·목록 밖 이름·
+   *   ver1 무결·목록 밖 outcome 값·키 부재 비거절·이미배정 거절·gate 7값·짝 규칙).
+   * · DB «물리»가 강제하는 값목록 = jobs.outcome CHECK + ㉤ 대조 ① — B4 원자 주입이 그
+   *   경로(값 밖 payload → 트랜잭션 중간 사망 → 세 행 전무)를 실측한다.
+   * 관리자 직접 INSERT 는 어느 문도 아니므로 여기서 던지지 않는다(안 재는 것을 잰 척하지 않는다). */
+  console.log('  ▸ A6 검증기 왕복 — 이벤트 API 층은 tests/계약c12왕복.test.js(15검사) · DB 물리 층은 B4 원자 주입이 잰다');
 
   /* A7 §16-1 선행 «필수» n/4 (§12-31) — 실물 존재를 한 자리에서 센다. */
   {

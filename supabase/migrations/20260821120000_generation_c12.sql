@@ -32,7 +32,7 @@ do $migration$
 declare
   migration_version constant text := '20260821120000';
   migration_name constant text := '20260821120000_generation_c12.sql';
-  expected_checksum constant text := '89888d01f22427ccc5907171d64e5a4f4e55fc0c593186b5dbd0f7ead244d986'; -- migration-checksum
+  expected_checksum constant text := 'da3bcef30ef721a5a607f57ed06e0092e9e2e0f604d00e6023535095c31e356f'; -- migration-checksum
   base_version constant text := '20260821060000';
   recorded_checksum text;
 begin
@@ -293,9 +293,12 @@ begin
     partial_count   int,                   -- C5 결손 수의 영속(B2)
     finished_at     timestamptz,           -- null = 도중에 죽었다
     constraint batch_runs_counts_pair_c12 check ((target_count is null) = (loaded_count is null)),
+    -- 🔴 v5.13-c: `target <= loaded` 를 걷었다 — target 은 «날짜» 분모(§3-6 ⓑ), loaded 는 «이 실행»
+    --    행 수라 재실행(B10)에서 순서가 원리상 안 선다(선행 실행의 대상 job 이 날짜 분모에 남는다).
+    --    생성왕복시험 B4 실측 — 정당한 재적재 완주 채움이 여기서 죽었다.
     constraint batch_runs_counts_order_c12 check (
       target_count is null
-      or (target_count >= 0 and target_count <= loaded_count and loaded_count <= enrolled_count)
+      or (target_count >= 0 and loaded_count <= enrolled_count)
     ),
     constraint batch_runs_enrolled_nonneg_c12 check (enrolled_count >= 0),
     constraint batch_runs_level_dist_ok_c12
@@ -1420,7 +1423,7 @@ do $migration2$
 declare
   migration_version constant text := '20260821120000';
   migration_name constant text := '20260821120000_generation_c12.sql';
-  expected_checksum constant text := '89888d01f22427ccc5907171d64e5a4f4e55fc0c593186b5dbd0f7ead244d986'; -- migration-checksum
+  expected_checksum constant text := 'da3bcef30ef721a5a607f57ed06e0092e9e2e0f604d00e6023535095c31e356f'; -- migration-checksum
 begin
   if exists (select 1 from engine.schema_migrations where version = migration_version) then
     return;
@@ -1749,7 +1752,7 @@ select case when 테이블수=21 and RLS켜짐=21 and 정책수=7
               and (select v from 빠진제약) is null
               and (select v from 빠진트리거) is null
               and (select version from 현재이력)='20260821120000'
-              and (select checksum from 현재이력)='89888d01f22427ccc5907171d64e5a4f4e55fc0c593186b5dbd0f7ead244d986' -- migration-checksum
+              and (select checksum from 현재이력)='da3bcef30ef721a5a607f57ed06e0092e9e2e0f604d00e6023535095c31e356f' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 21·21·7·0·0·5·1·0·0·1·0·0·0·0·22·0·0·0·0·2·6·6·0·0·0·1·1·1·30·0·1·26·0·11·0·1 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
