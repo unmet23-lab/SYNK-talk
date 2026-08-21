@@ -358,15 +358,17 @@ export async function 구제배달(ctx: {
     .map((r) => String(r.skill_id));
   const 조립 = 학생조립(학생, { 오늘, 스냅기준, 후보, 최근겨냥 });
 
+  /* ⚠ `job` 은 복합 타입(행) — 드라이버가 문자열로 접으므로 SQL 에서 칸을 편다(안 펴면
+   * status 가 undefined 라 모든 갈래가 조용히 «생성중»이 된다 — 08-22 리허설 실측). */
   const ld = (await sql`
-    select * from engine.jobs_load_one(
-      ${오늘}::date, ${run_id}::uuid, ${sql.json(조립.target)})`)[0];
+    select kind, (job).status as job_status, assigned_event_id
+      from engine.jobs_load_one(
+        ${오늘}::date, ${run_id}::uuid, ${sql.json(조립.target)})`)[0];
   if (!ld) return 응답('생성중');
   if (ld.kind === '이미배정') return 응답('이미배정', { event_id: ld.assigned_event_id });
   if (ld.kind === '조립실패') return 응답('조립실패', { 조립: 조립.계수키 });
   if (ld.assigned_event_id) return 응답('이미착지', { event_id: ld.assigned_event_id });
-  const job = ld.job as Record<string, unknown> | null;
-  if (!job || job.status !== '대기') return 응답('생성중');
+  if (ld.job_status !== '대기') return 응답('생성중');
 
   /* claim → ㉤ 구제 착지(원자) — 못 잡으면 워커가 쥔 것(§3-1: 생성도 폴백도 안 하고 물러난다). */
   const 잡음 = (await sql`
