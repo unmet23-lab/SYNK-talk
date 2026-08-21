@@ -655,12 +655,20 @@ async function main() {
   const 오늘 = (await sql(`select ((now() at time zone 'Asia/Ulaanbaatar')::date)::text as d`))[0].d;
   const 어제 = 다음날(오늘, -1), 그저께 = 다음날(오늘, -2);
 
-  /* 함수 이름 표기는 왕복골격 회귀의 스코프 스캔이 걷는 세 꼴 중 둘(기본값·`함수:` 옵션)을 쓴다. */
+  /* 함수 이름 표기는 왕복골격 회귀의 스코프 스캔이 걷는 세 꼴 중 둘(기본값·`함수:` 옵션)을 쓴다.
+   * 게이트웨이가 이따금 HTML 오류면(5xx)을 낸다(8차 실측 — 워커 7회차에서 JSON 파싱 사망) —
+   * 5xx·비 JSON 만 짧게 재시도하고, 4xx 는 판정 재료라 그대로 돌려준다. */
   const 함수호출 = async (질의 = '', 옵션 = {}) => {
-    const r = await fetch(`https://${ref}.supabase.co/functions/v1/${옵션.함수 ?? 'deliver'}${질의}`, {
-      method: 'POST', headers: { Authorization: `Bearer ${service}` },
-    });
-    return { status: r.status, 몸: JSON.parse((await r.text()) || '{}') };
+    for (let i = 0; ; i++) {
+      const r = await fetch(`https://${ref}.supabase.co/functions/v1/${옵션.함수 ?? 'deliver'}${질의}`, {
+        method: 'POST', headers: { Authorization: `Bearer ${service}` },
+      });
+      const 원문 = await r.text();
+      let 몸 = null;
+      try { 몸 = JSON.parse(원문 || '{}'); } catch { 몸 = null; }
+      if ((r.status >= 500 || 몸 === null) && i < 4) { await 쉼(5000); continue; }
+      return { status: r.status, 몸: 몸 ?? { 원문머리: String(원문).slice(0, 120) } };
+    }
   };
   const 워커호출 = () => 함수호출('', { 함수: 'deliver-one' });
 
