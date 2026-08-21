@@ -230,9 +230,11 @@ async function main() {
       for (const 줄 of 본.결과 || []) {
         새로돌림++;
         if (줄.사유) {
-          결과맵.set(줄.id, { id: 줄.id, 사유: 줄.사유 });
+          // 벤더의 «왜»가 오면 산출물·화면에 같이 남긴다(#Q83 — 상태 코드만으로는 처방이 안 나온다).
+          const 사유전체 = 줄.벤더사유 ? `${줄.사유} — ${줄.벤더사유}` : 줄.사유;
+          결과맵.set(줄.id, { id: 줄.id, 사유: 사유전체 });
           사유수++;
-          console.log(`  ✗ ${줄.id} ${줄.사유}`);
+          console.log(`  ✗ ${줄.id} ${사유전체}`);
           continue;
         }
         if (줄.usage) { 성적들.push(캐시성적(줄.usage)); 출력토큰 += Number(줄.usage.output_tokens || 0); }

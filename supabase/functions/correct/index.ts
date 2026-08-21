@@ -236,7 +236,11 @@ Deno.serve(async (req: Request) => {
           signal: AbortSignal.timeout(왕복제한밀리),
         });
         if (!r.ok) {
-          결과.push({ id: 항.id, 사유: `벤더:${r.status}`, 재시도가능: 재시도가능(r.status) });
+          /* 🔑 벤더가 말한 «왜»를 같이 싣는다(#Q83 — 상태 코드만으로는 처방이 안 나온다 · 배치
+           * 통로의 그 규율). 08-20 실측: 59×400 이 사유 없이 «벤더:400» 으로만 남아, 크레딧
+           * 소진인지 요청 결함인지 밖에서 가릴 수 없었다. */
+          const 실패글 = (await r.text()).slice(0, 300);
+          결과.push({ id: 항.id, 사유: `벤더:${r.status}`, 벤더사유: 벤더사유(실패글), 재시도가능: 재시도가능(r.status) });
           continue;
         }
         const 본문 = await r.json();
