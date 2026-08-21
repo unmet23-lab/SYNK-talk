@@ -46,12 +46,10 @@ import 토큰모듈 from './토큰.mjs';
 import 교정모듈 from './교정엔진.mjs';
 import 과제생성모듈 from './과제생성.mjs';
 import 과제검문모듈 from './과제검문.mjs';
-import 판독기모듈 from './판독기.mjs';
+import 실행판모듈 from './실행판.mjs';
 import 생성상수모듈 from './생성상수.mjs';
 import 판재료모듈 from './판재료.mjs';
 import 오늘과제모듈 from './오늘과제.mjs';
-import 학습자상태모듈 from './학습자상태.mjs';
-import 기술선택모듈 from './기술선택.mjs';
 import 계약판모듈 from './계약판.mjs';
 import 프롬프트전문 from './과제생성프롬프트.mjs';
 
@@ -60,13 +58,12 @@ const { 메시지경로, 벤더헤더 } = 교정모듈 as {
   메시지경로: string; 벤더헤더: (키: string) => Record<string, string>;
 };
 const {
-  생성요청몸통, 생성응답읽기, 입력초과인가, 응답초과인가, 프롬프트지문, 렌더,
+  생성요청몸통, 생성응답읽기, 입력초과인가, 응답초과인가, 렌더,
 } = 과제생성모듈 as {
   생성요청몸통: (a: { 본문: string; model: string }) => Record<string, unknown>;
   생성응답읽기: (봉투: unknown) => { 값?: { sentence: string; question: string }; 오류?: string; 사유?: string };
   입력초과인가: (본문: string) => boolean;
   응답초과인가: (원문: string) => boolean;
-  프롬프트지문: (a: { 전문: string; 파서해시: string }) => string | null;
   렌더: (전문: string, a: { 요약: string; 기술들: string[] }) => string | null;
 };
 const { 검문, 중복창_일 } = 과제검문모듈 as {
@@ -74,25 +71,22 @@ const { 검문, 중복창_일 } = 과제검문모듈 as {
     { ok: boolean; 사유: string | null; 사유들: string[]; 문장: string; 질문: string };
   중복창_일: number;
 };
-const { 정책지문 } = 판독기모듈 as { 정책지문: (재료: Record<string, string>) => string };
+const { 실행판조립, RPC질의문, 판질의문 } = 실행판모듈 as {
+  실행판조립: (재료: Record<string, unknown>) => Record<string, string>;
+  RPC질의문: () => string;
+  판질의문: () => string;
+};
 const {
   생성타임아웃_MS, 워커예산_MS, 워커학생상한, 임대_초, 배치실행상한_일, 폴백여유_MS,
-  회전식, RPC열, 타임아웃상수원소, 예산상수원소, cron원소,
 } = 생성상수모듈 as {
   생성타임아웃_MS: number; 워커예산_MS: number; 워커학생상한: number; 임대_초: number;
-  배치실행상한_일: number; 폴백여유_MS: number; 회전식: string; RPC열: readonly string[];
-  타임아웃상수원소: () => string; 예산상수원소: () => string; cron원소: () => string;
-};
-const { 파일해시, 폴백순서원소 } = 판재료모듈 as {
-  파일해시: Record<string, string>; 폴백순서원소: string;
+  배치실행상한_일: number; 폴백여유_MS: number;
 };
 const { 스냅샷, 따라말하기문장, 시간대 } = 오늘과제모듈 as {
   스냅샷: (날짜: string, 문장: string, 출처: string, 프롬프트: string, 선택?: unknown) => Record<string, unknown>;
   따라말하기문장: (snap: unknown) => string | null;
   시간대: string;
 };
-const { 추정판 } = 학습자상태모듈 as { 추정판: string };
-const { 분류판 } = 기술선택모듈 as { 분류판: string };
 const { 행들에서판 } = 계약판모듈 as { 행들에서판: (행들: unknown) => string | null };
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
@@ -114,41 +108,22 @@ function 센다(칸: Record<string, number>, 이름: string) {
   칸[이름] = (칸[이름] ?? 0) + 1;
 }
 
-/* ── 자기 실행판(호출당 1회) — 대조는 ㉢ 가 진다 ────────────────────────────────
- * 실패(마이그 이력 못 읽음 등)는 빈 문자열로 접는다 — ㉢ 이 판불일치로 거절하고 그 사실이
- * outcome 에 남는다(조용히 죽는 것보다 낫고, 판정 자리는 하나다). */
+/* ── 자기 실행판(호출당 1회) — 조립은 lib/실행판 하나(오케스트레이터와 같은 함수) · 대조는
+ * ㉢ 가 진다. DB 산출 둘(rpc 전문·schema_ver)만 여기서 조달한다. 실패는 빈 문자열 → 판불일치. */
 async function 자기실행판(): Promise<Record<string, string>> {
-  const model = Deno.env.get('GENERATION_MODEL') ?? '';
-  let prompt_ver = '';
+  let rpc전문 = '';
   try {
-    prompt_ver = 프롬프트지문({ 전문: 프롬프트전문 as unknown as string, 파서해시: 파일해시['오류분류'] }) ?? '';
-  } catch (e) { console.error('[deliver-one] prompt_ver 산출 실패', String((e as Error)?.message ?? e)); }
-  let policy_ver = '';
-  try {
-    /* 재료 10(rpc) — 지금 DB 에 선 정의(§5-1 v5.9 표: 함수명 오름차순 collate "C" · \n 연결 전문). */
-    const rpc행 = await sql`
-      select string_agg(pg_get_functiondef(p.oid), E'\n' order by p.proname collate "C") as 전문
-        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-       where n.nspname = 'engine' and p.proname = any(${RPC열 as string[]})`;
-    const rpc전문 = rpc행[0]?.전문 ?? '';
-    policy_ver = 정책지문({
-      요약조립: 파일해시['요약조립'], 검문: 파일해시['검문'], 폴백순서: 폴백순서원소,
-      타임아웃상수: 타임아웃상수원소(), 예산상수: 예산상수원소(), 회전식,
-      갈래판정: 파일해시['갈래판정'], 기술선택: 파일해시['기술선택'], cron: cron원소(),
-      rpc: rpc전문, 오류분류: 파일해시['오류분류'], 폴백조립: 파일해시['폴백조립'],
-      추정기: 파일해시['추정기'],
-    });
-  } catch (e) { console.error('[deliver-one] policy_ver 산출 실패', String((e as Error)?.message ?? e)); }
+    rpc전문 = (await sql.unsafe(RPC질의문()))[0]?.전문 ?? '';
+  } catch (e) { console.error('[deliver-one] rpc 재료 조회 실패', String((e as Error)?.message ?? e)); }
   let schema_ver = '';
   try {
-    const 판행 = await sql`
-      select name as 최신조각 from engine.schema_migrations order by version desc limit 1`;
-    schema_ver = 행들에서판(판행) ?? '';
+    schema_ver = 행들에서판(await sql.unsafe(판질의문())) ?? '';
   } catch (e) { console.error('[deliver-one] schema_ver 산출 실패', String((e as Error)?.message ?? e)); }
-  return {
-    model, prompt_ver, policy_ver,
-    estimator_version: 추정판, schema_ver, skill_taxonomy_ver: 분류판,
-  };
+  return 실행판조립({
+    model: Deno.env.get('GENERATION_MODEL') ?? '',
+    프롬프트전문: 프롬프트전문 as unknown as string,
+    rpc전문, schema_ver, 판재료: 판재료모듈,
+  });
 }
 
 /* ── ②' 중복 이력(워커 몫 · claim 직후) — §3 의 쿼리 규격 그대로 ──────────────────
@@ -314,6 +289,15 @@ Deno.serve(async (req: Request) => {
       if (!키) {
         const r = await 폴백착지(j, 오늘, { outcome: '키없음', deciding: null, gate_failed: null, input_text: null });
         센다(계수, r?.landed ? '키없음' : `키없음/${r?.reason ?? '?'}`);
+        continue;
+      }
+
+      /* 상태없음(§4-3) — 판정식 = «draft 에 굳은» axes_used 의 길이 0 하나(쓸축수와 같은 수 ·
+       * §6-1 C5). 재계산이 아니라 읽기다(D2) — 상태 없는 학생에게 「읽은 척하는」 생성을 안 낸다. */
+      const 축들 = (draft.evidence_refs as Record<string, unknown> | undefined)?.axes_used;
+      if (Array.isArray(축들) && 축들.length === 0) {
+        const r = await 폴백착지(j, 오늘, { outcome: '상태없음', deciding: null, gate_failed: null, input_text: null });
+        센다(계수, r?.landed ? '상태없음' : `상태없음/${r?.reason ?? '?'}`);
         continue;
       }
 

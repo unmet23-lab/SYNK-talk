@@ -34,6 +34,7 @@ import 회수모듈 from './성과회수.mjs';
 import 게임모듈 from './게임배정.mjs';
 import 라디오태스크모듈 from './라디오태스크.mjs';
 import 계약판모듈 from './계약판.mjs';
+import { 생성배달 } from './생성모드.ts';
 
 const { 행들에서판 } = 계약판모듈 as { 행들에서판: (행들: unknown) => string | null };
 
@@ -211,26 +212,23 @@ async function 점검하기(오늘: string) {
   return 봉투(200, { ok: true, mode: '점검', date: 오늘, 재적, 배정, 강등, 미달 });
 }
 
-async function 배달하기(오늘: string, 한사람: string | null = null) {
+/** 학급과 재료를 «한 번에» — 배달(현행)과 생성 모드(§3 ① 선판정)가 **같은 재료**로 같은
+ *  결정을 내게 하는 자리다(두 벌로 적으면 「전원」과 「생성」이 다른 학급을 본다). */
+async function 대상조회(스냅기준: string, 한사람: string | null) {
   /* 단건이면 대상만 좁힌다 — 재료를 만드는 lateral 셋은 **그대로 탄다**(첫날 판정·교정문·동의).
    * 좁히는 자리를 여기 하나로 두면 「전원」과 「한 명」이 같은 재료로 같은 결정을 낸다. */
   const 좁히기 = 한사람 ? sql`where l.learner_id = ${한사람}::uuid` : sql``;
-  /* 상태 스냅의 기준시각 — **배치 전체가 하나**(설계 §11-4 D1). 원신호 창을 SQL 의 now() 로
-   * 자르면 「몇 시간 뒤 깨어난 워커」가 같은 as_of 를 넘겨도 다른 창을 받는다 — 창 cutoff 도
-   * 상태 계산의 as_of 도 이 값 하나에서 나와야 「같은 as_of = 같은 표본」이 성립한다.
-   * ⚠ 착지 스탬프(`한명()` 의 `지금`)와 축이 다르다 — 그건 «실시각·조작하지 않는다»(§11-4 A7)
-   *   이고 이건 «읽기 스냅샷 기준»이다. 하나로 접으면 학생마다 스냅 기준이 갈린다. */
-  const 스냅기준 = new Date().toISOString();
   /* 학생과 재료를 **한 번에** 읽는다(학생 수만큼 왕복하지 않는다).
    * · 마지막 배정 = 「첫날인가」와 「전날 문장」의 근거
    * · 교정문 = **지난 배정 뒤에 새로 확정된 것**만. 「최신 1건」으로 잡으면 같은 교정문이
    *   매일 ②슬롯에 다시 오고, 그건 §6-3 이 말한 「어제 나간 교정」이 아니다.
    * · 동의 = 지금 유효한 것. 없으면 배정하지 않는다(consent_ver 는 not null) — 그 학생은
    *   건너뛴 채 §6-5 미달로 드러난다. 동의 없이 배정하는 우회로를 만들지 않는다. */
-  const 대상 = await sql`
+  return await sql`
     select l.learner_id, l.level_current, l.goal_track,
            배정.occurred_at as 마지막배정, 배정.task_snapshot as 마지막스냅샷,
-           교정.corrected_text as 교정문, 교정.원사건, 동의.consent_ver, 동의.consent_id,
+           교정.corrected_text as 교정문, 교정.correction_id as 교정id, 교정.원사건,
+           동의.consent_ver, 동의.consent_id,
            재제출.원제출사건, 재제출.원시드, 재제출.원챌린지,
            원신호.행들 as 원신호
       from engine.learners l
@@ -253,7 +251,7 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
          *   못 믿는 것은 고리뿐이라 null 로 둔다 — 「모른다」를 거짓말로 바꾸지 않는다.
          * ⚠ 이 주석은 sql 템플릿 리터럴 **안**이다 — 백틱을 쓰면 리터럴이 거기서 끊긴다
          *   (2026-08-08 실측: tests/화면구문 이 「Missing semicolon」으로 잡았다). */
-        select c.corrected_text,
+        select c.corrected_text, c.correction_id,
                case when e.event_type = 'submission.created' then e.event_id end as 원사건
           from engine.corrections c
           join engine.submissions s on s.submission_id = c.submission_id
@@ -382,6 +380,34 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
                    and e.ingested_at <= ${스냅기준}::timestamptz) y
              where y.몇째 <= ${종별상한}) x) 원신호 on true
       ${좁히기}`;
+}
+
+async function 배달하기(오늘: string, 한사람: string | null = null) {
+  /* 상태 스냅의 기준시각 — **배치 전체가 하나**(설계 §11-4 D1). 원신호 창을 SQL 의 now() 로
+   * 자르면 「몇 시간 뒤 깨어난 워커」가 같은 as_of 를 넘겨도 다른 창을 받는다 — 창 cutoff 도
+   * 상태 계산의 as_of 도 이 값 하나에서 나와야 「같은 as_of = 같은 표본」이 성립한다.
+   * ⚠ 착지 스탬프(`한명()` 의 `지금`)와 축이 다르다 — 그건 «실시각·조작하지 않는다»(§11-4 A7)
+   *   이고 이건 «읽기 스냅샷 기준»이다. 하나로 접으면 학생마다 스냅 기준이 갈린다. */
+  const 스냅기준 = new Date().toISOString();
+
+  /* 🔴 생성 모드 게이트(§3-2-a C5 · v5.13-b ⑤) — 활성 함수(`engine.gen_active_from()` · 활성
+   * 조각이 세운다)가 «있고» 시작일이 오늘 이전이면, 전원 배달은 오케스트레이터(생성모드.ts)가
+   * 진다. 함수가 없으면 현행 그대로 — 배포 순서가 어긋나도 학생이 빈손이 되는 갈래가 없다.
+   * ⚠ 단건(`한사람`)은 이 분기를 안 탄다 — 활성 뒤 단건은 구제 경로(㉨ · tasks)가 정본이고,
+   *   여기 남은 단건 통로는 멱등키·C5(기존 사건 우선)가 생성 큐와의 경합을 원자로 막는다. */
+  if (!한사람) {
+    const 게이트 = await sql`
+      select (to_regprocedure('engine.gen_active_from()') is not null) as 있음`;
+    if (게이트[0]?.있음) {
+      const 활성 = await sql`select engine.gen_active_from() <= ${오늘}::date as 켜짐`;
+      if (활성[0]?.켜짐) {
+        const 대상 = await 대상조회(스냅기준, null);
+        return await 생성배달({ sql, 오늘, 스냅기준, 대상: 대상 as unknown as Record<string, unknown>[], 봉투, 게임갈래 });
+      }
+    }
+  }
+
+  const 대상 = await 대상조회(스냅기준, 한사람);
 
   /* 🔴 단건인데 0건 = 없는 learner_id 로 불렸다는 뜻이다. 200 으로 넘기면 「배정 0/재적 0」이라
    *   미달 경고에도 안 걸려 **조용히 아무 일도 안 한 것**이 된다. 부른 쪽이 알아야 한다. */
@@ -459,29 +485,25 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
   return 봉투(200, 몸);
 }
 
-/** 한 학생 = 한 트랜잭션. 개입과 배정은 같이 서거나 같이 없다. */
-async function 한명(학생: Record<string, unknown>, 오늘: string, ver: string, 스냅기준: string) {
+/** 게임(G1~G4) 갈래 — 판정+배정 한 벌. 게임이 «못 서면 null»(호출자의 다음 갈래가 받는다).
+ *  배달(현행 말하기)과 생성 모드가 **같은 함수**를 먼저 시도한다 — 게임날 판정이 두 벌이 되면
+ *  한쪽만 고친 날 같은 학생이 두 통로에서 다른 것을 받는다. */
+async function 게임갈래(학생: Record<string, unknown>, 오늘: string, ver: string) {
   const learner_id = String(학생.learner_id);
-  if (!학생.consent_ver) {
-    return { learner_id, status: 'skipped', 사유: 'consent_missing' };
-  }
-
   const 지금 = new Date().toISOString();
   const 공통 = {
-    actor_kind: 'ai' as const,   // 배치가 만드는 사건의 행위자(§10-A-1 — `system` 을 새로 만들지 않는다)
+    actor_kind: 'ai' as const,
     level_snapshot: (학생.level_current ?? null) as string | null,
     goal_snapshot: (학생.goal_track ?? null) as string | null,
     consent_ver: String(학생.consent_ver),
-    // 동의 귀속(20260807120000) — 위 consent_ver 게이트가 무동의를 걸렀으니 여기선 항상 있다.
     consent_id: String(학생.consent_id),
   };
-
   /* ── 게임(G1) 갈래 — 배정 배선 ④ (발주 §6-6 ⑩·⑪) ──────────────────────────
    * 판정은 전부 `lib/게임배정.js` 가 진다(검수확정 게이트 · 게임날 · 첫날 · C3 교정문 우선 ·
-   * 초급 제외 · H3 재제출). null 이면 아래 말하기 경로가 그대로 받는다 — 게임이 못 서는 날
+   * 초급 제외 · H3 재제출). null 이면 호출자의 다음 경로가 그대로 받는다 — 게임이 못 서는 날
    * 학생이 빈손이 되는 갈래는 없다.
    * 🔴 판정도 학생별로 삼킨다 — 한 학생의 깨진 재료(못 펴는 시드 등)가 던지면 배치 전체가
-   *   500 이 된다(C0 §4-1 head-of-line blocking · 배정 배선 기각 실측 W). 실패는 말하기로
+   *   500 이 된다(C0 §4-1 head-of-line blocking · 배정 배선 기각 실측 W). 실패는 다음 경로로
    *   내려간다: 게임은 다음 게임날이 있지만 그날의 말하기 발화는 소급이 없다. */
   let 게임: ReturnType<typeof 게임배정> = null;
   try {
@@ -500,7 +522,7 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
         : null,
     });
   } catch (e) {
-    console.error('[deliver] 게임 판정 실패(말하기로 내려간다)', learner_id, String((e as Error)?.message ?? e));
+    console.error('[deliver] 게임 판정 실패(다음 경로로 내려간다)', learner_id, String((e as Error)?.message ?? e));
   }
 
   if (게임) {
@@ -555,6 +577,28 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
       return { learner_id, status: 'failed', 사유: 글.slice(0, 200) };
     }
   }
+  return null;
+}
+
+/** 한 학생 = 한 트랜잭션. 개입과 배정은 같이 서거나 같이 없다. */
+async function 한명(학생: Record<string, unknown>, 오늘: string, ver: string, 스냅기준: string) {
+  const learner_id = String(학생.learner_id);
+  if (!학생.consent_ver) {
+    return { learner_id, status: 'skipped', 사유: 'consent_missing' };
+  }
+
+  const 지금 = new Date().toISOString();
+  const 공통 = {
+    actor_kind: 'ai' as const,   // 배치가 만드는 사건의 행위자(§10-A-1 — `system` 을 새로 만들지 않는다)
+    level_snapshot: (학생.level_current ?? null) as string | null,
+    goal_snapshot: (학생.goal_track ?? null) as string | null,
+    consent_ver: String(학생.consent_ver),
+    // 동의 귀속(20260807120000) — 위 consent_ver 게이트가 무동의를 걸렀으니 여기선 항상 있다.
+    consent_id: String(학생.consent_id),
+  };
+
+  const 게임결과 = await 게임갈래(학생, 오늘, ver);
+  if (게임결과) return 게임결과;
 
   const 결정 = 오늘과제({
     날짜: 오늘,
