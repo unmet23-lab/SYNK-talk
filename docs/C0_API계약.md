@@ -13,7 +13,7 @@
 
 | 묻는 것 | 정본 | 여기서 하는 일 |
 |---|---|---|
-| 무엇이 **필수 필드**인가 · 값목록 | `계약/수집_교정_계약.json`(**현행 c11**) | **참조만.** 값을 복사하지 않는다 |
+| 무엇이 **필수 필드**인가 · 값목록 | `계약/수집_교정_계약.json`(**현행 c12**) | **참조만.** 값을 복사하지 않는다 |
 | DB에 **어떤 모양**으로 앉나 · 권한 | `docs/L0_데이터계약.md` | 참조만 |
 | 앱이 **무엇을 보내고 받나** | **이 문서** | 정한다 |
 
@@ -63,19 +63,19 @@
 | 헤더 | 예 | 없으면 |
 |---|---|---|
 | `Authorization` | `Bearer <access_token>` | 401 `AUTH_REQUIRED` |
-| `X-Contract-Ver` | `c11` | 400 `CONTRACT_VER_MISSING` |
+| `X-Contract-Ver` | `c12` | 400 `CONTRACT_VER_MISSING` |
 | `X-App-Ver` | `0.3.1 (42)` | 통과(로그용) |
 
 **응답 봉투 — 성공**
 
 ```json
-{ "ok": true, "contract_ver": "c11", "results": [ ... ] }
+{ "ok": true, "contract_ver": "c12", "results": [ ... ] }
 ```
 
 **응답 봉투 — 요청 전체 실패**
 
 ```json
-{ "ok": false, "contract_ver": "c11",
+{ "ok": false, "contract_ver": "c12",
   "error": { "code": "AUTH_EXPIRED", "message": "토큰이 만료됐습니다", "retryable": true } }
 ```
 
@@ -174,8 +174,9 @@
 
 - `payload.ver`(정수) **필수**. 모양이 바뀌면 `2`로 올리고 과거 행은 `1`로 남는다.
   > 🔑 **이벤트 이름에 `.v1`을 붙이지 않는다**(L0 §3-2 표기 정정 요청 · §9). 이름에 붙이면 값목록이 payload 개정마다 배로 늘고, 집계가 `like 'choice.selected%'`가 된다. `payload.ver`는 **컬럼도 값목록도 늘리지 않는다.**
-- payload 필드 이름도 **현행 계약(c11) 필드 목록에서 고른다**(`confidence`·`attempt_no`·`learner_response`·`options_shown`·`position`·`recommended_option`·`selected_option`·`changed_selection`·`latency_ms`·`skipped`·**`selection_reason`**·**`rejected_all`**·**`cited_refs`**·**`output_text`** · c11 추가: **`preference_dimension`·`stated_option`·`stated_via`**(선호 선언)·**`affect_kind`**(정서 자기보고)). 목록에 없는 이름이 필요하면 **다음 판 개정**이지 자유 추가가 아니다.
-  > 🔴 **굵은 4개는 c4·c5가 계약에 넣었는데 이 목록이 따라오지 않았다**(2026-08-06 외부 검토가 잡았다). 계약은 「필수」라 하고 이 문서는 「목록에 없는 이름은 자유 추가가 아니다」라 해서, **앱이 그 필드를 보내는 순간 계약 위반으로 거절되는** 상태였다. 두 문서가 각자 맞는 말을 하는데 합치면 구현이 불가능한 형태 — 계약을 늘릴 때 이 목록을 함께 늘리지 않으면 반드시 재발한다.
+- payload 필드 이름은 **계약 JSON 의 `payload_허용필드`(c12 신설)에서 고른다** — 그 배열이 **기계 원천**이고 검증기(`lib/이벤트검증.js` ⑧)가 목록 밖 이름을 거절한다. 목록에 없는 이름이 필요하면 **다음 판 개정**이지 자유 추가가 아니다.
+  > 🔴 **이 문서의 산문 목록은 c12 에서 «사본»으로 강등됐다**(설계 §11-2 D5). c11 까지의 산문 목록은 두 번 낡았다 — c4·c5 의 4개가 빠졌었고(2026-08-06 외부 검토), c12 직전 실측에서 `choice_dimension`·시험 5종(`exam_kind`·`exam_date`·`exam_level`·`exam_round`·`section_scores`)·`compose_meta`·`round_id` 가 실물인데 목록에 0회였다. 사람이 옮겨 적는 목록은 반드시 또 낡는다 — 그래서 검증기는 산문이 아니라 계약 JSON 을 읽는다. 현행 30개의 나열이 필요하면 계약 파일을 연다(여기 다시 적으면 세 번째 낡음이 곧 구멍이다).
+  > c12 추가분만 적는다: **`generation_outcome`·`generation_gate_failed`·`generation_input_text`**(상태기반 과제선택 3칸 — `intervention.delivered` ver=2 · 값목록·null 규칙은 계약 JSON `값목록`·`라이브_대응없음_주석` 참조).
 - **선택지는 `{option_id, label}`로 싣는다**(c6). `option_id`는 안 바뀌는 조인 키고 `label`은 그때 표시된 문구의 스냅샷이다. 문구만 문자열로 남기면 문구를 개정하는 날 **판을 가로지르는 집계가 끊긴다** — 스킬에 「이름 말고 불변 ID로 묶는다」를 적용한 것과 같은 이유이고, c5까지 선택지에만 그 규칙이 빠져 있었다.
 - 🔴 **`is_correct`(정답여부)를 만들지 않는다.** `submission.body_original`(고른 답) + `task_snapshot.정답`이 있으면 채점은 **언제든 다시 계산되는 파생**이다. 원본을 두고 파생을 저장하면 채점 규칙이 바뀌는 날 과거가 거짓말을 한다.
 - 빈 껍데기 방지: `event_type`이 요구하는 payload가 비면 **저장하지 않는다**(L0 §3-2 두 층 검증). 검증은 이 함수 한 곳에만 있다.
@@ -183,7 +184,7 @@
 **응답**
 
 ```json
-{ "ok": true, "contract_ver": "c11",
+{ "ok": true, "contract_ver": "c12",
   "results": [
     { "idempotency_key": "b6f1…", "status": "stored",    "event_id": "3c9e…" },
     { "idempotency_key": "77a2…", "status": "duplicate", "event_id": "1b40…" },
@@ -205,7 +206,7 @@
 
 ```json
 요청  { "kind": "audio", "content_type": "audio/wav", "byte_size": 482913 }
-응답  { "ok": true, "contract_ver": "c11",
+응답  { "ok": true, "contract_ver": "c12",
         "upload_url": "https://…", "audio_ref": "voice/9f2c…(learner_id)/3c9e….wav",
         "expires_at": "2026-08-05T13:35:00.000Z" }
 ```
@@ -270,7 +271,7 @@
 **응답 예 · 실패 표** (`supabase/functions/tasks`):
 
 ```json
-{ "ok": true, "contract_ver": "c11", "date": "2026-08-07", "next_cursor": null,
+{ "ok": true, "contract_ver": "c12", "date": "2026-08-07", "next_cursor": null,
   "data": [ { "task_id": "…", "task_snapshot": { "ver": 1, "호흡": [ … ] },
               "task_format": null, "task_ref": "task-2026-08-07",
               "level_snapshot": "Lv2", "goal_snapshot": "study",
@@ -288,6 +289,11 @@
 
 - 🔑 **`task_format`은 항상 `null`로 온다** — 배정 1건에 ②낭독 + ③자유발화 두 형식이 들어서 행에 담지 않는다(`P0 §2-1`). 형식은 `task_snapshot.호흡[]` 안에 있다.
 - 🔑 **`intervention`은 `intervention_id`로 잇는다**(시각·순서가 아니다). 하루 2건이 서는 날 시각으로 이으면 조용히 어긋난다.
+- 🆕 **`assignment_status`(c12 · 상태기반 과제선택 §3-1)** — 응답 **최상위**(`data` 의 형제 칸)에 넷 중 하나: **`있음` | `없음` | `생성중` | `오류`**. 빈 배정은 두 사실(「오늘 낼 것이 없다」/「지금 짓는 중이라 곧 생긴다」)을 한 모양으로 뭉갠다 — 뒤의 것은 10분 뒤 다시 열면 있는 상태라, 같은 화면이면 학생은 「오늘은 없구나」로 읽고 앱을 닫는다.
+  - **판정 주체는 서버 하나다.** `생성중` = claim 못 잡음 + 그 학생 job 이 `대기`·`claimed`(lease 유효)·마감 «전» `적재실패`. `오류` = **마감 시각 뒤인데** job 이 그 상태로 남아 있다(감시가 세는 그 집합과 같다 — 감시와 앱이 같은 사실을 본다). 앱이 시각으로 되짚어 가르지 않는다 — 같은 판정이 두 곳에 살면 시계가 어긋난 날 갈린다.
+  - **HTTP 200 그대로 · 재조회 1회 그대로** — 바뀐 것은 답의 칸 하나뿐이고 폴링·소켓은 안 연다.
+  - 🔴 **구앱 전환 규칙(명시 계약 1줄)** — `assignment_status` 를 안 읽는 클라이언트는 `data` 만 보고 «있음/없음»으로 그린다(= c12 전 라이브 동작 그대로 · 새 값이 와도 무시). 이 줄이 없으면 배포 순서에 따라 구앱이 미지 값에 깨지고, 그것은 학생 화면에서 발견된다. **창의 수명**: 신앱 활성 시작일 «이후»의 구앱 접속은 이 칸 미지원으로 간주하고 서버가 `data` 에 폴백 문구를 실어 보낸다(새 칸 0 — 구앱이 이미 읽는 그 칸이다).
+  - 학생이 볼 문구는 이 계약이 정하지 않는다 — 카피 정본 소관. 여기는 칸과 값만 연다.
 - 🔑 **`intervention.event_id` = 그 `intervention.delivered` 사건의 id — 앱이 `content.viewed`의 `parent_event_id`로 쓸 유일한 값**(c9 · 절단문서 ①-2·①-12 · 2026-08-07). 🔴 **`intervention_id`로 대신하지 못한다**: 그건 배달과 성과가 함께 드는 **업무 키**라 여러 행에 같은 값이 실리고, 그 값으로 가리키면 같은 개입을 두 번 내보낸 날 두 열람이 한 행으로 접힌다(`lib/이벤트검증.js`가 `task_ref` 대안을 기각한 것과 같은 축). 이 칸이 없어서 `content.viewed`는 이름·물리·검증기가 다 선 뒤에도 **생산자가 0**이었다 — 앱이 가리킬 대상을 손에 못 들었기 때문이다. ⚠ `null`일 수 있다(배정엔 `intervention_id`가 있는데 배달 사건 행을 못 찾은 경우) → 그때 앱은 열람을 **보내지 않는다**.
 - 🔴 **`retry_of_event_id` = 오늘 것이 교정문이면 그 교정의 원 제출 사건**(2026-08-08 · 계약 개정 0 · 마이그레이션 0). 앱은 이 값을 제출 사건의 `retry_of_event_id`로 되돌려 싣는다 — **설계 전체의 유일한 결과 변수**(`L0 §9-2`)이고, 없으면 엔진이 상관만 배우고 처방을 못 배운다. 🔑 **막고 있던 것은 이름도 물리도 검증기도 아니라 배달이었다**: `functions/deliver`의 교정 lateral이 `corrected_text`만 집고 그 교정이 **어느 제출**에 대한 것이었는지를 버려서, 교정문이 다음 날 ②슬롯에 나가도 앱에는 채울 재료가 없었다(이름·FK·CHECK·서버 INSERT는 c5부터 전부 서 있었다 = **생산자 0**). 🔴 **앱이 문장을 대조해 짐작하지 않는다** — 같은 문장이 두 번 교정된 날 조용히 갈리고, 그 오염은 결과축 자체를 못 믿게 만든다. 그래서 「어느 제출의 교정인가」를 아는 유일한 자리(배정을 정한 곳)에서 박아 내려보낸다. ⚠ 배정 행(`task.assigned`)이 이 칸을 들지만 성과 집계(`§4-3 ③` 교정재발화)는 `submission.created`만 세므로 숫자는 안 흔들린다. 🔑 `null`이 정상이다(교정문 날이 아니면 재시도가 아니다).
   - 🔴 **부작용을 미리 적는다 — 이 값이 서면 `intervention_id` 계승이 처음으로 실제로 발화한다**(§4-1 「서버가 채운다」 표). `functions/events`는 `retry_of_event_id`가 있으면 **원 제출의 `intervention_id`를 그 행에 적는다** → 교정문 날의 제출은 **오늘 배달(B)이 아니라 원 제출의 개입(A)**을 가리킨다. 그 규칙은 c6부터 계약에 있었지만 **생산자가 0이라 한 번도 안 돌았다.** 지금 깨지는 하류는 없다(`/tasks`는 배정 행의 `intervention_id`로 잇고 `§4-3 ③`은 `event_type`으로 센다). ⚠ 다만 「어느 개입이 성과를 냈나」를 읽는 첫 소비자가 서는 날, **A와 B 중 무엇에 공을 돌릴지**는 계약이 이미 A로 정해 둔 것이라는 사실을 그때 다시 확인해야 한다 — 바꾸려면 계약 개정이다.
@@ -338,7 +344,7 @@
 | 🔴 경계 | 이 엔드포인트는 **집계값만** 낸다. 점수·등수·타 학생 값은 담지 않는다(`P0 §2-1` 랭킹 금지) |
 
 ```json
-{ "ok": true, "contract_ver": "c11", "date": "2026-08-07", "next_cursor": null,
+{ "ok": true, "contract_ver": "c12", "date": "2026-08-07", "next_cursor": null,
   "data": [ { "today":     { "submission_count": 2, "retry_count": 1, "correction_retry": true },
               "yesterday": { "submission_count": 1, "retry_count": 0, "correction_retry": false } } ] }
 ```
@@ -495,7 +501,7 @@ anon 키로 부른다. 입력 `{ student_code, temp_password, new_password }` �
 ## 9. ~~열린 판정~~ → ✅ c4 개정 완료 (2026-08-06) — **이력 절**
 
 > ⚠ **이 절은 현행 규범이 아니라 이력이다**(2026-08-09 명시 · 심문 3벌 전부가 「한 문서 안에 판본이 여러
-> 갈래」로 짚은 자리의 절반이 여기였다). 현행 계약은 **c11**이고 아래는 **c4 시점**의 기술이다 —
+> 갈래」로 짚은 자리의 절반이 여기였다). 현행 계약은 **c12**이고 아래는 **c4 시점**의 기술이다 —
 > 「남은 것은 DB 적용뿐」·「그 SQL은 지금 다른 세션의 작업본」 같은 문장은 **그날의 상태**다.
 > 지금 무엇이 필수이고 무엇이 값목록인지는 §0 표가 가리키는 정본 둘(`계약/수집_교정_계약.json` ·
 > `lib/이벤트검증.js`)에서 읽는다. **이 절을 근거로 구현하지 않는다.**

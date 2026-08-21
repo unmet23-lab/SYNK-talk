@@ -1,11 +1,225 @@
+/* c12 — 상태기반 과제선택의 착지 계약: CHECK 접미 통일 c11→c12 (물리 값 변화 0)
+ *   (계약 수집_교정_계약.json c12 · 정본 = appsscript docs/상태기반_과제선택_설계.md §11-2·§4-1·§3-1
+ *    · 유호 승인 08-20 Ⅰ-① · 착수 순서 = ①c12 계약 → ②검증기·마이그(이 조각) → ③첫 생성 행)
+ *
+ * ■ 무엇이 바뀌나 — 표 0 · 열 0 · 트리거 0 · «값도 0». c12 가 여는 세 가지는 전부 물리 밖이다:
+ *   · payload 3칸(generation_outcome·generation_gate_failed·generation_input_text)은 jsonb 안이라
+ *     DDL 이 원리상 못 닿는다 — 지키는 층은 검증기(lib/이벤트검증.js ⑧⑨) 하나다.
+ *   · payload 화이트리스트의 원천은 계약 JSON(payload_허용필드)이다 — 여기 사본을 두지 않는다.
+ *   · assignment_status 는 /tasks «응답» 칸이다(C0 §4-3) — 행에 안 남으니 CHECK 가 없다.
+ *
+ * ■ CHECK 접미 통일 c11→c12 (c7·c8·c11 선례 — 값이 바뀐 것이 0이어도 판 접미는 전체를 통일한다.
+ *   같은 이름이 두 계약판을 가리키면 DB 확인 ④가 어느 판인지 못 가른다. 살아 있는 CHECK 31개:
+ *   engine 29 + radio 1 + ops 1. ⚠ UNIQUE(…once…)·EXCLUDE(season_no_overlap)·FK·PK 는 값목록이
+ *   없어 판 판별과 무관하다 — 이름을 안 간다(tests/L0스키마.test.js 의 접미 검사도 CHECK 만 본다).
+ *
+ * ■ Edge Function 은 계약판을 schema_migrations 최신 조각 이름(_c12.sql)에서 읽는다(lib/계약판.js).
+ *   저장소 계약이 c12 로 오른 뒤 이 조각이 DB 에 앉기 «전»까지 원격배포 판 대조가 「저장소 c12 ·
+ *   DB c11」로 빨갛다 — 그 빨강이 이 조각을 배포보다 먼저 부으라는 순서 강제다.
+ *
+ * 되돌림: 각 CHECK 를 _c11 정의로 재교체(값이 같으니 이름만 되돌리면 된다) +
+ *        delete from engine.schema_migrations where version='20260821060000'; */
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260821060000';
+  migration_name constant text := '20260821060000_engine_c12.sql';
+  expected_checksum constant text := '072c72e26709deda7893908ce44e7286298fea7df3c795c7ed684e9571980b3d'; -- migration-checksum
+  base_version constant text := '20260815080000';
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 c11 위에서만 돈다 — engine.schema_migrations가 없다(빈 DB면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      '이 조각은 기준선 % 위에서만 돈다 — 이력에 그 판이 없다(부분·혼합·불명이라 중단한다)',
+      base_version;
+  end if;
+
+  -- ── learning_events 3 ──
+  alter table engine.learning_events
+    drop constraint if exists learning_events_event_type_c11,
+    drop constraint if exists learning_events_task_type_c11,
+    drop constraint if exists learning_events_correction_target_c11,
+    add constraint learning_events_event_type_c12 check (event_type in (
+      'submission.created', 'quiz.answered', 'choice.selected', 'correction.responded', 'correction.viewed', 'preference.stated', 'session.abandoned', 'intervention.delivered', 'data_use.granted', 'data_use.revoked',
+      'task.assigned', 'exam.result', 'content.viewed', 'affect.reported'
+    )),
+    add constraint learning_events_task_type_c12 check (task_type is null or task_type in (
+      '숙제제출', '다시쓰기', '퀴즈응답', '대화턴', '발화녹음', '출석발화', '라디오퀴즈', '목표선언', '자습체크인'
+    )),
+    add constraint learning_events_correction_target_c12 check (
+      case when event_type in ('correction.viewed', 'correction.responded')
+           then correction_id is not null
+           else correction_id is null
+      end
+    );
+
+  -- ── submissions 3 ──
+  alter table engine.submissions
+    drop constraint if exists submissions_task_format_c11,
+    drop constraint if exists submissions_translation_source_c11,
+    drop constraint if exists submissions_due_paired_c11,
+    add constraint submissions_task_format_c12 check (task_format is null or task_format in (
+      '낭독', '응답', '자유발화', '모의면접', '높임전환', '쓰기첨삭', '번역'
+    )),
+    add constraint submissions_translation_source_c12 check (
+      task_format is distinct from '번역'
+      or nullif(btrim(task_snapshot->>'mn'), '') is not null
+    ),
+    add constraint submissions_due_paired_c12 check (
+      (due_at is null) = (due_ver is null)
+    );
+
+  /* ⚠ verdict 는 **혼자 한 문장**이다 — tests/검수확정.test.js 의 값 추출이 「check … ));」 로
+   *   끝나는 블록을 비탐욕으로 집는다. 다른 CHECK 와 한 alter 에 묶으면 종결이 「)),」 가 되어
+   *   추출이 다음 「));」 까지 흘러 들어가 대조가 거짓 적색이 된다(c11 조각 실측 그대로). */
+  alter table engine.corrections
+    drop constraint if exists corrections_verdict_c11,
+    add constraint corrections_verdict_c12 check (verdict is null or verdict in (
+      'AI 교정이 맞다', '고칠 곳이 있다', '원문이 이미 맞다'
+    ));
+
+  alter table engine.corrections
+    drop constraint if exists corrections_supersedes_not_self_c11,
+    drop constraint if exists corrections_promotion_intent_c11,
+    add constraint corrections_supersedes_not_self_c12
+      check (supersedes is null or supersedes <> correction_id),
+    add constraint corrections_promotion_intent_c12
+      check (promotion_intent = false or actor_kind = 'teacher');
+
+  -- ── learners 7 ──
+  alter table engine.learners
+    drop constraint if exists learners_signup_attempts_nonneg_c11,
+    drop constraint if exists learners_temp_password_paired_c11,
+    drop constraint if exists learners_gender_c11,
+    drop constraint if exists learners_goal_track_c11,
+    drop constraint if exists learners_home_aimag_c11,
+    drop constraint if exists learners_group_no_c11,
+    drop constraint if exists learners_seat_no_c11,
+    add constraint learners_signup_attempts_nonneg_c12 check (signup_attempts >= 0),
+    add constraint learners_temp_password_paired_c12
+      check (temp_password_hash is null or temp_password_expires_at is not null),
+    add constraint learners_gender_c12
+      check (gender is null or gender in ('female', 'male', 'undisclosed')),
+    add constraint learners_goal_track_c12
+      check (goal_track is null or goal_track in ('study', 'work', 'culture')),
+    add constraint learners_home_aimag_c12
+      check (home_aimag is null or home_aimag in (
+        'ulaanbaatar', 'arkhangai', 'bayan-olgii', 'bayankhongor', 'bulgan', 'darkhan-uul',
+        'dornod', 'dornogovi', 'dundgovi', 'govi-altai', 'govisumber', 'khentii',
+        'khovd', 'khovsgol', 'omnogovi', 'orkhon', 'ovorkhangai', 'selenge',
+        'sukhbaatar', 'tov', 'uvs', 'zavkhan')),
+    add constraint learners_group_no_c12 check (group_no between 1 and 20),
+    add constraint learners_seat_no_c12 check (seat_no between 1 and 20);
+
+  -- ── staff 1 · pipeline_jobs 1 · radio 1 · classes 1 · ops 1 ──
+  alter table engine.staff
+    drop constraint if exists staff_role_c11,
+    add constraint staff_role_c12 check (role in ('teacher', 'inspector', 'director'));
+
+  alter table engine.pipeline_jobs
+    drop constraint if exists pipeline_jobs_discard_reason_c11,
+    add constraint pipeline_jobs_discard_reason_c12
+      check (discard_reason is null
+             or (status = 'discarded'
+                 and discard_reason in
+                   ('무음', '손상', '중복', '과제 불일치', '타인 음성', '판정 불가')));
+
+  alter table radio.broadcast_segment
+    drop constraint if exists broadcast_segment_kind_c11,
+    add constraint broadcast_segment_kind_c12
+      check (kind in ('radio_loop', 'live_lecture', 'asmr_mode', 'other'));
+
+  alter table engine.classes
+    drop constraint if exists classes_key_nonblank_c11,
+    add constraint classes_key_nonblank_c12 check (btrim(class_key) <> '');
+
+  alter table ops.cron_runs
+    drop constraint if exists cron_runs_outcome_c11,
+    add constraint cron_runs_outcome_c12 check (outcome in
+      ('대기', '성공', '실패', '타임아웃', '전송오류', '상태없음', '유실', '발사실패'));
+
+  -- ── season 1 · season_compass 1 · season_review 3 ──
+  alter table engine.season
+    drop constraint if exists season_dates_c11,
+    add constraint season_dates_c12 check (ends_on is null or ends_on >= starts_on);
+
+  alter table engine.season_compass
+    drop constraint if exists season_compass_answers_c11,
+    add constraint season_compass_answers_c12 check (
+      (
+        self_in_5y_changed is null
+        and answers ?& array['why_learning', 'self_in_5y', 'topik_use', 'season_goal']
+        and answers - array['why_learning', 'self_in_5y', 'topik_use', 'season_goal'] = '{}'::jsonb
+      ) or (
+        self_in_5y_changed is not null
+        and answers ?& array['self_in_5y', 'season_goal']
+        and answers - array['self_in_5y', 'season_goal'] = '{}'::jsonb
+      )
+    );
+
+  alter table engine.season_review
+    drop constraint if exists season_review_verdict_c11,
+    drop constraint if exists season_review_self_c11,
+    drop constraint if exists season_review_decided_c11,
+    add constraint season_review_verdict_c12
+      check (verdict is null or verdict in ('closer', 'same', 'redirected')),
+    add constraint season_review_self_c12
+      check (verdict_by_self is null or verdict_by_self in ('closer', 'same', 'redirected')),
+    add constraint season_review_decided_c12 check (
+      (verdict is null and note is null and decided_by is null and decided_at is null)
+      or (verdict is not null and decided_by is not null and decided_at is not null
+          and note is not null and btrim(note) <> '')
+    );
+
+  -- ── teacher_notes 3 · companion_qa 2 ──
+  alter table engine.teacher_notes
+    drop constraint if exists teacher_notes_origin_c11,
+    drop constraint if exists teacher_notes_disposition_c11,
+    drop constraint if exists teacher_notes_body_nonblank_c11,
+    add constraint teacher_notes_origin_c12
+      check (origin in ('as_is', 'edited', 'written')),
+    add constraint teacher_notes_disposition_c12
+      check (disposition in ('confirmed', 'retry')),
+    add constraint teacher_notes_body_nonblank_c12 check (btrim(body) <> '');
+
+  alter table engine.companion_qa
+    drop constraint if exists companion_qa_question_nonblank_c11,
+    drop constraint if exists companion_qa_answer_paired_c11,
+    add constraint companion_qa_question_nonblank_c12 check (btrim(question) <> ''),
+    add constraint companion_qa_answer_paired_c12 check (handoff or btrim(answer) <> '');
+
+  insert into engine.schema_migrations(version, name, checksum)
+  values (migration_version, migration_name, expected_checksum);
+end
+$migration$;
+
+commit;
+
 -- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
---
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
 -- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -280,3 +494,29 @@ select case when 테이블수=18 and RLS켜짐=18 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
   from 셈;
+*/
+-- 사후 메모:
+-- ① 이 조각의 몫은 이름 교체 «만»이다 — c12 의 실체(payload 3칸·화이트리스트·assignment_status)는
+--    전부 물리 밖이라 검증기·계약 JSON·C0 가 진다. DB 가 지는 것은 「어느 계약판 위인가」 하나다.
+-- ② CHECK 제약은 현행 접미사만 남아야 한다(이 조각이 _c11 서른하나를 _c12 로 이름째 교체했다).
+--    ⚠ 이 줄은 마지막 조각이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    ⚠ `season_no_overlap_c11`(EXCLUDE) · `…_once_c11`(UNIQUE) · `companion_qa_*_fkey` 는 여기
+--      없다 — CHECK 가 아니라 이 줄의 대상이 아니고, 이름도 c11 그대로 산다(값목록이 없어
+--      판 판별과 무관하다 · 위 기대제약 목록에는 그 이름 그대로 들어 있다).
+--    기대: broadcast_segment_kind_c12 · classes_key_nonblank_c12
+--         · companion_qa_answer_paired_c12 · companion_qa_question_nonblank_c12
+--         · corrections_promotion_intent_c12
+--         · corrections_supersedes_not_self_c12 · corrections_verdict_c12
+--         · cron_runs_outcome_c12
+--         · learners_gender_c12 · learners_goal_track_c12 · learners_group_no_c12
+--         · learners_home_aimag_c12 · learners_seat_no_c12
+--         · learners_signup_attempts_nonneg_c12 · learners_temp_password_paired_c12
+--         · learning_events_correction_target_c12 · learning_events_event_type_c12
+--         · learning_events_task_type_c12 · pipeline_jobs_discard_reason_c12
+--         · season_compass_answers_c12 · season_dates_c12
+--         · season_review_decided_c12 · season_review_self_c12 · season_review_verdict_c12
+--         · staff_role_c12 · submissions_due_paired_c12 · submissions_task_format_c12
+--         · submissions_translation_source_c12 · teacher_notes_body_nonblank_c12
+--         · teacher_notes_disposition_c12 · teacher_notes_origin_c12
