@@ -12,5 +12,6 @@
   "알바변명문항.mjs": "contents/알바변명문항.js",
   "서류관문문항.mjs": "contents/서류관문문항.js",
   "서류관문.mjs": "lib/서류관문.js",
-  "계약판.mjs": "lib/계약판.js"
+  "계약판.mjs": "lib/계약판.js",
+  "갈래판정.mjs": "lib/갈래판정.js"
 }
