@@ -521,7 +521,7 @@ async function 배달하기(오늘: string, 한사람: string | null = null, 맥
    *   순차 때도 그 예외는 루프를 뚫고 나가 `Deno.serve` 의 catch 에서 500 이 됐다. 동시가
    *   바꾼 것은 그때 이미 시작된 다른 학생들의 행이 남는다는 것뿐이고, 그건 순차의 「앞
    *   학생들은 이미 받았다」와 같은 자리다. */
-  const 동시 = 8;
+  const 동시 = 5;
   let 다음 = 0;
   const 일꾼 = async () => {
     for (;;) {
