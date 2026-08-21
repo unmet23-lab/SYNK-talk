@@ -58,12 +58,69 @@ test('base64url 의 -·_ 를 되돌린다 — 안 되돌리면 특정 학생만 
   assert.ok(jwt({ sub: uid }).split('.')[1].match(/[-_]/), '픽스처가 base64url 문자를 담아야 이 검사가 의미 있다');
 });
 
-test('배치 호출자는 role 로 가른다 — 키 문자열 비교가 아니다', () => {
+/* 신형 시크릿 키 통로의 픽스처 — 값은 **이 파일이 만든다**(실키를 회귀에 끌어오지 않는다).
+ * 🔑 `서비스역할` 은 런타임 env 를 읽는다. Node 회귀에서는 `process.env` 가 그 자리다. */
+const 시크릿 = 'sb_secret_' + 'A'.repeat(31);
+const 공개키 = 'sb_publishable_' + 'B'.repeat(31);
+const env세우기 = (칸) => {
+  const 이름들 = ['SUPABASE_SECRET_KEYS', 'SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_ANON_KEY', 'SUPABASE_PUBLISHABLE_KEYS'];
+  const 옛 = {};
+  for (const n of 이름들) { 옛[n] = process.env[n]; delete process.env[n]; }
+  Object.assign(process.env, 칸);
+  return () => { for (const n of 이름들) { if (옛[n] === undefined) delete process.env[n]; else process.env[n] = 옛[n]; } };
+};
+
+test('배치 호출자 ① — 레거시 JWT 는 role 로 가른다', () => {
   assert.equal(서비스역할(요청(`Bearer ${jwt({ role: 'service_role' })}`)), true);
   assert.equal(서비스역할(요청(`Bearer ${jwt({ role: 'anon' })}`)), false);
   assert.equal(서비스역할(요청(`Bearer ${jwt({ role: 'authenticated', sub: 'x' })}`)), false);
-  assert.equal(서비스역할(요청('Bearer sb_secret_짧은새형식키')), false,
-    'JWT 가 아닌 새 형식 키는 마디가 3개가 아니라 여기서 걸린다');
+});
+
+test('배치 호출자 ② — 신형 시크릿 키는 원문 일치로 가른다(클레임이 없다)', () => {
+  const 되돌리기 = env세우기({ SUPABASE_SERVICE_ROLE_KEY: 시크릿 });
+  try {
+    assert.equal(서비스역할(요청(`Bearer ${시크릿}`)), true,
+      '함수끼리 부르는 통로가 이것이다 — 막히면 배정 0인 날 구제가 조용히 안 돈다');
+    assert.equal(서비스역할(요청(`Bearer sb_secret_${'A'.repeat(30)}`)), false, '길이가 다르면 통과 못 한다');
+    assert.equal(서비스역할(요청(`Bearer sb_secret_${'A'.repeat(30)}Z`)), false, '한 글자만 달라도 통과 못 한다');
+    assert.equal(서비스역할(요청('Bearer sb_secret_짧은새형식키')), false, '접두사만 맞는 아무 문자열은 못 지나간다');
+  } finally { 되돌리기(); }
+});
+
+test('배치 호출자 ② — `SUPABASE_SECRET_KEYS` 사전에서도 읽는다(키 회전 대비)', () => {
+  const 되돌리기 = env세우기({ SUPABASE_SECRET_KEYS: JSON.stringify({ default: 시크릿 }) });
+  try {
+    assert.equal(서비스역할(요청(`Bearer ${시크릿}`)), true);
+  } finally { 되돌리기(); }
+});
+
+test('🔴 배치 호출자 ② — **공개 키는 절대 통과 못 한다**(학생 앱 번들에 들어 있는 값이다)', () => {
+  /* 게이트웨이는 등급을 안 가른다(2026-08-22 실측: 진짜 sb_publishable_ 도 함수까지 온다).
+   * 여기서 안 가르면 배치 통로가 전교생에게 열리고, **새는 방향은 언제나 「통과」**다. */
+  const 되돌리기 = env세우기({
+    SUPABASE_ANON_KEY: 공개키,
+    SUPABASE_PUBLISHABLE_KEYS: JSON.stringify({ default: 공개키 }),
+    SUPABASE_SERVICE_ROLE_KEY: 시크릿,
+  });
+  try {
+    assert.equal(서비스역할(요청(`Bearer ${공개키}`)), false, '공개 키가 배치를 부르면 안 된다');
+    assert.equal(서비스역할(요청(`Bearer ${시크릿}`)), true, '같은 판정에서 시크릿 키는 살아 있어야 한다');
+  } finally { 되돌리기(); }
+});
+
+test('🔴 배치 호출자 ② — env 에 시크릿이 **하나도 없으면** 아무도 못 지나간다', () => {
+  const 되돌리기 = env세우기({});
+  try {
+    assert.equal(서비스역할(요청(`Bearer ${시크릿}`)), false,
+      '비교 대상이 없을 때 통과시키면 「미설정」이 「전원 통과」가 된다');
+  } finally { 되돌리기(); }
+});
+
+test('🔴 공개 키가 SERVICE_ROLE 칸에 잘못 들어와도 통과시키지 않는다', () => {
+  const 되돌리기 = env세우기({ SUPABASE_ANON_KEY: 공개키, SUPABASE_SERVICE_ROLE_KEY: 공개키 });
+  try {
+    assert.equal(서비스역할(요청(`Bearer ${공개키}`)), false);
+  } finally { 되돌리기(); }
 });
 
 /* ── 사본 금지 ─────────────────────────────────────────────────────
