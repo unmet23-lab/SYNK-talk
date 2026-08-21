@@ -32,7 +32,7 @@ do $migration$
 declare
   migration_version constant text := '20260821120000';
   migration_name constant text := '20260821120000_generation_c12.sql';
-  expected_checksum constant text := '7209248f222d48ab64971a14a7a975b1562a9283a5815f18439abf538315ad25'; -- migration-checksum
+  expected_checksum constant text := '89888d01f22427ccc5907171d64e5a4f4e55fc0c593186b5dbd0f7ead244d986'; -- migration-checksum
   base_version constant text := '20260821060000';
   recorded_checksum text;
 begin
@@ -691,7 +691,10 @@ create or replace function engine.attempt_close(
   returns boolean
   language plpgsql security definer set search_path = engine, public as $function$
 declare
-  캐논 constant text[] := array['길이','한국어비율','빈출력','금칙서식','질문형태','식별자역유입','중복'];
+  -- 캐논 = §8 «판정표의 행 순서»(C8 — 값 «목록»의 나열 순서가 아니다). 검문(JS)의 push 순서와
+  -- 같은 하나여야 한다 — 갈리면 복수 사유 검문탈락(빈출력은 길이도 함께 무는 것이 §8 판정식)이
+  -- 여기서 예외로 죽어 «내부오류» 로 오분류된다. tests/생성사유픽스처.test.js 가 두 원천을 대조한다.
+  캐논 constant text[] := array['빈출력','길이','한국어비율','금칙서식','질문형태','식별자역유입','중복'];
   달라진 int;
 begin
   if _result is null then
@@ -1417,7 +1420,7 @@ do $migration2$
 declare
   migration_version constant text := '20260821120000';
   migration_name constant text := '20260821120000_generation_c12.sql';
-  expected_checksum constant text := '7209248f222d48ab64971a14a7a975b1562a9283a5815f18439abf538315ad25'; -- migration-checksum
+  expected_checksum constant text := '89888d01f22427ccc5907171d64e5a4f4e55fc0c593186b5dbd0f7ead244d986'; -- migration-checksum
 begin
   if exists (select 1 from engine.schema_migrations where version = migration_version) then
     return;
@@ -1746,7 +1749,7 @@ select case when 테이블수=21 and RLS켜짐=21 and 정책수=7
               and (select v from 빠진제약) is null
               and (select v from 빠진트리거) is null
               and (select version from 현재이력)='20260821120000'
-              and (select checksum from 현재이력)='7209248f222d48ab64971a14a7a975b1562a9283a5815f18439abf538315ad25' -- migration-checksum
+              and (select checksum from 현재이력)='89888d01f22427ccc5907171d64e5a4f4e55fc0c593186b5dbd0f7ead244d986' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 21·21·7·0·0·5·1·0·0·1·0·0·0·0·22·0·0·0·0·2·6·6·0·0·0·1·1·1·30·0·1·26·0·11·0·1 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,

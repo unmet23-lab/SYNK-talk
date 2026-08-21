@@ -98,6 +98,7 @@ const { 회수요약, 쓰는사건: 걷는사건 } = 회수모듈 as {
   회수요약: (사건들: unknown[], 옵션: { 기준시각: string | Date }) => {
     개입: number; 닿음: number; 고리없음: number; 연결률: number | null;
     창별: Record<string, { 측정: number; 미도래: number; 표본0: number }>;
+    기술: { 겨냥개입: number; 관측있음: number; 관측수: number };
   };
 };
 /* 🔴 `시간대` 를 **가져다 쓴다** — IANA 이름을 여기에 다시 적으면 그 순간 날짜 경계가 두 곳에
@@ -474,7 +475,8 @@ async function 배달하기(오늘: string, 한사람: string | null = null, 맥
   const 기준시각 = new Date();
 
   const results: Record<string, unknown>[] = [];
-  const 회수들: { 개입: number; 닿음: number; 고리없음: number }[] = [];
+  const 회수들: { 개입: number; 닿음: number; 고리없음: number;
+    기술: { 겨냥개입: number; 관측있음: number; 관측수: number } }[] = [];
   /* 🔴 회수가 죽으면 아래 `사슬` 의 **분모가 조용히 줄어든다** — 「개입이 적었다」와 「세다가
    *   죽었다」가 같은 수로 접히고, 연결률은 그 위에서 계산된다. 세어서 봉투에 올려야 그 둘이 갈린다. */
   let 회수실패 = 0;
@@ -487,7 +489,7 @@ async function 배달하기(오늘: string, 한사람: string | null = null, 맥
      *   낙인이 굳는다(`lib/성과회수.js` 머리말 · 코어엔진 §원칙1). 내는 것은 계수뿐이다. */
     try {
       const r = 회수요약(((학생 as Record<string, unknown>).원신호 ?? []) as unknown[], { 기준시각 });
-      회수들.push({ 개입: r.개입, 닿음: r.닿음, 고리없음: r.고리없음 });
+      회수들.push({ 개입: r.개입, 닿음: r.닿음, 고리없음: r.고리없음, 기술: r.기술 });
     } catch (e) {
       console.error('[deliver] 성과 회수 실패(배달은 계속한다)',
         (학생 as Record<string, unknown>).learner_id, String((e as Error)?.message ?? e));
@@ -496,9 +498,17 @@ async function 배달하기(오늘: string, 한사람: string | null = null, 맥
   }
 
   const 센다 = (s: string) => results.filter((r) => r.status === s).length;
+  /* 기술 축(#7 · §12-17 「닿았나의 증거」) — lib 이 이미 세는 값을 봉투에 «싣기만» 한다.
+   * 이 칸이 응답에 없으면 왕복시험은 겨냥→후속 조인이 실제로 값을 내는지 밖에서 잴 수 없다
+   * (위 사슬 칸과 같은 근거 — 「이 칸이 응답에 있어야 … 밖에서 잰다」). */
   const 사슬 = 회수들.reduce((a, r) => ({
     개입: a.개입 + r.개입, 닿음: a.닿음 + r.닿음, 고리없음: a.고리없음 + r.고리없음,
-  }), { 개입: 0, 닿음: 0, 고리없음: 0 });
+    기술: {
+      겨냥개입: a.기술.겨냥개입 + (r.기술?.겨냥개입 ?? 0),
+      관측있음: a.기술.관측있음 + (r.기술?.관측있음 ?? 0),
+      관측수: a.기술.관측수 + (r.기술?.관측수 ?? 0),
+    },
+  }), { 개입: 0, 닿음: 0, 고리없음: 0, 기술: { 겨냥개입: 0, 관측있음: 0, 관측수: 0 } });
   /* 🔴 분모 0 은 `null` 이다 — 0% 로 접으면 «배달이 아직 없는 날»과 «나갔는데 아무도 안 본 날»이
    *   같은 값이 된다(`lib/성과회수.js` 의 일관 규칙). */
   const 잴수있는것 = 사슬.개입 - 사슬.고리없음;
