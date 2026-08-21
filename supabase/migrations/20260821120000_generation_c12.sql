@@ -32,7 +32,7 @@ do $migration$
 declare
   migration_version constant text := '20260821120000';
   migration_name constant text := '20260821120000_generation_c12.sql';
-  expected_checksum constant text := 'e09004eed6f5d65c882272f12b488c9ea30ef0dd0e565167ff1c62303b5990e5'; -- migration-checksum
+  expected_checksum constant text := '7209248f222d48ab64971a14a7a975b1562a9283a5815f18439abf538315ad25'; -- migration-checksum
   base_version constant text := '20260821060000';
   recorded_checksum text;
 begin
@@ -984,7 +984,9 @@ begin
     j.estimator_version,
     (iv ->> 'estimator_confidence')::numeric,
     iv -> 'evidence_refs',
-    case when _outcome = '성공' then j.skill_ids else null end,   -- E3 — 안 나간 겨냥은 안 싣는다
+    -- E3 — 안 나간 겨냥은 안 싣는다. 「없음」의 물리 = '{}' (learning_events.skill_ids 는
+    -- not null default '{}' · c6 :419 — null 을 넣으면 폴백 착지가 통째로 죽는다 · 08-21 실측).
+    case when _outcome = '성공' then j.skill_ids else '{}'::text[] end,
     case when _outcome = '성공' then j.skill_taxonomy_ver else null end,
     deg);
 
@@ -1415,7 +1417,7 @@ do $migration2$
 declare
   migration_version constant text := '20260821120000';
   migration_name constant text := '20260821120000_generation_c12.sql';
-  expected_checksum constant text := 'e09004eed6f5d65c882272f12b488c9ea30ef0dd0e565167ff1c62303b5990e5'; -- migration-checksum
+  expected_checksum constant text := '7209248f222d48ab64971a14a7a975b1562a9283a5815f18439abf538315ad25'; -- migration-checksum
 begin
   if exists (select 1 from engine.schema_migrations where version = migration_version) then
     return;
@@ -1744,7 +1746,7 @@ select case when 테이블수=21 and RLS켜짐=21 and 정책수=7
               and (select v from 빠진제약) is null
               and (select v from 빠진트리거) is null
               and (select version from 현재이력)='20260821120000'
-              and (select checksum from 현재이력)='e09004eed6f5d65c882272f12b488c9ea30ef0dd0e565167ff1c62303b5990e5' -- migration-checksum
+              and (select checksum from 현재이력)='7209248f222d48ab64971a14a7a975b1562a9283a5815f18439abf538315ad25' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 21·21·7·0·0·5·1·0·0·1·0·0·0·0·22·0·0·0·0·2·6·6·0·0·0·1·1·1·30·0·1·26·0·11·0·1 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
