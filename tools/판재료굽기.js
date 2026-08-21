@@ -22,7 +22,8 @@ const crypto = require('crypto');
 const { execSync } = require('child_process');
 const { 인자게이트 } = require('../lib/플래그.js');
 
-인자게이트('판재료굽기', process.argv.slice(2), ['--확인']);
+const 플래그오류 = 인자게이트('판재료굽기', process.argv.slice(2), ['--확인']);
+if (플래그오류) { console.error(플래그오류); process.exit(1); }
 
 const ROOT = path.join(__dirname, '..');
 const OUT = path.join(ROOT, 'contents', '판재료.js');

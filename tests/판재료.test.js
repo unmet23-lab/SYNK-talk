@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { execFileSync } = require('child_process');
+const { 띄우기 } = require('./lib/띄우기.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const 판재료 = require('../contents/판재료.js');
@@ -19,9 +19,9 @@ const 마이그 = fs.readFileSync(path.join(ROOT, 'supabase', 'migrations',
   '20260821120000_generation_c12.sql'), 'utf8');
 
 test('생성물이 원본과 같다 — 드리프트는 「다시 굽는다」로만 풀린다', () => {
-  const r = execFileSync(process.execPath, [path.join(ROOT, 'tools', '판재료굽기.js'), '--확인'],
+  const r = 띄우기([path.join(ROOT, 'tools', '판재료굽기.js'), '--확인'],
     { cwd: ROOT, encoding: 'utf8' });
-  assert.match(r, /같다/);
+  assert.match(String(r.stdout), /같다/);
 });
 
 test('파일 해시 7 이 실물 재계산과 같다 (원문 UTF-8 바이트 · v5.9 표)', () => {
