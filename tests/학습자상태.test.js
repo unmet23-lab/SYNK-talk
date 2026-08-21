@@ -53,6 +53,48 @@ test('as_of «이후» 사건은 안 센다 — 같은 배열이라도 기준이
   assert.ok(이전.evidence_refs.사건.length < 나중.evidence_refs.사건.length);
 });
 
+/* ── ①-b 늦적재 경계 (v11 · 설계 §11-4 ㉤·C4·D1 / §12-21 「늦적재 배제」) ──────────
+ * 🔴 정상 경로에서는 배선 유무가 **둘 다 통과**라, 이 픽스처가 없으면 「배선했다」와
+ *   「안 했다」가 같은 초록이다. 그리고 함수 단위로만 재면 조회층이 비어도 초록이라(C4 가
+ *   실측한 그 모양) — 조회층(deliver SQL)까지 같은 절에서 잰다. */
+test('늦적재 — occurred_at 은 창 안인데 ingested_at > 기준이면 상태에 안 들어온다', () => {
+  const 행 = [...하루(2), ...하루(1)].map((e) => ({ ...e, ingested_at: e.occurred_at }));
+  // 어제 배정·제출이 «기준 뒤에» 적재된 상황 — 발생 시각만 보면 창 안이다.
+  const 늦은 = 행.map((e, i) => (i >= 2 ? { ...e, ingested_at: 전(기준, -1 * 일) } : e));
+  const 다걸림 = 학습자상태(늦은, { as_of: 기준, ingested_as_of: 기준 });
+  assert.equal(다걸림.축.리듬.n, 1, '늦적재 행이 상태에 섞였다 — 같은 as_of 가 다른 표본을 낸다');
+  const 안걸림 = 학습자상태(늦은, { as_of: 기준 });
+  assert.equal(안걸림.축.리듬.n, 2, '미전달인데 행동이 바뀌었다 — 기존 호출자 무영향 계약 위반');
+});
+
+test('늦적재 모드에서 ingested_at 없는 사건은 버린다 — 배선 누락은 조용히 통과하지 않는다', () => {
+  const 행 = [...하루(1)];   // ingested_at 을 일부러 안 싣는다(조회층이 칸을 빠뜨린 모양)
+  const r = 학습자상태(행, { as_of: 기준, ingested_as_of: 기준 });
+  assert.equal(r.축.리듬?.n ?? 0, 0, '값 없는 사건이 통과했다 — 「모르면 포함」은 늦적재가 새는 방향이다');
+  assert.equal(r.estimator_confidence, 0);
+});
+
+test('경계를 «썼다»는 사실이 evidence_refs 에 남는다 — 두 모드가 한 이름이 되지 않게', () => {
+  const 행 = [...하루(1)].map((e) => ({ ...e, ingested_at: e.occurred_at }));
+  const 쓴 = 학습자상태(행, { as_of: 기준, ingested_as_of: 기준 });
+  assert.equal(쓴.evidence_refs.ingested_as_of, new Date(Date.parse(기준)).toISOString());
+  const 안쓴 = 학습자상태(행, { as_of: 기준 });
+  assert.ok(!('ingested_as_of' in 안쓴.evidence_refs));
+});
+
+test('조회층 — deliver 원신호 질의가 ingested_at 을 싣고, 창은 now() 가 아니라 스냅 기준을 쓴다', () => {
+  const { 코드만 } = require('./lib/소스검사.js');
+  const 원문 = 코드만(fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'deliver', 'index.ts'), 'utf8'));
+  assert.ok(/'ingested_at',\s*x\.ingested_at/.test(원문),
+    '원신호 행들에 ingested_at 이 안 실린다 — 하류 필터는 검사할 값이 없어 항상 통과한다(C4)');
+  assert.ok(/e\.ingested_at\s*<=\s*\$\{스냅기준\}/.test(원문),
+    'SQL 층의 늦적재 cutoff 가 없다 — 이중 cutoff(㉤)가 문서에만 있다');
+  assert.ok(!/occurred_at\s*>=\s*now\(\)/.test(원문),
+    '창이 아직 now() 를 쓴다 — 몇 시간 뒤 깨어난 워커가 같은 as_of 로 다른 창을 받는다(D1)');
+  assert.ok(/ingested_as_of:\s*스냅기준/.test(원문),
+    '호출부가 ingested_as_of 를 안 넘긴다 — lib 갈래가 영원히 죽은 코드다');
+});
+
 test('창 밖(기본 30일)은 안 센다 — 창 길이는 evidence_refs 에 남는다', () => {
   const 행 = [...하루(2), ...하루(창일수 + 5)];
   const r = 학습자상태(행, { as_of: 기준 });

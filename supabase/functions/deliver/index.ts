@@ -79,7 +79,7 @@ const { 라디오태스크종 } = 라디오태스크모듈 as { 라디오태스�
 const { 학습자상태, 창일수 } = 상태모듈 as {
   창일수: number;
   쓰는사건: string[];
-  학습자상태: (사건들: unknown[], 옵션: { as_of: string }) => {
+  학습자상태: (사건들: unknown[], 옵션: { as_of: string; ingested_as_of?: string; 시간대?: string }) => {
     estimator_version: string; estimator_confidence: number;
     evidence_refs: Record<string, unknown>; 축: Record<string, unknown>;
   };
@@ -215,6 +215,12 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
   /* 단건이면 대상만 좁힌다 — 재료를 만드는 lateral 셋은 **그대로 탄다**(첫날 판정·교정문·동의).
    * 좁히는 자리를 여기 하나로 두면 「전원」과 「한 명」이 같은 재료로 같은 결정을 낸다. */
   const 좁히기 = 한사람 ? sql`where l.learner_id = ${한사람}::uuid` : sql``;
+  /* 상태 스냅의 기준시각 — **배치 전체가 하나**(설계 §11-4 D1). 원신호 창을 SQL 의 now() 로
+   * 자르면 「몇 시간 뒤 깨어난 워커」가 같은 as_of 를 넘겨도 다른 창을 받는다 — 창 cutoff 도
+   * 상태 계산의 as_of 도 이 값 하나에서 나와야 「같은 as_of = 같은 표본」이 성립한다.
+   * ⚠ 착지 스탬프(`한명()` 의 `지금`)와 축이 다르다 — 그건 «실시각·조작하지 않는다»(§11-4 A7)
+   *   이고 이건 «읽기 스냅샷 기준»이다. 하나로 접으면 학생마다 스냅 기준이 갈린다. */
+  const 스냅기준 = new Date().toISOString();
   /* 학생과 재료를 **한 번에** 읽는다(학생 수만큼 왕복하지 않는다).
    * · 마지막 배정 = 「첫날인가」와 「전날 문장」의 근거
    * · 교정문 = **지난 배정 뒤에 새로 확정된 것**만. 「최신 1건」으로 잡으면 같은 교정문이
@@ -322,6 +328,9 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
       left join lateral (
         select coalesce(jsonb_agg(jsonb_build_object(
                  'event_id', x.event_id, 'event_type', x.event_type, 'occurred_at', x.occurred_at,
+                 /* 늦적재 경계의 재료(§11-4 ㉤·C4) — 이 칸이 없으면 하류(학습자상태 v11)의
+                  * ingested_as_of 필터는 검사할 값이 없어 전건 배제로 기운다(v11 규약). */
+                 'ingested_at', x.ingested_at,
                  'retry_of_event_id', x.retry_of_event_id, 'correction_id', x.correction_id,
                  'task_type', x.task_type, 'task_schema_ver', x.task_schema_ver,
                  'payload', x.payload, 'due_at', x.due_at,
@@ -345,12 +354,12 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
                   * 원신호를 두 번 걷어도 행들 배열이 다른 모양일 수 있다(발견 4 의 둘째 절반). */
                  order by x.occurred_at desc, x.event_id desc), '[]'::jsonb) as 행들
           from (
-            select y.event_id, y.event_type, y.occurred_at, y.retry_of_event_id,
+            select y.event_id, y.event_type, y.occurred_at, y.ingested_at, y.retry_of_event_id,
                    y.correction_id, y.task_type, y.task_schema_ver, y.payload, y.due_at,
                    y.parent_event_id, y.policy_ver, y.estimator_version, y.intervention_id,
                    y.task_snapshot
               from (
-                select e.event_id, e.event_type, e.occurred_at, e.retry_of_event_id,
+                select e.event_id, e.event_type, e.occurred_at, e.ingested_at, e.retry_of_event_id,
                        e.correction_id, e.task_type, s.task_schema_ver, e.payload, s.due_at,
                        e.parent_event_id, e.policy_ver, e.estimator_version, e.intervention_id,
                        s.task_snapshot,
@@ -366,7 +375,11 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
                    and not (e.event_type = 'submission.created'
                             and e.task_type is not null
                             and e.task_type = any(${라디오태스크종}::text[]))
-                   and e.occurred_at >= now() - make_interval(days => ${창일수})) y
+                   /* 창 cutoff 는 now() 가 아니라 스냅 기준이다(§11-4 D1) — 늦적재 경계까지
+                    * 같은 시각으로 건다(㉤ 이중 cutoff · 여기서 걸어야 하류가 잴 값이 있다). */
+                   and e.occurred_at >= ${스냅기준}::timestamptz - make_interval(days => ${창일수})
+                   and e.occurred_at <= ${스냅기준}::timestamptz
+                   and e.ingested_at <= ${스냅기준}::timestamptz) y
              where y.몇째 <= ${종별상한}) x) 원신호 on true
       ${좁히기}`;
 
@@ -397,7 +410,7 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
    *   죽었다」가 같은 수로 접히고, 연결률은 그 위에서 계산된다. 세어서 봉투에 올려야 그 둘이 갈린다. */
   let 회수실패 = 0;
   for (const 학생 of 대상) {
-    results.push(await 한명(학생 as Record<string, unknown>, 오늘, ver));
+    results.push(await 한명(학생 as Record<string, unknown>, 오늘, ver, 스냅기준));
     /* 🔑 배달의 **부속이 아니라 나란한 일**이다 — 회수가 재는 것은 오늘 나가는 개입이 아니라
      *   «지난» 개입이라, 오늘 배달이 건너뛰거나 실패해도 회수는 그대로 성립한다. 그래서
      *   `한명()` 안에 넣지 않는다(반환 지점이 일곱이라 넣으면 반드시 몇 개를 빠뜨린다).
@@ -447,7 +460,7 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
 }
 
 /** 한 학생 = 한 트랜잭션. 개입과 배정은 같이 서거나 같이 없다. */
-async function 한명(학생: Record<string, unknown>, 오늘: string, ver: string) {
+async function 한명(학생: Record<string, unknown>, 오늘: string, ver: string, 스냅기준: string) {
   const learner_id = String(학생.learner_id);
   if (!학생.consent_ver) {
     return { learner_id, status: 'skipped', 사유: 'consent_missing' };
@@ -572,9 +585,12 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
 
   /* 🔴 **사슬 ⑦칸이 여기서 처음 돈다** — 쌓인 원신호를 읽어 그 시점의 상태를 파생하고, 그
    *   결과를 개입 행에 스탬프한다(엔진도달_설계 §3 경로 A).
-   * 🔑 `as_of` 를 「지금」으로 주는 것이 여기서는 **맞다** — 이 개입은 지금 나가고, 상태는
-   *   그 직전까지의 것이어야 한다. 모듈이 기본값을 안 주는 이유는 «과거» 개입을 나중에
-   *   평가하는 자리에서 그 절단을 빠뜨리면 미래가 섞이기 때문이고, 그 자리는 여기가 아니다.
+   * 🔑 `as_of` = **배치의 스냅 기준**이다(§11-4 D1 · 08-21) — 원신호를 자른 SQL 창과 같은
+   *   시각이어야 「같은 as_of = 같은 표본」이 성립한다. 옛 판은 여기서 학생별 `지금` 을 써서
+   *   창(now())과 상태(as_of)가 두 시점이었다. `ingested_as_of` 도 같은 값 — 늦적재(발생은
+   *   창 안·적재는 기준 뒤)가 읽는 순간에 따라 끼는 것을 이중 cutoff 가 막는다(㉤).
+   *   모듈이 기본값을 안 주는 이유는 «과거» 개입을 나중에 평가하는 자리에서 그 절단을
+   *   빠뜨리면 미래가 섞이기 때문이고, 그 자리는 여기가 아니다.
    * 🔴 상태가 오늘의 과제를 **고르지는 않는다.** 지금 고르게 하면 그건 모델 없이 규칙을
    *   하드코딩하는 것이라 제품방향 불변식 5 의 「죽는 쪽」에 그대로 걸리고, 학생 0명이라
    *   그 규칙이 맞는지 잴 방법도 없다. 지금 남기는 것은 소급 불가한 것 — 「그때 그 학생이
@@ -587,7 +603,7 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
     /* 🔴 `시간대` 를 **넘겨준다** — 집중띠 축(v7)만 현지 시각을 쓰고, 안 넘기면 그 축은 조용히
      *   `null` 이다(모듈이 UTC 로 접는 것을 거부한다 · `lib/학습자상태.js` JSDoc). 여기서 IANA
      *   이름을 다시 적지 않는 이유는 이 파일 머리(93행)에 이미 적혀 있다. */
-    상태 = 학습자상태((학생.원신호 ?? []) as unknown[], { as_of: 지금, 시간대 });
+    상태 = 학습자상태((학생.원신호 ?? []) as unknown[], { as_of: 스냅기준, ingested_as_of: 스냅기준, 시간대 });
   } catch (e) {
     console.error('[deliver] 학습자 상태 계산 실패(배달은 계속한다)', learner_id, String((e as Error)?.message ?? e));
   }
