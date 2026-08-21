@@ -50,6 +50,7 @@ import 실행판모듈 from './실행판.mjs';
 import 생성상수모듈 from './생성상수.mjs';
 import 판재료모듈 from './판재료.mjs';
 import 오늘과제모듈 from './오늘과제.mjs';
+import 착지봉투모듈 from './착지봉투.mjs';
 import 계약판모듈 from './계약판.mjs';
 import 프롬프트전문 from './과제생성프롬프트.mjs';
 
@@ -82,10 +83,13 @@ const {
   생성타임아웃_MS: number; 워커예산_MS: number; 워커학생상한: number; 임대_초: number;
   배치실행상한_일: number; 폴백여유_MS: number;
 };
-const { 스냅샷, 따라말하기문장, 시간대 } = 오늘과제모듈 as {
+const { 스냅샷, 시간대 } = 오늘과제모듈 as {
   스냅샷: (날짜: string, 문장: string, 출처: string, 프롬프트: string, 선택?: unknown) => Record<string, unknown>;
-  따라말하기문장: (snap: unknown) => string | null;
   시간대: string;
+};
+const { 착지봉투, 폴백봉투 } = 착지봉투모듈 as {
+  착지봉투: (재료: Record<string, unknown>) => Record<string, unknown>;
+  폴백봉투: (재료: Record<string, unknown>) => Record<string, unknown>;
 };
 const { 행들에서판 } = 계약판모듈 as { 행들에서판: (행들: unknown) => string | null };
 
@@ -169,42 +173,13 @@ async function 식별자들(learner_id: string): Promise<string[]> {
     .filter((x): x is string => typeof x === 'string' && x.length > 0);
 }
 
-/* ── ㉤ 봉투 조립 — 함수 몫 19칸은 싣지 않는다(A12) ──────────────────────────── */
-function 착지봉투(j: Job, a: {
-  outcome: string; snap: Record<string, unknown>; output_text: string | null;
-  gate_failed: string | null; input_text: string | null;
-}) {
-  const draft = j.event_draft ?? {};
-  const iv페이로드: Record<string, unknown> = {
-    ver: 2,
-    output_text: a.output_text,
-    generation_outcome: a.outcome,
-    generation_input_text: a.input_text,
-  };
-  if (a.gate_failed != null) iv페이로드.generation_gate_failed = a.gate_failed;
-  /* retry_of_event_id 는 안 싣는다 — draft 허용 키 밖이고(ⓒ-13) 생성 경로에 재시도가 없다(§4-2). */
-  return {
-    task_assigned: { task_snapshot: a.snap, payload: { ver: 1 } },
-    intervention_delivered: {
-      estimator_version: j.estimator_version,          // 대조 ⑦ — job 실행판과 같은 값
-      estimator_confidence: draft.estimator_confidence ?? null,
-      evidence_refs: draft.evidence_refs ?? null,      // 대조 ⑩ — draft 에 굳힌 그대로
-      payload: iv페이로드,
-    },
-    submission_row: { task_snapshot: a.snap, task_schema_ver: 'task.v1' },
-  };
-}
-
-async function 폴백착지(j: Job, 오늘: string, a: {
+/* ── ㉤ 봉투 조립 — lib/착지봉투 한 원천(구제 경로와 같은 조립 · A12 함수 몫 규칙도 거기) ── */
+async function 폴백착지(j: Job, _오늘: string, a: {
   outcome: string; deciding: string | null; gate_failed: string | null; input_text: string | null;
 }) {
-  const draft = j.event_draft ?? {};
-  const snap = (draft.task_snapshot ?? null) as Record<string, unknown> | null;
-  if (!snap) throw new Error(`폴백착지: event_draft.task_snapshot 이 없다 — job ${j.job_id}`);
-  const 문장 = 따라말하기문장(snap);
-  const 봉 = 착지봉투(j, {
-    outcome: a.outcome, snap, output_text: 문장,
-    gate_failed: a.gate_failed, input_text: a.input_text,
+  const 봉 = 폴백봉투({
+    estimator_version: j.estimator_version, draft: j.event_draft,
+    outcome: a.outcome, gate_failed: a.gate_failed, input_text: a.input_text,
   });
   const r = await sql`
     select * from engine.jobs_finalize(
@@ -388,7 +363,8 @@ Deno.serve(async (req: Request) => {
       if (결과 === '성공' && 검문값) {
         /* ⑥ 성공 착지 — 문장·질문은 검문 «정규화 후» 값(§7 표 · 대조 ⑥ 파서와 동치). */
         const snap = 스냅샷(오늘, 검문값.문장, '생성', 검문값.질문);
-        const 봉 = 착지봉투(j, {
+        const 봉 = 착지봉투({
+          estimator_version: j.estimator_version, draft: j.event_draft,
           outcome: '성공', snap, output_text: 검문값.문장, gate_failed: null, input_text: 본문,
         });
         const r = (await sql`

@@ -514,7 +514,7 @@ Deno.serve(async (req: Request) => {
  *     §6-5 점검 모드가 진다. */
 async function 첫배정세우기(learner_id: string): Promise<{ 첫배정: boolean; 첫배정사유: string | null }> {
   try {
-    const r = await fetch(`${함수기지}/deliver?learner_id=${encodeURIComponent(learner_id)}`, {
+    const r = await fetch(`${함수기지}/deliver?learner_id=${encodeURIComponent(learner_id)}&${new URLSearchParams({ 맥락: '구제' })}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${서비스키}`, 'Content-Type': 'application/json' },
     });

@@ -11,6 +11,7 @@
   "생성상수.mjs": "lib/생성상수.js",
   "판재료.mjs": "contents/판재료.js",
   "오늘과제.mjs": "lib/오늘과제.js",
+  "착지봉투.mjs": "lib/착지봉투.js",
   "갈래판정.mjs": "lib/갈래판정.js",
   "게임스냅샷.mjs": "lib/게임스냅샷.js",
   "교수멘탈문항.mjs": "contents/교수멘탈문항.js",

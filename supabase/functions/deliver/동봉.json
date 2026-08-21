@@ -30,5 +30,6 @@
   "판재료.mjs": "contents/판재료.js",
   "기술선택.mjs": "lib/기술선택.js",
   "과제요약.mjs": "lib/과제요약.js",
+  "착지봉투.mjs": "lib/착지봉투.js",
   "과제생성프롬프트.mjs": "prompts/과제생성.md"
 }

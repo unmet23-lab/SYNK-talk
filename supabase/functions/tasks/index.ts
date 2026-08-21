@@ -87,7 +87,7 @@ async function 지금세우기(learner_id: string): Promise<구제결과> {
     return { 결과: '설정없음', 사유: '설정없음:SUPABASE_URL·SERVICE_ROLE_KEY' };
   }
   try {
-    const r = await fetch(`${함수기지}/deliver?learner_id=${encodeURIComponent(learner_id)}`, {
+    const r = await fetch(`${함수기지}/deliver?learner_id=${encodeURIComponent(learner_id)}&${new URLSearchParams({ 맥락: '구제' })}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${서비스키}`, 'Content-Type': 'application/json' },
     });
@@ -297,8 +297,37 @@ Deno.serve(async (req: Request) => {
      *   업로드는 403」이 되므로 정본(`lib/동의게이트.js`)을 그대로 부른다.
      * 🔑 `동의`·`blocked` 는 위에서 이미 읽었다(구제 판정이 그것을 먼저 필요로 한다). */
 
+    /* `assignment_status`(§3-1 v5.4~v5.6 · c12 값 4: 있음|없음|생성중|오류) — 「오늘 낼 것이
+     * 없다」와 「지금 짓는 중이라 곧 생긴다」를 가른다(같은 화면이면 학생은 닫는다).
+     * · 판정 주체는 서버 «하나»다 — 마감 경계(`gen_deadline`)를 앱이 시각으로 되짚으면 같은
+     *   판정이 두 곳에 살고 시계가 어긋난 날 갈린다(v5.6 D2).
+     * · `생성중` = 그 학생 job 이 대기·claimed·적재실패(마감 «전» — v5.7 B11: lease 유효/만료
+     *   불문 실리는 값은 하나다) · 마감 «뒤» 잔존은 `오류`(감시 ①과 같은 집합 — 같은 사실).
+     * · 신구조 물리가 없는 DB(활성 전 운영)는 표 존재 가드로 현행 이분법(있음/없음) 그대로 —
+     *   구앱 규칙(§3-1: 이 칸을 안 읽는 클라이언트는 data 만 본다)과 같은 방향이다. */
+    let assignment_status: string = 행들.length ? '있음' : '없음';
+    if (!행들.length) {
+      try {
+        const 물리 = await sql`
+          select to_regclass('engine.generation_jobs') is not null as 있음`;
+        if (물리[0]?.있음) {
+          const j = await sql`
+            select g.status, (now() >= engine.gen_deadline(${날짜}::date)) as 마감뒤
+              from engine.generation_jobs g
+             where g.learner_id = ${행.learner_id}::uuid and g.assign_date = ${날짜}::date`;
+          const 상태 = j[0]?.status as string | undefined;
+          if (상태 === '대기' || 상태 === 'claimed' || 상태 === '적재실패') {
+            assignment_status = j[0]?.마감뒤 ? '오류' : '생성중';
+          }
+        }
+      } catch (e) {
+        /* 판정 실패는 «없음»으로 낸다(현행 동작) — 조회 부속이 본 응답을 깨지 않는다. */
+        console.error('[tasks] assignment_status 판정 실패(없음으로 낸다)', String((e as Error)?.message ?? e));
+      }
+    }
+
     // 하루 1건이 멱등으로 보장되므로 `next_cursor` 는 항상 null 이다(C0 §4-3 ①).
-    return 봉투(200, { ok: true, date: 날짜, data, blocked, next_cursor: null, 구제 }, ver);
+    return 봉투(200, { ok: true, date: 날짜, data, blocked, next_cursor: null, 구제, assignment_status }, ver);
   } catch (e) {
     console.error('[tasks] 조회 실패', String((e as Error)?.message ?? e));
     return 실패(500, { code: 'SERVER_ERROR', message: '잠시 뒤 다시 시도해 주세요', retryable: true }, ver);

@@ -34,7 +34,7 @@ import 회수모듈 from './성과회수.mjs';
 import 게임모듈 from './게임배정.mjs';
 import 라디오태스크모듈 from './라디오태스크.mjs';
 import 계약판모듈 from './계약판.mjs';
-import { 생성배달 } from './생성모드.ts';
+import { 생성배달, 구제배달 } from './생성모드.ts';
 
 const { 행들에서판 } = 계약판모듈 as { 행들에서판: (행들: unknown) => string | null };
 
@@ -159,9 +159,15 @@ Deno.serve(async (req: Request) => {
   if (한사람 !== null && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(한사람)) {
     return 봉투(400, { ok: false, error: { code: 'BAD_REQUEST', message: 'learner_id 가 uuid 가 아닙니다' } });
   }
+  /* `맥락`(§3-1 v5.8 — 활성 뒤엔 «필수» · 누락도 목록 밖과 같이 400) — 검증은 활성 게이트 안에서
+   * 한다(`배달하기`): 활성 «전» 라이브 호출자(cron·auth·왕복시험)는 이 인자를 아직 안 붙인다. */
+  const 맥락 = 인자.get('맥락');
+  if (맥락 !== null && 맥락 !== '배치' && 맥락 !== '구제') {
+    return 봉투(400, { ok: false, error: { code: 'BAD_REQUEST', message: '맥락은 배치·구제 뿐입니다' } });
+  }
 
   try {
-    return 점검 ? await 점검하기(오늘) : await 배달하기(오늘, 한사람);
+    return 점검 ? await 점검하기(오늘) : await 배달하기(오늘, 한사람, 맥락);
   } catch (e) {
     const 글 = String((e as Error)?.message ?? e);
     console.error('[deliver] 실패', 글);
@@ -382,7 +388,7 @@ async function 대상조회(스냅기준: string, 한사람: string | null) {
       ${좁히기}`;
 }
 
-async function 배달하기(오늘: string, 한사람: string | null = null) {
+async function 배달하기(오늘: string, 한사람: string | null = null, 맥락: string | null = null) {
   /* 상태 스냅의 기준시각 — **배치 전체가 하나**(설계 §11-4 D1). 원신호 창을 SQL 의 now() 로
    * 자르면 「몇 시간 뒤 깨어난 워커」가 같은 as_of 를 넘겨도 다른 창을 받는다 — 창 cutoff 도
    * 상태 계산의 as_of 도 이 값 하나에서 나와야 「같은 as_of = 같은 표본」이 성립한다.
@@ -391,19 +397,37 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
   const 스냅기준 = new Date().toISOString();
 
   /* 🔴 생성 모드 게이트(§3-2-a C5 · v5.13-b ⑤) — 활성 함수(`engine.gen_active_from()` · 활성
-   * 조각이 세운다)가 «있고» 시작일이 오늘 이전이면, 전원 배달은 오케스트레이터(생성모드.ts)가
-   * 진다. 함수가 없으면 현행 그대로 — 배포 순서가 어긋나도 학생이 빈손이 되는 갈래가 없다.
-   * ⚠ 단건(`한사람`)은 이 분기를 안 탄다 — 활성 뒤 단건은 구제 경로(㉨ · tasks)가 정본이고,
-   *   여기 남은 단건 통로는 멱등키·C5(기존 사건 우선)가 생성 큐와의 경합을 원자로 막는다. */
-  if (!한사람) {
-    const 게이트 = await sql`
-      select (to_regprocedure('engine.gen_active_from()') is not null) as 있음`;
-    if (게이트[0]?.있음) {
-      const 활성 = await sql`select engine.gen_active_from() <= ${오늘}::date as 켜짐`;
-      if (활성[0]?.켜짐) {
+   * 조각이 세운다)가 «있고» 시작일이 오늘 이전이면 이 배달은 신구조가 진다:
+   *   전원(맥락=배치) → 오케스트레이터(㉠) · 단건(맥락=구제) → ㉨ 구제. 함수가 없으면 현행
+   * 그대로 — 배포 순서가 어긋나도 학생이 빈손이 되는 갈래가 없다.
+   * 🔴 활성 뒤 `맥락` 은 «필수»다(§3-1 v5.8 — 누락도 400 · fail-closed): 호출자는 tasks·auth·
+   *   cron 전부 우리 서버 층이라 앱 호환이 필수화를 막지 않고, 잊으면 배포 시점에 시끄럽게
+   *   죽는다(활성 조각의 cron 마이그가 `&맥락=배치` 를 §12-21 대조 아래 명시로 박는 이유). */
+  const 게이트 = await sql`
+    select (to_regprocedure('engine.gen_active_from()') is not null) as 있음`;
+  if (게이트[0]?.있음) {
+    const 활성 = await sql`select engine.gen_active_from() <= ${오늘}::date as 켜짐`;
+    if (활성[0]?.켜짐) {
+      if (맥락 !== '배치' && 맥락 !== '구제') {
+        return 봉투(400, { ok: false, date: 오늘, error: {
+          code: 'BAD_REQUEST', message: '활성 뒤 deliver 는 맥락(배치·구제)이 필수입니다(§3-1)',
+        } });
+      }
+      if (맥락 === '배치' && !한사람) {
         const 대상 = await 대상조회(스냅기준, null);
         return await 생성배달({ sql, 오늘, 스냅기준, 대상: 대상 as unknown as Record<string, unknown>[], 봉투, 게임갈래 });
       }
+      if (맥락 === '구제' && 한사람) {
+        const 대상 = await 대상조회(스냅기준, 한사람);
+        if (!대상.length) {
+          console.error('[deliver] 🔴 구제 대상 없음', 한사람);
+          return 봉투(404, { ok: false, date: 오늘, mode: '구제', error: { code: 'NOT_FOUND', message: '그 학생이 없습니다' } });
+        }
+        return await 구제배달({ sql, 오늘, 스냅기준, 학생: 대상[0] as Record<string, unknown>, 봉투, 게임갈래 });
+      }
+      return 봉투(400, { ok: false, date: 오늘, error: {
+        code: 'BAD_REQUEST', message: '배치=전원 · 구제=단건 조합만 받습니다(§3-1)',
+      } });
     }
   }
 

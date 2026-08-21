@@ -24,6 +24,7 @@ import 검문모듈 from './과제검문.mjs';
 import 상수모듈 from './생성상수.mjs';
 import 판재료모듈 from './판재료.mjs';
 import 게임배정모듈 from './게임배정.mjs';
+import 착지봉투모듈 from './착지봉투.mjs';
 import 계약판모듈 from './계약판.mjs';
 import 프롬프트전문 from './과제생성프롬프트.mjs';
 
@@ -51,7 +52,10 @@ const { 학습자상태 } = 상태모듈 as {
   학습자상태: (행들: unknown[], 옵션: Record<string, unknown>) => Record<string, unknown>;
 };
 const { 중복창_일 } = 검문모듈 as { 중복창_일: number };
-const { 적재예산_MS } = 상수모듈 as { 적재예산_MS: number };
+const { 적재예산_MS, 임대_초 } = 상수모듈 as { 적재예산_MS: number; 임대_초: number };
+const { 폴백봉투 } = 착지봉투모듈 as {
+  폴백봉투: (재료: Record<string, unknown>) => Record<string, unknown>;
+};
 const { 게임날인가 } = 게임배정모듈 as { 게임날인가: (날짜: string) => boolean };
 const { 행들에서판 } = 계약판모듈 as { 행들에서판: (행들: unknown) => string | null };
 
@@ -62,6 +66,76 @@ type Sql = {
 };
 
 const 급수꼴 = /^Lv[1-6]$/;
+
+/* ── 학생 하나의 선판정·draft 조립(벤더 0 · 순수 재료만) — 전원(㉠)과 구제(㉨)가 같은 함수 하나.
+ * 반환 = { target, 계수키 } — 실패도 target 이다(load_error 원소 · 명단 등식과 B4 재적재 몫). */
+function 학생조립(학생: Record<string, unknown>, 재료: {
+  오늘: string; 스냅기준: string; 후보: string[]; 최근겨냥: string[];
+}): { target: Record<string, unknown>; 계수키: string } {
+  const learner_id = String(학생.learner_id);
+  const { 오늘, 스냅기준, 후보, 최근겨냥 } = 재료;
+  try {
+    const 전날문장 = 따라말하기문장(학생.마지막스냅샷);
+    const 첫날 = !학생.마지막배정;
+    const 교정문 = (학생.교정문 ?? null) as string | null;
+    const 판정 = 갈래판정({ 첫날, 교정문, 전날문장 });
+
+    /* 급수 정규화(A11 ⑤ — 값목록 밖은 null 로 접는다 · «중급» 류가 적재를 죽이지 않게)
+     * + §7-1 게이트: 첫날·교정문이 아닌 학생만 급수로 가른다(갈래 우선순위가 먼저다). */
+    const 원급수 = (학생.level_current ?? null) as string | null;
+    const lvl = 원급수 && 급수꼴.test(원급수) ? 원급수 : null;
+    let 사유: string | null = null;
+    if (판정.갈래 === '첫날') 사유 = '첫날';
+    else if (판정.갈래 === '교정문') 사유 = '교정문';
+    else if (lvl === null) 사유 = '미정';
+    else if (lvl === 'Lv1' || lvl === 'Lv2') 사유 = '초급';
+
+    /* 그날 조립기 출력을 draft 에 굳힌다(§7-2 — 폴백·비대상이 그대로 쓴다 · 재호출 0). */
+    const 결정 = 오늘과제({ 날짜: 오늘, 첫날, 교정문, 전날문장, 급수: 원급수 });
+
+    /* 상태 1회(D2 — 생산자 하나) → §6 요약·근거. 실패는 load_error(§4-3 상태오류). */
+    const 상태 = 학습자상태(((학생.원신호 ?? []) as unknown[]),
+      { as_of: 스냅기준, ingested_as_of: 스냅기준, 시간대 });
+    const 요약산출 = 과제요약(상태, {
+      목표: (학생.goal_track ?? null) as string | null, 급수: 원급수,
+    });
+
+    /* 겨냥(§6-0) — 대상만. 비대상은 빈 배열(A11 ⑦ 존재 대조는 빈 배열 면제). */
+    const skill_ids = 사유 === null
+      ? 기술선택({ learner_id, assign_date: 오늘, 후보, 최근겨냥 }).skill_ids
+      : [];
+
+    return {
+      계수키: 사유 === null ? '대상' : `비대상/${사유}`,
+      target: {
+        learner_id,
+        branch_snapshot: {
+          ver: 1,
+          is_first_day: 첫날,
+          correction_ref: 사유 === '교정문' ? (학생.교정id ?? null) : null,
+          is_game_day: false,
+          level: lvl,
+          goal: (학생.goal_track ?? null) as string | null,
+        },
+        skill_ids,
+        ...(사유 !== null ? { not_target_reason: 사유 } : {}),
+        event_draft: {
+          task_ref: `task-${오늘}`,
+          task_snapshot: 결정.task_snapshot,
+          estimator_version: String(상태.estimator_version ?? ''),
+          estimator_confidence: 상태.estimator_confidence ?? null,
+          evidence_refs: 요약산출.evidence_refs,
+          요약: 요약산출.요약,
+        },
+      },
+    };
+  } catch (e) {
+    return {
+      계수키: '상태오류',
+      target: { learner_id, load_error: `상태오류: ${String((e as Error)?.message ?? e)}`.slice(0, 200) },
+    };
+  }
+}
 
 export async function 생성배달(ctx: {
   sql: Sql; 오늘: string; 스냅기준: string;
@@ -183,63 +257,9 @@ export async function 생성배달(ctx: {
       continue;
     }
 
-    try {
-      const 전날문장 = 따라말하기문장(학생.마지막스냅샷);
-      const 첫날 = !학생.마지막배정;
-      const 교정문 = (학생.교정문 ?? null) as string | null;
-      const 판정 = 갈래판정({ 첫날, 교정문, 전날문장 });
-
-      /* 급수 정규화(A11 ⑤ — 값목록 밖은 null 로 접는다 · «중급» 류가 적재를 죽이지 않게)
-       * + §7-1 게이트: 첫날·교정문이 아닌 학생만 급수로 가른다(갈래 우선순위가 먼저다). */
-      const 원급수 = (학생.level_current ?? null) as string | null;
-      const lvl = 원급수 && 급수꼴.test(원급수) ? 원급수 : null;
-      let 사유: string | null = null;
-      if (판정.갈래 === '첫날') 사유 = '첫날';
-      else if (판정.갈래 === '교정문') 사유 = '교정문';
-      else if (lvl === null) 사유 = '미정';
-      else if (lvl === 'Lv1' || lvl === 'Lv2') 사유 = '초급';
-
-      /* 그날 조립기 출력을 draft 에 굳힌다(§7-2 — 폴백·비대상이 그대로 쓴다 · 재호출 0). */
-      const 결정 = 오늘과제({ 날짜: 오늘, 첫날, 교정문, 전날문장, 급수: 원급수 });
-
-      /* 상태 1회(D2 — 생산자 하나) → §6 요약·근거. 실패는 load_error(§4-3 상태오류). */
-      const 상태 = 학습자상태(((학생.원신호 ?? []) as unknown[]),
-        { as_of: 스냅기준, ingested_as_of: 스냅기준, 시간대 });
-      const 요약산출 = 과제요약(상태, {
-        목표: (학생.goal_track ?? null) as string | null, 급수: 원급수,
-      });
-
-      /* 겨냥(§6-0) — 대상만. 비대상은 빈 배열(A11 ⑦ 존재 대조는 빈 배열 면제). */
-      const skill_ids = 사유 === null
-        ? 기술선택({ learner_id, assign_date: 오늘, 후보, 최근겨냥: 겨냥맵.get(learner_id) ?? [] }).skill_ids
-        : [];
-
-      targets.push({
-        learner_id,
-        branch_snapshot: {
-          ver: 1,
-          is_first_day: 첫날,
-          correction_ref: 사유 === '교정문' ? (학생.교정id ?? null) : null,
-          is_game_day: false,
-          level: lvl,
-          goal: (학생.goal_track ?? null) as string | null,
-        },
-        skill_ids,
-        ...(사유 !== null ? { not_target_reason: 사유 } : {}),
-        event_draft: {
-          task_ref: `task-${오늘}`,
-          task_snapshot: 결정.task_snapshot,
-          estimator_version: String(상태.estimator_version ?? ''),
-          estimator_confidence: 상태.estimator_confidence ?? null,
-          evidence_refs: 요약산출.evidence_refs,
-          요약: 요약산출.요약,
-        },
-      });
-      센다(사유 === null ? '대상' : `비대상/${사유}`);
-    } catch (e) {
-      targets.push({ learner_id, load_error: `상태오류: ${String((e as Error)?.message ?? e)}`.slice(0, 200) });
-      센다('상태오류');
-    }
+    const 조립 = 학생조립(학생, { 오늘, 스냅기준, 후보, 최근겨냥: 겨냥맵.get(learner_id) ?? [] });
+    targets.push(조립.target);
+    센다(조립.계수키);
   }
 
   if (예산소진) {
@@ -260,4 +280,118 @@ export async function 생성배달(ctx: {
     ok: true, date: 오늘, mode: '생성', run_id, 재적: 대상.length,
     적재, 계수,
   });
+}
+
+/* ── ㉨ 구제 — 학생 조회가 부른다(tasks · §3-1). 생성을 «안» 부른다(P0-E) · claim 은 «잡는다»
+ * (A군 ㉢ — 안 잡으면 워커와의 경쟁을 최종 유일키가 사후에 정한다). 벤더 0 은 ㉤ 구제 모드가
+ * 물리로 강제한다(B1 — attempts 있으면 예외 → 반납하고 «생성중»으로 물러난다). */
+export async function 구제배달(ctx: {
+  sql: Sql; 오늘: string; 스냅기준: string;
+  학생: Record<string, unknown>;
+  봉투: (status: number, body: Record<string, unknown>) => Response;
+  게임갈래: (학생: Record<string, unknown>, 오늘: string, ver: string) => Promise<Record<string, unknown> | null>;
+}): Promise<Response> {
+  const { sql, 오늘, 스냅기준, 학생, 봉투, 게임갈래 } = ctx;
+  const learner_id = String(학생.learner_id);
+  const 응답 = (결과: string, 나머지: Record<string, unknown> = {}) =>
+    봉투(200, { ok: true, date: 오늘, mode: '구제', 결과, ...나머지 });
+
+  if (!학생.consent_ver) return 응답('동의없음');
+
+  /* 구제의 실행판 = 그 날짜 «정본 실행 행»의 값(v5.7 D3 · A1 — 완주 우선 · 없으면 마지막 시작 행).
+   * 그날 배치 행이 0 이면(전멸일) ㉯: 현행 조립로 직접 짓는다(ⓓ-14 — 🚫 「가장 최근 행 차용」). */
+  const 정본 = (await sql`
+    select model, prompt_ver, policy_ver, estimator_version, schema_ver, skill_taxonomy_ver
+      from engine.generation_batch_runs r
+     where r.assign_date = ${오늘}::date and r.run_kind = '배치'
+     order by (r.finished_at is not null) desc, r.started_at desc limit 1`)[0] ?? null;
+  let 실행판: Record<string, string>;
+  if (정본) {
+    실행판 = {
+      model: String(정본.model), prompt_ver: String(정본.prompt_ver),
+      policy_ver: String(정본.policy_ver), estimator_version: String(정본.estimator_version),
+      schema_ver: String(정본.schema_ver), skill_taxonomy_ver: String(정본.skill_taxonomy_ver),
+    };
+  } else {
+    let rpc전문 = ''; let schema_ver = '';
+    try { rpc전문 = String((await sql.unsafe(RPC질의문()))[0]?.전문 ?? ''); } catch { /* 아래 검사 */ }
+    try { schema_ver = 행들에서판(await sql.unsafe(판질의문())) ?? ''; } catch { /* 아래 검사 */ }
+    실행판 = 실행판조립({
+      model: Deno.env.get('GENERATION_MODEL') ?? '',
+      프롬프트전문: 프롬프트전문 as unknown as string,
+      rpc전문, schema_ver, 판재료: 판재료모듈,
+    });
+    if (Object.values(실행판).some((v) => !v)) {
+      /* ⓪ 의 비공백 CHECK 를 못 지난다 — 구제 run 자체가 못 선다. 학생은 빈 배정으로(다음 회차 몫). */
+      console.error('[deliver/구제] 전멸일 ㉯ 인데 실행판을 못 조립했다 — 구제 run 없이 물러난다', learner_id);
+      return 응답('실행판없음');
+    }
+  }
+
+  /* 게임 갈래 — 현행과 같은 함수 하나(게임이 서면 job 0 그대로 그 배정을 반환한다). */
+  const 게임 = await 게임갈래(학생, 오늘, 실행판.schema_ver);
+  if (게임) {
+    if (게임.status === 'failed') return 응답('게임실패', { 사유: 게임.사유 ?? null });
+    return 응답('게임', { event_id: 게임.event_id ?? null });
+  }
+
+  const run_id = (await sql`
+    select engine.batch_run_start(
+      ${오늘}::date, '구제',
+      ${sql.json({
+        snapshot_as_of: 스냅기준, calendar_game_day: 게임날인가(오늘), ...실행판,
+      })}, null) as run_id`)[0].run_id as string;
+
+  /* 조립 재료(단건) — 전원 루프와 같은 함수·같은 원천. */
+  const 후보 = (await sql`
+    select skill_id from engine.skills where domain = 'grammar' order by skill_id`)
+    .map((r) => String(r.skill_id));
+  const 최근겨냥 = (await sql`
+    select distinct x.skill_id
+      from engine.learning_events e, unnest(e.skill_ids) x(skill_id)
+     where e.learner_id = ${learner_id}::uuid
+       and e.event_type = 'intervention.delivered'
+       and e.task_type = '발화녹음'
+       and e.occurred_at >  ${스냅기준}::timestamptz - make_interval(days => ${중복창_일})
+       and e.occurred_at <= ${스냅기준}::timestamptz
+       and e.ingested_at <= ${스냅기준}::timestamptz`)
+    .map((r) => String(r.skill_id));
+  const 조립 = 학생조립(학생, { 오늘, 스냅기준, 후보, 최근겨냥 });
+
+  const ld = (await sql`
+    select * from engine.jobs_load_one(
+      ${오늘}::date, ${run_id}::uuid, ${sql.json(조립.target)})`)[0];
+  if (!ld) return 응답('생성중');
+  if (ld.kind === '이미배정') return 응답('이미배정', { event_id: ld.assigned_event_id });
+  if (ld.kind === '조립실패') return 응답('조립실패', { 조립: 조립.계수키 });
+  if (ld.assigned_event_id) return 응답('이미착지', { event_id: ld.assigned_event_id });
+  const job = ld.job as Record<string, unknown> | null;
+  if (!job || job.status !== '대기') return 응답('생성중');
+
+  /* claim → ㉤ 구제 착지(원자) — 못 잡으면 워커가 쥔 것(§3-1: 생성도 폴백도 안 하고 물러난다). */
+  const 잡음 = (await sql`
+    select * from engine.jobs_claim(
+      ${오늘}::date, ${'deliver-구제:' + crypto.randomUUID()}, 1, ${임대_초}, ${learner_id}::uuid)`)[0];
+  if (!잡음) return 응답('생성중');
+  try {
+    const 봉 = 폴백봉투({
+      estimator_version: String(잡음.estimator_version), draft: 잡음.event_draft,
+      outcome: '구제경로', gate_failed: null, input_text: null,
+    });
+    const fin = (await sql`
+      select * from engine.jobs_finalize(
+        ${잡음.job_id}::uuid, ${잡음.fence as string}::bigint, '구제경로', ${sql.json(봉 as never)},
+        null, null, '구제')`)[0];
+    if (fin?.landed) return 응답('구제착지', { event_id: fin.assigned_event_id });
+    if (fin?.reason === '멱등') return 응답('이미착지', { event_id: fin.assigned_event_id });
+    await sql`select engine.jobs_release(${잡음.job_id}::uuid, ${잡음.fence as string}::bigint)`;
+    return 응답('생성중', { 사유: fin?.reason ?? null });
+  } catch (e) {
+    /* B1(attempts 있는 job — 마감 뒤 벤더 경합 방지) 등 — 반납하고 물러난다(워커·스윕 몫). */
+    console.error('[deliver/구제] 착지 예외 — 반납하고 물러난다', learner_id, String((e as Error)?.message ?? e));
+    try {
+      await sql`select engine.jobs_release(${잡음.job_id}::uuid, ${잡음.fence as string}::bigint)`;
+    } catch { /* 반납 실패는 임대 만료가 받는다(㉥) */ }
+    return 응답('생성중');
+  }
 }
