@@ -58,7 +58,19 @@ with 기대열(t, c) as (values
   ('teacher_notes','origin'), ('teacher_notes','disposition'),
   ('teacher_notes','updated_at'), ('teacher_notes','schema_ver'),
   -- 조·좌석 거울(20260814100000 · 숙제서클 §10-3)
-  ('learners','group_no'), ('learners','seat_no')
+  ('learners','group_no'), ('learners','seat_no'),
+  -- 생성 실행 장부 세 표(20260821120000 · §3-5-b) — 계보 핵심 열이 빠지면 재현·감시가 정의부터 죽는다.
+  ('generation_jobs','batch_run_id'), ('generation_jobs','snapshot_as_of'),
+  ('generation_jobs','branch_snapshot'), ('generation_jobs','event_draft'),
+  ('generation_jobs','fence'), ('generation_jobs','outcome'),
+  ('generation_jobs','winning_attempt_id'), ('generation_jobs','deciding_attempt_id'),
+  ('generation_jobs','load_retry_count'),
+  ('generation_attempts','request_body'), ('generation_attempts','raw_response'),
+  ('generation_attempts','result'), ('generation_attempts','gate_failed_reasons'),
+  ('generation_attempts','fence'),
+  ('generation_batch_runs','run_kind'), ('generation_batch_runs','roster_hash'),
+  ('generation_batch_runs','level_distribution'), ('generation_batch_runs','finished_at'),
+  ('generation_batch_runs','snapshot_as_of')
 ), 기대제약(n) as (values
   -- ── c12: CHECK 는 전부 _c12 접미 — 이 조각이 _c11 서른하나를 이름째 교체했다.
   --    UNIQUE·EXCLUDE·FK·PK 는 값목록이 없어 판 판별과 무관하니 c11 이름 그대로다.
@@ -97,7 +109,44 @@ with 기대열(t, c) as (values
   ('learners_group_no_c12'), ('learners_seat_no_c12'),
   -- companion 빈칸 로그(20260814110000)
   ('companion_qa_question_nonblank_c12'), ('companion_qa_answer_paired_c12'),
-  ('companion_qa_staff_id_fkey')
+  ('companion_qa_staff_id_fkey'),
+  -- 생성 실행 장부(20260821120000) — CHECK 34 + FK 3 + UNIQUE 3(전이·계보의 물리).
+  ('attempts_gate_values_c12'),
+  ('attempts_response_present_c12'),
+  ('attempts_result_gate_c12'),
+  ('attempts_ver_nonempty_c12'),
+  ('batch_runs_counts_order_c12'),
+  ('batch_runs_counts_pair_c12'),
+  ('batch_runs_enrolled_nonneg_c12'),
+  ('batch_runs_finished_cols_c12'),
+  ('batch_runs_level_dist_ok_c12'),
+  ('batch_runs_partial_pair_c12'),
+  ('batch_runs_partial_range_c12'),
+  ('batch_runs_roster_equation_c12'),
+  ('batch_runs_skipped_range_c12'),
+  ('batch_runs_ver_nonempty_c12'),
+  ('jobs_anchor_present_c12'),
+  ('jobs_claim_cols_c12'),
+  ('jobs_deciding_pair_c12'),
+  ('jobs_deciding_result_matches_c12'),
+  ('jobs_deciding_scope_c12'),
+  ('jobs_draft_present_c12'),
+  ('jobs_idle_cols_c12'),
+  ('jobs_load_failed_cols_c12'),
+  ('jobs_nontarget_cols_c12'),
+  ('jobs_nonterminal_cols_c12'),
+  ('jobs_skill_ids_present_c12'),
+  ('jobs_status_outcome_pairs_c12'),
+  ('jobs_terminal_cols_c12'),
+  ('jobs_ver_nonempty_c12'),
+  ('jobs_winner_fence_current_c12'),
+  ('jobs_winner_fence_pair_c12'),
+  ('jobs_winner_only_success_c12'),
+  ('jobs_winner_present_c12'),
+  ('jobs_winner_result_only_success_c12'),
+  ('jobs_winner_result_pair_c12'),
+  ('jobs_winning_attempt_fk'), ('jobs_deciding_attempt_fk'), ('jobs_batch_run_fk'),
+  ('attempts_id_job_result_uk'), ('attempts_id_job_fence_result_uk'), ('batch_runs_run_date_uq')
 ), 기대트리거(n) as (values
   ('learning_events_immutable'), ('corrections_immutable'), ('submissions_original_immutable'),
   ('staff_access_log_immutable'), ('learning_events_correction_same_learner'),
@@ -110,7 +159,9 @@ with 기대열(t, c) as (values
   -- 강사 한 마디 삭제 금지(20260812210000)
   ('teacher_notes_protect'),
   -- companion 빈칸 로그 개서·삭제 금지(20260814110000)
-  ('companion_qa_immutable')
+  ('companion_qa_immutable'),
+  -- 생성 실행 장부(20260821120000) — 선판정 스냅샷·실행 계보 freeze + 비대상 커밋 게이트.
+  ('generation_jobs_freeze'), ('generation_batch_runs_freeze'), ('jobs_nontarget_settled')
 ), 대상역할(r) as (values ('anon'), ('authenticated'))
 , 대상권한(p) as (values
   ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE'), ('REFERENCES'), ('TRIGGER')
@@ -251,7 +302,7 @@ with 기대열(t, c) as (values
     where connamespace=to_regnamespace('ops')
       and conname='cron_runs_outcome_c12') as 회차제약
 )
-select case when 테이블수=18 and RLS켜짐=18 and 정책수=7
+select case when 테이블수=21 and RLS켜짐=21 and 정책수=7
               and 새는테이블권한=0 and 새는스키마권한=0 and 삭제차단=5 and 실패상태=1
               and 이력정책=0 and 잡없는제출=0 and 검수뷰=1 and 옛검수정책=0
               and 마감없는배정=0 and 분모칸오염=0 and 폐기사유없는폐기=0
@@ -266,10 +317,10 @@ select case when 테이블수=18 and RLS켜짐=18 and 정책수=7
               and (select v from 빠진열) is null
               and (select v from 빠진제약) is null
               and (select v from 빠진트리거) is null
-              and (select version from 현재이력)='20260821060000'
-              and (select checksum from 현재이력)='072c72e26709deda7893908ce44e7286298fea7df3c795c7ed684e9571980b3d' -- migration-checksum
+              and (select version from 현재이력)='20260821120000'
+              and (select checksum from 현재이력)='1716e7b0b2dbba22d3592435445b1a4c9764b564e0649df1cce409e84a17ca8c' -- migration-checksum
             then '✅ 전부 통과'
-            else '❌ 아래 칸을 그대로 알려주세요 (기대: 18·18·7·0·0·5·1·0·0·1·0·0·0·0·22·0·0·0·0·2·6·6·0·0·0·1·1·1·30·0·1·26·0·11·0·1 · 빠진 칸은 전부 비어 있어야 합니다)'
+            else '❌ 아래 칸을 그대로 알려주세요 (기대: 21·21·7·0·0·5·1·0·0·1·0·0·0·0·22·0·0·0·0·2·6·6·0·0·0·1·1·1·30·0·1·26·0·11·0·1 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
        (select version from 현재이력) as 현재버전,
        (select checksum from 현재이력) as checksum,
