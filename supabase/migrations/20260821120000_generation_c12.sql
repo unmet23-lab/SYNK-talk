@@ -32,7 +32,7 @@ do $migration$
 declare
   migration_version constant text := '20260821120000';
   migration_name constant text := '20260821120000_generation_c12.sql';
-  expected_checksum constant text := 'da3bcef30ef721a5a607f57ed06e0092e9e2e0f604d00e6023535095c31e356f'; -- migration-checksum
+  expected_checksum constant text := '4c6946fc912ad5749151dabea0d4bab08a6c3dad800dbe5b78367ed92380f67b'; -- migration-checksum
   base_version constant text := '20260821060000';
   recorded_checksum text;
 begin
@@ -1369,7 +1369,11 @@ begin
          set status = '대기', outcome = null, closed_at = null,
              branch_snapshot = _target -> 'branch_snapshot',
              event_draft = _target -> 'event_draft',
-             snapshot_as_of = now(),      -- 구제 신규·부활의 기준시각은 함수가 스스로(A6)
+             -- 🔴 갱신표(v5.8) 그대로 «시작 행에서» 읽는다 — now() 로 스스로 굳히면 호출자 draft 의
+             --    evidence_refs.as_of(호출자 스냅기준 = 구제 run 의 그 값)와 영원히 갈려 ㉤ 대조 ⑦이
+             --    부활 job 의 착지를 전부 거절한다(§12 픽스처 7차 실측 — 「가장 필요한 날에만 안 도는
+             --    구제」의 재현). A6 의 「함수가 스스로」는 «호출자 임의 값 금지»지 run 결속 해제가 아니다.
+             snapshot_as_of = run.snapshot_as_of,
              skill_ids = coalesce((select array_agg(x) from jsonb_array_elements_text(_target -> 'skill_ids') x), '{}'),
              skill_taxonomy_ver = run.skill_taxonomy_ver,
              model = run.model, prompt_ver = run.prompt_ver, policy_ver = run.policy_ver,
@@ -1423,7 +1427,7 @@ do $migration2$
 declare
   migration_version constant text := '20260821120000';
   migration_name constant text := '20260821120000_generation_c12.sql';
-  expected_checksum constant text := 'da3bcef30ef721a5a607f57ed06e0092e9e2e0f604d00e6023535095c31e356f'; -- migration-checksum
+  expected_checksum constant text := '4c6946fc912ad5749151dabea0d4bab08a6c3dad800dbe5b78367ed92380f67b'; -- migration-checksum
 begin
   if exists (select 1 from engine.schema_migrations where version = migration_version) then
     return;
@@ -1752,7 +1756,7 @@ select case when 테이블수=21 and RLS켜짐=21 and 정책수=7
               and (select v from 빠진제약) is null
               and (select v from 빠진트리거) is null
               and (select version from 현재이력)='20260821120000'
-              and (select checksum from 현재이력)='da3bcef30ef721a5a607f57ed06e0092e9e2e0f604d00e6023535095c31e356f' -- migration-checksum
+              and (select checksum from 현재이력)='4c6946fc912ad5749151dabea0d4bab08a6c3dad800dbe5b78367ed92380f67b' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 21·21·7·0·0·5·1·0·0·1·0·0·0·0·22·0·0·0·0·2·6·6·0·0·0·1·1·1·30·0·1·26·0·11·0·1 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,

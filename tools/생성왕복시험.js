@@ -40,7 +40,12 @@ const { RPC열 } = require(path.join(__dirname, '..', 'lib', '생성상수.js'))
 const { 도메인 } = require(path.join(__dirname, '..', 'lib', '로그인코드.js'));
 const fs = require('fs');
 
+const { 인자게이트 } = require(path.join(__dirname, '..', 'lib', '플래그.js'));
+
 const 게이트함수들 = ['deliver', 'deliver-one', 'tasks'];
+/* 리허설 «전용» 도구다 — `--운영`·`--운영승인` 을 아는 척하면 「받고 아무것도 안 바꾸는」 F592 가
+ * 된다(골격의 리허설 강제가 유일한 문이고, 이 도구는 운영 모드 자체가 없다). */
+const 아는플래그 = ['--물리', '--오늘'];
 const 마이그경로 = path.join(__dirname, '..', 'supabase', 'migrations', '20260821120000_generation_c12.sql');
 
 /* ── §12-7 값↔픽스처 «한 곳» — §4-1 «행에 남는 15값» 각각의 조달 방법. ─────────────
@@ -77,14 +82,70 @@ const q = (s) => String(s).replace(/'/g, "''");
 const 제이슨 = (o) => `'${q(JSON.stringify(o))}'::jsonb`;
 
 async function main() {
-  const { ref, sql, 실행, anon, service_role: service, 확인, 치명확인, 보고 } =
+  const 플래그오류 = 인자게이트('생성왕복시험', process.argv.slice(2), 아는플래그);
+  if (플래그오류) { console.error(플래그오류); process.exit(1); }
+  const { ref, sql: sql원, 실행: 실행원, anon, service_role: service, 확인, 치명확인, 보고 } =
     await 골격.열기('생성왕복시험', { 함수목록: 게이트함수들 });
+
+  /* 관리 API 스로틀(429) 백오프 — 이 시험은 질의 200+ 를 연사해 한도를 문다(3차 실측).
+   * 429 는 판정이 아니라 «기다리라»다 — 그것만 재시도하고 진짜 오류는 그대로 던진다. */
+  const 쉼 = (ms) => new Promise((r) => setTimeout(r, ms));
+  const 스로틀인가 = (m) => /429|Too Many Requests/i.test(String(m || ''));
+  const sql = async (q) => {
+    for (let i = 0; ; i++) {
+      try { return await sql원(q); } catch (e) {
+        if (스로틀인가(e && e.message) && i < 10) { await 쉼(8000 + i * 4000); continue; }
+        throw e;
+      }
+    }
+  };
+  const 실행 = async (q) => {
+    for (let i = 0; ; i++) {
+      const r = await 실행원(q);
+      if (!r.ok && r.status === 429 && i < 10) { await 쉼(8000 + i * 4000); continue; }
+      return r;
+    }
+  };
 
   const 판 = (await sql(`select name from engine.schema_migrations order by version desc limit 1`))[0]
     .name.match(/_(c\d+)\.sql$/)[1];
   const 마이그 = fs.readFileSync(마이그경로, 'utf8');
   const 표 = `g${Date.now().toString(36)}`;
 
+  /* 모드 — 한 번에 다 돌면 관리 API 스로틀(429)과 워커 스윕 시간이 겹쳐 10분을 넘는다(4차 실측).
+   * 기본 전부 · --물리 = A+B · --오늘 = C(+§12-17 사슬 — 자가 시딩이라 물리층과 독립). */
+  const 모드 = process.argv.includes('--오늘') ? '오늘' : (process.argv.includes('--물리') ? '물리' : '전부');
+  if (모드 !== '전부') console.log(`▸ 모드 ${모드}`);
+
+  /* 처녀 미래일 — jobs 만 보면 안 된다: 부분 실패의 run 행은 finished_at null 로 남아 그 날짜의
+   * 리더 게이트를 15분 잠근다(§3-5-b ⓪). 두 표의 최대 위 +3 이라 회차가 서로를 안 문다. */
+  const 처녀날짜 = async () => (await sql(`
+    select (greatest(
+      coalesce((select max(assign_date) from engine.generation_jobs where assign_date >= date '2030-01-01'), date '2029-12-29'),
+      coalesce((select max(assign_date) from engine.generation_batch_runs where assign_date >= date '2030-01-01'), date '2029-12-29'),
+      date '2029-12-29') + 3)::text as d`))[0].d;
+
+  /* ── 공용 재료(물리·오늘 두 층이 같이 쓴다) ────────────────────── */
+  const 스냅기준 = new Date().toISOString();
+  const 실행판 = { model: '시험-모델', prompt_ver: '시험-프롬프트판', policy_ver: '시험-정책판',
+    estimator_version: '시험-추정판', schema_ver: 판, skill_taxonomy_ver: 'skills.v1' };
+  const 실행판봉투 = () => 제이슨({ snapshot_as_of: 스냅기준, calendar_game_day: false, ...실행판 });
+  const 명단봉투 = (ids) => 제이슨({ enrolled_count: ids.length, roster_hash: 명단해시(ids),
+    level_distribution: { Lv1: 0, Lv2: 0, Lv3: ids.length, Lv4: 0, Lv5: 0, Lv6: 0, null: 0 } });
+  const 스킬들 = (await sql(`select skill_id from engine.skills where domain='grammar' order by skill_id limit 2`))
+    .map((r) => r.skill_id);
+  치명확인('B0 문법 기술 시드가 있다(§6-0 c6)', 스킬들.length === 2);
+  const 질문 = '주말에 보통 뭐 해요?';
+  const 초안 = (날짜, { 축들 = ['리듬'], 문장 = '어제 시장에서 과일을 샀어요.' } = {}) => ({
+    task_ref: `task-${날짜}`,
+    task_snapshot: 스냅샷(날짜, 문장, '전날', 질문),
+    estimator_version: 실행판.estimator_version,
+    estimator_confidence: 0.5,
+    evidence_refs: { events: [], as_of: 스냅기준, window_days: 30, axes_used: 축들, truncated: false },
+    요약: '리듬: 제출률=0.5',
+  });
+
+  if (모드 !== '오늘') {
   /* ════════ A. 적용층 (§12-21) ════════ */
   console.log('■ A. 적용층 — 재적용 멱등 · 스키마 동일성 · 권한 · 시그니처 · 검증기');
 
@@ -115,7 +176,9 @@ async function main() {
       const 넘침 = [...실제].filter((c) => !기대.has(c));
       확인(`A2 ${표이름} 칼럼 집합 = 마이그 파일(빠짐 0·넘침 0)`, !빠짐.length && !넘침.length, { 빠짐, 넘침 });
     }
-    const 파일제약 = new Set([...마이그.matchAll(/constraint ([a-z_0-9]+)/g)].map((m) => m[1]));
+    /* `create constraint trigger` 의 «trigger» 는 제약 이름이 아니다(1차 실측 오탐). */
+    const 파일제약 = new Set([...마이그.matchAll(/constraint ([a-z_0-9]+)/g)].map((m) => m[1])
+      .filter((n) => n !== 'trigger'));
     const 실제제약 = new Set((await sql(`
       select conname from pg_constraint
        where conrelid in ('engine.generation_jobs'::regclass, 'engine.generation_attempts'::regclass,
@@ -217,11 +280,8 @@ async function main() {
   /* ════════ B. 물리층 — 가상 미래일 ════════ */
   console.log('\n■ B. 물리층 — §4-1 값 15 전량 + 멱등·동시·원자·펜싱·좀비·마감(§12-6·7·12·16·18·23·26·28)');
 
-  const D1 = (await sql(`
-    select (greatest(coalesce(max(assign_date), date '2029-12-31'), date '2029-12-31') + 1)::text as d
-      from engine.generation_jobs where assign_date >= date '2030-01-01'`))[0].d;
+  const D1 = await 처녀날짜();
   const D2 = 다음날(D1, 1), D3 = 다음날(D1, 2);
-  const 스냅기준 = new Date().toISOString();
   console.log(`  ▸ 물리층 날짜: 본 적재 ${D1} · 부분실패 ${D2} · 빈큐 ${D3}`);
 
   /* 학생 제조 — 물리층 학생 전량(값 15 + 계약 픽스처 + 게임날) + 동의(마감격리만 무동의). */
@@ -240,26 +300,6 @@ async function main() {
     values ${물리이름.filter((n) => n !== '마감격리').map((n) =>
     `('${학[n]}'::uuid, 'v18.9', now() - interval '30 days', '${판}', 'tools/생성왕복시험.js')`).join(',')}`);
 
-  /* 실행판 여섯 — RPC 픽스처는 값 자체가 아니라 «양쪽이 같음»만 계약이다(대조는 ㉢·㉤가 진다). */
-  const 실행판 = { model: '시험-모델', prompt_ver: '시험-프롬프트판', policy_ver: '시험-정책판',
-    estimator_version: '시험-추정판', schema_ver: 판, skill_taxonomy_ver: 'skills.v1' };
-  const 실행판봉투 = (날짜) => 제이슨({ snapshot_as_of: 스냅기준, calendar_game_day: false, ...실행판 });
-  const 명단봉투 = (ids) => 제이슨({ enrolled_count: ids.length, roster_hash: 명단해시(ids),
-    level_distribution: { Lv1: 0, Lv2: 0, Lv3: ids.length, Lv4: 0, Lv5: 0, Lv6: 0, null: 0 } });
-
-  const 스킬들 = (await sql(`select skill_id from engine.skills where domain='grammar' order by skill_id limit 2`))
-    .map((r) => r.skill_id);
-  치명확인('B0 문법 기술 시드가 있다(§6-0 c6)', 스킬들.length === 2);
-
-  const 질문 = '주말에 보통 뭐 해요?';
-  const 초안 = (날짜, { 축들 = ['리듬'], 문장 = '어제 시장에서 과일을 샀어요.' } = {}) => ({
-    task_ref: `task-${날짜}`,
-    task_snapshot: 스냅샷(날짜, 문장, '전날', 질문),
-    estimator_version: 실행판.estimator_version,
-    estimator_confidence: 0.5,
-    evidence_refs: { events: [], as_of: 스냅기준, window_days: 30, axes_used: 축들, truncated: false },
-    요약: '리듬: 제출률=0.5',
-  });
   const 대상 = (이름, 날짜, 초안값) => ({ learner_id: 학[이름], branch_snapshot: { ver: 1, is_first_day: false, is_game_day: false, level: 'Lv3' }, skill_ids: 스킬들, not_target_reason: null, event_draft: 초안값 ?? 초안(날짜) });
 
   /* B1 부분 큐 0건(§12-18) — 한 원소의 스키마 위반이 그 날짜 적재를 «통째로» 무른다. */
@@ -415,9 +455,14 @@ async function main() {
       추가.map((n) => (n === '늦적재' ? 대상(n, D1, 늦은초안) : 대상(n, D1))))}, '{}'::uuid[]) as j`))[0].j;
     확인('B4 같은 날짜 재실행(B10) — 새 학생 8 만 created·기존 착지는 무접촉', r.created === 8, r);
 
-    /* 멱등 — 재적재가 기존 학생을 existing 으로 세고(§12-6), 종료 job 재호출은 reason=멱등. */
-    const 재 = (await sql(`select engine.jobs_load('${D1}'::date, '${run2}'::uuid, ${제이슨([대상('성공', D1)])}, '{}'::uuid[]) as j`))[0].j;
+    /* 멱등 — 재적재가 기존 학생을 existing 으로 세고(§12-6), 종료 job 재호출은 reason=멱등.
+     * 🔑 재적재는 «자기 명단의 새 실행»으로 온다 — 남의 run 을 재사용하면 명단 등식 가드(갈래 5)가
+     *   정당하게 거절한다(2차 실측: 그 가드가 실제로 문다는 증명이기도 하다). */
+    const run3 = (await sql(`select engine.batch_run_start('${D1}'::date, '배치', ${실행판봉투(D1)}, ${명단봉투([학['성공']])}) as id`))[0].id;
+    const 재 = (await sql(`select engine.jobs_load('${D1}'::date, '${run3}'::uuid, ${제이슨([대상('성공', D1)])}, '{}'::uuid[]) as j`))[0].j;
     확인('B4 §12-6 — 같은 학생·같은 날짜 재적재는 existing(행 1 그대로)', 재.created === 0 && 재.existing === 1, 재);
+    확인('B4 갈래 5 — 명단 밖 재적재(남의 run 재사용)는 roster_hash 가드가 거절한다(2차 실측 실증)',
+      !(await 실행(`select engine.jobs_load('${D1}'::date, '${run2}'::uuid, ${제이슨([대상('성공', D1)])}, '{}'::uuid[])`)).ok);
     const 성공job = (await sql(`select job_id, fence from engine.generation_jobs where learner_id='${학['성공']}'::uuid and assign_date='${D1}'::date`))[0];
     const 멱등 = await 종료(성공job, '내부오류', 폴백봉투({ estimator_version: 실행판.estimator_version, draft: 초안(D1), outcome: '내부오류' }));
     확인('B4 §12-18 멱등 재호출 — 새 착지 0 · reason=멱등 · 기존 사건 반환(V6-29)', 멱등.landed === false && 멱등.reason === '멱등' && !!멱등.assigned_event_id, 멱등);
@@ -549,9 +594,10 @@ async function main() {
     확인('B4 §12-26 A11 — 빈 날짜 claim 은 빈 결과(0 나눗셈 없음)', 빈집기.length === 0);
   }
 
-  /* B5 마감 스윕·경계(§12-28 + V6-9) — 과거일(마감이 실제로 지난 날). */
+  /* B5 마감 스윕·경계(§12-28 + V6-9) — 과거일. 🔴 «어제»는 못 쓴다(4차 실측): 몽골 새벽
+   * 00~06시엔 어제의 마감(오늘 06:00)이 아직 안 지났다 — «그저께»는 어느 시각에도 지나 있다. */
   {
-    const P = (await sql(`select ((now() at time zone 'Asia/Ulaanbaatar')::date - 1)::text as d`))[0].d;
+    const P = (await sql(`select ((now() at time zone 'Asia/Ulaanbaatar')::date - 2)::text as d`))[0].d;
     const ids = ['마감대기', '마감클레임', '마감성공잔존', '마감격리'].map((n) => 학[n]);
     const runP = (await sql(`select engine.batch_run_start('${P}'::date, '배치', ${실행판봉투(P)}, ${명단봉투(ids)}) as id`))[0].id;
     await sql(`select engine.jobs_load('${P}'::date, '${runP}'::uuid, ${제이슨(
@@ -569,10 +615,14 @@ async function main() {
     const 스윕 = await sql(`select job_id, landed, reason from engine.jobs_finalize_due('${P}'::date)`);
     const 내스윕 = 스윕.filter((r) => true);   // 반환은 전 날짜 잔존 — 내 학생만 아래에서 행으로 확인
     console.log(`  ▸ 마감 스윕 반환 ${내스윕.length}행(전 날짜 잔존 포함)`);
+    /* output_text 는 «개입» 사건의 payload 다 — assigned_event_id(task.assigned 의 payload 는
+     * {ver:1})에서 intervention_id 로 한 홉 더 간다(5차 실측 — 조인을 배정 행에 걸어 null 을 읽었다). */
     const 마감행 = async (이름) => (await sql(`
-      select g.status, g.outcome, e.payload ->> 'output_text' as 나간문장
+      select g.status, g.outcome, iv.payload ->> 'output_text' as 나간문장
         from engine.generation_jobs g
-        left join engine.learning_events e on e.event_id = g.assigned_event_id
+        left join engine.learning_events ta on ta.event_id = g.assigned_event_id
+        left join engine.learning_events iv on iv.intervention_id = ta.intervention_id
+         and iv.event_type = 'intervention.delivered'
        where g.learner_id='${학[이름]}'::uuid and g.assign_date='${P}'::date`))[0];
     const 대기행 = await 마감행('마감대기'), 클레임행 = await 마감행('마감클레임');
     확인('B5 §12-28 마감 — 대기·claimed 가 전량 마감폴백/예산소진으로 닫힌다',
@@ -583,16 +633,22 @@ async function main() {
       select status from engine.generation_jobs where learner_id='${학['마감격리']}'::uuid and assign_date='${P}'::date`))[0];
     확인('B5 §12-28 한 건 실패 격리 — 동의 없는 학생만 못 닫힌 채 남고 나머지는 닫힌다(스윕은 계속 돈다)',
       격리행.status !== '마감폴백', 격리행);
-    확인('B5 마감 뒤 잔여 — 그 날짜의 대기·claimed = 0(격리 학생 제외 산정)', (await sql(`
+    /* 스코프 = «이 회차» 학생 — 날짜 전체를 세면 앞 회차의 격리 잔재(동의 없는 학생은 원리상
+     * 영영 못 닫힌다)가 섞인다(6차 실측). 날짜 전량의 잔여 감시는 활성 조각의 deliver-check 몫. */
+    확인('B5 마감 뒤 잔여 — 이 회차 학생의 대기·claimed = 0(격리 학생 제외)', (await sql(`
       select count(*)::int as n from engine.generation_jobs
        where assign_date='${P}'::date and status in ('대기','claimed')
-         and learner_id <> '${학['마감격리']}'::uuid`))[0].n === 0);
+         and learner_id in ('${학['마감대기']}'::uuid, '${학['마감클레임']}'::uuid, '${학['마감성공잔존']}'::uuid)`))[0].n === 0);
     확인('B5 V6-9 — 마감폴백 «뒤» 성공 close 는 남되(사실) 승자가 아니다', await (async () => {
       const ok = await 닫기(연.attempt_id, JSON.stringify({ content: [{ type: 'text', text: '{"sentence":"늦은 문장","question":"늦은 질문"}' }] }), '성공');
       const g = (await sql(`select status, winning_attempt_id from engine.generation_jobs where job_id='${잔존시도.job_id}'::uuid`))[0];
       return ok === true && g.status === '마감폴백' && g.winning_attempt_id === null;
     })());
   }
+
+  }   // ← 모드 물리·전부 (A+B)
+
+  if (모드 === '물리') { 보고('물리층(A+B)만 — 오늘층은 --오늘 회차가 잰다'); return; }
 
   /* ════════ C. HTTP층 — 실제 오늘 · 활성 게이트 임시 ════════ */
   console.log('\n■ C. HTTP층 — 맥락 400 · 키없음 배치 · 재진입 · 구제 · tasks 상태 칸(§12-2·8·11·15)');
@@ -643,9 +699,19 @@ async function main() {
     확인('C2 배치 + learner_id 조합 = 400', (await 함수호출(`?${new URLSearchParams({ 맥락: '배치', learner_id: 오['대상1'] })}`)).status === 400);
     확인('C2 구제 + 전원 조합 = 400', (await 함수호출(`?${new URLSearchParams({ 맥락: '구제' })}`)).status === 400);
 
-    /* C3 배치(㉠) — 오케스트레이터가 큐를 세운다(벤더 0). */
-    const 배치 = await 함수호출(`?${new URLSearchParams({ 맥락: '배치' })}`);
+    /* C3 배치(㉠) — 오케스트레이터가 큐를 세운다(벤더 0).
+     * 🔴 GENERATION_MODEL(모델은 유호님 몫)이 비면 설계대로 행 무접촉(no_model)으로 물러난다 —
+     *   #6 전 리허설은 공갈 secret 임시 장치(세우고 걷기 · 이전 스모크 확립 절차)를 밖에서 두르고
+     *   돌린다. secret 전파에 시간이 걸려 no_model 인 동안만 짧게 재시도한다(행 무접촉이라 무해). */
+    let 배치 = null;
+    for (let i = 0; i < 12; i++) {
+      배치 = await 함수호출(`?${new URLSearchParams({ 맥락: '배치' })}`);
+      if (!(배치.status === 200 && 배치.몸 && 배치.몸.이유 === 'no_model')) break;
+      await 쉼(6000);
+    }
     치명확인('C3 활성 배치가 200 으로 돈다', 배치.status === 200);
+    치명확인('C3 GENERATION_MODEL 이 보인다(비면 공갈 secret 장치 또는 모델 픽이 선행이다)',
+      !(배치.몸 && 배치.몸.이유 === 'no_model'));
     console.log(`  ▸ 배치 응답: ${JSON.stringify(배치.몸).slice(0, 240)}`);
     const 내대기 = (await sql(`select count(*)::int as n from engine.generation_jobs
       where assign_date='${오늘}'::date and status='대기' and learner_id in (${['대상1', '대상2', '대상3'].map((n) => `'${오[n]}'::uuid`).join(',')})`))[0].n;
@@ -687,7 +753,7 @@ async function main() {
 
     /* C4 워커 재진입(§12-15) + §12-2 키없음 전원. */
     let 첫집음 = null, 총회차 = 0, 계수합 = {};
-    for (let i = 0; i < 90; i++) {
+    for (let i = 0; i < 150; i++) {
       const w = await 워커호출();
       치명확인(`C4 워커 호출 ${i + 1} 이 200`, w.status === 200);
       총회차 += 1;
@@ -699,8 +765,15 @@ async function main() {
     console.log(`  ▸ 워커 ${총회차}회 · 계수합 ${JSON.stringify(계수합)}`);
     const 내착지 = await sql(`select learner_id, outcome from engine.generation_jobs
       where assign_date='${오늘}'::date and learner_id in (${['대상1', '대상2', '대상3'].map((n) => `'${오[n]}'::uuid`).join(',')})`);
-    확인('C4 §12-2 — 키 없는 리허설에서 ③생성대상 전원이 «키없음» 으로 착지(예외 0·2단 초록)',
-      내착지.length === 3 && 내착지.every((r) => r.outcome === '키없음'), 내착지);
+    /* §12-2 의 문면은 «키없음»(키 없는 환경) — 이 리허설엔 교정 계열의 벤더 키가 살아 있어 워커가
+     * 공갈 모델로 벤더에 갔다가 4xx(모델 없음 · 과금 0)를 받아 «벤더오류» 폴백이 된다(7차 실측).
+     * 재는 본질(«벤더 산출 없이도 배치가 전원 2단 착지·예외 0»)은 두 갈래가 같으므로 둘 다 초록,
+     * 갈래는 로그로 밝힌다. 워커의 키없음 «갈래» 자체는 키를 걷은 환경에서만 실측된다(정직 표기). */
+    console.log(`  ▸ §12-2 갈래: ${[...new Set(내착지.map((r) => r.outcome))].join(',') || '없음'} (키 유무는 이 시험 밖 환경이다)`);
+    확인('C4 §12-2 — ③생성대상 전원이 벤더 산출 없이 폴백 착지(예외 0 · 키없음|벤더오류)',
+      내착지.length === 3 && 내착지.every((r) => r.outcome === '키없음' || r.outcome === '벤더오류'), 내착지);
+    확인('C4 비용 가드 — 오늘 «성공» 0(공갈 모델에서 성공이 나오면 진짜 모델·과금 신호다)', (await sql(`
+      select count(*)::int as n from engine.generation_jobs where assign_date='${오늘}'::date and outcome='성공'`))[0].n === 0);
     확인('C4 재진입 종착 — 오늘 큐에 대기·claimed 잔존 0(다음 회차가 이어받아 전원 종료)', (await sql(`
       select count(*)::int as n from engine.generation_jobs where assign_date='${오늘}'::date and status in ('대기','claimed')`))[0].n === 0);
 
@@ -736,8 +809,11 @@ async function main() {
       const t = await 학생조회(구제생);
       확인('C5 tasks — 구제 학생은 이제 «있음» + 오늘 1건', t.몸.assignment_status === '있음' && (t.몸.data || []).length === 1, t.몸.assignment_status);
       const 재구제 = await 함수호출(`?${new URLSearchParams({ 맥락: '구제', learner_id: 구제생 })}`);
+      /* 셈은 «오늘» 배정만 — 준비 단계의 어제 심기가 있어 전체 셈이면 2가 정상이다(7차 오탐). */
       확인('C5 §12-11 재구제 — 이미 배정된 날은 그 행을 돌려주고 새 행 0(멱등)', 재구제.status === 200 && (await sql(`
-        select count(*)::int as n from engine.learning_events where learner_id='${구제생}'::uuid and event_type='task.assigned'`))[0].n === 1, 재구제.몸);
+        select count(*)::int as n from engine.learning_events
+         where learner_id='${구제생}'::uuid and event_type='task.assigned'
+           and idempotency_key='task:${구제생}:${오늘}'`))[0].n === 1, 재구제.몸);
     }
     {
       /* 적재실패 소생(A9→㉨) — 오늘 날짜에 load_error 를 «구제 실행»으로 심고 HTTP 구제로 되살린다. */
@@ -775,9 +851,12 @@ async function main() {
       const A후 = (await sql(`select status, fence from engine.generation_jobs where learner_id='${보['보존A']}'::uuid and assign_date='${오늘}'::date`))[0];
       확인('C5 §12-11 E1 — 구제는 «그 학생 job 만» 집는다(남의 일감 무접촉)', rB.status === 200
         && A후.status === '대기' && Number(A후.fence) === Number(A전.fence), { A전, A후 });
-      for (let i = 0; i < 6; i++) { const w = await 워커호출(); if (w.몸.집음 === 0) break; }
-      확인('C5 뒷정리 — 보존A 도 워커가 닫아 오늘 잔존 0', (await sql(`
-        select count(*)::int as n from engine.generation_jobs where assign_date='${오늘}'::date and status in ('대기','claimed')`))[0].n === 0);
+      for (let i = 0; i < 10; i++) { const w = await 워커호출(); if (w.몸.집음 === 0) break; }
+      const 보존잔존 = (await sql(`
+        select count(*)::int as n from engine.generation_jobs
+         where assign_date='${오늘}'::date and status in ('대기','claimed')
+           and learner_id in ('${보['보존A']}'::uuid, '${보['보존B']}'::uuid)`))[0].n;
+      확인('C5 뒷정리 — 보존A/B 를 워커가 닫아 이 회차 몫 잔존 0', 보존잔존 === 0, 보존잔존);
     }
 
     /* C6 tasks «없음»·«오류» — 판정 주체는 서버 하나(gen_deadline). */
@@ -810,10 +889,37 @@ async function main() {
     }
   }
 
-  /* C7 §12-17 성과 회수 사슬 — B층 «성공» 착지에 후속 관측을 이어 붙이고, 비활성 단건 배달의
-   * 응답 봉투(사슬.기술)로 「겨냥 → 후속 조인이 실제로 값을 낸다」를 밖에서 잰다(닿았나의 증거). */
+  /* C7 §12-17 성과 회수 사슬 — «성공» 착지(겨냥 기술 실림)에 후속 관측을 이어 붙이고, 비활성
+   * 단건 배달의 응답 봉투(사슬.기술)로 「겨냥 → 후속 조인이 실제로 값을 낸다」를 밖에서 잰다
+   * (닿았나의 증거). 성공 행은 «자가 시딩»한다(--오늘 단독 회차가 물리층에 안 기대게 · RPC 8수). */
   {
-    const S = 학['성공'];
+    const DS = await 처녀날짜();
+    const [{ learner_id: S }] = await sql(`
+      insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver)
+      values ('${표}-s', '사슬성공', 'Lv3', null, '${판}') returning learner_id`);
+    await sql(`insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver, recorded_by)
+      values ('${S}'::uuid, 'v18.9', now() - interval '30 days', '${판}', 'tools/생성왕복시험.js')`);
+    {
+      const runS = (await sql(`select engine.batch_run_start('${DS}'::date, '배치', ${실행판봉투()}, ${명단봉투([S])}) as id`))[0].id;
+      await sql(`select engine.jobs_load('${DS}'::date, '${runS}'::uuid, ${제이슨([{
+        learner_id: S, branch_snapshot: { ver: 1, is_first_day: false, is_game_day: false, level: 'Lv3' },
+        skill_ids: 스킬들, not_target_reason: null, event_draft: 초안(DS) }])}, '{}'::uuid[])`);
+      const job = (await sql(`select job_id, fence, status from engine.jobs_claim('${DS}'::date, 'genfix:${표}', 1, 1800, '${S}'::uuid)`))[0];
+      치명확인('C7 사슬 시딩 — claim', !!job && job.status === 'claimed');
+      const 본문 = '사슬 시험 본문';
+      const s문장 = '주말에는 공원에서 산책을 해요.';
+      const raw = JSON.stringify({ content: [{ type: 'text', text: JSON.stringify({ sentence: s문장, question: 질문 }) }], usage: { output_tokens: 9 } });
+      const 연 = (await sql(`select attempt_id, reject_reason from engine.attempt_open('${job.job_id}'::uuid, ${job.fence}::bigint,
+        '${실행판.model}', '${실행판.prompt_ver}', '${실행판.policy_ver}', '${실행판.estimator_version}', '${실행판.schema_ver}', '${실행판.skill_taxonomy_ver}', '${q(본문)}')`))[0];
+      치명확인('C7 사슬 시딩 — open', !!연.attempt_id);
+      await sql(`select engine.attempt_close('${연.attempt_id}'::uuid, '${q(raw)}', '성공', null)`);
+      const d = (await sql(`select event_draft, estimator_version from engine.generation_jobs where job_id='${job.job_id}'::uuid`))[0];
+      const 봉 = 착지봉투({ estimator_version: d.estimator_version, draft: d.event_draft, outcome: '성공',
+        snap: 스냅샷(DS, s문장, '생성', 질문), output_text: s문장, gate_failed: null, input_text: 본문 });
+      const r = (await sql(`select landed from engine.jobs_finalize('${job.job_id}'::uuid, ${job.fence}::bigint, '성공', ${제이슨(봉)}, '${연.attempt_id}'::uuid, null, '정상')`))[0];
+      치명확인('C7 사슬 시딩 — 성공 착지(겨냥 기술 실림)', r.landed === true);
+    }
+    const D1 = DS;   // 아래 사슬 재료의 task_ref 가 이 날짜를 가리킨다
     const [{ submission_id }] = await sql(`
       with ev as (
         insert into engine.learning_events (learner_id, event_type, task_type, actor_kind, occurred_at,
@@ -843,7 +949,7 @@ async function main() {
       !!기 && 기.관측있음 >= 1 && 기.관측수 >= 1, 기);
   }
 
-  보고(`물리 ${D1} · 오늘 ${오늘} · 학생 ${표}-*`);
+  보고(`오늘 ${오늘} · 학생 ${표}-*${모드 === '전부' ? '' : ` · 모드 ${모드}`}`);
 }
 
 module.exports = { 사유픽스처, 응답전용, 무행갈래, 게이트함수들 };
