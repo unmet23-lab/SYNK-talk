@@ -340,7 +340,10 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
                   * 영원히 빈다. 없는 행은 null(지어내지 않는다 — 위 evidence_refs 와 같은 규율). */
                  'submission', case when x.task_snapshot is null then null
                                     else jsonb_build_object('task_snapshot', x.task_snapshot) end,
-                 'intervention_id', x.intervention_id)), '[]'::jsonb) as 행들
+                 'intervention_id', x.intervention_id)
+                 /* agg 순서도 같은 규율 — order by 없는 jsonb_agg 는 순서 미보장이라, 같은
+                  * 원신호를 두 번 걷어도 행들 배열이 다른 모양일 수 있다(발견 4 의 둘째 절반). */
+                 order by x.occurred_at desc, x.event_id desc), '[]'::jsonb) as 행들
           from (
             select y.event_id, y.event_type, y.occurred_at, y.retry_of_event_id,
                    y.correction_id, y.task_type, y.task_schema_ver, y.payload, y.due_at,
@@ -351,8 +354,11 @@ async function 배달하기(오늘: string, 한사람: string | null = null) {
                        e.correction_id, e.task_type, s.task_schema_ver, e.payload, s.due_at,
                        e.parent_event_id, e.policy_ver, e.estimator_version, e.intervention_id,
                        s.task_snapshot,
+                       /* 둘째 키 event_id — 동시각 사건에서 절단이 비결정이면 「원래 개수 재현」
+                        * (evidence_refs·근거상한의 소급 재현)이 깨진다. 설계 C2 가 진단한 병의
+                        * 같은 형태가 이 자리에 실재했다(9회차 심문 발견 4 · 2026-08-20). */
                        row_number() over (partition by e.event_type
-                                          order by e.occurred_at desc) as 몇째
+                                          order by e.occurred_at desc, e.event_id desc) as 몇째
                   from engine.learning_events e
                   left join engine.submissions s on s.event_id = e.event_id
                  where e.learner_id = l.learner_id
