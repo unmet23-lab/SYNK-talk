@@ -46,7 +46,16 @@ const 게이트함수들 = ['deliver', 'deliver-one', 'tasks'];
 /* 리허설 «전용» 도구다 — `--운영`·`--운영승인` 을 아는 척하면 「받고 아무것도 안 바꾸는」 F592 가
  * 된다(골격의 리허설 강제가 유일한 문이고, 이 도구는 운영 모드 자체가 없다). */
 const 아는플래그 = ['--물리', '--오늘'];
-const 마이그경로 = path.join(__dirname, '..', 'supabase', 'migrations', '20260821120000_generation_c12.sql');
+const 마이그폴더 = path.join(__dirname, '..', 'supabase', 'migrations');
+const 마이그경로 = path.join(마이그폴더, '20260821120000_generation_c12.sql');
+/* 재적용 대상 = generation_c12 «부터의 전 마이그»(버전 오름차순 — 파일시스템에서 파생).
+ * 하나만 다시 부으면 뒤 판의 create or replace 를 앞 판이 덮는다 — B6 실측(2026-08-22):
+ * A1 이 generation_c12 하나를 재적용해 가드 마이그(20260822090000)의 jobs_load 를 옛 몸으로
+ * 되돌렸고, B층 전체가 가드 없는 판 위에서 돌았다(중복 def 가 정본을 덮는 자리의 마이그판). */
+const 재적용경로들 = fs.readdirSync(마이그폴더)
+  .filter((f) => f.endsWith('.sql') && f >= '20260821120000')
+  .sort()
+  .map((f) => path.join(마이그폴더, f));
 
 /* ── §12-7 값↔픽스처 «한 곳» — §4-1 «행에 남는 15값» 각각의 조달 방법. ─────────────
  * 목록에 있는데 픽스처가 없는 값이 생기면: ①tests/생성사유픽스처.test.js(DDL 대조)가 빨개지고
@@ -149,13 +158,19 @@ async function main() {
   /* ════════ A. 적용층 (§12-21) ════════ */
   console.log('■ A. 적용층 — 재적용 멱등 · 스키마 동일성 · 권한 · 시그니처 · 검증기');
 
-  /* A1 재적용 멱등 — 이미 적용된 리허설 «위에» 같은 조각을 통째로 다시 태운다. */
+  /* A1 재적용 멱등 — 이미 적용된 리허설 «위에» generation_c12 부터의 전 조각을 «버전 순»으로
+   * 통째 재적용한다. 하나만 부으면 뒤 판의 create or replace 를 앞 판이 덮는다(B6 실측 08-22 —
+   * 재적용이 남긴 DB 가 «현행»이어야 B·C 층 전체가 옳은 몸을 잰다). */
   {
-    const 전 = (await sql(`select count(*)::int as n from engine.schema_migrations where version='20260821120000'`))[0].n;
-    const r = await 실행(마이그);
-    확인('A1 재적용 멱등 — 적용된 DB 위에 같은 조각을 다시 돌려도 오류 0(§12-21)', r.ok, r.메시지 && r.메시지.slice(0, 300));
-    const 후 = (await sql(`select count(*)::int as n from engine.schema_migrations where version='20260821120000'`))[0].n;
-    확인('A1 이력 행이 안 늘어난다(채번 가드)', 전 === 1 && 후 === 1, { 전, 후 });
+    const 전 = (await sql(`select count(*)::int as n from engine.schema_migrations where version >= '20260821120000'`))[0].n;
+    for (const p of 재적용경로들) {
+      const r = await 실행(fs.readFileSync(p, 'utf8'));
+      확인(`A1 재적용 멱등 — ${path.basename(p)} 재적용 오류 0(§12-21)`, r.ok, r.메시지 && r.메시지.slice(0, 300));
+    }
+    const 후 = (await sql(`select count(*)::int as n from engine.schema_migrations where version >= '20260821120000'`))[0].n;
+    확인('A1 이력 행이 안 늘어난다(채번 가드) · 파일 수와 같다', 전 === 재적용경로들.length && 후 === 재적용경로들.length, { 전, 후, 파일수: 재적용경로들.length });
+    확인('A1 재적용 뒤 jobs_load 가 «마지막 판»의 몸이다(활성일 가드 실재 — 덮임 탐지)', (await sql(`
+      select position('skipped_inactive' in pg_get_functiondef('engine.jobs_load(date,uuid,jsonb,uuid[])'::regprocedure)) > 0 as b`))[0].b === true);
   }
 
   /* A2 스키마 동일성 — 「재적용의 성공은 동일성의 증거가 아니다」(가드가 불일치를 삼킨다). */
@@ -275,6 +290,31 @@ async function main() {
     console.log(`  ▸ §16-1 선행 필수 ${n}/4 — #1 c12계약 ${n1 ? '✓' : '✗'} · #3 늦적재조회층 ${n3 ? '✓' : '✗'} · #5 판독기 ${n5 ? '✓' : '✗'} · #6 §8-B결과 ${n6 ? '✓' : '✗'}`);
     if (n < 4) console.log('  ▸ 🔒 4/4 아님 — §12 항31: 운영 붓기 차단(리허설까지가 상한)');
     확인('A7 선행 n/4 — 엔진 몫 셋(#1·#3·#5)은 서 있다(#6 은 유호님 몫)', n1 && n3 && n5, { n1, n3, n5, n6 });
+  }
+
+  /* A8 활성 조각 — §12-21 cron 등록 대조의 «실물» 반쪽. 파일↔코드 정본 대조는
+   * tests/활성조각.test.js 가 상시로 지고, 여기는 활성 «후»(gen_active_from 실재 — A층은
+   * 임시를 안 세우므로 실재 = 착지됨) cron.job 실물이 착지 마이그 본문과 같은지를 잰다.
+   * 실물 == 파일이고 파일 == 정본(순수 테스트)이면 전이로 실물 == 정본이다. */
+  {
+    const 활성 = (await sql(`select to_regprocedure('engine.gen_active_from()') is not null as b`))[0].b;
+    const 착지들 = fs.readdirSync(마이그폴더).filter((f) => /_gen_activate_c12\.sql$/.test(f));
+    if (!활성) {
+      console.log('  ▸ A8 활성 전 — cron 실물 대조는 착지 뒤 이 갈래가 진다(파일 층은 tests/활성조각.test.js · 대기 파일 supabase/활성조각_c12.sql)');
+    } else {
+      치명확인('A8 활성인데 착지 마이그가 마이그 폴더에 있다(절차 2 — 이동)', 착지들.length === 1, 착지들);
+      const 조각 = fs.readFileSync(path.join(마이그폴더, 착지들[0]), 'utf8');
+      const { 크론표 } = require('../lib/생성상수.js');
+      const 잡들 = await sql(`select jobname, schedule, command from cron.job
+        where jobname in ('deliver-daily','deliver-check','generate-worker','generate-deadline')`);
+      확인('A8 cron 4잡 실재(§12-21 — 표만 있고 마이그가 없는 것이 원 결함)', 잡들.length === 4, 잡들.map((j) => j.jobname));
+      for (const j of 잡들) {
+        확인(`A8 ${j.jobname} 스케줄 == 크론표(생성상수 정본)`, j.schedule === 크론표[j.jobname], { 실물: j.schedule, 정본: 크론표[j.jobname] });
+        const 몸 = 조각.split(`cron.schedule('${j.jobname}'`)[1]?.split('$job$);')[0]?.split('$job$')[1];
+        확인(`A8 ${j.jobname} 실물 command == 착지 마이그 본문(오과녁 차단 — 무엇이 도는가)`,
+          몸 != null && j.command.trim() === 몸.trim(), { 실물머리: String(j.command).slice(0, 80) });
+      }
+    }
   }
 
   /* ════════ B. 물리층 — 가상 미래일 ════════ */
@@ -644,6 +684,26 @@ async function main() {
       const g = (await sql(`select status, winning_attempt_id from engine.generation_jobs where job_id='${잔존시도.job_id}'::uuid`))[0];
       return ok === true && g.status === '마감폴백' && g.winning_attempt_id === null;
     })());
+  }
+
+  /* B6 활성일 가드(§12-28 «전환» · §3-2-a C5 · 가드 마이그 20260822090000) — 활성 시작일
+   * «이전» 날짜로 jobs_load 를 부르면 0건 적재. 활성 함수를 처녀날짜보다 먼 미래로 임시 세워
+   * 발동을 실측하고 걷는다(C층 임시 장치 선례 — 잔존 없음 확인까지가 한 벌). 함수가 «없는»
+   * 동안의 무동작(행동 불변)은 B1~B5 전체가 그 상태로 초록인 것이 증인이다. */
+  {
+    const D6 = await 처녀날짜();
+    try {
+      await sql(`create or replace function engine.gen_active_from() returns date language sql immutable as $f$ select date '9999-01-01' $f$`);
+      const runG = (await sql(`select engine.batch_run_start('${D6}'::date, '배치', ${실행판봉투(D6)}, ${명단봉투([학['성공']])}) as id`))[0].id;
+      치명확인('B6 가드 실증용 시작 행이 선다(처녀날짜 — 리더 없음)', !!runG);
+      const r = (await sql(`select engine.jobs_load('${D6}'::date, '${runG}'::uuid, ${제이슨([대상('성공', D6)])}, '{}'::uuid[]) as j`))[0].j;
+      확인('B6 §12-28 전환 — 활성일 «이전» 날짜의 jobs_load 는 0건 적재(skipped_inactive · v5.13-d)', r.created === 0 && r.existing === 0 && r.skipped_inactive === true, r);
+      확인('B6 물리 — 그 날짜의 generation_jobs 행 0(가드의 몸은 반환값이 아니라 «행 부재»다)', (await sql(`
+        select count(*)::int as n from engine.generation_jobs where assign_date='${D6}'::date`))[0].n === 0);
+    } finally {
+      await sql(`drop function if exists engine.gen_active_from()`);
+      확인('B6 임시 활성 함수 걷힘(잔존 false)', (await sql(`select to_regprocedure('engine.gen_active_from()') is null as b`))[0].b === true);
+    }
   }
 
   }   // ← 모드 물리·전부 (A+B)
