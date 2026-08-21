@@ -205,14 +205,32 @@ async function 원장인가(req: Request): Promise<boolean> {
  *   배치 예정 시각 +30분에 이 모드로 한 번 더 부른다: 오늘 배정 수 < 재적 수면 미달이다.
  *   S1 구간의 수신자는 유호님 한 명이라 별도 발송 통로를 만들지 않는다 — 로그 1행 + 응답. */
 async function 점검하기(오늘: string) {
+  /* 🔴 **배정일의 정본은 `occurred_at` 이 아니라 멱등키의 셋째 마디다** (2026-08-22 수리).
+   *   `멱등키` 정본 = `lib/오늘과제.js` 의 `종류:learner:날짜` 이고, 생성 트랙의 착지 SQL
+   *   (마이그 20260821120000 jobs_land)도 같은 글자를 쓴다. `occurred_at` 은 «행이 실제로
+   *   앉은 시각»이라 배정일과 갈릴 수 있고, 갈리는 순간 이 칸은 **조용히** 틀린다:
+   *     · 배치가 자정을 넘겨 끝나면 뒤쪽 학생의 occurred_at 은 «내일»이라, 다 돈 날이 미달로
+   *       뜬다. (마감 `due_at` 은 이미 이 함정을 피해 `오늘` 을 쓴다 — 점검만 남아 있었다.)
+   *     · 반대로 오늘 앉았지만 «다른 날» 배정인 행(구제·재적재·픽스처)이 오늘 분자에 섞인다.
+   *   🔑 실측이 그 둘째 갈래를 잡았다(2026-08-22 리허설): 생성왕복시험 픽스처가 배정일
+   *     2030-01-xx 를 «지금» 시각으로 앉히자 분자 741 > 분모 693 이 되어 **미달이 영영
+   *     false** 였다 — §6-5 의 유일한 눈이 꺼진 채로 「정상」을 보고했다. 새는 방향이 「통과」다.
+   * 🔑 분자와 분모의 **단위**도 맞춘다 — 분모는 학생 수인데 분자는 행 수였다. 키는 학생·날짜당
+   *   유일(`learning_events_learner_id_idempotency_key_key`)이라 이 셈이 곧 학생 수다.
+   * ⚠ 키 글자를 여기 적는 이유 — 집합 질의라 학생마다 `멱등키()` 를 부를 수 없다(생성 트랙
+   *   마이그가 같은 글자를 쓰는 것도 같은 사정이다). 셋이 갈리면 이 칸은 0 을 세고 미달이
+   *   **항상 참**이 된다 — 그건 시끄러운 방향이라 조용히 죽지는 않는다.
+   * ⚠ 천장: 이 술어는 인덱스를 못 탄다(두 열을 이어 붙인 식). 옛 판의 `at time zone` 식도
+   *   같은 전량 스캔이라 지금 바뀐 것은 없고, 학급이 수십만 행이 되는 날 여기에 식 인덱스가
+   *   필요해진다 — 그때는 스키마 레인의 일이다. */
   const [r] = await sql`
     select (select count(*) from engine.learners) as 재적,
            (select count(*) from engine.learning_events
              where event_type = 'task.assigned'
-               and (occurred_at at time zone ${시간대})::date = ${오늘}::date) as 배정,
+               and idempotency_key = 'task:' || learner_id::text || ':' || ${오늘}) as 배정,
            (select count(*) from engine.learning_events
              where event_type = 'task.assigned' and degraded
-               and (occurred_at at time zone ${시간대})::date = ${오늘}::date) as 강등`;
+               and idempotency_key = 'task:' || learner_id::text || ':' || ${오늘}) as 강등`;
   const 재적 = Number(r.재적), 배정 = Number(r.배정), 강등 = Number(r.강등);
   const 미달 = 배정 < 재적;
   if (미달) console.error(`[deliver] 🔴 배치 미달 — ${오늘} 배정 ${배정}/${재적}`);
