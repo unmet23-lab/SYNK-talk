@@ -31,6 +31,7 @@ import 과제모듈 from './오늘과제.mjs';
 import 동의모듈 from './동의게이트.mjs';
 import 계약판모듈 from './계약판.mjs';
 import 사유모듈 from './벤더사유.mjs';
+import 생성문구모듈 from './문구_생성.mjs';
 
 /* 진단 한 칸(`blocked`)을 위해서만 쓴다 — 이 함수는 막는 게이트가 아니다(아래 주석). */
 const { 지금유효, 거절몸통 } = 동의모듈 as {
@@ -41,7 +42,7 @@ const { 지금유효, 거절몸통 } = 동의모듈 as {
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
 const { 벤더사유 } = 사유모듈 as { 벤더사유: (글: unknown, 상한?: number) => string | null };
 /* 🔴 `시간대` 도 여기서 가져온다 — 리터럴을 다시 적으면 배치와 조회가 갈린다(절단문서 ①-14). */
-const { 몽골날짜, 시간대, 학생판스냅샷, 구제할까 } = 과제모듈 as {
+const { 몽골날짜, 시간대, 학생판스냅샷, 구제할까, 구앱안내항목 } = 과제모듈 as {
   몽골날짜: (때?: Date) => string;
   시간대: string;
   /* 🔴 배정 0인 날을 구제할지의 판정 — **여기 인라인으로 다시 적지 않는다**(B3).
@@ -50,6 +51,12 @@ const { 몽골날짜, 시간대, 학생판스냅샷, 구제할까 } = 과제모�
   구제할까: (상황: { 배정수: number; 막힘: unknown; 날짜: string; 오늘: string }) => boolean;
   /* 🔴 이 응답이 답안지가 되지 않게 거르는 자리(절단문서 ②-20) — 목록도 정본도 저 파일 하나다. */
   학생판스냅샷: (snap: unknown) => unknown;
+  /* ⓔ-22 — 활성 뒤 구앱 응답의 `data` 에 싣는 안내 항목. 모양의 정본은 저 파일(`화면과제` 옆)이고
+   *   문구는 `contents/문구_생성.js`(카피 소관) — 이 함수는 둘을 잇기만 한다. */
+  구앱안내항목: (날짜: string, 안내: unknown) => Record<string, unknown> | null;
+};
+const { 생성안내 } = 생성문구모듈 as {
+  생성안내: (상태: unknown) => { 제목: string[]; 본문: string[] } | null;
 };
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
@@ -323,6 +330,31 @@ Deno.serve(async (req: Request) => {
       } catch (e) {
         /* 판정 실패는 «없음»으로 낸다(현행 동작) — 조회 부속이 본 응답을 깨지 않는다. */
         console.error('[tasks] assignment_status 판정 실패(없음으로 낸다)', String((e as Error)?.message ?? e));
+      }
+    }
+
+    /* ⓔ-22 «구앱 간주»의 서버 반쪽(§3-1 v5.13 · C0 §4-3 ① 「창의 수명」) — **활성 시작일 이후**의
+     * 구앱(c12 전 판 선언) 접속은 `assignment_status` 미지원으로 간주하고, 생성중·오류의 안내를
+     * `data` 에 실어 보낸다(새 칸 0 — 구앱이 이미 읽는 그 칸이다). 그래야 「곧 생기는데 없다고
+     * 읽고 닫는」 경험이 빈 화면이 아니라 안내로 닫힌다.
+     * · 활성 «전»은 무동작 — `gen_active_from` 은 활성 조각이 세우므로 함수 부재 = 현행 그대로
+     *   (`deliver` 의 생성 모드 게이트와 같은 무늬 · 배포 순서가 어긋나도 행동이 안 바뀐다).
+     * · 신앱(c12 이상 선언)은 이 분기 밖 — 그 칸을 읽고 문구는 앱이 그린다(§12-11 어댑터).
+     * · 안내 항목은 `task_ref` 가 null 이라 구앱이 발화를 서버로 안 보낸다(`화면과제` 의 안전판) —
+     *   안내를 향해 말한 것이 사건이 되면 안 된다. */
+    if ((assignment_status === '생성중' || assignment_status === '오류') && (판번호(선언) as number) < 12) {
+      try {
+        const fn = await sql`select (to_regprocedure('engine.gen_active_from()') is not null) as 있음`;
+        if (fn[0]?.있음) {
+          const 활성 = await sql`select engine.gen_active_from() <= ${날짜}::date as 켜짐`;
+          if (활성[0]?.켜짐) {
+            const 항목 = 구앱안내항목(날짜, 생성안내(assignment_status));
+            if (항목) (data as Array<Record<string, unknown>>).push(항목);
+          }
+        }
+      } catch (e) {
+        /* 안내 조립 실패는 빈 채로 낸다 — 부속이 본 응답을 깨지 않는다(위 판정과 같은 규율). */
+        console.error('[tasks] 구앱 안내 조립 실패(빈 채로 낸다)', String((e as Error)?.message ?? e));
       }
     }
 
