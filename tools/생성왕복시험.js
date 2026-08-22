@@ -731,6 +731,15 @@ async function main() {
     }
   };
   const 워커호출 = () => 함수호출('', { 함수: 'deliver-one' });
+  /* §8-B 벤더 통로(deliver-one?평가=1 · v5.13-e ⑤) — 갈래 «도달»만 잰다(벤더 0): 사례 0건이면 400 계약(1~상한) ·
+   * 모델이 없으면 503 eval_no_model 이 먼저 온다(둘 다 갈래에 닿았다는 증거 · 운영 큐 무접촉). 실제 벤더 왕복은 #6 몫. */
+  const 평가통로도달 = async () => {
+    const r = await fetch(`https://${ref}.supabase.co/functions/v1/deliver-one?%ED%8F%89%EA%B0%80=1`, {
+      method: 'POST', headers: { Authorization: `Bearer ${service}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ 사례: [] }),
+    });
+    let 몸 = null; try { 몸 = JSON.parse(await r.text()); } catch { /* 비 JSON — 아래 판정이 잡는다 */ }
+    return { status: r.status, 몸 };
+  };
 
   /* 오늘층 학생 — 대상 3(어제 배정 심기) + 첫날 1. */
   const 오늘이름 = ['대상1', '대상2', '대상3', '첫날생'];
@@ -760,6 +769,13 @@ async function main() {
   try {
     await sql(`create or replace function engine.gen_active_from() returns date language sql immutable as $f$ select date '2020-01-01' $f$`);
     활성섰다 = true;
+
+    /* C1 §8-B 평가 갈래 도달(v5.13-e ⑤ — 운영 큐 무접촉 벤더 통로) — 사례 0건 → 400(1~상한 계약) 또는 모델 미설정 → 503. */
+    {
+      const e = await 평가통로도달();
+      확인('C1 deliver-one?평가=1 갈래가 서 있다 — 빈 사례는 400(사례 1~상한) · 모델 미설정이면 503 eval_no_model(둘 다 도달 증거 · 벤더 0)',
+        (e.status === 400 && !!e.몸 && /사례는 1~/.test(String(e.몸.error))) || (e.status === 503 && !!e.몸 && e.몸.error === 'eval_no_model'), e);
+    }
 
     /* C2 맥락 계약(§3-1 v5.8) — 활성 뒤 필수·값목록·조합. */
     확인('C2 활성 + 맥락 누락 = 400(fail-closed — 조용히 옛 길로 안 간다)', (await 함수호출()).status === 400);
