@@ -14,11 +14,14 @@ import { 색, 폰트, 모노트래킹 } from './테마';
 import { 생성안내 } from '../contents/문구_생성.js';
 
 /**
- * @param {{상태: string|null, 학생번호?: string|null}} props
+ * @param {{상태: string|null, 학생번호?: string|null, 이름?: string|null}} props
  *   `상태` = `오늘과제받기()` 가 실어 온 `assignment_status`. 그릴 것이 없으면 null — 빈 카드를 세우지 않는다.
+ *   `이름` = 학생 이름(`display_name`) — 있으면 오류 제목이 「{이름}님답게」 판으로 선다(정본·치환은
+ *   `contents/문구_생성.js` 하나). ⚠ 지금 로그인 세션에는 이름이 안 실려(인증API — 합성 이메일뿐)
+ *   호출부가 못 넘긴다 — 세션에 이름이 실리는 날 이 prop 만 이으면 켜진다(이름 없는 판이 그때까지 정본).
  */
-export default function 생성카드({ 상태, 학생번호 = null }) {
-  const 안 = 생성안내(상태);
+export default function 생성카드({ 상태, 학생번호 = null, 이름 = null }) {
+  const 안 = 생성안내(상태, 이름);
   if (!안) return null;
 
   return (

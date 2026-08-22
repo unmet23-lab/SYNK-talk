@@ -203,7 +203,7 @@ export default function 보고서교정화면({
       idempotency_key: 흐름id(),
     });
     if (!사건) {
-      set오류('답을 담지 못했어요 — 잠시 뒤 다시 눌러 주세요');
+      set오류('답을 다시 담아 볼게요! 잠시 뒤 다시 눌러 주세요');
       return;
     }
     await 담아넘기기(사건, null);
@@ -213,7 +213,7 @@ export default function 보고서교정화면({
     if (!이번 || !짚은것) return;
     const 교정문 = 교정문만들기(이번.보기, 짚은것, 입력참조.current);
     if (교정문 === null) {
-      set오류('고친 문장을 담지 못했어요 — 잠시 뒤 다시 눌러 주세요');
+      set오류('고친 문장을 다시 담아 볼게요! 잠시 뒤 다시 눌러 주세요');
       return;
     }
     let 현재로그 = 로그;
@@ -229,7 +229,7 @@ export default function 보고서교정화면({
       idempotency_key: 흐름id(),
     });
     if (!사건) {
-      set오류('고친 문장을 담지 못했어요 — 잠시 뒤 다시 눌러 주세요');
+      set오류('고친 문장을 다시 담아 볼게요! 잠시 뒤 다시 눌러 주세요');
       return;
     }
     await 담아넘기기(사건, 교정문);

@@ -258,7 +258,7 @@ export default function 서류관문화면({
       idempotency_key: 흐름id(),
     });
     if (!사건) {
-      set오류('답을 담지 못했어요 — 잠시 뒤 다시 눌러 주세요');
+      set오류('답을 다시 담아 볼게요! 잠시 뒤 다시 눌러 주세요');
       return;
     }
     await 담아넘기기(사건, 턴재료.스냅샷.prompt_seed, { 본문 });
@@ -274,7 +274,7 @@ export default function 서류관문화면({
       idempotency_key: 흐름id(),
     });
     if (!사건) {
-      set오류('넘김을 담지 못했어요 — 잠시 뒤 다시 눌러 주세요');
+      set오류('넘김을 다시 담아 볼게요! 잠시 뒤 다시 눌러 주세요');
       return;
     }
     await 담아넘기기(사건, 턴재료.스냅샷.prompt_seed, { 모름: true });
@@ -294,7 +294,7 @@ export default function 서류관문화면({
       idempotency_key: 흐름id(),
     });
     if (!사건) {
-      set오류('바꿔 쓴 문장을 담지 못했어요 — 잠시 뒤 다시 눌러 주세요');
+      set오류('바꿔 쓴 문장을 다시 담아 볼게요! 잠시 뒤 다시 눌러 주세요');
       return;
     }
     await 담아넘기기(사건, 턴재료.스냅샷.prompt_seed, { 본문 });

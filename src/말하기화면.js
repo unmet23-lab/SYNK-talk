@@ -395,9 +395,11 @@ export default function 말하기화면({
         if (살아있음) set서버생성상태(null); // 서버를 못 받은 날은 생성 상태도 모른다 — 추측으로 그리지 않는다
         게임수거참조.current = null; // 오늘을 모르는 날은 수거도 쉰다(오귀속보다 0건)
         결과 = 화면과제(null, 폴백);
+        /* 말투 = 시스템 말투 상시 규칙(유호 확정 08-22 · synk-brand) — 귀책·결핍 대신 진행형·명랑.
+         * 원인(e.message)은 남긴다: 명랑은 말투지 정보 삭제가 아니다. */
         결과.사유 = 토큰
-          ? `오늘 과제를 받지 못했어요 — ${String(e.message || e)}`
-          : '오늘 과제를 받지 못했어요';
+          ? `오늘 과제를 다시 받아 볼게요! (${String(e.message || e)})`
+          : '오늘 과제를 다시 받아 볼게요!';
       }
       if (!살아있음) return;
       set과제(결과);
@@ -412,7 +414,7 @@ export default function 말하기화면({
       try {
         await setAudioModeAsync({ playsInSilentMode: true });
       } catch (e) {
-        if (살아있음) set오류('소리를 준비하지 못했어요: ' + String(e.message || e));
+        if (살아있음) set오류('소리를 다시 준비할게요! (' + String(e.message || e) + ')');
       }
 
       /* 🔑 **밀린 것을 여기서 올린다** — 몽골 회선에서 제출 순간 전송이 실패하는 것은 예외가
@@ -870,7 +872,7 @@ function 녹음카드({
     } catch (e) {
       set단계('대기');
       set녹음(null);
-      set막힘('녹음을 시작하지 못했어요: ' + String(e.message || e));
+      set막힘('녹음을 다시 준비할게요! (' + String(e.message || e) + ')');
     }
   };
 
@@ -902,7 +904,7 @@ function 녹음카드({
     } catch (e) {
       set단계('대기');
       set녹음(null);
-      set막힘('녹음을 담지 못했어요: ' + String(e.message || e));
+      set막힘('녹음을 다시 담아 볼게요! (' + String(e.message || e) + ')');
       return;
     }
 

@@ -34,14 +34,43 @@ test('② 문구 칸이 비어 있지 않다 — §12-11 이 재는 전부(질�
     assert.ok(안.제목.ko.trim().length, `${값} 제목 ko 빔`);
     assert.ok(안.본문.ko.trim().length, `${값} 본문 ko 빔`);
     assert.equal(안.제목.mn, ''); assert.equal(안.본문.mn, '');   // 지어낸 번역 0(문구_동의 규율)
+    if (안.제목_이름없음) {
+      assert.ok(안.제목_이름없음.ko.trim().length, `${값} 이름 없는 판 ko 빔`);
+      assert.ok(!안.제목_이름없음.ko.includes('{이름}'), `${값} 이름 없는 판에 자리표가 남았다`);
+    }
   }
 });
 
-test('③ synk-brand 바닥 — 금칙어·금칙 형태·이모지 0 · 존댓말 · 카피 확정 표식', () => {
-  const 전문 = Object.values(생성문구).flatMap((안) => [안.제목.ko, 안.본문.ko]).join('\n');
+test('③ synk-brand 바닥 — 금칙어·금칙 형태·이모지 0 · 존댓말(말투 규칙: 느낌표 허용) · 카피 확정', () => {
+  const 전문 = Object.values(생성문구)
+    .flatMap((안) => [안.제목.ko, 안.본문.ko, 안.제목_이름없음 ? 안.제목_이름없음.ko : null])
+    .filter(Boolean).join('\n');
   for (const w of 금칙어) assert.ok(!전문.includes(w), `금칙어 «${w}»`);
   for (const w of 금칙형태) assert.ok(!전문.includes(w), `금칙 형태 «${w}»`);
   assert.ok(!이모지.test(전문), '이모지 0(DESIGN §1 — 위계는 킷이 진다)');
-  for (const 줄 of 전문.split('\n').filter(Boolean)) assert.match(줄, /요\.?$|요$|게요\.?$/, `존댓말 «~요» 로 끝나야 한다: ${줄}`);
-  assert.equal(typeof 카피확정, 'boolean', '카피 확정 표식은 boolean — 임시 문구임을 기계에 남긴다');
+  /* 시스템 말투 상시 규칙(유호 확정 08-22) — 존댓말 「~요」 + 명랑 느낌표 허용. */
+  for (const 줄 of 전문.split('\n').filter(Boolean)) assert.match(줄, /(?:게?요)[.!]?$/, `존댓말 «~요» 로 끝나야 한다(느낌표 허용): ${줄}`);
+  assert.equal(카피확정, true, '유호 확정 08-22 — 임시 표식이 되돌아왔다면 카피가 낡은 것이다');
+});
+
+test('④ 말투 규칙 — 귀책·결핍 낱말이 학생 문구에 없다 (유호 확정 08-22 「귀책이더라도 긍정·명랑」)', () => {
+  const 전문 = Object.values(생성문구)
+    .flatMap((안) => [안.제목.ko, 안.본문.ko, 안.제목_이름없음 ? 안.제목_이름없음.ko : null])
+    .concat([생성안내('알수없는값').제목.join(' '), 생성안내('알수없는값').본문.join(' ')])
+    .filter(Boolean).join('\n');
+  for (const w of ['못했', '못 했', '불러오지 못', '오류', '실패', '문제가', '죄송', '없어요']) {
+    assert.ok(!전문.includes(w), `귀책·결핍 낱말 «${w}» — 진행형·긍정으로 재프레임한다`);
+  }
+});
+
+test('⑤ 이름 자리 — 있으면 「{이름}님답게」 판, 없으면 이름 없는 판 · 지어내지 않는다', () => {
+  const 있음 = 생성안내('오류', '바트');
+  assert.ok(있음.제목.join(' ').includes('바트님'), 있음.제목.join(' '));
+  assert.ok(!있음.제목.join(' ').includes('{이름}'), '자리표가 화면에 샜다');
+  for (const 빈 of [null, undefined, '', '  ']) {
+    const 없음 = 생성안내('오류', 빈);
+    assert.equal(없음.제목.join(' '), 생성문구.오류.제목_이름없음.ko, `빈 이름(${JSON.stringify(빈)})인데 이름 판이 나갔다`);
+  }
+  // 이름 자리가 없는 문구(생성중)는 이름이 와도 원문 그대로다.
+  assert.equal(생성안내('생성중', '바트').제목.join(' '), 생성문구.생성중.제목.ko);
 });

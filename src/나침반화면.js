@@ -73,7 +73,7 @@ export default function 나침반화면({ 토큰, 돌아가기 }) {
       set세션(null);
       /* 🔑 「시즌이 안 열렸다」는 **운영 안내**로 가른다(위 머리말) — 오류색으로 그리면
        *   강사는 앱을 의심하고, 그러면 그날의 나침반이 통째로 밀린다. */
-      set오류({ 말: e?.message || '열지 못했어요', 운영: e?.code === 'SEASON_NOT_OPEN' });
+      set오류({ 말: e?.message || '다시 여는 중이에요!', 운영: e?.code === 'SEASON_NOT_OPEN' });
     } finally { set도는중(false); }
   }, [토큰, 학생번호입력]);
 
@@ -111,7 +111,7 @@ export default function 나침반화면({ 토큰, 돌아가기 }) {
     } catch (e) {
       /* 🔑 `SEASON_ROLLED` = 화면을 연 뒤 시즌 경계가 넘어갔다. 이건 실패가 아니라 **다시
        *   열어야 한다**는 뜻이라 그대로 말한다(조준이 밀린 자리 · 서버 머리말 🔑). */
-      set오류({ 말: e?.message || '저장하지 못했어요', 운영: e?.code === 'SEASON_ROLLED' });
+      set오류({ 말: e?.message || '저장을 다시 해 볼게요!', 운영: e?.code === 'SEASON_ROLLED' });
     } finally { set도는중(false); }
   }, [채워짐, 도는중, 문항들, 답값, 토큰, 세션, 시즌회차, 바꿨나]);
 

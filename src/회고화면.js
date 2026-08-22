@@ -90,7 +90,7 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
       set세션(null);
       /* 🔑 「회고할 시즌이 없다」는 **운영 안내**로 가른다 — 오류색으로 그리면 강사는 앱을
        *   의심하고, 그러면 그날의 회고가 통째로 밀린다(밀린 회고 = 라벨 0). */
-      set오류({ 말: e?.message || '열지 못했어요', 운영: e?.code === 'RETRO_NOT_DUE' });
+      set오류({ 말: e?.message || '다시 여는 중이에요!', 운영: e?.code === 'RETRO_NOT_DUE' });
     } finally { set도는중(false); }
   }, [토큰, 학생번호입력]);
 
@@ -105,7 +105,7 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
        *   강사가 판정해 버리고, 그 행의 대조군은 영영 null 이다. */
       set자기저장됨(r.자기판정);
     } catch (e) {
-      set오류({ 말: e?.message || '학생 판정을 적지 못했어요', 운영: e?.code === 'SELF_AFTER_JUDGE' });
+      set오류({ 말: e?.message || '판정을 다시 적어 볼게요!', 운영: e?.code === 'SELF_AFTER_JUDGE' });
     } finally { set도는중(false); }
   }, [토큰, 세션, 자기고름, 도는중]);
 
@@ -118,7 +118,7 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
       });
       set확정(r);
     } catch (e) {
-      set오류({ 말: e?.message || '확정하지 못했어요', 운영: e?.code === 'RETRO_NOT_OPENED' });
+      set오류({ 말: e?.message || '확정을 다시 해 볼게요!', 운영: e?.code === 'RETRO_NOT_OPENED' });
     } finally { set도는중(false); }
   }, [토큰, 세션, 강사고름, 사유, 도는중]);
 
@@ -183,7 +183,7 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
           </Text>
           <Text style={s.메모}>
             {세션.시즌?.starts_on ?? ''} ~ {세션.시즌?.ends_on ?? '진행 중'}
-            {굳힌것?.구간?.시즌_진행중 ? ' (교재가 아직 끝나지 않았어요 — 오늘까지 기준으로 계산해요)' : ''}
+            {굳힌것?.구간?.시즌_진행중 ? ' (교재가 아직 진행 중이에요 — 오늘까지 기준으로 계산해요)' : ''}
           </Text>
         </View>
       )}

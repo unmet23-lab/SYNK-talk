@@ -102,13 +102,15 @@ export async function 부르기(길, 토큰, 몸) {
  */
 export async function 사건보내기(토큰, 사건) {
   if (!토큰) return { 오류: '로그인이 풀렸어요', 끝: false };
-  if (!사건) return { 오류: '보낼 내용을 만들지 못했어요', 끝: true };
+  /* 말투 = 시스템 말투 상시 규칙(유호 확정 08-22) — 영구 실패도 «선생님과 함께 챙기는» 프레임으로.
+   * 「끝: true」(서버에 안 갔다)라는 사실은 화면 흐름이 지고, 학생 문장은 다음 걸음만 준다. */
+  if (!사건) return { 오류: '이 답은 선생님과 함께 챙길게요 — 이 화면을 보여 주세요!', 끝: true };
 
   const v = 검증(사건, {});
   // 학생 오류칸에 그대로 뜬다 — 개발 어휘를 앞세우지 않고, 학생이 할 수 있는 다음 걸음을 먼저 준다.
   // 실패 가시성(P0 §4-1)은 괄호로 보존한다: 원인 문자열을 지우면 강사·개발이 못 쫓는다.
   if (!v.ok) {
-    return { 오류: `앱이 보낼 기록을 만들지 못했어요 — 선생님께 알려 주세요 (계약 위반: ${v.오류들.join(' · ')})`, 끝: true };
+    return { 오류: `이 기록은 선생님과 함께 챙길게요 — 이 화면을 보여 주세요! (계약 위반: ${v.오류들.join(' · ')})`, 끝: true };
   }
 
   const 첫판 = await 한벌쏘기(토큰, 사건);
@@ -125,7 +127,7 @@ export async function 사건보내기(토큰, 사건) {
   const 다시 = { ...사건, idempotency_key: 흐름id() };
   const 둘째판 = await 한벌쏘기(토큰, 다시);
   if (둘째판.충돌) {
-    return { 오류: '앱에 문제가 생겨 이 발화를 보내지 못했어요 — 선생님께 알려 주세요', 끝: true };
+    return { 오류: '이 발화는 선생님과 함께 챙길게요 — 이 화면을 보여 주세요!', 끝: true };
   }
   return 둘째판.결과;
 }
@@ -148,5 +150,5 @@ async function 한벌쏘기(토큰, 사건) {
   }
   const e = (한건 && 한건.error) || {};
   if (e.code === 'IDEMPOTENCY_CONFLICT') return { 충돌: true, 결과: null };
-  return { 충돌: false, 결과: { 오류: e.message || '서버가 받지 않았어요', 끝: e.retryable === false } };
+  return { 충돌: false, 결과: { 오류: e.message || '전달이 조금 늦어지고 있어요', 끝: e.retryable === false } };
 }

@@ -190,7 +190,7 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
       compose_meta: 계측payload(계측참조.current, 경과시계()),
     });
     if (!사건) {
-      set오류('메일을 담지 못했어요 — 잠시 뒤 다시 눌러 주세요');
+      set오류('메일을 다시 담아 볼게요! 잠시 뒤 다시 눌러 주세요');
       return;
     }
     try {
