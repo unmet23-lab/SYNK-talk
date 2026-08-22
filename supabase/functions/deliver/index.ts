@@ -270,6 +270,20 @@ function 대상질의(스냅기준: string, 한사람: string | null,
    *   건너뛴 채 §6-5 미달로 드러난다. 동의 없이 배정하는 우회로를 만들지 않는다. */
   return sql`
     select l.learner_id, l.level_current, l.goal_track,
+           /* ㉢ 경로 A(08-22 · 엔진검토 Ⅰ-② 둘째 통로) — 배정 «날짜»를 덮는 시즌의, 그 학생
+            * 나침반 답 하나. correct 의 첨삭 배선(08-20)과 같은 무늬이고 기준만 다르다: 그쪽은
+            * 「그 제출의 날」(첨삭은 비동기), 여기는 「오늘」 — 이 질의가 짓는 것이 오늘 배정이다.
+            * 날짜는 스냅기준에서 파생한다(같은 호출의 몽골날짜()와 같은 값 — 인자를 늘리면 세
+            * 갈래 호출부가 같이 늘고, 둘이 갈리면 시즌 경계의 밤에 어제 시즌으로 오늘을 짓는다).
+            * 겹침은 DDL(no_overlap)이 막아 덮는 시즌은 많아야 1 — limit 1 은 그 사실의 표기다.
+            * 소비자는 생성 모드의 요약(과제요약 조각)뿐 — 현행(비생성) 경로는 이 칸을 안 읽는다. */
+           (select c.answers->>'season_goal'
+              from engine.season sn
+              join engine.season_compass c
+                on c.season_id = sn.season_id and c.learner_id = l.learner_id
+             where sn.starts_on <= (${스냅기준}::timestamptz at time zone ${시간대})::date
+               and (sn.ends_on is null or sn.ends_on >= (${스냅기준}::timestamptz at time zone ${시간대})::date)
+             limit 1) as 시즌목표,
            배정.occurred_at as 마지막배정, 배정.task_snapshot as 마지막스냅샷,
            교정.corrected_text as 교정문, 교정.correction_id as 교정id, 교정.원사건,
            동의.consent_ver, 동의.consent_id,

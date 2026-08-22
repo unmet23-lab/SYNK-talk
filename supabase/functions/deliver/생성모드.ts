@@ -98,6 +98,9 @@ function 학생조립(학생: Record<string, unknown>, 재료: {
       { as_of: 스냅기준, ingested_as_of: 스냅기준, 시간대 });
     const 요약산출 = 과제요약(상태, {
       목표: (학생.goal_track ?? null) as string | null, 급수: 원급수,
+      /* ㉢ 나침반(경로 A) — 대상조회가 배정 날짜의 시즌에서 걷어 온 season_goal.
+       * 없으면 null → 요약에 안 실린다(널 규칙 · 나침반 0행이 개원 전 정상 상태). */
+      시즌목표: (학생.시즌목표 ?? null) as string | null,
     });
 
     /* 겨냥(§6-0) — 대상만. 비대상은 빈 배열(A11 ⑦ 존재 대조는 빈 배열 면제). */
