@@ -559,7 +559,7 @@ async function 배달하기(오늘: string, 한사람: string | null = null, 맥
    *   묶음을 키우면 힙이, 동시를 키우면 커넥션이 먼저 벽에 닿는다 — 두 손잡이의 벽이 다르다.
    * ⚠ 묶음 사이에는 벽(barrier)이 선다 — 앞 묶음이 다 끝나야 다음 쪽을 부른다. 완전 파이프라인
    *   보다 조금 느리지만, 그 벽이 곧 «힙이 다시 내려가는 자리»라 여기선 그게 이득이다. */
-  const 묶음크기 = 100;
+  const 묶음크기 = 25;
 
   const 묶음처리 = async (학생들: Record<string, unknown>[]) => {
     const 묶음결과: Record<string, unknown>[] = new Array(학생들.length);
