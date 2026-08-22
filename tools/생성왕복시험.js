@@ -916,11 +916,20 @@ async function main() {
      * 재는 본질(«벤더 산출 없이도 배치가 전원 2단 착지·예외 0»)은 두 갈래가 같으므로 둘 다 초록,
      * 갈래는 로그로 밝힌다. 워커의 키없음 «갈래» 자체는 키를 걷은 환경에서만 실측된다(정직 표기). */
     console.log(`  ▸ §12-2 갈래: ${[...new Set(내착지.map((r) => r.outcome))].join(',') || '없음'} (키 유무는 이 시험 밖 환경이다)`);
-    /* «구제경로» 도 허용 — C3 의 tasks 조회가 대상2 를 구제로 착지시킨다(401 수리 뒤 · 벤더 0). 셋 다 「벤더 산출 없는 2단 착지」다. */
-    확인('C4 §12-2 — ③생성대상 전원이 벤더 산출 없이 폴백 착지(예외 0 · 키없음|벤더오류|구제경로)',
-      내착지.length === 3 && 내착지.every((r) => r.outcome === '키없음' || r.outcome === '벤더오류' || r.outcome === '구제경로'), 내착지);
-    확인('C4 비용 가드 — 오늘 «성공» 0(공갈 모델에서 성공이 나오면 진짜 모델·과금 신호다)', (await sql(`
-      select count(*)::int as n from engine.generation_jobs where assign_date='${오늘}'::date and outcome='성공'`))[0].n === 0);
+    /* «구제경로» 허용 — C3 의 tasks 조회가 대상2 를 구제로 착지시킨다(401 수리 뒤 · 벤더 0).
+     * 🔴 «성공» 도 정당하다(08-23 현행화 — 심문 T4·T5 소화): GENERATION_MODEL 이 유호 픽 실모델로
+     *   섰다(#6). 공갈 시대의 「성공 = 몰래 과금 신호」 전제가 소멸했고, 성공 경로 실측이 곧 T5
+     *   (워커 성공 무시험)를 닫는 유일한 길이다. 본질(전원 예외 0 착지)은 그대로 잰다. */
+    확인('C4 §12-2 — ③생성대상 전원이 착지(예외 0 · 키없음|벤더오류|구제경로|성공)',
+      내착지.length === 3 && 내착지.every((r) => ['키없음', '벤더오류', '구제경로', '성공'].includes(r.outcome)), 내착지);
+    /* 비용 «표시»(옛 「성공 0」 가드의 후신) — 과금을 막는 게 아니라 «아는 과금»으로 만든다:
+     * 성공 수를 세어 밝히고, 성공 행마다 model 이 행에 남았는지(어느 모델의 돈인지)를 잰다. */
+    {
+      const 성공행 = await sql(`select count(*)::int as n, count(*) filter (where coalesce(model,'') = '')::int as 모델빈
+        from engine.generation_jobs where assign_date='${오늘}'::date and outcome='성공'`);
+      console.log(`  ▸ 비용 표시: 오늘 벤더 성공 ${성공행[0].n}건(실모델 — 대략 건당 $0.004 · #6 크레딧)`);
+      확인('C4 비용 표시 — 성공 행 전부에 model 이 남는다(어느 모델의 돈인지 행이 안다)', 성공행[0].모델빈 === 0, 성공행[0]);
+    }
     확인('C4 재진입 종착 — 오늘 큐에 대기·claimed 잔존 0(다음 회차가 이어받아 전원 종료)', (await sql(`
       select count(*)::int as n from engine.generation_jobs where assign_date='${오늘}'::date and status in ('대기','claimed')`))[0].n === 0);
 
