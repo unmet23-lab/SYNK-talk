@@ -1,7 +1,7 @@
 {
   "프롬프트": "prompts/교정.md (v7)",
   "prompt_ver": "v7",
-  "돌린날": "2026-08-21",
+  "돌린날": "2026-08-22",
   "실행자": "tools/eval-run.js --원격(리허설 correct?평가=1) (claude-sonnet-5)",
   "완주": true,
   "새로돌림": 61,
@@ -219,7 +219,7 @@
     },
     {
       "id": "E21",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "E22",
@@ -323,7 +323,7 @@
     },
     {
       "id": "E32",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "E33",
@@ -438,239 +438,239 @@
     },
     {
       "id": "E44",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "E45",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "E46",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "E47",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "M01",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "M02",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "M03",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "M04",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "M05",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "M06",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "M07",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "M08",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "M09",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "M10",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "M11",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "M12",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "M13",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "M14",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "M15",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C01",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C02",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C03",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C04",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C05",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C06",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C07",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C08",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C09",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C10",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C11",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C12",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C13",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C14",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C15",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C16",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C17",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C18",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C19",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C20",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C21",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C22",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C23",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C24",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C25",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C26",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C27",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C28",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C29",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C30",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C31",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C32",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C33",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C34",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C35",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C36",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C37",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C38",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C39",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     },
     {
       "id": "C40",
-      "사유": "벤더:400"
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
     }
   ]
 }
