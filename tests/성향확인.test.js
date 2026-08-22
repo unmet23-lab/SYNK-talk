@@ -6,7 +6,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { 판정판, 리듬후보, 확인카드, 확인사건 } = require('../lib/성향확인.js');
-const { 확인문구, 반응안내 } = require('../contents/문구_성향확인.js');
+const { 확인문구, 반응안내, 카피확정 } = require('../contents/문구_성향확인.js');
+
+test('카피 확정 표식 — 유호 확정 08-22 · 임시로 되돌아오면 카피가 낡은 것이다', () => {
+  assert.equal(카피확정, true);
+});
 const { 검증 } = require('../lib/이벤트검증.js');
 
 const 계약 = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '계약', '수집_교정_계약.json'), 'utf8'));
