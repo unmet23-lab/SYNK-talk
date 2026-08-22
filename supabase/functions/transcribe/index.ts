@@ -77,8 +77,8 @@ function 센다(칸: Record<string, number>, 이름: string) {
 async function 원본받기(ref: string): Promise<{ bytes: Uint8Array } | { 오류: string }> {
   const base = Deno.env.get('SUPABASE_URL') ?? '';
   const 키 = Deno.env.get('STORAGE_SIGN_KEY') ?? '';
-  /* 모양을 **먼저** 본다 — `SUPABASE_SERVICE_ROLE_KEY`(새 형식 `sb_secret_…`)를 넣으면 Storage 가
-   * 거절하고 증상은 「전사만 안 됨」이라 원인이 어디에도 안 남는다(events·uploads 와 같은 자리). */
+  /* 모양을 **먼저** 본다 — 읽기 갈래의 인증 실패는 `Bucket not found` 로 위장해서(2026-08-22 실측)
+   * 사람이 버킷부터 뒤진다 — 형식 표의 정본은 `lib/업로드경로.js` 머리말이다(events·uploads 와 같은 자리). */
   if (!base || 저장소키흠(키)) return { 오류: 'storage_key' };
   const r = await fetch(`${base}/storage/v1/object/${버킷}/${ref}`, {
     headers: 저장소헤더(키),

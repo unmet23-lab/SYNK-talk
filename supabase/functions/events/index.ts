@@ -129,8 +129,8 @@ async function 헤더측정(ref: string): Promise<Record<string, unknown>> {
   const 봉 = (v: Record<string, unknown>) => ({ measured_at: new Date().toISOString(), agc_verified: 'unknown', ...v });
   const base = Deno.env.get('SUPABASE_URL') ?? '';
   const 키 = Deno.env.get('STORAGE_SIGN_KEY') ?? '';
-  // 모양을 **먼저** 본다 — `SUPABASE_SERVICE_ROLE_KEY` 는 새 형식(`sb_secret_…`)이라 Storage 가
-  // 거절하고, 증상은 「측정만 안 됨」이라 원인이 어디에도 안 남는다(2026-08-06 실측 · uploads 와 같은 자리).
+  // 모양을 **먼저** 본다 — 읽기 갈래의 인증 실패는 `Bucket not found` 로 위장해서(2026-08-22 실측)
+  // 사람이 버킷부터 뒤진다 — 형식 표의 정본은 `lib/업로드경로.js` 머리말이다.
   const 키흠 = 저장소키흠(키);
   if (!base || 키흠) {
     console.error('[events] STORAGE_SIGN_KEY 를 쓸 수 없다 — capture_meta.server 를 못 잰다', 키흠 ?? 'SUPABASE_URL 없음');

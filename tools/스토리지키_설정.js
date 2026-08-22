@@ -52,7 +52,12 @@ async function main() {
   const 이름 = pr.ok ? (JSON.parse(await pr.text()).name ?? '(이름 조회 실패)') : '(이름 조회 실패)';
   console.error(`[스토리지키] 대상 ▸ ${이름}  (${ref})${적용 ? '  ⚠ 쓰기(--적용)' : '  미리보기'}`);
 
-  const kr = await fetch(`${API}/${ref}/api-keys`, { headers: 헤더 });
+  /* 🔴 `?reveal=true` 가 **없으면 신형 시크릿 키는 «가려진» 값으로 온다** — 길이도 접두사도
+   *   진짜와 같아서 눈으로도 `length` 로도 안 갈린다(2026-08-22 실측: 가려진 값을 넣었더니
+   *   업로드가 통째로 죽었고, 증상은 함수 500 하나였다). 레거시 JWT 는 가림 없이 와서 이
+   *   도구가 그동안 안 걸렸던 자리다 — 키 시대가 바뀌며 열린 함정이다.
+   * 🔑 갈랐다는 것은 다이제스트로만 확인된다(Management API `/secrets` 가 sha256 을 준다). */
+  const kr = await fetch(`${API}/${ref}/api-keys?reveal=true`, { headers: 헤더 });
   if (!kr.ok) die(`api-keys HTTP ${kr.status}`);
   const 키들 = JSON.parse(await kr.text());
   /* 🔑 **신형 시크릿이 1순위다** — 레거시는 연말 폐기 예고라 그걸 넣으면 폐기일에 죽는다.

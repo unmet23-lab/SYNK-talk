@@ -159,12 +159,15 @@ Deno.serve(async (req: Request) => {
 
   /* 서명 발급 — Storage REST. `engine` 스키마 미노출과 무관하다(Storage 는 PostgREST 를 안 지난다).
    *
-   * 🔴 **`SUPABASE_SERVICE_ROLE_KEY` 를 쓰지 않는다.** 2026-08-06 리허설 실측:
-   *   플랫폼이 그 이름에 넣어주는 값이 **새 형식(`sb_secret_…`)** 이고, Storage 는 그걸 거절한다
-   *   (`Invalid Compact JWS`). 헤더 조합 5가지를 전부 쏴 봤고 통과한 것은 **레거시 JWT 키뿐**이다
-   *   (`Authorization` 단독·`apikey`+`Authorization` 둘 다 200 · 새 키는 세 조합 모두 400).
-   *   그래서 **명시 시크릿**으로 받는다 — 이름이 뜻하는 바가 플랫폼 사정으로 조용히 바뀌는 것을
-   *   그대로 맞는 대신, 우리가 이름을 정하고 모양까지 검사한다(`tools/스토리지키_설정.js`).
+   * ■ 왜 이름을 우리가 정했나 (2026-08-06)
+   *   플랫폼이 `SUPABASE_SERVICE_ROLE_KEY` 에 넣어주는 값의 «뜻»이 조용히 바뀌었고, 그날 Storage 는
+   *   그 새 값을 헤더 조합 셋 모두 거절했다. 이름이 뜻하는 바가 플랫폼 사정으로 바뀌는 것을 그대로
+   *   맞는 대신 **명시 시크릿**으로 받기로 했다 — 그 판단은 지금도 산다.
+   *
+   * 🔴 **그 «키 형식» 결론은 낡았다** (2026-08-22 재실측 · 정본 표 = `lib/업로드경로.js` 머리말)
+   *   플랫폼이 그 사이 신형 시크릿을 받기 시작했고, 두 형식 모두 통하는 조합은 `apikey`+`Authorization`
+   *   **둘 다** 하나뿐이다. 그래서 헤더는 `저장소헤더` 가 만들고 이 자리는 형식을 안 가린다.
+   *   ⏳ 레거시 JWT 는 2026년 말 폐기 예고라, 이제 기본값은 신형 시크릿이다.
    */
   const base = Deno.env.get('SUPABASE_URL')!;
   const 키 = Deno.env.get('STORAGE_SIGN_KEY') ?? '';
