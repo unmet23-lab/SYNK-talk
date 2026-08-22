@@ -64,3 +64,23 @@ test('§12-29 ④ — achieve 효과음 게이트의 판정 입력은 녹음 상
   게이트.녹음시작();
   assert.equal(게이트.판정('sfx', 'achieve').허용, false, '녹음 중엔 어느 배정이든 같은 거부다');
 });
+
+/* T1·T2 봉인(엔진심문 0822 — 활성 날 사고 예약) — ts 층은 배선 «앵커»로 잰다(배포대조 본체판정 규율).
+ * 앵커가 사라지면 그 처방이 걷힌 것이니 이 시험이 먼저 빨개진다. */
+test('심문 T1·T2 — 재호출 맥락 열쇠 · 상태오류 강등 배선이 산다', () => {
+  const 워커 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'deliver-one', 'index.ts'), 'utf8');
+  const 생성 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'deliver', '생성모드.ts'), 'utf8');
+  const 조각 = fs.readFileSync(path.join(ROOT, 'supabase', '활성조각_c12.sql'), 'utf8');
+
+  /* T1 — B3 재호출 URL 에 맥락=배치(퍼센트 인코딩). cron 등록(활성조각)과 «같은 바이트»여야
+   * 한 문에 두 열쇠가 안 생긴다. 활성 뒤 deliver 는 맥락 누락을 400 으로 거절한다(§3-1 v5.8). */
+  const 열쇠 = '%EB%A7%A5%EB%9D%BD=%EB%B0%B0%EC%B9%98';
+  assert.ok(조각.includes(열쇠), '활성조각 cron URL 의 맥락 인코딩이 바뀌었다 — 아래 재호출과 같이 가야 한다');
+  assert.ok(워커.includes(`'/deliver?${열쇠}'`), 'B3 재호출 URL 에 맥락=배치 가 없다 — 활성 뒤 그 호출은 pg_net 발사-망각 뒤 400 이다(T1)');
+
+  /* T2 — 상태·요약 실패는 load_error 가 아니라 «상태오류 강등»(빈 요약 + 빈 판 → 워커가 값으로
+   * 착지). 옛 처분이 되살아나면 그날 그 학생은 생성도 폴백도 0 이 된다. */
+  assert.ok(/상태오류 강등/.test(생성), '생성모드의 상태오류 강등 갈래가 사라졌다(T2)');
+  assert.ok(!/load_error: `상태오류:/.test(생성), '상태·요약 실패가 다시 load_error 로 접힌다 — 그날 그 학생은 생성도 폴백도 0 이다(T2)');
+  assert.ok(/'상태오류' : '상태없음'/.test(워커), '워커의 상태없음↔상태오류 값 가름이 사라졌다(§4-3 「값으로 가른다」)');
+});

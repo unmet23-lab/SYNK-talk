@@ -298,9 +298,15 @@ Deno.serve(async (req: Request) => {
         console.error(`[deliver-one] 재호출 거절 — 그날 배치 실행 ${b.배치수}/${배치실행상한_일} (ⓒ-12 · 감시 ②-b 가 이미 적색이다)`);
       } else {
         try {
+          /* 🔴 `맥락=배치` 를 URL 에 싣는다(심문 T1) — 활성 뒤 deliver 는 맥락 누락을 400 으로
+           * 거절하는데(§3-1 v5.8 fail-closed) 이 재호출이 '{}' 만 보내면 pg_net 발사-망각이라
+           * 「성공」 보고 뒤 실제 400 이었다: 배치 도중 사망 → 자가치유 0 · 재적재 영영 안 돎.
+           * 인코딩은 활성조각 cron 과 같은 바이트(%EB%A7%A5%EB%9D%BD=%EB%B0%B0%EC%B9%98 — 두
+           * 호출자가 같은 문에 다른 열쇠를 들면 한쪽만 조용히 죽는다). 활성 «전» deliver 는 이
+           * 인자를 무시하므로 지금 행동 변화 0 이다. */
           await sql`
             select net.http_post(
-              url := (select decrypted_secret from vault.decrypted_secrets where name = 'functions_base_url') || '/deliver',
+              url := (select decrypted_secret from vault.decrypted_secrets where name = 'functions_base_url') || '/deliver?%EB%A7%A5%EB%9D%BD=%EB%B0%B0%EC%B9%98',
               headers := jsonb_build_object(
                 'Content-Type', 'application/json',
                 'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'service_role_key')),
@@ -340,12 +346,18 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
-      /* 상태없음(§4-3) — 판정식 = «draft 에 굳은» axes_used 의 길이 0 하나(쓸축수와 같은 수 ·
-       * §6-1 C5). 재계산이 아니라 읽기다(D2) — 상태 없는 학생에게 「읽은 척하는」 생성을 안 낸다. */
+      /* 상태없음·상태오류(§4-3 — 값으로 가른다) — 판정식 = «draft 에 굳은» axes_used 의 길이 0
+       * (쓸축수와 같은 수 · §6-1 C5). 재계산이 아니라 읽기다(D2) — 상태 없는 학생에게 「읽은
+       * 척하는」 생성을 안 낸다.
+       * 🔴 두 값의 가름(심문 T2 · 새 칸 0): 상태없음 = 계산이 «성공»해 판이 박혔는데 표본이 빈 것
+       * (estimator_version 있음) · 상태오류 = 계산 자체가 죽어 판이 못 박힌 것(빈 문자열 — 생성모드
+       * 상태오류 강등이 이 조합을 만든다). 한 값으로 접으면 「추정기가 죽었다」가 「학생이 새로
+       * 왔다」의 얼굴로 상주한다. */
       const 축들 = (draft.evidence_refs as Record<string, unknown> | undefined)?.axes_used;
       if (Array.isArray(축들) && 축들.length === 0) {
-        const r = await 폴백착지(j, 오늘, { outcome: '상태없음', deciding: null, gate_failed: null, input_text: null });
-        센다(계수, r?.landed ? '상태없음' : `상태없음/${r?.reason ?? '?'}`);
+        const 값 = String(draft.estimator_version ?? '') === '' ? '상태오류' : '상태없음';
+        const r = await 폴백착지(j, 오늘, { outcome: 값, deciding: null, gate_failed: null, input_text: null });
+        센다(계수, r?.landed ? 값 : `${값}/${r?.reason ?? '?'}`);
         continue;
       }
 

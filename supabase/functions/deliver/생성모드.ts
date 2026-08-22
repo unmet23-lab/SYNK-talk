@@ -93,15 +93,30 @@ function 학생조립(학생: Record<string, unknown>, 재료: {
     /* 그날 조립기 출력을 draft 에 굳힌다(§7-2 — 폴백·비대상이 그대로 쓴다 · 재호출 0). */
     const 결정 = 오늘과제({ 날짜: 오늘, 첫날, 교정문, 전날문장, 급수: 원급수 });
 
-    /* 상태 1회(D2 — 생산자 하나) → §6 요약·근거. 실패는 load_error(§4-3 상태오류). */
-    const 상태 = 학습자상태(((학생.원신호 ?? []) as unknown[]),
-      { as_of: 스냅기준, ingested_as_of: 스냅기준, 시간대 });
-    const 요약산출 = 과제요약(상태, {
-      목표: (학생.goal_track ?? null) as string | null, 급수: 원급수,
-      /* ㉢ 나침반(경로 A) — 대상조회가 배정 날짜의 시즌에서 걷어 온 season_goal.
-       * 없으면 null → 요약에 안 실린다(널 규칙 · 나침반 0행이 개원 전 정상 상태). */
-      시즌목표: (학생.시즌목표 ?? null) as string | null,
-    });
+    /* 상태 1회(D2 — 생산자 하나) → §6 요약·근거.
+     * 🔴 실패 = «상태오류 강등»이지 load_error 가 아니다(심문 T2 · §4-3 「값으로 가른다」).
+     *   옛 처분(학생 전체를 load_error 로)은 draft 를 안 만들어 마감 스윕의 착지 대상에서도
+     *   빠졌다 — 결정적으로 죽는 입력이면 B4 재적재 3회가 다 실패하고 «그날 그 학생은 생성도
+     *   폴백도 0»(경로마다 정반대: 현행 한명() 은 같은 실패를 삼키고 배달한다). 여기서는 빈
+     *   요약(쓸축수 0 · estimator_version '')으로 강등해 job 은 세우고, 워커가 그 조합을
+     *   «상태오류» 폴백으로 착지시킨다 — 학생은 그날 과제를 받고 사고는 값으로 행에 남는다.
+     *   evidence_refs 는 §6-1 모양(5키) 그대로 빈 값 — 오류 문구는 로그·계수 몫이다. */
+    let 상태: Record<string, unknown> | null = null;
+    let 요약산출: { 요약: string; 쓸축수: number; axes_used: string[]; evidence_refs: Record<string, unknown> };
+    try {
+      상태 = 학습자상태(((학생.원신호 ?? []) as unknown[]),
+        { as_of: 스냅기준, ingested_as_of: 스냅기준, 시간대 }) as Record<string, unknown>;
+      요약산출 = 과제요약(상태, {
+        목표: (학생.goal_track ?? null) as string | null, 급수: 원급수,
+        /* ㉢ 나침반(경로 A) — 대상조회가 배정 날짜의 시즌에서 걷어 온 season_goal.
+         * 없으면 null → 요약에 안 실린다(널 규칙 · 나침반 0행이 개원 전 정상 상태). */
+        시즌목표: (학생.시즌목표 ?? null) as string | null,
+      });
+    } catch (e) {
+      console.error('[deliver/생성] 상태오류 강등(폴백으로 간다)', learner_id, String((e as Error)?.message ?? e).slice(0, 200));
+      상태 = null;
+      요약산출 = { 요약: '', 쓸축수: 0, axes_used: [], evidence_refs: { events: [], as_of: 스냅기준, window_days: 0, axes_used: [], truncated: 0 } };
+    }
 
     /* 겨냥(§6-0) — 대상만. 비대상은 빈 배열(A11 ⑦ 존재 대조는 빈 배열 면제). */
     const skill_ids = 사유 === null
@@ -125,17 +140,21 @@ function 학생조립(학생: Record<string, unknown>, 재료: {
         event_draft: {
           task_ref: `task-${오늘}`,
           task_snapshot: 결정.task_snapshot,
-          estimator_version: String(상태.estimator_version ?? ''),
-          estimator_confidence: 상태.estimator_confidence ?? null,
+          /* 상태 null(위 강등) → '' — 워커가 axes_used 0 + 빈 판 조합을 «상태오류»로 착지시킨다. */
+          estimator_version: String(상태?.estimator_version ?? ''),
+          estimator_confidence: (상태?.estimator_confidence ?? null) as number | null,
           evidence_refs: 요약산출.evidence_refs,
           요약: 요약산출.요약,
         },
       },
     };
   } catch (e) {
+    /* 상태·요약 «밖»의 조립 실패(갈래판정·오늘과제·기술선택 등) — §4-3 상태오류가 아니라
+     * «조립오류»다(그 이름을 빌리면 위 강등 갈래와 뭉개진다). draft 를 못 세우는 실패라
+     * load_error 가 맞고, B4 재적재가 집는다. */
     return {
-      계수키: '상태오류',
-      target: { learner_id, load_error: `상태오류: ${String((e as Error)?.message ?? e)}`.slice(0, 200) },
+      계수키: '조립오류',
+      target: { learner_id, load_error: `조립오류: ${String((e as Error)?.message ?? e)}`.slice(0, 200) },
     };
   }
 }
