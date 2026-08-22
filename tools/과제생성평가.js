@@ -20,12 +20,23 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const readline = require('node:readline');
-const { 인자게이트 } = require('../lib/플래그.js');
+const { 공용플래그, 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
 const 평가 = require('../lib/과제생성평가.js');
 const { 경로, 파일해시, 활성인가, 현행판 } = require('../lib/과제생성현행판.js');
 
+const { 검문 } = require('../lib/과제검문.js');
+const { 생성응답읽기 } = require('../lib/과제생성.js');
+const { 워커예산_MS, 생성타임아웃_MS } = require('../lib/생성상수.js');
+
 const ROOT = path.resolve(__dirname, '..');
-const 아는플래그 = ['--드라이런', '--원격', '--채점', '--판정', '--채점자', '--출력'];
+/* 배포판 게이트 스코프 — 이 도구가 부르는 Edge Fn 은 deliver-one 하나(tests/왕복골격.test.js 가 「소스가 부르는
+ * 함수 ⊆ 선언」을 잰다). 평가 갈래는 운영 큐 무접촉이라 다른 함수를 안 부른다. */
+const 게이트함수들 = ['deliver-one'];
+/* 묶음 = 워커 자기 예산 ÷ 학생당 타임아웃 — 서버(평가 갈래)와 같은 두 상수에서 파생(손 숫자 0 · 서버 상한과 같다). */
+const 묶음크기 = Math.max(1, Math.floor(워커예산_MS / 생성타임아웃_MS));
+/* 🎯 조준축 — `--원격` 이 왕복골격.열기를 지나 자격증명.읽기()로 조준한다(한 겹 건너 · eval-run 선례). 그래서
+ * `공용플래그`(--운영)를 편다 — 받으면 왕복골격의 리허설 강제가 거절한다(받고 아무것도 안 바꾸는 F592 가 아니다). */
+const 아는플래그 = [...공용플래그, '--드라이런', '--원격', '--채점', '--판정', '--채점자', '--출력'];
 const argv = process.argv.slice(2);
 const 막힘 = 인자게이트('과제생성평가', argv, 아는플래그);
 if (막힘) { console.error(막힘); process.exit(2); }
@@ -73,12 +84,108 @@ if (argv.includes('--드라이런')) {
   process.exit(사유.length ? 1 : 0);
 }
 
-/* ── 원격(거절) ───────────────────────────────────────────────────────────── */
+/* ── 원격 — 리허설 deliver-one?평가=1 (벤더는 거기서 · 로컬 키 0 · 운영 큐 무접촉) ──────────────
+ * 🔴 유료 제출이다 — 게이트(왕복골격.열기: 리허설 강제 · 배포판=소스 · 키)가 맨 앞이다. 재개 가능: 출력 파일에 이미
+ * «성공» 행(raw 가 있고 파서가 읽히는 행)이 있으면 건너뛴다. 사례 × 2회차 = 80 호출을 묶음으로 자른다.
+ * 결과 행은 «채점 전» 상태로 쓴다(axis_scores 전부 0 · grader_note '미채점') — 채점 CLI 가 채운다. 호출 실패·
+ * 응답파손·검문탈락은 §8-B 「호출 실패·누락 출력 0점(재시도 없음)」 규율대로 0점 «고정»이고 note 에 사유가 남는다
+ * (그 문장은 런타임이면 학생에게 안 나갔을 문장이라 채점 대상이 아니다 · v5.13-e). */
 if (argv.includes('--원격')) {
-  console.error('[과제생성평가] ⛔ --원격 은 아직 통로가 없다 — 오프라인 평가는 운영 큐를 안 지나므로(§8-B E5) deliver-one 에'
-    + ' DB 무접촉 «평가 갈래»(correct?평가=1 선례)가 서야 하고, 그 갈래는 벤더 키·GENERATION_MODEL(유호님 몫)과 한 벌이라'
-    + ' #6 착수 때 함께 짓는다. 로컬 키는 끌어오지 않는다.');
-  process.exit(2);
+  (async () => {
+    const 골격 = require('../lib/왕복골격.js');
+    const { ref, service_role } = await 골격.열기('과제생성평가', {
+      키: true, 사유: '이 시험은 벤더 비용을 쓴다(운영 큐엔 행을 안 남긴다)', 함수목록: 게이트함수들,
+    });
+    const 시험지 = 읽기(경로.시험지);
+    const 현 = 현행판();
+    const 출력 = 값('--출력') ? path.resolve(값('--출력')) : 경로.결과;
+    let 기존 = { 동봉: {}, 행: [] };
+    if (fs.existsSync(출력)) {
+      기존 = 읽기(출력);
+      /* 다른 시험지·다른 프롬프트 판의 결과에 이어 붙이면 한 파일에 두 판이 섞인다 — 재개 거부. */
+      if (기존.동봉 && (기존.동봉.시험지_해시 !== 현.시험지_해시 || 기존.동봉.prompt_ver !== 현.prompt_ver)) {
+        console.error(`[과제생성평가] 재개 거부 — 기존 파일의 시험지_해시·prompt_ver 가 현행과 다르다. 파일을 갈라라(--출력).`);
+        process.exit(1);
+      }
+    }
+    const 행맵 = new Map((기존.행 || []).map((r) => [r.case_id, r]));
+    const 읽힌다 = (raw) => { try { return !!생성응답읽기(JSON.parse(raw)).값; } catch { return false; } };
+    const 성공행 = (r) => !!(r && typeof r.raw_response === 'string' && r.raw_response.length && 읽힌다(r.raw_response));
+
+    /* 일감 = 사례 × 회차 중 성공 행이 아닌 것(재개 — 제품의 「다음 회차가 다시 집는다」와 같은 방향). */
+    const 일감 = [];
+    for (const c of 시험지.사례) {
+      const { 본문 } = 평가.사례본문(전문, c);
+      for (const 회차 of [1, 2]) {
+        const id = 평가.case_id(c.case_base_id, 회차);
+        if (!성공행(행맵.get(id))) 일감.push({ id, c, 본문 });
+      }
+    }
+    const 전체 = 시험지.사례.length * 2;
+    console.log(`[과제생성평가] 원격 — ${시험지.사례.length}사례 × 2회차 = ${전체} · 건너뜀 ${전체 - 일감.length} · 돌릴 것 ${일감.length} · 묶음 ${묶음크기}`);
+    const 주소 = `https://${ref}.supabase.co/functions/v1/deliver-one?%ED%8F%89%EA%B0%80=1`;
+    let 서버실행판 = null;
+    /* 행이 하나도 없으면 안 쓴다 — 첫 묶음이 503(모델 미설정 등)으로 죽은 날 «빈 정본»이 정본 경로에 남아
+     * 차단기가 「존재하는데 80건 누락」 빨강을 내는 것을 막는다(빈 파일은 미실행이지 결과가 아니다). */
+    const 저장 = () => 행맵.size && 쓰기(출력, {
+      판: '§8-B 결과 — 실물 응답. 채점은 --채점 이 채운다(미채점 행은 집계 0 → 차단기 빨강: 실행과 채점은 한 벌이다)',
+      동봉: {
+        ...현,
+        ...(서버실행판 ? {
+          model: 서버실행판.model, prompt_ver: 서버실행판.prompt_ver, policy_ver: 서버실행판.policy_ver,
+          estimator_version: 서버실행판.estimator_version, skill_taxonomy_ver: 서버실행판.skill_taxonomy_ver,
+        } : { policy_ver: 기존.동봉?.policy_ver ?? '(미수신)' }),
+        채점자: 기존.동봉?.채점자 || '(미채점)', 시각: new Date().toISOString(),
+      },
+      행: 시험지.사례.flatMap((c) => [1, 2].map((r) => 행맵.get(평가.case_id(c.case_base_id, r))).filter(Boolean)),
+    });
+    const 축0 = (c) => Object.fromEntries(평가.축키들.map((k) => [k, (k === 평가.null허용축 && c.goal == null) ? null : 0]));
+    const 행 = (x, raw, note, 값) => ({
+      case_id: x.id, axis_scores: 축0(x.c), grader_note: note,
+      sentence: 값 ? 값.sentence : '', question: 값 ? 값.question : '',
+      raw_response: raw, raw_response_hash: 평가.응답해시(raw), input_hash: 평가.input_hash(x.본문),
+    });
+    for (let i = 0; i < 일감.length; i += 묶음크기) {
+      const 조각 = 일감.slice(i, i + 묶음크기);
+      const r = await fetch(주소, {
+        method: 'POST',
+        headers: { apikey: service_role, Authorization: `Bearer ${service_role}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 사례: 조각.map((x) => ({ case_id: x.id, 본문: x.본문 })) }),
+        /* 서버 최악(묶음 전체가 타임아웃까지)보다 길게 — 짧으면 서버가 답을 만드는데 먼저 끊어 벤더 비용이 증발한다. */
+        signal: AbortSignal.timeout(생성타임아웃_MS * 묶음크기 + 30_000),
+      });
+      if (!r.ok) { console.error(`[과제생성평가] 평가 통로 HTTP ${r.status} — ${(await r.text()).slice(0, 300)}`); 저장(); process.exit(1); }
+      const 본 = await r.json();
+      if (!서버실행판) {
+        서버실행판 = 본.실행판 || null;
+        /* 이중 자물쇠 — 배포된 동봉의 판이 로컬 파일 판과 다르면 이 실행 전체가 무효다. */
+        if (!서버실행판 || 서버실행판.prompt_ver !== 현.prompt_ver) {
+          console.error(`[과제생성평가] 판 불일치 — 원격 ${서버실행판 && 서버실행판.prompt_ver} ≠ 로컬 ${현.prompt_ver}. 재배포부터(원격배포.js deliver-one --적용).`);
+          process.exit(1);
+        }
+      }
+      for (const 줄 of 본.결과 || []) {
+        const x = 조각.find((y) => y.id === 줄.case_id);
+        if (!x) continue;
+        if (줄.사유) {
+          행맵.set(x.id, 행(x, '', `0점 고정 — ${줄.사유}${줄.벤더사유 ? ' · ' + 줄.벤더사유 : ''}`, null));
+          console.log(`  ✗ ${x.id} ${줄.사유}${줄.벤더사유 ? ' · ' + 줄.벤더사유 : ''}`);
+          continue;
+        }
+        const raw = String(줄.raw ?? '');
+        let 봉투 = null; try { 봉투 = JSON.parse(raw); } catch { /* 파서가 응답파손으로 접는다 */ }
+        const 읽 = 생성응답읽기(봉투);
+        if (!읽.값) { 행맵.set(x.id, 행(x, raw, `0점 고정 — 응답파손: ${읽.사유}`, null)); console.log(`  ✗ ${x.id} 응답파손 ${읽.사유}`); continue; }
+        const 검 = 검문({ 문장: 읽.값.sentence, 질문: 읽.값.question, 식별자들: [], 최근문장들: [], 최근질문들: [] });
+        행맵.set(x.id, 행(x, raw, 검.ok ? '미채점' : `0점 고정 — 검문탈락: ${검.사유들.join(',')}`, 읽.값));
+        console.log(`  ${검.ok ? '·' : '✗'} ${x.id} ${검.ok ? '응답 받음' : '검문탈락 ' + 검.사유들.join(',')}`);
+      }
+      저장();
+      console.log(`  … ${Math.min(i + 묶음크기, 일감.length)}/${일감.length}`);
+    }
+    const 사유 = 평가.결과검증(읽기(출력), 시험지, 전문);
+    console.log(`[과제생성평가] 저장 → ${path.relative(ROOT, 출력)} · 기계 계약 ${사유.length ? '❌ ' + 사유.slice(0, 3).join(' / ') : '✅'} · 다음 = --채점 ${path.relative(ROOT, 출력)} --채점자 <이름>`);
+  })().catch((e) => { console.error('[과제생성평가] 원격 실패:', e && e.message ? e.message : e); process.exit(1); });
 }
 
 /* ── 채점(CLI · 사람) ─────────────────────────────────────────────────────── */

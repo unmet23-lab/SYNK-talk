@@ -59,13 +59,15 @@ const { 메시지경로, 벤더헤더 } = 교정모듈 as {
   메시지경로: string; 벤더헤더: (키: string) => Record<string, string>;
 };
 const {
-  생성요청몸통, 생성응답읽기, 입력초과인가, 응답초과인가, 렌더,
+  생성요청몸통, 생성응답읽기, 입력초과인가, 응답초과인가, 렌더, 재시도가능, 벤더사유,
 } = 과제생성모듈 as {
   생성요청몸통: (a: { 본문: string; model: string }) => Record<string, unknown>;
   생성응답읽기: (봉투: unknown) => { 값?: { sentence: string; question: string }; 오류?: string; 사유?: string };
   입력초과인가: (본문: string) => boolean;
   응답초과인가: (원문: string) => boolean;
   렌더: (전문: string, a: { 요약: string; 기술들: string[] }) => string | null;
+  재시도가능: (status: number) => boolean;
+  벤더사유: (실패글: string) => string | null;
 };
 const { 검문, 중복창_일 } = 과제검문모듈 as {
   검문: (재료: Record<string, unknown>) =>
@@ -197,6 +199,57 @@ Deno.serve(async (req: Request) => {
   const owner = `deliver-one:${crypto.randomUUID()}`;
   const 계수: Record<string, number> = {};
   const 오류들: string[] = [];
+
+  /* ── 평가 통로 (`?평가=1`) — **운영 큐 무접촉**(§8-B E5 — 평가가 generation_jobs·attempts 에 행을 만들면
+   * 운영 장부가 평가로 오염된다 · `attempt_id` 금지의 그 논거) · `correct?평가=1` 선례 그대로:
+   * 렌더된 요청 본문(= generation_input_text · tools/과제생성평가.js 가 같은 lib 로 조립)을 받아 **같은 동봉·같은
+   * 요청 몸통·같은 타임아웃**으로 벤더만 왕복하고 원자재(원문·model·usage)를 돌려준다. 해석·검문·채점은
+   * 부르는 쪽(같은 lib)이 한다. DB 는 «읽기»(자기 실행판 — rpc 전문·schema_ver)만 닿는다.
+   * 🔑 실행판은 워커와 «같은 함수 하나»(자기실행판)로 낸다 — 실행기가 응답 `prompt_ver` 를 로컬 파일 판과 대조하는
+   *    이중 자물쇠가 여기 걸린다(배포판 ≠ HEAD 면 평가 전체 무효). 설정 실패는 5xx+error(200+`이유` 가 아니다 —
+   *    도구가 그 자리에서 부르는 왕복이라 실패를 실패로 받아야 재시도·중단 판단이 선다).
+   * ⚠ 모델은 env GENERATION_MODEL(유호님 몫) — 없으면 503. 여기 리터럴 0. */
+  const url = new URL(req.url);
+  if (url.searchParams.get('평가') === '1') {
+    if (!키) return 봉투(503, { error: 'eval_no_api_key' });
+    const 모델 = Deno.env.get('GENERATION_MODEL') ?? '';
+    if (!모델.trim()) return 봉투(503, { error: 'eval_no_model', 힌트: 'GENERATION_MODEL 은 유호님이 고른다(v5.13-b ④)' });
+    /* 묶음 상한 = 워커 자기 예산 ÷ 학생당 타임아웃(생성상수 재료 둘에서 파생 — 손 숫자 0). */
+    const 최대묶음 = Math.max(1, Math.floor(워커예산_MS / 생성타임아웃_MS));
+    let 몸: { 사례?: { case_id?: string; 본문?: string }[] };
+    try { 몸 = await req.json(); } catch { return 봉투(400, { error: 'body 가 JSON 이 아니다' }); }
+    const 사례들 = Array.isArray(몸.사례) ? 몸.사례 : [];
+    if (!사례들.length || 사례들.length > 최대묶음) {
+      return 봉투(400, { error: `사례는 1~${최대묶음}건이어야 한다`, 받음: 사례들.length });
+    }
+    const 실행판 = await 자기실행판();
+    const 결과: Record<string, unknown>[] = [];
+    for (const 사 of 사례들) {
+      if (!사 || typeof 사.본문 !== 'string' || !사.본문.trim()) { 결과.push({ case_id: 사?.case_id ?? null, 사유: '본문없음' }); continue; }
+      if (입력초과인가(사.본문)) { 결과.push({ case_id: 사.case_id, 사유: '입력초과' }); continue; }
+      try {
+        const r = await fetch(메시지경로, {
+          method: 'POST',
+          headers: 벤더헤더(키),
+          body: JSON.stringify(생성요청몸통({ 본문: 사.본문, model: 모델 })),
+          signal: AbortSignal.timeout(생성타임아웃_MS),
+        });
+        const 원문 = await r.text();
+        if (!r.ok) {
+          결과.push({ case_id: 사.case_id, 사유: `벤더:${r.status}`, 벤더사유: 벤더사유(원문.slice(0, 300)), 재시도가능: 재시도가능(r.status) });
+          continue;
+        }
+        if (응답초과인가(원문)) { 결과.push({ case_id: 사.case_id, 사유: '응답초과' }); continue; }
+        let 본문: { model?: string; usage?: unknown } = {};
+        try { 본문 = JSON.parse(원문); } catch { /* 원문은 그대로 싣는다 — 파서(응답파손)는 부르는 쪽 */ }
+        결과.push({ case_id: 사.case_id, raw: 원문, model: 본문.model ?? null, usage: 본문.usage ?? null });
+      } catch (e) {
+        const 이름 = String((e as Error)?.name ?? e);
+        결과.push({ case_id: 사.case_id, 사유: 이름 === 'TimeoutError' || 이름 === 'AbortError' ? '타임아웃' : `예외:${이름.slice(0, 40)}` });
+      }
+    }
+    return 봉투(200, { 평가: true, 실행판, 결과 });
+  }
 
   /* 「오늘」의 원천은 SQL 식 하나(§3-2-a B1 — UTC ::date 로 접으면 워커 시간대가 통째로 전날이다). */
   const 오늘 = (await sql`
