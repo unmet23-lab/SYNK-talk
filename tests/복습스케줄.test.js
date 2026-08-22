@@ -123,3 +123,23 @@ test('⑦ 소비자 명부 — 파생층이 생기면 이 목록부터 는다(G7
   assert.deepEqual(실소비자.sort(), [...아는소비자].sort(),
     '복습스케줄의 소비자 실물이 명부와 다르다 — 파생층을 세웠으면 이 목록과 트랙.md ④칸을 같은 커밋에서 갱신한다(늘리는 쪽) / 소비자를 지웠으면 여기서도 지운다(줄이는 쪽)');
 });
+
+/* S2 봉인 — 정오 «미상»은 리뷰가 아니다. Again 으로 접으면 「대조 불가」가 매번 lapse 라
+ * 과재노출 + lapses 오염(파생층이 null 을 넘기는 날 학생이 같은 카드를 영원히 다시 받는다). */
+test('⑧ 정오 미상은 Again 이 아니라 버림이다 (S2) · ts-fsrs 판올림 감시 (S3)', () => {
+  const 미상열 = [
+    { card_id: 'x', at: '2026-08-22T10:00:00Z', 정답: true },
+    { card_id: 'x', at: '2026-08-23T10:00:00Z', 정답: null },        // 대조 불가 — 리뷰가 아니다
+    { card_id: 'x', at: '2026-08-24T10:00:00Z', 정답: undefined },   // 같은 갈래
+  ];
+  const s = 카드접기(미상열);
+  assert.equal(s.리뷰수, 1, '미상이 리뷰로 접혔다');
+  assert.equal(s.버린수, 2, '미상을 버렸으면 세어 드러나야 한다 — 조용한 삼킴 금지');
+  assert.equal(s.lapses, 0, '미상이 Again 으로 접혀 lapse 가 됐다 — 「모른다」는 벌점이 아니다(S2)');
+
+  /* S3 — 가둠이 S·D 를 안 자르는 전제(next 가 last_review 기준)는 5.4.1 실측이다.
+   * 판을 올리면 이 검사가 빨개진다 — 그때 가둠의 전제를 다시 재고 이 리터럴을 갱신한다. */
+  const 설치판 = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'node_modules', 'ts-fsrs', 'package.json'), 'utf8')).version;
+  assert.equal(설치판, '5.4.1',
+    `ts-fsrs 가 ${설치판} 로 바뀌었다 — 가둠(due 만 절단·S·D 유지)의 전제가 그 판에서도 참인지 실측으로 재확인한 뒤 이 리터럴을 올린다(S3)`);
+});
