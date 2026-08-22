@@ -76,6 +76,9 @@ export default function 서류관문화면({
   const [로그, set로그] = useState([]);
   const [오류, set오류] = useState(null);
   const [본문있음, set본문있음] = useState(false);
+  /* Ⅲ⑦(유호 확정 08-22) — 확신도 기호식(라디오 ?·?? 와 같은 뜻·값 · 정본은 조립기). 표기는
+   * 선택이고 턴이 바뀌면 리셋된다(입력세대와 같은 축) — 이월된 표기는 거짓 표기다. */
+  const [확신도, set확신도] = useState(null);
   const 본문있음참조 = useRef(false);
   const [입력세대, set입력세대] = useState(0); // 턴·재도전마다 입력 칸을 새로 세운다(uncontrolled 리셋)
 
@@ -183,6 +186,7 @@ export default function 서류관문화면({
     상태참조.current = { ...상태참조.current, 글: '' };
     본문있음참조.current = false;
     set본문있음(false);
+    set확신도(null);   // Ⅲ⑦ — 턴이 바뀌면 표기도 새로(이월은 거짓 표기)
     set입력세대((n) => n + 1);
     턴뜬때.current = 경과시계();
   };
@@ -252,6 +256,7 @@ export default function 서류관문화면({
     if (!본문.trim()) return; // 빈 제출은 여기 없다 — 비우고 넘기는 문은 「모르겠어요」다
     const 사건 = 빈칸제출사건(턴재료, {
       본문,
+      확신도,
       attempt_no: await attempt잡기(턴재료),
       latency_ms: 체류(),
       correlation_id: 앉음,
@@ -365,6 +370,20 @@ export default function 서류관문화면({
             autoCapitalize="none"
             autoCorrect={false}
           />
+          {/* Ⅲ⑦ 확신도 — 누르면 켜지고 다시 누르면 꺼진다(표기는 선택). 「모르겠어요」와 다른
+              축이다: 이건 «답을 내면서» 하는 자기 표기이고 그건 답을 안 내는 문이다. */}
+          <View style={s.확신줄}>
+            {[['low', '? 자신이 없어요'], ['guess', '?? 찍었어요']].map(([값, 라벨]) => (
+              <Pressable
+                key={값}
+                onPress={() => set확신도(확신도 === 값 ? null : 값)}
+                accessibilityRole="button"
+                style={({ pressed }) => [s.확신토글, 확신도 === 값 && s.확신토글_켬, pressed && s.눌림]}
+              >
+                <Text style={[s.확신글, 확신도 === 값 && s.확신글_켬]}>{라벨}</Text>
+              </Pressable>
+            ))}
+          </View>
           <Pressable
             onPress={빈칸내기}
             disabled={!본문있음}
@@ -524,6 +543,12 @@ const s = StyleSheet.create({
     paddingVertical: 14, alignItems: 'center',
   },
   모름글: { fontFamily: 폰트.강조, fontSize: 14, color: 색.잉크_태그 },
+  /* Ⅲ⑦ 확신도 토글 — 신호색 0 · 켬은 테두리·글자만(보고서교정화면과 같은 무늬). */
+  확신줄: { flexDirection: 'row', gap: 8 },
+  확신토글: { flex: 1, borderWidth: 1, borderColor: 색.선, borderRadius: 12, paddingVertical: 8, alignItems: 'center' },
+  확신토글_켬: { borderColor: 색.잉크, backgroundColor: 색.바탕띄움 },
+  확신글: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_보조 },
+  확신글_켬: { color: 색.잉크 },
   돌아가기: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_보조, textAlign: 'center' },
   눌림: { opacity: 0.75 },
 

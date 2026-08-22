@@ -38,12 +38,21 @@ test('탐지력 ③ — 축의 재료를 빼면 그 축이 null 로 잡힌다(�
   for (const [종, 축] of [
     ['preference.stated', '선호'],
     ['affect.reported', '정서'],
-    ['quiz.answered', '자기인식'],
     ['choice.selected', '관심'],
   ]) {
     const 글 = 끊김글(빼고(종));
     assert.match(글, new RegExp(`${축}[^]*축이 null`), `${종} 를 뺐는데 ${축} 축이 null 로 안 잡혔다`);
   }
+});
+
+test('탐지력 ③-b — 자기인식은 v12 부터 두 통로다: 퀴즈만 빼면 살고(짚음 제출이 남는다) 둘 다 빼면 죽는다', () => {
+  /* Ⅲ⑦(유호 확정 08-22) — 확신도 기호식이 G2 짚음 제출로 확장되면서 이 축의 재료가 quiz.answered
+   * 하나에서 둘이 됐다. 「퀴즈를 빼도 축이 산다」가 결함이 아니라 그 확장의 뜻이다. */
+  const 퀴즈뺌 = 끊김글(빼고('quiz.answered'));
+  assert.ok(!/자기인식[^]*축이 null/.test(퀴즈뺌), '퀴즈만 뺐는데 자기인식이 죽었다 — 짚음 통로가 안 세어진다(v12)');
+  const 둘다뺌 = 끊김글(합성이력().행들.filter(
+    (e) => e.event_type !== 'quiz.answered' && !(e.event_type === 'submission.created' && e.task_type === '숙제제출')));
+  assert.match(둘다뺌, /자기인식[^]*축이 null/, '두 통로를 다 뺐는데 자기인식이 null 로 안 잡혔다');
 });
 
 test('탐지력 ④ — 사건이 하나도 없으면 여러 자리가 동시에 빨개진다(조용한 0 이 없다)', () => {
@@ -52,8 +61,8 @@ test('탐지력 ④ — 사건이 하나도 없으면 여러 자리가 동시에
 });
 
 test('탐지력 ⑤ — G4 지목 행을 빼면 강제산출 축이 null 로 잡힌다(표식이 사건 종이 아니라 스냅샷이다)', () => {
-  /* 이 축은 사건 «종»을 빼서는 못 죽는다(quiz.answered 를 빼면 자기인식이 먼저 죽는다) —
-   * 표식(팩 challenge_id)으로만 갈리므로, 탐지력도 그 표식으로 걷어낸 이력으로 잰다. */
+  /* 이 축은 사건 «종»을 빼서는 못 죽는다(quiz.answered 를 빼면 강제산출보다 넓은 축들이 같이
+   * 죽는다) — 표식(팩 challenge_id)으로만 갈리므로, 탐지력도 그 표식으로 걷어낸 이력으로 잰다. */
   const { 모듈상수 } = require('../contents/서류관문문항.js');
   const 남김 = 합성이력().행들.filter((e) => {
     const snap = e.submission && e.submission.task_snapshot;

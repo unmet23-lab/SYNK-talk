@@ -72,6 +72,11 @@ export default function 보고서교정화면({
   const [로그, set로그] = useState([]);
   const [오류, set오류] = useState(null);
   const [낸것, set낸것] = useState([]); // 이 앉음에서 이미 나간 문장 — 대기 카드가 되보여 준다
+  /* Ⅲ⑦(유호 확정 08-22) — 확신도 기호식(라디오 `?`·`??` 와 같은 뜻·같은 값). 문구·값의 정본은
+   * lib(조립기)가 지고 화면은 토글 배치만 한다. 표기는 선택이다 — 안 누르면 키 자체가 안 실린다. */
+  const [확신도, set확신도] = useState(null);
+  const 이번참조용키 = 턴 != null ? String(턴) : '';
+  useEffect(() => { set확신도(null); }, [이번참조용키]);   // 문항이 넘어가면 표기도 새로 — 이월은 거짓 표기다
 
   /* 한 앉음 = 한 correlation_id (발주 G2 §6-1 「3문장이 한 자리에서 나왔다는 사실은 그 순간에만
    * 안다」). 3턴이 **같은 값**을 쓰고, 큐에서 셋을 가르는 것은 항목 id 의 턴 칸이다. */
@@ -223,6 +228,7 @@ export default function 보고서교정화면({
     const 사건 = 짚음제출사건(이번, {
       교정문,
       고른것: 짚은것,
+      확신도,
       latency_ms: 지연참조.current,
       attempt_no: 다음시도번호(현재로그, 이번.task_ref, 이번.문항id),
       correlation_id: 앉음,
@@ -315,6 +321,19 @@ export default function 보고서교정화면({
                 autoCorrect={false}
               />
               <Text style={s.메모}>비우면 그 낱말을 지우는 것이 돼요.</Text>
+              {/* Ⅲ⑦ 확신도 — 누르면 켜지고 다시 누르면 꺼진다(표기는 선택 · 라디오 ?·?? 와 같은 뜻). */}
+              <View style={s.확신줄}>
+                {[['low', '? 자신이 없어요'], ['guess', '?? 찍었어요']].map(([값, 라벨]) => (
+                  <Pressable
+                    key={값}
+                    onPress={() => set확신도(확신도 === 값 ? null : 값)}
+                    accessibilityRole="button"
+                    style={({ pressed }) => [s.확신토글, 확신도 === 값 && s.확신토글_켬, pressed && s.눌림]}
+                  >
+                    <Text style={[s.확신글, 확신도 === 값 && s.확신글_켬]}>{라벨}</Text>
+                  </Pressable>
+                ))}
+              </View>
               <Pressable
                 onPress={제출}
                 accessibilityRole="button"
@@ -322,7 +341,7 @@ export default function 보고서교정화면({
               >
                 <Text style={s.제출글}>제출</Text>
               </Pressable>
-              <Pressable onPress={() => { set짚은것(null); set단계('짚기'); }} accessibilityRole="button">
+              <Pressable onPress={() => { set짚은것(null); set단계('짚기'); set확신도(null); }} accessibilityRole="button">
                 <Text style={s.다시고르기}>다른 데를 짚을래요</Text>
               </Pressable>
             </View>
@@ -407,6 +426,12 @@ const s = StyleSheet.create({
   제출버튼: { backgroundColor: 색.잉크, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
   제출글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.바탕 },
   다시고르기: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_보조, textAlign: 'center' },
+  /* Ⅲ⑦ 확신도 토글 — 신호색 0(코랄은 녹음 버튼 하나 — 이 화면 규율 그대로) · 켬은 테두리·글자만. */
+  확신줄: { flexDirection: 'row', gap: 8 },
+  확신토글: { flex: 1, borderWidth: 1, borderColor: 색.선, borderRadius: 12, paddingVertical: 8, alignItems: 'center' },
+  확신토글_켬: { borderColor: 색.잉크, backgroundColor: 색.바탕띄움 },
+  확신글: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_보조 },
+  확신글_켬: { color: 색.잉크 },
   눌림: { opacity: 0.75 },
 
   대기제목: { fontFamily: 폰트.헤드, fontSize: 24, color: 색.잉크 },

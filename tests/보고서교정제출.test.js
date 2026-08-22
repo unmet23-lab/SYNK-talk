@@ -96,6 +96,21 @@ const 짚음 = (덧입력 = {}, 문항id = 오류id) => {
   });
 };
 
+test('짚음 확신도(Ⅲ⑦ · 유호 확정 08-22) — 표기했을 때만 payload.confidence · 무산출은 그대로 안 묻는다', () => {
+  for (const 값 of ['low', 'guess']) {
+    const e = 짚음({ 확신도: 값 });
+    assert.equal(e.payload.confidence, 값, `${값} 표기가 payload 에 안 실렸다`);
+    태우기(e, `짚음 확신도 ${값}`);
+  }
+  for (const 빈 of [null, undefined, '', 'high']) {
+    const e = 짚음(빈 === undefined ? {} : { 확신도: 빈 });
+    assert.ok(!('confidence' in e.payload),
+      `확신도 ${JSON.stringify(빈)} 인데 키가 실렸다 — 안 물린 표기는 안 싣는다`);
+  }
+  const 무산출 = 무산출사건(재료of(오류id), { 전량거절: true, 건너뜀: false, attempt_no: 1, ...키들, 확신도: 'low' });
+  assert.ok(무산출 && !('confidence' in 무산출.payload), '무산출에 확신도가 실렸다 — 그 판에는 토글이 없다(거짓 표기)');
+});
+
 /** 검증기에 실제로 태운다 — 통과 판정의 유일한 근거. */
 function 태우기(사건, 무엇) {
   const r = 검증(사건);
