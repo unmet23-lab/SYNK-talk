@@ -38,6 +38,18 @@ test('🔴 막힘이 앱까지 그대로 온다 — 서버가 실은 이유를 �
   assert.deepEqual(r.막힘, { code: 'CONSENT_MISSING' });
 });
 
+test('🔴 assignment_status 가 앱까지 그대로 온다 — 빈 배정의 «없다»와 «곧 온다»를 이 층에서 뭉개지 않는다(§3-1 · §12-11)', async () => {
+  for (const v of ['있음', '없음', '생성중', '오류', '대기중']) {
+    const API = 세우기({ ok: true, data: [], blocked: null, assignment_status: v, contract_ver: 'c12' });
+    const r = await API.오늘과제받기('토큰');
+    assert.equal(r.assignment_status, v, `값 ${v} 를 그대로 싣는다(모르는 값도 — 화면이 「괜찮다」로 접지 않게)`);
+  }
+  const 구앱 = 세우기({ ok: true, data: [], blocked: null, contract_ver: 'c11' });
+  assert.equal((await 구앱.오늘과제받기('토큰')).assignment_status, null, '칸이 없으면 null — 구앱 규칙(data 만으로 그린다)과 같은 동작');
+  const 이상 = 세우기({ ok: true, data: [], assignment_status: 7 });
+  assert.equal((await 이상.오늘과제받기('토큰')).assignment_status, null, '문자열이 아니면 null — 모양이 다른 값을 화면에 흘리지 않는다');
+});
+
 test('🔴 과제가 있어도 막힘을 잰다 — 배정 뒤 철회한 학생은 과제를 보면서 업로드만 막힌다', async () => {
   const API = 세우기({ ok: true, data: [{ task_id: 't1' }], blocked: { code: 'CONSENT_MISSING' } });
   const r = await API.오늘과제받기('토큰');

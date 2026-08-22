@@ -1,0 +1,56 @@
+'use strict';
+/**
+ * 생성 카드 — 오늘 과제가 **없는 게 아니라 오는 중(또는 못 온)** 학생이 읽는 자리 (상태기반 §3-1 · §12-11).
+ *
+ * ■ 이 파일이 닫는 것
+ *   `GET /v1/tasks` 의 `assignment_status` 가 `생성중` 이면 「곧 온다」, `오류` 면 「선생님께 보여 주기」를
+ *   그린다 — 그 둘을 빈 과제 폴백과 «다르게 그리는» 것이 §12-11 어댑터 인수 조건이다(칸만 실리고 앱이 안
+ *   읽으면 두 사실이 여전히 한 화면이다). `있음`·`없음`·칸 없음이면 **아무것도 그리지 않는다**(기존 화면 그대로).
+ * ■ 문장은 여기 없다 — 정본은 `contents/문구_생성.js`(임시 문구 · 유호 카피 확정 대기) · 이 파일은 배치만.
+ * ■ 디자인 — 막힘카드와 같은 밀도·같은 위계(신호 1점 = 녹음 버튼 · 여기엔 코랄 0). `테마.js` R1.
+ */
+import { StyleSheet, Text, View } from 'react-native';
+import { 색, 폰트, 모노트래킹 } from './테마';
+import { 생성안내 } from '../contents/문구_생성.js';
+
+/**
+ * @param {{상태: string|null, 학생번호?: string|null}} props
+ *   `상태` = `오늘과제받기()` 가 실어 온 `assignment_status`. 그릴 것이 없으면 null — 빈 카드를 세우지 않는다.
+ */
+export default function 생성카드({ 상태, 학생번호 = null }) {
+  const 안 = 생성안내(상태);
+  if (!안) return null;
+
+  return (
+    <View style={s.카드}>
+      {안.제목.map((줄, i) => (
+        <Text key={`제목${i}`} style={i === 0 ? s.제목 : s.제목_병기}>{줄}</Text>
+      ))}
+      {안.본문.map((줄, i) => (
+        <Text key={`본문${i}`} style={i === 0 ? s.본문 : s.본문_병기}>{줄}</Text>
+      ))}
+
+      {안.보여줄값 === '학생번호' && 학생번호 ? (
+        <View style={s.번호칸}>
+          <Text style={s.번호라벨}>STUDENT ID</Text>
+          <Text style={s.번호} selectable>{학생번호}</Text>
+        </View>
+      ) : null}
+
+      {/* 🔴 모르는 값을 「괜찮다」로 접지 않는다 — 서버가 값목록을 늘리는 날 이 한 줄이 무엇이 왔는지 남긴다. */}
+      {안.아는값 ? null : <Text style={s.메모}>{안.값}</Text>}
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
+  카드: { backgroundColor: 색.바탕띄움, borderRadius: 20, padding: 22, gap: 14 },
+  제목: { fontFamily: 폰트.헤드, fontSize: 21, lineHeight: 31, color: 색.잉크 },
+  본문: { fontFamily: 폰트.본문, fontSize: 16, lineHeight: 26, color: 색.잉크_서브 },
+  제목_병기: { fontFamily: 폰트.강조, fontSize: 17, lineHeight: 26, color: 색.잉크_서브 },
+  본문_병기: { fontFamily: 폰트.캡션, fontSize: 15, lineHeight: 24, color: 색.잉크_메타 },
+  번호칸: { alignItems: 'center', gap: 6, paddingVertical: 12 },
+  번호라벨: { fontFamily: 폰트.모노, fontSize: 12, letterSpacing: 모노트래킹, color: 색.잉크_메타 },
+  번호: { fontFamily: 폰트.모노, fontSize: 28, letterSpacing: 모노트래킹, color: 색.잉크 },
+  메모: { fontFamily: 폰트.모노, fontSize: 12, letterSpacing: 모노트래킹, color: 색.잉크_메타 },
+});

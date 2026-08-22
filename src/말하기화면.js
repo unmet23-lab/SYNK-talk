@@ -43,6 +43,7 @@ import { 로그읽기, 로그쓰기, 음성쓰기, 지속저장 } from './저장
 import { 오늘과제받기 } from './과제API.js';
 import { 발화보내기 } from './제출API.js';
 import 막힘카드 from './막힘카드.js';
+import 생성카드 from './생성카드.js';
 import { 급수편지 } from '../contents/첫편지.js';
 /* G1 갈래 — 오늘 배정이 미니게임이면 이 화면 대신 게임 화면이 선다(발주_게임모듈 G1 §4).
  * 판정은 `게임재료` 하나다(H5): challenge_id 대조·시드 펴기·검수확정 게이트가 그 안에 살아서
@@ -154,6 +155,9 @@ export default function 말하기화면({
   /* 서버가 준 `blocked` — **왜** 비었나(F176 ①). 아래 `녹음카드` 의 `막힘`(녹음이 시작되지
    * 못한 이유)과 이름이 겹치지 않게 `서버` 를 붙인다 — 같은 파일 안이라 헷갈리면 그대로 버그다. */
   const [서버막힘, set서버막힘] = useState(null);
+  /* 생성 상태(상태기반 §3-1 `assignment_status`) — 과제가 **없을 때만** 뜻이 있다(있으면 과제 카드가 선다).
+   * `생성중`·`오류` 만 생성카드가 그린다 · `있음`·`없음`·칸 없음(구앱 규칙)은 null 로 접어 기존 화면 그대로. */
+  const [서버생성상태, set서버생성상태] = useState(null);
   /* 🔑 같은 값을 **ref 로도** 쥔다 — 아래 `AppState` 리스너는 `[date, 토큰]` 으로 등록돼
    *   state 를 낡은 채 보고, 그 자리가 곧 큐를 미는 두 자리 중 하나다(`로그참조` 와 같은 이유). */
   const 막힘참조 = useRef(null);
@@ -358,7 +362,7 @@ export default function 말하기화면({
       let 그날 = 몽골날짜();
       try {
         if (!토큰) throw new Error('토큰 없음');
-        const { 항목, 막힘 } = await 오늘과제받기(토큰);
+        const { 항목, 막힘, assignment_status } = await 오늘과제받기(토큰);
         /* 🔴 **큐를 세우는 자리다** — 아래 `밀린것보내기` 가 이 값을 보고 멈춘다. 막힌 학생의
          *   발화를 보내면 서버가 `CONSENT_MISSING`(`retryable:false`)으로 접고 앱은 그것을
          *   `send_final` 로 적어 다시 못 보낸다 = 동의가 서는 날 나갈 수 있었던 발화가 죽는다.
@@ -366,6 +370,7 @@ export default function 말하기화면({
          * 🔑 ref 는 `살아있음` 과 무관하게 적는다 — 화면이 사라져도 복귀 리스너는 산다. */
         막힘참조.current = 막힘;
         if (살아있음) set서버막힘(막힘);
+        if (살아있음) set서버생성상태(항목 ? null : (assignment_status || null));
         /* 🔑 새 날 되세움에서도 **양쪽을 적는다**(아래 `set호흡` 과 같은 이유) — 어제가 게임이고
          * 오늘이 말하기면 비워져야 오늘 화면이 선다. `게임재료` 가 null 이면(게임 아님·못 펴는
          * 시드·미검수 판) 아래 `화면과제` 폴백이 그대로 선다 — 조용한 말하기 폴백이 설계다(H5). */
@@ -387,6 +392,7 @@ export default function 말하기화면({
         if (살아있음) setG2벌(null);
         if (살아있음) setG3재료(null);
         if (살아있음) setG4벌(null);
+        if (살아있음) set서버생성상태(null); // 서버를 못 받은 날은 생성 상태도 모른다 — 추측으로 그리지 않는다
         게임수거참조.current = null; // 오늘을 모르는 날은 수거도 쉰다(오귀속보다 0건)
         결과 = 화면과제(null, 폴백);
         결과.사유 = 토큰
@@ -510,6 +516,17 @@ export default function 말하기화면({
         <머리 호흡={호흡} />
         {오류 && <Text style={s.오류}>{오류}</Text>}
         <막힘카드 막힘={서버막힘} 학생번호={학생번호} />
+      </ScrollView>
+    );
+  }
+  /* 생성 상태 분기(§12-11 어댑터 인수 조건) — 막힘이 먼저, 그다음 «곧 온다(생성중)»·«못 왔다(오류)».
+   * 두 값만 여기로 온다(`있음`·`없음`·칸 없음은 위에서 null 로 접혔다) — 빈 과제 폴백과 다르게 그린다. */
+  if (서버생성상태 === '생성중' || 서버생성상태 === '오류') {
+    return (
+      <ScrollView style={s.wrap} contentContainerStyle={s.inner}>
+        <머리 호흡={호흡} />
+        {오류 && <Text style={s.오류}>{오류}</Text>}
+        <생성카드 상태={서버생성상태} 학생번호={학생번호} />
       </ScrollView>
     );
   }

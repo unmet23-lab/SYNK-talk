@@ -45,6 +45,10 @@ export async function 오늘과제받기(토큰, 날짜) {
   return {
     항목: data.length ? data[0] : null,
     막힘: 몸.blocked || null,
+    /* 🔑 `assignment_status`(있음|없음|생성중|오류 · c12 §3-1) — 빈 배정의 두 사실(「없다」·「곧 온다」)을
+     *   가르는 칸이다. 값을 **그대로** 싣는다(모르는 값도 — 화면이 「괜찮다」로 접지 않게). 칸이 없으면
+     *   null = 구앱 규칙(`data` 만으로 그린다)과 같은 동작이라 기존 소비자에 무영향이다. */
+    assignment_status: typeof 몸.assignment_status === 'string' ? 몸.assignment_status : null,
     contract_ver: 몸.contract_ver || null,
   };
 }
