@@ -33,7 +33,7 @@ export default function App() {
   const [복원중, set복원중] = useState(true);
   const [교정, set교정] = useState(null); // 나에게 온 최신 교정 1건 (없으면 답장 링크를 안 그린다)
   const [교정막힘, set교정막힘] = useState(null); // 서버 `blocked` — 있으면 답장 화면이 사건을 안 보낸다
-  const [견줌값, set견줌값] = useState(null); // 오늘·어제 (첫날이면 null — 「어제의 나」 링크를 안 그린다)
+  const [견줌값, set견줌값] = useState(null); // {견줌, 오늘의확인} — 견줌은 첫날 null(「어제의 나」 링크를 안 그린다)
   const [배치미달, set배치미달] = useState(null); // 오늘 배달이 덜 돈 것 (원장만 값을 받는다 · P0 §6-5)
   const [fontsLoaded] = useFonts({
     'SUIT-Regular': require('./assets/fonts/SUIT-Regular.ttf'),
@@ -165,8 +165,9 @@ export default function App() {
         <말하기화면
           토큰={세션.access_token}
           학생번호={세션.학생번호}
-          견줌={견줌값}
+          견줌={견줌값?.견줌 ?? null}
           견줌다시읽기={견줌읽기}
+          확인카드값={견줌값?.오늘의확인 ?? null}
         />
       )}
       {/* 🔑 답장에도 학생번호를 넘긴다 — 말하기 화면과 **같은 이유**다(위 주석). 막힘 안내가
@@ -223,7 +224,7 @@ export default function App() {
       {화면 === '회고' && (
         <회고화면 토큰={세션.access_token} 돌아가기={() => set화면('시스템')} />
       )}
-      {화면 === '어제' && <어제의나 값={견줌값} 돌아가기={() => set화면('말하기')} />}
+      {화면 === '어제' && <어제의나 값={견줌값?.견줌 ?? null} 돌아가기={() => set화면('말하기')} />}
       {화면 === '말하기' && (
         <Pressable onPress={() => set화면('시스템')} style={s.시스템링크} hitSlop={8}>
           <Text style={s.시스템글}>SYSTEM</Text>
@@ -241,7 +242,7 @@ export default function App() {
       {/* 🔴 배치 미달은 **원장에게만** 값이 온다 — 학생 화면에는 이 칸이 아예 안 그려진다.
           코랄을 쓰지 않는다: 이 화면의 신호 1점은 녹음 버튼이고(`테마.신호자리`), 둘로
           만들면 R1 이 깨진다. 위계는 **밝기**로 준다(다른 두 링크보다 한 층 위). */}
-      {화면 === '말하기' && (배치미달 || 교정 || 견줌값) && (
+      {화면 === '말하기' && (배치미달 || 교정 || 견줌값?.견줌) && (
         <View style={s.겉테줄}>
           {배치미달 && (
             <Text style={s.미달글}>오늘 배달 {배치미달.배정}/{배치미달.재적}</Text>
@@ -251,7 +252,7 @@ export default function App() {
               <Text style={s.겉테글}>답장</Text>
             </Pressable>
           )}
-          {견줌값 && (
+          {견줌값?.견줌 && (
             <Pressable onPress={() => set화면('어제')} hitSlop={8}>
               <Text style={s.겉테글}>어제의 나</Text>
             </Pressable>

@@ -118,6 +118,15 @@ function 합성이력() {
       행들.push({ event_id: id('af'), event_type: 'affect.reported', occurred_at: t(d + 0.5),
         payload: { affect_kind: 'slump' } });
     }
+    /* ⑫ 성향 확인 답(c13 Ⅲ⑥) — 확인축 재료. 긍·부정을 다 낸다(하나면 「축이 값을 낸다」는
+     * 초록이 반쪽만 도는 상태를 덮는다 — G2 세 갈래와 같은 이유). */
+    if (d % 7 === 0) {
+      행들.push({ event_id: id('er'), event_type: 'estimate.responded', occurred_at: t(d + 0.55),
+        payload: { trait_axis: '리듬', shown_key: d % 14 === 0 ? '여유제출' : '반복제출',
+          shown_text: '요즘 과제를 마감보다 미리 내고 계시던데요 — 미리 계획해 두는 편이에요?',
+          response: d % 14 === 0 ? '맞다' : '아니다',
+          estimator_version: '학습자상태.v13+성향확인.v1', estimate_as_of: t(d + 0.5) } });
+    }
 
     /* ⑪ G2 「보고서 교정」 지목 — 탐지축(v8). 세 갈래를 다 낸다: 짚음 · 「고칠 곳 없음」 ·
      * 무반응. 🔴 갈래가 하나면 「축이 값을 낸다」는 초록이 세 뜻 중 하나만 도는 상태를 덮는다.

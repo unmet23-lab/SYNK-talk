@@ -11,5 +11,11 @@
   "서류관문문항.mjs": "contents/서류관문문항.js",
   "서류관문.mjs": "lib/서류관문.js",
   "계약판.mjs": "lib/계약판.js",
-  "갈래판정.mjs": "lib/갈래판정.js"
+  "갈래판정.mjs": "lib/갈래판정.js",
+  "성향확인.mjs": "lib/성향확인.js",
+  "문구_성향확인.mjs": "contents/문구_성향확인.js",
+  "문구_동의.mjs": "contents/문구_동의.js",
+  "학습자상태.mjs": "lib/학습자상태.js",
+  "작성과정.mjs": "lib/작성과정.js",
+  "라디오태스크.mjs": "lib/라디오태스크.js"
 }

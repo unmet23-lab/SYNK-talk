@@ -36,9 +36,20 @@ import postgres from 'npm:postgres@3.4.4';
 import 토큰모듈 from './토큰.mjs';
 import 과제모듈 from './오늘과제.mjs';
 import 계약판모듈 from './계약판.mjs';
+import 성향확인모듈 from './성향확인.mjs';
+import 상태모듈 from './학습자상태.mjs';
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
 const { 몽골날짜, 시간대 } = 과제모듈 as { 몽골날짜: (때?: Date) => string; 시간대: string };
+/* Ⅲ⑥ — 오늘 보여줄 성향 확인 하나. 판정의 정본은 lib 하나(서버·앱·회귀가 같은 함수를 본다).
+ * 리듬 «추정» 자체는 학습자상태() 그대로다 — 배정↔제출 구간 잇기를 SQL 로 다시 적으면 두 벌이다. */
+const { 확인카드 } = 성향확인모듈 as {
+  확인카드: (리듬: unknown, 이력: unknown, 기준시각: string, 추정판: string) => Record<string, unknown> | null;
+};
+const { 학습자상태 } = 상태모듈 as {
+  학습자상태: (행들: unknown[], 옵션: Record<string, unknown>) =>
+    { estimator_version: string; 축: { 리듬: unknown } };
+};
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
 
@@ -157,8 +168,39 @@ Deno.serve(async (req: Request) => {
       },
     }];
 
+    /* Ⅲ⑥ — 오늘의 성향 확인 카드(c13 · 유호 확정 08-22). growth_note 선례: 서버가 짓고 앱은
+     * 그린다(응답 필드 추가 = 판올림 아님 · null 이면 앱이 안 그린다). 판정 재료는 방향·등식뿐
+     * (문턱 0 — lib/성향확인.js 머리말) · 하루 1회·부정 재노출 금지는 estimate.responded 행이 진다.
+     * 실패는 null 로 낸다 — 확인 카드는 «없어도 되는» 꼬리라 본 응답을 절대 안 깨뜨린다. */
+    let 오늘의확인: Record<string, unknown> | null = null;
+    try {
+      /* 행만 걷는다 — 리듬 추정(배정↔제출 구간 잇기·마감 여유)은 학습자상태() 정본이 계산한다.
+       * 창(30일)도 그 함수의 as_of 절단이 지므로 여기선 40일을 넉넉히 걷는다(두 벌 방지). */
+      const 원행들 = await sql`
+        select e.event_id, e.event_type, e.occurred_at, e.due_at
+          from engine.learning_events e
+         where e.learner_id = ${행.learner_id}::uuid
+           and e.event_type in ('task.assigned', 'submission.created')
+           and e.occurred_at >= now() - interval '40 days'`;
+      const [답이력] = await sql`
+        select count(*) filter (where (e.occurred_at at time zone ${시간대})::date = ${오늘}::date) as 오늘답수,
+               coalesce(array_agg((e.payload->>'trait_axis') || ':' || (e.payload->>'shown_key'))
+                 filter (where e.payload->>'response' = '아니다'), '{}') as 부정키들
+          from engine.learning_events e
+         where e.learner_id = ${행.learner_id}::uuid
+           and e.event_type = 'estimate.responded'`;
+      const 기준 = new Date().toISOString();
+      const 상태 = 학습자상태(원행들 as unknown[], { as_of: 기준, 시간대 });
+      오늘의확인 = 확인카드(
+        상태.축.리듬,
+        { 오늘답함: Number(답이력.오늘답수) > 0, 부정키들: (답이력.부정키들 as string[]) ?? [] },
+        기준, 상태.estimator_version);
+    } catch (e) {
+      console.error('[progress] 오늘의확인 판정 실패(null 로 낸다)', String((e as Error)?.message ?? e));
+    }
+
     // 두 날짜 고정이라 넘길 쪽이 없다(C0 §4-3 ③ — 쿼리 없음).
-    return 봉투(200, { ok: true, date: 오늘, data, next_cursor: null }, ver);
+    return 봉투(200, { ok: true, date: 오늘, data, next_cursor: null, 오늘의확인 }, ver);
   } catch (e) {
     console.error('[progress] 조회 실패', String((e as Error)?.message ?? e));
     return 실패(500, { code: 'SERVER_ERROR', message: '잠시 뒤 다시 시도해 주세요', retryable: true }, ver);

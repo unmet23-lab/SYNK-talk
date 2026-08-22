@@ -10,6 +10,8 @@ import { 계측시작, 타건, 계측payload } from '../lib/작성과정.js';
  * 지고 여기는 그릴 자리만 준다 — 화면이 문구를 손으로 적으면 「비교하지 않는다」가 화면마다
  * 다시 지켜져야 하고, 한 화면이 잊으면 그 자리에서만 조용히 깨진다. */
 import { 관찰한줄 } from '../lib/돌려주기.js';
+import { 확인사건 } from '../lib/성향확인.js';
+import { 반응안내 } from '../contents/문구_성향확인.js';
 import { 다음시도번호, 제출항목 } from '../lib/게임로그.js';
 import { 흐름id, 깨진기록안내 } from '../lib/제출로그.js';
 import { 몽골날짜 } from '../lib/오늘과제.js';
@@ -63,7 +65,7 @@ const 경과시계 = () =>
   (typeof performance !== 'undefined' && performance && typeof performance.now === 'function'
     ? performance.now() : null);
 
-export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null, 시작단계 = '전략' }) {
+export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null, 시작단계 = '전략', 확인 = null, 확인뒤 = null }) {
   /* 표시 순서를 마운트 때 한 번 확정한다(`말하기화면` 녹음카드와 같은 규칙) — 매 렌더 섞으면
    * 행에 적힌 자리와 학생이 본 자리가 갈리고, 그 갈림은 증상이 없다. 추천은 시드에서 결정적. */
   const [보기] = useState(() => (재료 ? 보기세우기(사과전략.보기들, 오늘추천(재료.prompt_seed)) : null));
@@ -77,6 +79,9 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
   const [본문있음, set본문있음] = useState(false);
   const 본문있음참조 = useRef(false);
   const [보낸메일, set보낸메일] = useState(null);
+  /* Ⅲ⑥ — 이 앉음에서 성향 확인에 답했나(즉시 반응용 · 값 = '맞다'|'아니다'). 답 자체는 게임큐로
+   * 나가고(오프라인 안전·멱등), 다음 노출 게이트(하루 1회)는 서버가 행을 읽어 진다. */
+  const [확인답, set확인답] = useState(null);
 
   /* 한 앉음 = 한 correlation_id (P0 §3-1 ④). 재제출은 새 마운트 = 새 앉음이라 **새 키**다 —
    * 원 제출과의 고리는 `retry_of_event_id`(서버 배정 행이 낸 값)가 잇는다(발주 G1 §6). */
@@ -234,6 +239,21 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
    * 🔴 도착과 무관하다 — 관찰은 «기기가 잰 것»이라 서버가 아직 못 받은 날에도 참이다. */
   const 관찰 = 메일항목 && 메일항목.사건 ? 관찰한줄(로그, 메일항목.사건.correlation_id) : null;
 
+  /* Ⅲ⑥ — 성향 확인에 답한다. 카드의 다섯 값을 그대로 되싣는 조립은 lib 이 지고(값록 포함),
+   * 전송은 이 화면의 유일한 통로(게임큐 — 직렬·멱등·오프라인 안전)로 나간다. 담기가 죽어도
+   * 즉시 반응은 선다 — 학생 경험이 저장 실패를 기다리지 않는다(고칠 것은 로그가 안다). */
+  const 확인답하기 = async (값) => {
+    const 사건 = 확인사건(확인, 값, { correlation_id: 앉음, idempotency_key: 흐름id() });
+    if (!사건) return;
+    set확인답(값);
+    try {
+      const { 로그: 더한, 새것 } = await 게임사건담기(사건, null);
+      set로그(더한);
+      if (새것) 게임큐밀기(토큰, null).then(set로그, () => {});
+    } catch { /* 담기 실패 — 반응은 이미 섰고, 다음 노출은 서버 행 기준이라 거짓 하루1회가 안 생긴다 */ }
+    if (확인뒤) 확인뒤();
+  };
+
   return (
     <ScrollView style={s.wrap} contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
       <머리 />
@@ -333,6 +353,28 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
               점수도 채점도 아니라 카드 밖 한 줄로 조용히 둔다. **없으면 안 그린다** — 빈 자리를
               남기면 「관찰이 없다」와 「관찰을 못 잰다」가 같은 모양이 된다. */}
           {관찰 ? <Text style={s.관찰}>{관찰.글}</Text> : null}
+          {/* Ⅲ⑥ 성향 확인 — 같은 「이미 보는 자리」 규칙(새 화면 0 · 하루 1회는 서버가 진다).
+              답하면 즉시 반응 한 줄이 서고(반영이 «보이는» 상호작용), 사건은 게임큐로 나간다.
+              카드가 null 이면 아무것도 안 그린다 — 확인은 «없어도 되는» 꼬리다. */}
+          {확인 && !확인답 ? (
+            <View style={s.카드}>
+              <Text style={s.카드라벨}>몽글의 관찰</Text>
+              <Text style={s.본문글}>{String(확인.shown_text || '')}</Text>
+              <View style={s.확인줄}>
+                {[['맞다', '맞아요'], ['아니다', '아니에요']].map(([값, 라벨]) => (
+                  <Pressable
+                    key={값}
+                    onPress={() => 확인답하기(값)}
+                    accessibilityRole="button"
+                    style={({ pressed }) => [s.확인단추, pressed && s.눌림]}
+                  >
+                    <Text style={s.확인단추글}>{라벨}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
+          {확인답 ? <Text style={s.관찰}>{(반응안내(확인답) || []).join(' ')}</Text> : null}
           {/* 산출물 렌더 — 「보냈다」의 기록이지 「맞았다」의 전시가 아니다(게임층 §2 한 수 더). */}
           {보낸메일 ? (
             <View style={s.카드}>
@@ -404,4 +446,8 @@ const s = StyleSheet.create({
    * 흐려지고, 관찰이 «성적»으로 읽힌다. 위계는 색이 아니라 밀도로 준다(`어제의나` 와 같은 규칙). */
   관찰: { fontFamily: 폰트.캡션, fontSize: 14, lineHeight: 22, color: 색.잉크_보조, paddingHorizontal: 4 },
   편지글: { fontFamily: 폰트.본문, fontSize: 16, lineHeight: 27, color: 색.잉크 },
+  /* Ⅲ⑥ 확인 단추 — 신호색 0(확신 토글과 같은 결) · 두 단추는 같은 무게다(어느 답도 밀지 않는다). */
+  확인줄: { flexDirection: 'row', gap: 8 },
+  확인단추: { flex: 1, borderWidth: 1, borderColor: 색.선, borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
+  확인단추글: { fontFamily: 폰트.강조, fontSize: 14, color: 색.잉크 },
 });

@@ -13,7 +13,7 @@
 
 | 묻는 것 | 정본 | 여기서 하는 일 |
 |---|---|---|
-| 무엇이 **필수 필드**인가 · 값목록 | `계약/수집_교정_계약.json`(**현행 c12**) | **참조만.** 값을 복사하지 않는다 |
+| 무엇이 **필수 필드**인가 · 값목록 | `계약/수집_교정_계약.json`(**현행 c13**) | **참조만.** 값을 복사하지 않는다 |
 | DB에 **어떤 모양**으로 앉나 · 권한 | `docs/L0_데이터계약.md` | 참조만 |
 | 앱이 **무엇을 보내고 받나** | **이 문서** | 정한다 |
 
@@ -63,19 +63,19 @@
 | 헤더 | 예 | 없으면 |
 |---|---|---|
 | `Authorization` | `Bearer <access_token>` | 401 `AUTH_REQUIRED` |
-| `X-Contract-Ver` | `c12` | 400 `CONTRACT_VER_MISSING` |
+| `X-Contract-Ver` | `c13` | 400 `CONTRACT_VER_MISSING` |
 | `X-App-Ver` | `0.3.1 (42)` | 통과(로그용) |
 
 **응답 봉투 — 성공**
 
 ```json
-{ "ok": true, "contract_ver": "c12", "results": [ ... ] }
+{ "ok": true, "contract_ver": "c13", "results": [ ... ] }
 ```
 
 **응답 봉투 — 요청 전체 실패**
 
 ```json
-{ "ok": false, "contract_ver": "c12",
+{ "ok": false, "contract_ver": "c13",
   "error": { "code": "AUTH_EXPIRED", "message": "토큰이 만료됐습니다", "retryable": true } }
 ```
 
@@ -184,7 +184,7 @@
 **응답**
 
 ```json
-{ "ok": true, "contract_ver": "c12",
+{ "ok": true, "contract_ver": "c13",
   "results": [
     { "idempotency_key": "b6f1…", "status": "stored",    "event_id": "3c9e…" },
     { "idempotency_key": "77a2…", "status": "duplicate", "event_id": "1b40…" },
@@ -206,7 +206,7 @@
 
 ```json
 요청  { "kind": "audio", "content_type": "audio/wav", "byte_size": 482913 }
-응답  { "ok": true, "contract_ver": "c12",
+응답  { "ok": true, "contract_ver": "c13",
         "upload_url": "https://…", "audio_ref": "voice/9f2c…(learner_id)/3c9e….wav",
         "expires_at": "2026-08-05T13:35:00.000Z" }
 ```
@@ -271,7 +271,7 @@
 **응답 예 · 실패 표** (`supabase/functions/tasks`):
 
 ```json
-{ "ok": true, "contract_ver": "c12", "date": "2026-08-07", "next_cursor": null,
+{ "ok": true, "contract_ver": "c13", "date": "2026-08-07", "next_cursor": null,
   "data": [ { "task_id": "…", "task_snapshot": { "ver": 1, "호흡": [ … ] },
               "task_format": null, "task_ref": "task-2026-08-07",
               "level_snapshot": "Lv2", "goal_snapshot": "study",
@@ -344,7 +344,7 @@
 | 🔴 경계 | 이 엔드포인트는 **집계값만** 낸다. 점수·등수·타 학생 값은 담지 않는다(`P0 §2-1` 랭킹 금지) |
 
 ```json
-{ "ok": true, "contract_ver": "c12", "date": "2026-08-07", "next_cursor": null,
+{ "ok": true, "contract_ver": "c13", "date": "2026-08-07", "next_cursor": null,
   "data": [ { "today":     { "submission_count": 2, "retry_count": 1, "correction_retry": true },
               "yesterday": { "submission_count": 1, "retry_count": 0, "correction_retry": false } } ] }
 ```
@@ -501,7 +501,7 @@ anon 키로 부른다. 입력 `{ student_code, temp_password, new_password }` �
 ## 9. ~~열린 판정~~ → ✅ c4 개정 완료 (2026-08-06) — **이력 절**
 
 > ⚠ **이 절은 현행 규범이 아니라 이력이다**(2026-08-09 명시 · 심문 3벌 전부가 「한 문서 안에 판본이 여러
-> 갈래」로 짚은 자리의 절반이 여기였다). 현행 계약은 **c12**이고 아래는 **c4 시점**의 기술이다 —
+> 갈래」로 짚은 자리의 절반이 여기였다). 현행 계약은 **c13**이고 아래는 **c4 시점**의 기술이다 —
 > 「남은 것은 DB 적용뿐」·「그 SQL은 지금 다른 세션의 작업본」 같은 문장은 **그날의 상태**다.
 > 지금 무엇이 필수이고 무엇이 값목록인지는 §0 표가 가리키는 정본 둘(`계약/수집_교정_계약.json` ·
 > `lib/이벤트검증.js`)에서 읽는다. **이 절을 근거로 구현하지 않는다.**
