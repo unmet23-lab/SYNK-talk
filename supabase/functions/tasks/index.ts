@@ -313,6 +313,7 @@ Deno.serve(async (req: Request) => {
      * · 신구조 물리가 없는 DB(활성 전 운영)는 표 존재 가드로 현행 이분법(있음/없음) 그대로 —
      *   구앱 규칙(§3-1: 이 칸을 안 읽는 클라이언트는 data 만 본다)과 같은 방향이다. */
     let assignment_status: string = 행들.length ? '있음' : '없음';
+    let status_degraded = false;   // T9 — 판정 실패 표식(값록 4 는 그대로 · 봉투에만 붙는다)
     if (!행들.length) {
       try {
         const 물리 = await sql`
@@ -328,8 +329,13 @@ Deno.serve(async (req: Request) => {
           }
         }
       } catch (e) {
-        /* 판정 실패는 «없음»으로 낸다(현행 동작) — 조회 부속이 본 응답을 깨지 않는다. */
-        console.error('[tasks] assignment_status 판정 실패(없음으로 낸다)', String((e as Error)?.message ?? e));
+        /* 판정 실패는 «없음»으로 낸다(현행 동작) — 조회 부속이 본 응답을 깨지 않는다.
+         * 🔴 단 그 사실을 봉투에 싣는다(심문 T9 — «없음»과 «못 쟀다»가 같은 모양이면 생성중
+         * 안내가 조용히 침묵한다). 새 응답 칸은 growth_note 선례(모르는 앱은 무시 · null 아님
+         * 때만 존재)라 판올림이 아니다 — 지금 소비자는 사람(디버깅)이고, 신앱이 「상태를 못
+         * 읽었어요」 안내를 그리고 싶은 날 이 칸이 그 재료가 된다. */
+        status_degraded = true;
+        console.error('[tasks] assignment_status 판정 실패(없음으로 낸다 · status_degraded)', String((e as Error)?.message ?? e));
       }
     }
 
@@ -359,7 +365,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // 하루 1건이 멱등으로 보장되므로 `next_cursor` 는 항상 null 이다(C0 §4-3 ①).
-    return 봉투(200, { ok: true, date: 날짜, data, blocked, next_cursor: null, 구제, assignment_status }, ver);
+    return 봉투(200, { ok: true, date: 날짜, data, blocked, next_cursor: null, 구제, assignment_status, ...(status_degraded ? { status_degraded } : {}) }, ver);
   } catch (e) {
     console.error('[tasks] 조회 실패', String((e as Error)?.message ?? e));
     return 실패(500, { code: 'SERVER_ERROR', message: '잠시 뒤 다시 시도해 주세요', retryable: true }, ver);

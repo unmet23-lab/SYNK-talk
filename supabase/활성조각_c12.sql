@@ -131,6 +131,7 @@ begin
       활성일 date := engine.gen_active_from();
       정본 engine.generation_batch_runs%rowtype;
       적색 text[] := '{}';
+      정보 text[] := '{}';   -- 적색 아님·알고 있어야 하는 수(T12 동의격리) — notice 로만 낸다
       n int;
     begin
       -- 일곱 항 전부 «활성 시작일부터»만(v5.7 B9) — 머리 게이트 하나가 배포~활성 사이 거짓 적색을 없앤다.
@@ -173,9 +174,24 @@ begin
       if n > 0 then 적색 := 적색 || format('④ 열린 시도 %s건', n); end if;
 
       -- ⑤ 과거 고아(v5.7 B2) — ㉧ 스윕이 마감 지난 «전량» 을 쓸므로 정상이면 항상 0 이다.
-      select count(*)::int into n from engine.generation_jobs
-       where assign_date < 오늘 and assign_date >= 활성일 and status in ('대기','claimed');
+      -- 🔴 동의 없는 학생의 잔존은 «따로» 센다(심문 T12): 스윕이 그 job 을 «일부러» 격리하므로
+      --    (한 건 실패 격리 — 왕복 B5 「원리상 영영 못 닫힌다」 자인) 고아로 합쳐 세면 철회 1건이
+      --    이 항을 «매일» 적색으로 만들고, 상시 적색은 신호로서 죽는다(F103 늑대소년 — 진짜 고아가
+      --    그 속에 숨는다). 술어 = lib/동의게이트.js 지금유효술어와 같은 식(그 파일이 정본).
+      select count(*)::int into n from engine.generation_jobs g
+       where g.assign_date < 오늘 and g.assign_date >= 활성일 and g.status in ('대기','claimed')
+         and exists (select 1 from engine.consents c
+                      where c.learner_id = g.learner_id
+                        and c.agreed_at <= now() and (c.revoked_at is null or c.revoked_at > now()));
       if n > 0 then 적색 := 적색 || format('⑤ 과거 고아 %s건', n); end if;
+      -- 동의격리 잔존(정보 — 적색 아님): 철회가 서는 날 1 이 되는 것이 «정상»이고, 처분(닫을 값)은
+      -- status 값록 개정(cN)의 몫이라 여기선 세어 보이기만 한다. 0 이 아니면 봉투에 실린다.
+      select count(*)::int into n from engine.generation_jobs g
+       where g.assign_date < 오늘 and g.assign_date >= 활성일 and g.status in ('대기','claimed')
+         and not exists (select 1 from engine.consents c
+                          where c.learner_id = g.learner_id
+                            and c.agreed_at <= now() and (c.revoked_at is null or c.revoked_at > now()));
+      if n > 0 then 정보 := 정보 || format('동의격리 잔존 %s건(적색 아님 — 철회 학생의 스윕 격리 · T12)', n); end if;
 
       -- ⑥ 실행판 갈림(v5.9 갈래 17) — 정본 실행판 여섯 ↔ 그날 job 실행판 여섯이 다른 job 수.
       --    attempts↔job 은 attempt_open 이 물리로 거절하는데(A5) 이 축은 여기가 유일한 눈이다.
@@ -188,6 +204,9 @@ begin
         if n > 0 then 적색 := 적색 || format('⑥ 실행판 갈림 %s건', n); end if;
       end if;
 
+      if cardinality(정보) > 0 then
+        raise notice 'deliver-check 정보(적색 아님): %', array_to_string(정보, ' · ');
+      end if;
       if cardinality(적색) > 0 then
         raise exception 'deliver-check 적색(§3-2-a 감시 7항): %', array_to_string(적색, ' · ');
       end if;

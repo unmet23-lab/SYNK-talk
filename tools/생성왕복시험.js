@@ -118,6 +118,15 @@ async function main() {
 
   const 판 = (await sql(`select name from engine.schema_migrations order by version desc limit 1`))[0]
     .name.match(/_(c\d+)\.sql$/)[1];
+
+  /* A0 vault 전제(심문 T3) — 활성조각 cron·B3 재호출·감시가 전부 이 두 이름에 얹혀 있는데
+   * 어느 층도 실재를 안 쟀다: 활성조각은 「이미 있어야 한다」 위임 · cron.schedule 은 등록 때 몸을
+   * 평가 안 함 · A8 은 command «문자열» 대조뿐. 미설정 채 활성이면 매밤 조용한 실패가
+   * net._http_response 에만 남는다. 값은 안 본다 — 이름 존재만 센다(자격증명 규율). */
+  {
+    const v = (await sql(`select name from vault.decrypted_secrets where name in ('functions_base_url','service_role_key') order by name`)).map((r) => r.name);
+    확인('A0 vault 전제 — functions_base_url·service_role_key 실재(값 안 봄 · T3)', v.length === 2, v);
+  }
   const 마이그 = fs.readFileSync(마이그경로, 'utf8');
   const 표 = `g${Date.now().toString(36)}`;
 
