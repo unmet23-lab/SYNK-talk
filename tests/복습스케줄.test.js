@@ -96,3 +96,30 @@ test('⑥ 정직성 — 시각 없는 리뷰는 세어서 드러내고, 리뷰 0
   assert.equal(카드접기([]), null);
   assert.equal(학생카드접기([{ at: '2026-08-22T10:00:00Z', 정답: true }]).size, 0, 'card_id 없는 리뷰가 카드가 됐다');
 });
+
+/* G7 봉인(엔진심문 0822 · 유호 확정 「잔여 전부 진행해」) — 이 계산기는 **소비자 0 인 파생층**인데
+ * 행동층 래칫(이벤트검증)은 «사건 부품» 축이라 이 파일을 원리상 못 센다. 그래서 소비자 명부를
+ * 여기 못박는다: 파생층(사건→리뷰 파생 명세가 선 뒤의 소비 코드)이 생기면 이 목록에 그 파일을
+ * 더한다 — 안 더하면 빨강이라, G1(장부가 실물을 못 따라오는 병)이 이 파일에서 재발하지 않는다.
+ * ⚠ 「소비자 0」은 결함이 아니라 현행 확정이다(유호 08-22 ⓓ 개원 전 «배선만» — 병행 출력·교체 없음). */
+test('⑦ 소비자 명부 — 파생층이 생기면 이 목록부터 는다(G7 · 장부-실물 동기)', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const ROOT = path.resolve(__dirname, '..');
+  const 아는소비자 = ['tests/복습스케줄.test.js'];   // 자기 시험뿐 = 소비자 0 (import 축 — 문자열 언급은 안 센다)
+  const 훑을곳 = ['lib', 'src', 'tools', 'contents', 'supabase', 'tests'];
+  const 실소비자 = [];
+  const 걷기 = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) { if (e.name !== 'node_modules') 걷기(p); continue; }
+      if (!/\.(js|ts|mjs)$/.test(e.name)) continue;
+      const rel = path.relative(ROOT, p).split(path.sep).join('/');
+      if (rel === 'lib/복습스케줄.js') continue;
+      if (/(?:require\(|import\(|from)\s*['"`][^'"`]*복습스케줄[^'"`]*['"`]/.test(fs.readFileSync(p, 'utf8'))) 실소비자.push(rel);
+    }
+  };
+  for (const d of 훑을곳) { if (fs.existsSync(path.join(ROOT, d))) 걷기(path.join(ROOT, d)); }
+  assert.deepEqual(실소비자.sort(), [...아는소비자].sort(),
+    '복습스케줄의 소비자 실물이 명부와 다르다 — 파생층을 세웠으면 이 목록과 트랙.md ④칸을 같은 커밋에서 갱신한다(늘리는 쪽) / 소비자를 지웠으면 여기서도 지운다(줄이는 쪽)');
+});
