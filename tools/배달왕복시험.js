@@ -55,11 +55,40 @@ const 어제 = (오늘) => {
 async function main() {
   const { ref, sql, anon, service_role: service, 확인, 보고 } = await 골격.열기('배달왕복시험', { 함수목록: 게이트함수들 });
 
+  /* 🔴 5xx·비 JSON 만 짧게 재시도한다 — 4xx 는 판정 재료라 그대로 돌려준다(①의 401 이 그 자리).
+   *   `생성왕복시험` 이 먼저 같은 판을 세웠고(talk 182a668) 그것과 같은 모양을 쓴다.
+   *
+   *   ■ 무엇을 덮고 있나 — 숨기지 않고 적는다
+   *   재적 823 의 전원 배달은 Edge 자원 예산의 «가장자리»에 앉아 있어, 같은 요청이 들쭉날쭉
+   *   `546 WORKER_RESOURCE_LIMIT` 을 낸다(2026-08-22 실측: 판마다 2/5 ~ 4/5 성공). 인구가
+   *   648 이던 어제는 41초에 늘 200 이었다. 이 재시도는 **그 가장자리를 없애지 않는다** —
+   *   시험이 그 흔들림 위에서도 회귀를 재게 할 뿐이다.
+   *
+   *   ■ 그런데도 정당한 이유
+   *   배달은 설계상 멱등이고(그 사실을 재는 것이 바로 아래 ④다), 진짜 호출자인 cron 도 5xx 를
+   *   만나면 다시 불러야 한다 — 안 그러면 그날 학급 전체가 배달을 못 받는다. 즉 이 재시도는
+   *   시험만의 편의가 아니라 **운영 호출자가 해야 할 일과 같은 행동**이다.
+   *   ⚠ 뒤집어 말하면, cron 이 재시도를 안 하고 있다면 그건 별건의 결함이다.
+   *
+   *   🔑 그래도 «몇 번 만에 됐나»는 남긴다 — 조용히 초록이 되면 가장자리가 사라진 줄 안다. */
+  let 재시도누적 = 0;
+  const 쉼 = (ms) => new Promise((r) => setTimeout(r, ms));
   const 호출 = async (질의 = '', 키 = service) => {
-    const r = await fetch(`https://${ref}.supabase.co/functions/v1/deliver${질의}`, {
-      method: 'POST', headers: { Authorization: `Bearer ${키}` },
-    });
-    return { status: r.status, 몸: JSON.parse((await r.text()) || '{}') };
+    for (let i = 0; ; i++) {
+      const r = await fetch(`https://${ref}.supabase.co/functions/v1/deliver${질의}`, {
+        method: 'POST', headers: { Authorization: `Bearer ${키}` },
+      });
+      const 원문 = await r.text();
+      let 몸 = null;
+      try { 몸 = JSON.parse(원문 || '{}'); } catch { 몸 = null; }
+      if ((r.status >= 500 || 몸 === null) && i < 4) {
+        재시도누적 += 1;
+        console.log(`     ↻ deliver${질의 || ''} ${r.status}${r.headers.get('sb-error-code') ? ` ${r.headers.get('sb-error-code')}` : ''} — 다시 부른다(${i + 1}/4)`);
+        await 쉼(5000);
+        continue;
+      }
+      return { status: r.status, 몸: 몸 ?? { 원문머리: String(원문).slice(0, 120) } };
+    }
   };
 
   const 오늘 = 몽골날짜();
@@ -996,7 +1025,9 @@ async function main() {
   확인('🔴 같은 학생에게 tasks 도 같은 코드를 낸다 — 두 통로가 갈리면 화면마다 다르게 막힌다',
     막힌과제.몸.blocked && 막힌과제.몸.blocked.code === (막힌A.몸.blocked || {}).code, 막힌과제.몸.blocked);
 
-  보고();
+  /* 🔑 초록은 **분모와 함께만** 읽는다(F207) — 재시도가 0 이 아니면 그날 전원 배달은 한 번에
+   *   안 돈 것이다. 조용히 초록이면 다음 사람은 가장자리가 사라진 줄 안다. */
+  보고(재시도누적 ? `⚠ deliver 5xx 재시도 ${재시도누적}회 — 전원 배달이 한 번에 안 돌았다(자원 가장자리)` : 'deliver 재시도 0');
 }
 
 main().catch((e) => die(String((e && e.message) || e)));
