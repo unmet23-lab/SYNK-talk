@@ -317,6 +317,42 @@ async function main() {
     }
   }
 
+  /* A9 감시 7항이 «돈다»(§3-2-a v5.6~v5.9 · 활성 조각) — 이 질의들은 활성 날 06:05 에 처음 도는데,
+   * 그때 칼럼 하나가 개명돼 있으면 그날부터 감시가 통째로 죽고 그 사실은 아무도 모른다(감시가 자기
+   * 부재를 정상으로 읽는 그 형태). 그래서 지금 «그대로» 태운다: 활성 함수를 과거 날짜로 임시 세워
+   * 머리 게이트를 통과시키고 DO 블록을 실행한다.
+   * 🔑 판정 규약 — 성공이거나 «적색 예외»면 통과다(둘 다 질의가 실제로 돌았다는 증거). 리허설은
+   *   시험 잔재로 늘 적색이라(오늘 실측: ①남은큐·⑤과거고아·⑥실행판갈림 > 0) 적색 자체는 결함이
+   *   아니고, «다른 예외»(칼럼·함수 없음)만 결함이다. 파일은 대기 자리·착지 자리 어느 쪽이든 읽는다. */
+  {
+    const 착지들 = fs.readdirSync(마이그폴더).filter((f) => /_gen_activate_c12\.sql$/.test(f));
+    const 조각경로 = 착지들.length
+      ? path.join(마이그폴더, 착지들[0])
+      : path.join(__dirname, '..', 'supabase', '활성조각_c12.sql');
+    if (!fs.existsSync(조각경로)) {
+      확인('A9 감시 7항 — 활성 조각 파일이 어디에도 없다(대기 자리·착지 자리 둘 다)', false, 조각경로);
+    } else {
+      const 원문 = fs.readFileSync(조각경로, 'utf8');
+      const m = /do \$watch\$[\s\S]*?\$watch\$;/.exec(원문);
+      치명확인('A9 감시 블록(do $watch$ … $watch$;)을 활성 조각에서 꺼냈다', !!m, 조각경로);
+      const 있었다 = (await sql(`select to_regprocedure('engine.gen_active_from()') is not null as b`))[0].b;
+      try {
+        if (!있었다) {
+          await sql(`create or replace function engine.gen_active_from() returns date language sql immutable as $f$ select date '2020-01-01' $f$`);
+        }
+        const r = await 실행(m[0]);
+        const 적색 = !r.ok && /deliver-check 적색/.test(String(r.메시지 || ''));
+        확인('A9 감시 7항이 실제로 돈다 — 성공이거나 «적색 예외»(칼럼·함수 이름이 전부 유효하다는 증거 · 다른 예외면 활성 날 감시가 죽는다)',
+          r.ok || 적색, r.ok ? '초록' : String(r.메시지 || '').slice(0, 160));
+      } finally {
+        if (!있었다) {
+          await sql(`drop function if exists engine.gen_active_from()`);
+          확인('A9 임시 활성 함수 걷힘(잔존 false)', (await sql(`select to_regprocedure('engine.gen_active_from()') is null as b`))[0].b === true);
+        }
+      }
+    }
+  }
+
   /* ════════ B. 물리층 — 가상 미래일 ════════ */
   console.log('\n■ B. 물리층 — §4-1 값 15 전량 + 멱등·동시·원자·펜싱·좀비·마감(§12-6·7·12·16·18·23·26·28)');
 
