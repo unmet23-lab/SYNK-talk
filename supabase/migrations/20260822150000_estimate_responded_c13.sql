@@ -23,7 +23,7 @@ do $migration$
 declare
   migration_version constant text := '20260822150000';
   migration_name constant text := '20260822150000_estimate_responded_c13.sql';
-  expected_checksum constant text := '804d8867e0b2de0b91b3718d23a8308b7a77131d489816e4ae147b61847a813f'; -- migration-checksum
+  expected_checksum constant text := '3f3b49afc63cdcf71d3ec2078e0df3fbc47b492dfd59be1272263ff6234317a5'; -- migration-checksum
   base_version constant text := '20260822090000';
   recorded_checksum text;
 begin
@@ -117,7 +117,7 @@ alter table engine.generation_batch_runs
   drop constraint if exists batch_runs_ver_nonempty_c12,
   add constraint batch_runs_ver_nonempty_c13 check ( btrim(model) <> '' and btrim(prompt_ver) <> '' and btrim(policy_ver) <> '' and btrim(estimator_version) <> '' and btrim(schema_ver) <> '' and btrim(skill_taxonomy_ver) <> '' );
 
-alter table engine.pipeline_jobs
+alter table radio.broadcast_segment
   drop constraint if exists broadcast_segment_kind_c12,
   add constraint broadcast_segment_kind_c13 check (kind in ('radio_loop', 'live_lecture', 'asmr_mode', 'other'));
 
@@ -145,7 +145,7 @@ alter table engine.corrections
   drop constraint if exists corrections_verdict_c12,
   add constraint corrections_verdict_c13 check (verdict is null or verdict in ( 'AI 교정이 맞다', '고칠 곳이 있다', '원문이 이미 맞다' ));
 
-alter table engine.classes
+alter table ops.cron_runs
   drop constraint if exists cron_runs_outcome_c12,
   add constraint cron_runs_outcome_c13 check (outcome in ('대기', '성공', '실패', '타임아웃', '전송오류', '상태없음', '유실', '발사실패'));
 
@@ -319,7 +319,7 @@ alter table engine.teacher_notes
 
 do $migration2$
 declare
-  expected_checksum constant text := '804d8867e0b2de0b91b3718d23a8308b7a77131d489816e4ae147b61847a813f'; -- migration-checksum
+  expected_checksum constant text := '3f3b49afc63cdcf71d3ec2078e0df3fbc47b492dfd59be1272263ff6234317a5'; -- migration-checksum
 begin
   insert into engine.schema_migrations(version, name, checksum)
   values ('20260822150000', '20260822150000_estimate_responded_c13.sql', expected_checksum);
@@ -645,7 +645,7 @@ select case when 테이블수=21 and RLS켜짐=21 and 정책수=7
               and (select v from 빠진제약) is null
               and (select v from 빠진트리거) is null
               and (select version from 현재이력)='20260822090000'
-              and (select checksum from 현재이력)='804d8867e0b2de0b91b3718d23a8308b7a77131d489816e4ae147b61847a813f' -- migration-checksum
+              and (select checksum from 현재이력)='3f3b49afc63cdcf71d3ec2078e0df3fbc47b492dfd59be1272263ff6234317a5' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 21·21·7·0·0·5·1·0·0·1·0·0·0·0·22·0·0·0·0·2·6·6·0·0·0·1·1·1·30·0·1·26·0·11·0·1 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
