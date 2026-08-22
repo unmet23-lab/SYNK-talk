@@ -944,7 +944,40 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
              (select count(*) from 제출)::int as 제출수`;
 
     if (!r || !r.배정id) {
-      // 재실행. 결정론적 키가 접었다 — 오류가 아니다(C0 §4-1 · §10-A-4).
+      /* 재실행. 결정론적 키가 접었다 — 오류가 아니다(C0 §4-1 · §10-A-4).
+       * 🔴 단 «빈 배정»(배정 사건은 있는데 submissions 0 — 아래 자인 주석의 「원리상 안 나는」
+       *   그 행)이면 duplicate 로 접기 «전에» 제출 행만 보충한다(심문 T11): tasks 조인이 inner
+       *   join 이라 그 행은 학생에게 영구 «없음»이고, 멱등 때문에 다음 배달도 구제도 그 자리를
+       *   못 고친다 — 자가치유 경로가 여기 하나뿐이다. 보충은 그날 결정(같은 스코프)의 스냅샷
+       *   그대로·not exists 게이트라 정상 재실행에는 0행(비용 = select 1회)이다. */
+      const 보충 = await sql`
+        with 빈배정 as (
+          select e.event_id, e.intervention_id, e.degraded
+            from engine.learning_events e
+           where e.learner_id = ${learner_id}::uuid
+             and e.idempotency_key = ${멱등키('task', learner_id, 오늘)}
+             and not exists (select 1 from engine.submissions s where s.event_id = e.event_id)
+        ), 보충제출 as (
+          insert into engine.submissions (
+            event_id, task_type, task_ref, task_snapshot, task_schema_ver, occurred_at, schema_ver,
+            due_at, due_ver
+          )
+          select 빈배정.event_id, ${통로}, ${결정.task_ref},
+                 ${sql.json(결정.task_snapshot)}, 'task.v1', ${지금}::timestamptz, ${ver},
+                 (${오늘}::date + 1)::timestamp at time zone ${시간대}::text, 'due.v1'
+            from 빈배정
+          returning event_id
+        )
+        select b.event_id as 배정id, b.intervention_id as 개입id, b.degraded
+          from 빈배정 b join 보충제출 on 보충제출.event_id = b.event_id`;
+      if (보충.length) {
+        console.error('[deliver] 🔴 빈 배정을 보충했다(T11 자가치유) — 이 로그가 반복되면 생산자를 조사하라', learner_id, 보충[0].배정id);
+        return {
+          learner_id, status: 'assigned', event_id: 보충[0].배정id,
+          intervention_id: 보충[0].개입id, degraded: 보충[0].degraded, 출처: 결정.출처,
+          상태없음: 상태 === null,
+        };
+      }
       return { learner_id, status: 'duplicate', degraded: 결정.degraded, 출처: 결정.출처 };
     }
     /* 🔴 배정은 섰는데 제출이 0 이면 큐가 «빈 배정»으로 선 것이다 — 앱이 그 행을 읽어도 보여줄

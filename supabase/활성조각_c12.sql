@@ -13,9 +13,13 @@
  *       · deliver-daily     5 16 * * *      00:05 UB  Edge `deliver` — 기존 잡 «재사용» · 🔴 URL 에 `맥락=배치` 명시(§3-1 v5.8 — 활성 뒤 누락도 400 이라 잊으면 배포 시점에 시끄럽게 죽는다)
  *       · generate-worker   */10 16-21 * * *  00:00~05:50 UB 10분마다  Edge `deliver-one` — 워커 재진입(v5.5 B3 — 구 10-50/10 은 시 경계마다 20분 공백)
  *       · generate-deadline 0 22 * * *      06:00 UB  SQL 직접 `engine.jobs_finalize_due` — 마감 스윕(벤더 0 · 대상은 마감 지난 «전량» — 함수 안 조건이 진다 · v5.7 B2)
- *       · deliver-check     5 22 * * *      06:05 UB  SQL 직접 — 감시 7항(마감 «뒤» 기준 · v5.4 C4 — 옛 «착지 수» 감시(35 16 · http ?점검)를 이 등록이 걷는다)
- *    ㉰ 감시 7항(①남은 큐 · ②-a 배치 완주 · ②-b 죽은 실행 · ③부분 결손 · ④열린 시도 · ⑤과거 고아 · ⑥실행판 갈림)
+ *       · deliver-check     5 22 * * *      06:05 UB  SQL 직접 — 감시 9항(마감 «뒤» 기준 · v5.4 C4 — 옛 «착지 수» 감시(35 16 · http ?점검)를 이 등록이 걷는다)
+ *    ㉰ 감시 9항(①남은 큐 · ②-a 배치 완주 · ②-b 죽은 실행 · ③부분 결손 · ④열린 시도 · ⑤과거 고아(동의격리는 정보 채널 · T12) · ⑥실행판 갈림 · ⑦빈 배정(T11) · ⑧산출 전멸(T6))
  *       — 전부 «활성 시작일부터»만(v5.7 B9 — 머리 게이트 하나). 적색이면 raise exception 으로 잡 실패에 남는다.
+ *    ㉱ 밤당 생성 상한(심문 T7 — 활성 «전» 점검): 워커학생상한 3 × generate-worker 36회 = **하루 최대
+ *       108명**. 재적이 이를 넘으면 초과분은 매일 06:00 마감폴백으로 빠지는데 큐는 닫혀 감시가 초록이다
+ *       (⑧ 이 성공 0 만 재므로 «일부 폴백»은 못 본다). 지금 정원 16 이라 여유 ×6.75 — **재적이 커지는 날
+ *       워커학생상한(§12-20 실측 후 걷기 예약)·워커 창을 함께 늘린다.** 활성 날 이 산술을 다시 센다.
  *
  * ■ 착지 절차(스토어 출시 커밋을 만드는 세션이 순서대로 — 활성일은 「c12 신앱이 스토어에 나간 뒤」 v5.8 갈래 12):
  *    1. 자리표 셋을 채운다 — `__활성일__`(YYYY-MM-DD · 유호님 확정값), `__버전__`(그날 타임스탬프 14자리),
@@ -204,11 +208,41 @@ begin
         if n > 0 then 적색 := 적색 || format('⑥ 실행판 갈림 %s건', n); end if;
       end if;
 
+      -- ⑦ 빈 배정(심문 T11 — «원리상 안 나는» 행의 감시): 배정 사건은 섰는데 submissions 0.
+      --    tasks inner join 이 그 행을 못 봐 학생은 영구 «없음»이고, deliver 재실행의 T11 자가치유
+      --    (제출 보충)가 닿기 전까지 이 수가 그 존재를 든다. 활성 뒤 착지는 봉투 세 블록 전부
+      --    필수(jobs_finalize «부분 착지 금지»)라 정상이면 항상 0 이다.
+      select count(*)::int into n
+        from engine.learning_events e
+       where e.event_type = 'task.assigned'
+         and (e.occurred_at at time zone 'Asia/Ulaanbaatar')::date = 오늘
+         and not exists (select 1 from engine.submissions s where s.event_id = e.event_id);
+      if n > 0 then 적색 := 적색 || format('⑦ 빈 배정 %s건', n); end if;
+
+      -- ⑧ 산출 전멸(심문 T6 — 큐 위생만 있고 «산출 질» 축이 0항이던 자리): 생성 대상이 있었는데
+      --    벤더 성공이 하루 0 이면, 키 만료·벤더 장애의 날에도 큐는 닫혀 ①~⑥ 이 전부 초록이다 —
+      --    강등률이 봉투·로그에만 남고 감시는 침묵한다. 문턱 없음(0 등식)이고, 전원 구제·전원
+      --    폴백의 «정당한» 날도 이 항에 걸리는 것이 의도다(그날 무엇으로 빠졌는지는 분포가 든다).
+      if 정본.run_id is not null and coalesce(정본.target_count, 0) > 0 then
+        select count(*)::int into n from engine.generation_jobs
+         where assign_date = 오늘 and outcome = '성공';
+        if n = 0 then
+          declare 분포 text;
+          begin
+            select string_agg(format('%s=%s', outcome, cnt), '·') into 분포
+              from (select outcome, count(*)::int as cnt from engine.generation_jobs
+                     where assign_date = 오늘 and outcome is not null
+                     group by outcome order by cnt desc) d;
+            적색 := 적색 || format('⑧ 산출 전멸(대상 %s · 성공 0 · 분포 %s)', 정본.target_count, coalesce(분포, '없음'));
+          end;
+        end if;
+      end if;
+
       if cardinality(정보) > 0 then
         raise notice 'deliver-check 정보(적색 아님): %', array_to_string(정보, ' · ');
       end if;
       if cardinality(적색) > 0 then
-        raise exception 'deliver-check 적색(§3-2-a 감시 7항): %', array_to_string(적색, ' · ');
+        raise exception 'deliver-check 적색(§3-2-a 감시 9항): %', array_to_string(적색, ' · ');
       end if;
     end
     $watch$;
