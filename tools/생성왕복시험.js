@@ -815,8 +815,18 @@ async function main() {
       return { status: r.status, 몸: JSON.parse((await r.text()) || '{}') };
     };
     {
+      /* 🔴 401 수리(lib/토큰.js 서비스역할 — deliver v68 · 08-22)가 리허설에 닿은 뒤 tasks→deliver 구제가 **실제로 돈다**:
+       * «대기» job 학생을 조회하면 구제가 그 job 을 집어 폴백(구제경로)으로 착지시키므로 현행 계약은 «있음»이다
+       * (401 시절엔 구제가 거절돼 «생성중»이 찍혔다 — 그 기대가 오늘 아침까지 초록이던 것이 잠복 결함의 얼굴이었다).
+       * «생성중» 은 「구제가 못 잡는 job」= 남이 집은(claimed · lease 유효) 상태에서만 난다(§3-1 v5.7 B11 판정식) —
+       * 그 상태를 시험이 먼저 집어 심고 잰 뒤 반납한다(C4 워커가 이어받는다). */
+      const 잡힘 = (await sql(`select job_id, fence from engine.jobs_claim('${오늘}'::date, 'genfix-hold:${표}', 1, 1800, '${오['대상1']}'::uuid)`))[0];
+      치명확인('C3 대상1 job 을 시험이 먼저 집는다(claimed · lease 유효 — «생성중» 재료)', !!잡힘 && !!잡힘.job_id);
       const t = await 학생조회(오['대상1']);
-      확인('C3 tasks — 대기 job 학생은 assignment_status=«생성중»(빈 화면과 갈린다)', t.status === 200 && t.몸.assignment_status === '생성중', t.몸.assignment_status);
+      확인('C3 tasks — 남이 집은(claimed·lease 유효) job 학생은 assignment_status=«생성중»(빈 화면과 갈린다 · 구제는 그 job 을 못 잡는다)', t.status === 200 && t.몸.assignment_status === '생성중', t.몸.assignment_status);
+      await sql(`select engine.jobs_release('${잡힘.job_id}'::uuid, ${잡힘.fence}::bigint) as ok`);
+      const t2 = await 학생조회(오['대상2']);
+      확인('C3 tasks — «대기» job 학생은 구제가 집어 착지하므로 «있음»(401 수리 뒤 현행 — 구제 도달의 첫 외부 증거)', t2.status === 200 && t2.몸.assignment_status === '있음', t2.몸.assignment_status);
     }
 
     /* C4 워커 재진입(§12-15) + §12-2 키없음 전원. */
@@ -845,8 +855,9 @@ async function main() {
      * 재는 본질(«벤더 산출 없이도 배치가 전원 2단 착지·예외 0»)은 두 갈래가 같으므로 둘 다 초록,
      * 갈래는 로그로 밝힌다. 워커의 키없음 «갈래» 자체는 키를 걷은 환경에서만 실측된다(정직 표기). */
     console.log(`  ▸ §12-2 갈래: ${[...new Set(내착지.map((r) => r.outcome))].join(',') || '없음'} (키 유무는 이 시험 밖 환경이다)`);
-    확인('C4 §12-2 — ③생성대상 전원이 벤더 산출 없이 폴백 착지(예외 0 · 키없음|벤더오류)',
-      내착지.length === 3 && 내착지.every((r) => r.outcome === '키없음' || r.outcome === '벤더오류'), 내착지);
+    /* «구제경로» 도 허용 — C3 의 tasks 조회가 대상2 를 구제로 착지시킨다(401 수리 뒤 · 벤더 0). 셋 다 「벤더 산출 없는 2단 착지」다. */
+    확인('C4 §12-2 — ③생성대상 전원이 벤더 산출 없이 폴백 착지(예외 0 · 키없음|벤더오류|구제경로)',
+      내착지.length === 3 && 내착지.every((r) => r.outcome === '키없음' || r.outcome === '벤더오류' || r.outcome === '구제경로'), 내착지);
     확인('C4 비용 가드 — 오늘 «성공» 0(공갈 모델에서 성공이 나오면 진짜 모델·과금 신호다)', (await sql(`
       select count(*)::int as n from engine.generation_jobs where assign_date='${오늘}'::date and outcome='성공'`))[0].n === 0);
     확인('C4 재진입 종착 — 오늘 큐에 대기·claimed 잔존 0(다음 회차가 이어받아 전원 종료)', (await sql(`
@@ -942,7 +953,10 @@ async function main() {
       await sql(`insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver, recorded_by)
         values ('${없음생}'::uuid, 'v18.9', now() - interval '30 days', '${판}', 'tools/생성왕복시험.js')`);
       const t = await 학생조회(없음생);
-      확인('C6 tasks — job 도 배정도 없는 학생은 «없음»', t.몸.assignment_status === '없음', t.몸.assignment_status);
+      /* 401 수리 뒤 현행: job 도 배정도 없는 재적 학생은 구제(㉨ jobs_load_one)가 job 을 만들어 폴백 착지시키므로 «있음»이다
+       * (401 시절엔 구제가 거절돼 «없음»이 찍혔다). 값 «없음» 은 달력 게임날(job 자체를 안 만든다)에서만 나는 값이라
+       * 이 시험은 그 값을 «못 잰다»(정직 표기 — 게임날 회차가 오면 그 자리에서 잰다). */
+      확인('C6 tasks — job 도 배정도 없는 재적 학생은 구제가 만들어 착지하므로 «있음»(401 수리 뒤 현행 · «없음» 은 게임날 값 — 이 시험 밖)', t.몸.assignment_status === '있음', t.몸.assignment_status);
       const [{ learner_id: 오류생 }] = await sql(`
         insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver)
         values ('${표}-e', '오류생', 'Lv3', null, '${판}') returning learner_id`);
