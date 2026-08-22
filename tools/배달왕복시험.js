@@ -21,7 +21,7 @@ const path = require('path');
 const die = (m) => { console.error('[배달왕복시험] ' + m); process.exit(1); };
 
 const 골격 = require(path.join(__dirname, '..', 'lib', '왕복골격.js'));   // 공통 머리 — 왕복 5종 공용
-const { 오늘과제, 몽골날짜, 따라말하기문장 } = require(path.join(__dirname, '..', 'lib', '오늘과제.js'));
+const { 오늘과제, 몽골날짜, 따라말하기문장, 시간대 } = require(path.join(__dirname, '..', 'lib', '오늘과제.js'));
 // 합성 도메인은 정본에서 가져온다 — 여기 박으면 도메인이 바뀌는 날 조용히 갈린다.
 const { 도메인 } = require(path.join(__dirname, '..', 'lib', '로그인코드.js'));
 // 동의 귀속 — 술어를 여기 다시 적지 않는다(`lib/동의게이트.js` 가 유일 정본)
@@ -543,6 +543,50 @@ async function main() {
   확인('교정문 날의 ②슬롯이 그 교정문이다 — 고리와 문장이 같은 행에서 나온다',
     !!D읽은 && 따라말하기문장(D읽은.task_snapshot) === '어제 친구를 만나서 밥을 먹었어요',
     D읽은 && D읽은.task_snapshot);
+
+  /* ── ⑧-b 빈 날 구제 (C0 심문 B3 · 소급 불가) ────────────────────
+   * 🔴 **이 갈래가 여기 없어서 결함이 초록 밑에서 살았다** (2026-08-22 실측).
+   *   `/tasks` 는 배정 0 + 동의 O + 오늘이면 그 자리에서 `deliver` 를 불러 세운다. 그 호출은
+   *   함수 런타임의 `SUPABASE_SERVICE_ROLE_KEY` 로 나가는데, 플랫폼이 그 칸을 신형 시크릿
+   *   키(`sb_secret_…`)로 갈아 끼운 뒤로 `deliver` 가 401 을 냈다. 그런데 계약이 「빈 상태는
+   *   오류가 아니다」라 응답은 **200 + 빈 배열**이고, 왕복시험 전량은 초록이었다 —
+   *   즉 **통과와 미실행이 같은 모양**이었다.
+   * 🔑 그래서 재는 것은 「봉투가 200 인가」가 아니라 **`구제` 칸의 결과와 배정 행이 실제로 섰는가**다.
+   * 🔑 학생을 **여기서** 만든다 — 위 ① 배치가 이미 돈 뒤여야 「배정 0인 날」이 성립한다.
+   *   준비 절에서 만들면 배치가 그 학생 것도 세워 버려 이 갈래는 영영 안 탄다. */
+  console.log('\n■ ⑧-b 빈 날 구제 — 배정 0 인 날 /tasks 가 그 자리에서 세우는가');
+  const [신선] = await sql(`
+    insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver)
+    values ('${표}-G','시험G','Lv2','study','${판}') returning learner_id`);
+  await sql(`
+    insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver, recorded_by)
+    values ('${신선.learner_id}'::uuid,'v18.9', now() - interval '1 day','${판}','tools/배달왕복시험.js')`);
+  const 오늘배정수 = async () => Number((await sql(`
+    select count(*)::int as n from engine.learning_events
+     where learner_id = '${신선.learner_id}'::uuid and event_type = 'task.assigned'
+       and (occurred_at at time zone '${시간대}')::date = '${오늘}'::date`))[0].n);
+  const 구제전 = await 오늘배정수();
+  확인('🔑 분모 — 부르기 전 이 학생의 오늘 배정은 0이다(0이 아니면 아래가 구제를 안 잰다)',
+    구제전 === 0, 구제전);
+
+  await sql(`update engine.learners set auth_user_id = null where auth_user_id = '${uid}'`);
+  await sql(`update engine.learners set auth_user_id = '${uid}' where learner_id = '${신선.learner_id}'::uuid`);
+  const 구제응답 = await 조회();
+  확인('🔴 구제가 «세움» 으로 끝난다 — 사유가 붙으면 그날 발화가 사건이 안 된다(소급 불가)',
+    구제응답.status === 200 && !!구제응답.몸.구제
+      && 구제응답.몸.구제.결과 === '세움' && 구제응답.몸.구제.사유 === null, 구제응답.몸.구제);
+  확인('🔴 같은 응답에 오늘 것이 실려 온다 — 세우고도 안 실으면 학생 화면은 그대로 비어 있다',
+    (구제응답.몸.data || []).length === 1, (구제응답.몸.data || []).length);
+  확인('🔴 배정 행이 DB 에 실제로 섰다 — 봉투만 보고 재면 「세웠다」는 말만 초록이 된다',
+    (await 오늘배정수()) === 1);
+  /* ⚠ **한 번만 부른다**(`functions/tasks` 머리말) — 두 번째 조회에서 또 구제가 돌면 그건
+   *   재시도가 아니라 매 요청마다 배치를 때리는 것이다.
+   * 🔑 칸은 **언제나 실린다**(index.ts:330) — 「안 불렀다」는 칸의 부재가 아니라 **값 null** 이다.
+   *   부재로 재면 옛 배포(칸이 없던 판)와 「안 불렀다」가 한 모양이 된다. */
+  const 두번째 = await 조회();
+  확인('🔴 두 번째 조회는 구제를 다시 안 부른다 — 부르면 매 요청이 배치를 때린다',
+    (두번째.몸.data || []).length === 1
+      && '구제' in 두번째.몸 && 두번째.몸.구제 === null, 두번째.몸.구제);
 
   /* A 로 되돌린다 — 아래 ⑨ 가 같은 토큰으로 A 의 교정을 읽는다. 안 되돌리면 그쪽이 빈 채로 돈다. */
   await sql(`update engine.learners set auth_user_id = null where auth_user_id = '${uid}'`);
