@@ -43,8 +43,9 @@ const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => strin
 const { 몽골날짜, 시간대 } = 과제모듈 as { 몽골날짜: (때?: Date) => string; 시간대: string };
 /* Ⅲ⑥ — 오늘 보여줄 성향 확인 하나. 판정의 정본은 lib 하나(서버·앱·회귀가 같은 함수를 본다).
  * 리듬 «추정» 자체는 학습자상태() 그대로다 — 배정↔제출 구간 잇기를 SQL 로 다시 적으면 두 벌이다. */
-const { 확인카드 } = 성향확인모듈 as {
+const { 확인카드, 부정키 } = 성향확인모듈 as {
   확인카드: (리듬: unknown, 이력: unknown, 기준시각: string, 추정판: string) => Record<string, unknown> | null;
+  부정키: (축: string, 키: string) => string;
 };
 const { 학습자상태 } = 상태모듈 as {
   학습자상태: (행들: unknown[], 옵션: Record<string, unknown>) =>
@@ -182,18 +183,25 @@ Deno.serve(async (req: Request) => {
          where e.learner_id = ${행.learner_id}::uuid
            and e.event_type in ('task.assigned', 'submission.created')
            and e.occurred_at >= now() - interval '40 days'`;
+      /* 🔴 「오늘」의 축 = ingested_at(서버 수신 시각 · default now()) — occurred_at 은 앱 시계라
+       * (C0 「기기 시계는 못 믿는다」) 시계 앞선 기기가 «내일»로 찍으면 오늘 또 묻고 내일 억제된다
+       * (심문 G12). 예산 판정만 서버 시계다 — 학습 사건의 «일어난 때»는 그대로 occurred_at 이 정본.
+       * 🔴 부정키는 SQL 이 쌍(축·키)을 내고 조립은 lib `부정키` 한 원천이 진다(심문 G13 — 형식을
+       * 두 곳에 적으면 새 축이 서는 날 갈리고, 갈린 쪽 증상은 «재노출»이라 학생이 먼저 겪는다). */
       const [답이력] = await sql`
-        select count(*) filter (where (e.occurred_at at time zone ${시간대})::date = ${오늘}::date) as 오늘답수,
-               coalesce(array_agg((e.payload->>'trait_axis') || ':' || (e.payload->>'shown_key'))
-                 filter (where e.payload->>'response' = '아니다'), '{}') as 부정키들
+        select count(*) filter (where (e.ingested_at at time zone ${시간대})::date = ${오늘}::date) as 오늘답수,
+               coalesce(jsonb_agg(jsonb_build_object('축', e.payload->>'trait_axis', '키', e.payload->>'shown_key'))
+                 filter (where e.payload->>'response' = '아니다'), '[]'::jsonb) as 부정쌍들
           from engine.learning_events e
          where e.learner_id = ${행.learner_id}::uuid
            and e.event_type = 'estimate.responded'`;
+      const 부정키들 = ((답이력.부정쌍들 ?? []) as Array<{ 축: string; 키: string }>)
+        .map((p) => 부정키(String(p.축), String(p.키)));
       const 기준 = new Date().toISOString();
       const 상태 = 학습자상태(원행들 as unknown[], { as_of: 기준, 시간대 });
       오늘의확인 = 확인카드(
         상태.축.리듬,
-        { 오늘답함: Number(답이력.오늘답수) > 0, 부정키들: (답이력.부정키들 as string[]) ?? [] },
+        { 오늘답함: Number(답이력.오늘답수) > 0, 부정키들 },
         기준, 상태.estimator_version);
     } catch (e) {
       console.error('[progress] 오늘의확인 판정 실패(null 로 낸다)', String((e as Error)?.message ?? e));

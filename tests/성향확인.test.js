@@ -60,3 +60,15 @@ test('확인사건 — 카드 다섯 값 되싣기 · 값록(맞다|아니다) �
   assert.equal(확인사건(null, '맞다', 키들), null, '카드 없이 답만 있는 사건은 무엇의 긍정인지 모른다');
   assert.equal(확인사건({ ...카드, shown_text: '' }, '맞다', 키들), null, '반쪽 카드는 학습 재료가 못 된다');
 });
+
+/* G13 봉인(엔진심문 0822) — 부정 키 «형식»의 원천은 lib `부정키` 하나다. 서버 SQL 이 구분자를
+ * 다시 적으면(옛 `|| ':' ||`) 새 축이 서는 날 두 형식이 갈리고, 갈린 쪽 증상은 «부정했는데
+ * 재노출»이라 학생이 먼저 겪는다. 그래서 소스 층에서 못박는다: SQL 은 쌍만 내고 조립은 lib. */
+test('부정 키 형식 — 한 원천(lib 부정키) · 서버 SQL 은 구분자를 다시 적지 않는다', () => {
+  const { 부정키 } = require('../lib/성향확인.js');
+  assert.equal(부정키('리듬', '여유제출'), '리듬:여유제출');
+  const 원문 = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'progress', 'index.ts'), 'utf8');
+  assert.ok(!/\|\|\s*':'\s*\|\|/.test(원문),
+    'progress SQL 이 부정 키 구분자를 문자열로 다시 적었다 — 형식의 원천은 lib 부정키 하나다(G13)');
+  assert.ok(/부정키\(/.test(원문), 'progress 가 lib 부정키() 로 조립하지 않는다 — 형식이 두 벌로 갈 위험');
+});
