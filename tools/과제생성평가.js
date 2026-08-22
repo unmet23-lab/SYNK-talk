@@ -198,22 +198,62 @@ if (값('--채점')) {
   const 사례맵 = new Map(시험지.사례.map((c) => [c.case_base_id, c]));
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const 물음 = (q) => new Promise((res) => rl.question(q, (a) => res(a.trim())));
+  /* 축 한국어 이름 — 화면 전용(기계 이름의 정본은 lib 의 `축키들`이고 여기는 사람이 읽는 자리다). */
+  const 축이름 = ['①연결성', '②답변가능', '③수준적합', '④신선함', '⑤재미', '⑥정확성', '⑦목표활용', '⑧상태활용'];
+  /* 모델이 «실제로 본» 상태 블록 — ⑧상태활용은 이걸 안 보면 원리상 못 매긴다(요약에 실린 값이
+   * 산출에 쓰였나를 재는 축이라, 요약을 못 보면 채점자는 무엇이 쓰였는지 모른다). 렌더된 요청
+   * 본문에서 그 절만 잘라 보여준다 — 시험지 칸을 다시 조립하지 않는다(두 벌이 되면 갈라진다). */
+  const 상태블록 = (c) => {
+    try {
+      const { 본문 } = 평가.사례본문(전문, c);
+      const m = /\[학생 상태\]\r?\n([\s\S]*?)(?=\r?\n\[|$)/.exec(본문);
+      return m ? m[1].trim() : null;
+    } catch { return null; }
+  };
+  /* 채점 대상 = «미채점» 행뿐. 0점 고정(검문탈락·응답파손)은 채점할 문장이 아니고(§8-B 규율 —
+   * 런타임이면 학생에게 안 나갔을 문장), 이미 매긴 행을 다시 묻으면 이어서 하기가 80번 엔터가 된다. */
+  const 미채점인가 = (행) => 행.grader_note === '미채점';
+  /* 「1 1 1 1 0 1 1 1」도 「11110111」도 받는다 — 80번 반복되는 입력이라 형식으로 튕기지 않는다. */
+  const 여덟자리 = (s) => {
+    const t = String(s).replace(/\s+/g, '');
+    return /^[01]{8}$/.test(t) ? [...t].map(Number) : null;
+  };
   (async () => {
-    console.log(`■ 채점 — ${결과.행.length}행 · 축 여덟(①connect ②answerable ③level_fit ④fresh ⑤fun ⑥accuracy ⑦goal_use ⑧state_use) · 값 0/1 · ⑦은 goal 없는 사례에서 자동 null`);
-    console.log(`  ⑤ 채점자 질문: ${평가.앵커.채점자질문} · 0점 조건 Z1~Z3 · 1점 앵커 A1~A3 · 중간: ${평가.앵커.중간사례기준}`);
-    console.log('  빈 입력 = 그 행 건너뜀(나중에 이어서) · q = 저장하고 종료');
-    for (const 행 of 결과.행) {
+    const 대상 = 결과.행.filter(미채점인가);
+    const 고정 = 결과.행.filter((행) => String(행.grader_note).startsWith('0점 고정')).length;
+    const 마침 = 결과.행.length - 대상.length - 고정;
+    console.log(`■ 채점 — 전체 ${결과.행.length}행 = 매길 것 ${대상.length} + 이미 매김 ${마침} + 0점 고정 ${고정}(검문탈락·응답파손 — 채점 대상이 아니다)`);
+    console.log(`  축 여덟을 0/1 로: ${축이름.join(' ')}   ← 넣는 순서가 이 순서다`);
+    console.log(`  ⑤ 채점자 질문: ${평가.앵커.채점자질문}`);
+    console.log(`     0점 조건 Z1~Z3 · 1점 앵커 A1~A3 · 중간이면 ${평가.앵커.중간사례기준}`);
+    console.log('  빈 입력 = 그 행은 나중에 · q = 저장하고 종료(매긴 데까지 남는다)');
+    let 셈 = 0;
+    for (const 행 of 대상) {
+      셈 += 1;
       const base = 행.case_id.replace(/#[12]$/, '');
       const c = 사례맵.get(base);
-      console.log(`\n▸ ${행.case_id} · ${c ? `${c.칸} · goal=${c.goal ?? '(없음)'} · 기술=${(c.기술들 || []).join(' / ')}` : '(시험지에 없는 사례)'}`);
+      const 목표없음 = !c || c.goal == null;
+      console.log(`\n▸ [${셈}/${대상.length}] ${행.case_id} · ${c ? `${c.칸} · 목표=${c.goal ?? '(없음)'}` : '(시험지에 없는 사례)'}`);
+      if (c) console.log(`  겨냥 문법: ${(c.기술들 || []).join(' / ')}`);
+      const 상태 = c && 상태블록(c);
+      console.log(상태 ? `  [모델이 본 학생 상태]\n${상태.split('\n').map((l) => '    ' + l).join('\n')}`
+        : '  [모델이 본 학생 상태] (못 읽었다 — 본문 템플릿이 바뀌었을 수 있다 · ⑧은 이 사례에서 판단 보류)');
       console.log(`  문장: ${행.sentence}\n  질문: ${행.question}`);
-      const 입력 = await 물음('  8축 0/1 (예: 1 1 1 1 0 1 1 1 · ⑦ 자리는 goal 없으면 아무 값) > ');
+      if (목표없음) console.log('  ⓘ 이 사례는 목표가 없다 — ⑦ 자리엔 아무 값이나 넣으면 «분모에서 뺌»으로 기록된다(0점이 아니다).');
+      const 입력 = await 물음(`  여덟 자리 > `);
       if (입력 === 'q') break;
       if (!입력) continue;
-      const v = 입력.split(/\s+/).map(Number);
-      if (v.length !== 8 || v.some((x) => x !== 0 && x !== 1)) { console.log('  ✗ 여덟 개의 0/1 이어야 한다 — 건너뜀'); continue; }
-      행.axis_scores = Object.fromEntries(평가.축키들.map((k, i) => [k, (k === 평가.null허용축 && c && c.goal == null) ? null : v[i]]));
-      const note = await 물음('  grader_note(0점 축이 있으면 필수 · 없으면 빈 줄) > ');
+      const v = 여덟자리(입력);
+      if (!v) { console.log('  ✗ 0 과 1 을 여덟 개 넣어야 한다(「1 1 1 1 0 1 1 1」 또는 「11110111」) — 이 행은 나중에'); continue; }
+      const 매김 = Object.fromEntries(평가.축키들.map((k, i) => [k, (k === 평가.null허용축 && 목표없음) ? null : v[i]]));
+      const 영점 = 평가.축키들.filter((k) => 매김[k] === 0).map((k) => 축이름[평가.축키들.indexOf(k)]);
+      let note = await 물음(영점.length ? `  0점: ${영점.join(' ')} — 이유를 적는다(필수) > ` : '  메모(없으면 빈 줄) > ');
+      if (영점.length && !note) {
+        console.log('  ⚠ 0점이 있는데 이유가 비었다 — 안 적히면 결과 파일 전체가 무효가 된다(한 행만 버리는 처분은 없다).');
+        note = await 물음('  이유 > ');
+        if (!note) { console.log('  ↩ 이 사례는 «안 매긴 것»으로 되돌린다 — 나중에 다시 만난다.'); continue; }
+      }
+      행.axis_scores = 매김;
       행.grader_note = note;
       결과.동봉 = { ...(결과.동봉 || {}), 채점자, 시각: new Date().toISOString() };
       쓰기(파일, 결과);   // 중간 저장 — 80회는 하루에 안 끝난다(F3)
