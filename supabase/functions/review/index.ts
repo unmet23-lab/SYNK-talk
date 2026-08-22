@@ -56,7 +56,11 @@ import 확정모듈 from './검수확정.mjs';
 import 계약판모듈 from './계약판.mjs';
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
-const { 버킷 } = 경로모듈 as { 버킷: string };
+const { 버킷, 저장소헤더, 저장소키흠 } = 경로모듈 as {
+  버킷: string;
+  저장소헤더: (키: string) => Record<string, string>;
+  저장소키흠: (키: string) => string | null;
+};
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
 
@@ -407,11 +411,12 @@ async function 오디오서명(req: Request, staff_id: string, ver: string) {
   const 키 = Deno.env.get('STORAGE_SIGN_KEY') ?? '';
   /* 모양을 **먼저** 본다 — `uploads` 가 이미 한 바퀴 돈 자리다(플랫폼이 `SERVICE_ROLE_KEY`
    * 이름에 넣어주는 새 형식 `sb_secret_…` 을 Storage 가 거절한다 · 레거시 JWT 여야 한다). */
-  if (키.split('.').length !== 3) {
-    console.error('[review/audio] STORAGE_SIGN_KEY 가 JWT 형태가 아니다 — 레거시 service_role 키여야 한다');
+  const 키흠 = 저장소키흠(키);
+  if (키흠) {
+    console.error('[review/audio] STORAGE_SIGN_KEY 를 쓸 수 없다 —', 키흠);
     return 실패(500, {
       code: 'INTERNAL', retryable: false,
-      message: 'STORAGE_SIGN_KEY 설정 오류입니다 — 레거시 service_role(JWT) 키가 필요합니다',
+      message: `STORAGE_SIGN_KEY 설정 오류입니다 — ${키흠}`,
     }, ver);
   }
 
@@ -421,7 +426,7 @@ async function 오디오서명(req: Request, staff_id: string, ver: string) {
    *   서명은 아무도 손에 못 쥔 채 수명만큼 떠 있다가 죽는다. 그 방향이 안전하다. */
   const r = await fetch(`${base}/storage/v1/object/sign/${버킷}/${행.audio_ref}`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${키}`, 'Content-Type': 'application/json' },
+    headers: { ...저장소헤더(키), 'Content-Type': 'application/json' },
     body: JSON.stringify({ expiresIn: 서명수명초 }),
   });
   if (!r.ok) {

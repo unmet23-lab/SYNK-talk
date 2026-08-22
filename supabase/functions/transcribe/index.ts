@@ -23,7 +23,11 @@ import 사유모듈 from './벤더사유.mjs';
 
 const { 서비스역할 } = 토큰모듈 as { 서비스역할: (req: Request) => boolean };
 const { 벤더사유 } = 사유모듈 as { 벤더사유: (글: unknown, 상한?: number) => string | null };
-const { 버킷 } = 경로모듈 as { 버킷: string };
+const { 버킷, 저장소헤더, 저장소키흠 } = 경로모듈 as {
+  버킷: string;
+  저장소헤더: (키: string) => Record<string, string>;
+  저장소키흠: (키: string) => string | null;
+};
 const { 상태, 전사값, 세그먼트값, 전사실패 } = 전사모듈 as {
   상태: Record<string, string>;
   전사값: (본문: unknown) => { transcript: string; 언어: string | null } | null;
@@ -75,9 +79,9 @@ async function 원본받기(ref: string): Promise<{ bytes: Uint8Array } | { 오�
   const 키 = Deno.env.get('STORAGE_SIGN_KEY') ?? '';
   /* 모양을 **먼저** 본다 — `SUPABASE_SERVICE_ROLE_KEY`(새 형식 `sb_secret_…`)를 넣으면 Storage 가
    * 거절하고 증상은 「전사만 안 됨」이라 원인이 어디에도 안 남는다(events·uploads 와 같은 자리). */
-  if (!base || 키.split('.').length !== 3) return { 오류: 'storage_key' };
+  if (!base || 저장소키흠(키)) return { 오류: 'storage_key' };
   const r = await fetch(`${base}/storage/v1/object/${버킷}/${ref}`, {
-    headers: { Authorization: `Bearer ${키}` },
+    headers: 저장소헤더(키),
     signal: AbortSignal.timeout(왕복제한밀리),
   });
   if (!r.ok) return { 오류: `storage_${r.status}` };

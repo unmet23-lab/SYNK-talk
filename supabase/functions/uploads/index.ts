@@ -26,7 +26,9 @@ import 토큰모듈 from './토큰.mjs';
 import 계약판모듈 from './계약판.mjs';
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
-const { 버킷, 경로만들기 } = 경로모듈 as {
+const { 버킷, 경로만들기, 저장소헤더, 저장소키흠 } = 경로모듈 as {
+  저장소헤더: (키: string) => Record<string, string>;
+  저장소키흠: (키: string) => string | null;
   버킷: string;
   경로만들기: (a: Record<string, unknown>) => { ref: string | null; 이유: string | null };
 };
@@ -168,16 +170,17 @@ Deno.serve(async (req: Request) => {
   const 키 = Deno.env.get('STORAGE_SIGN_KEY') ?? '';
   /* 모양을 **먼저** 본다. 안 그러면 증상이 「업로드만 안 됨」이고 원인이 키 형식이라는 게
    * 어디에도 안 적힌다 — 오늘 그걸로 한 바퀴 돌았다. 같은 실수를 기계가 막는다. */
-  if (키.split('.').length !== 3) {
-    console.error('[uploads-sign] STORAGE_SIGN_KEY 가 JWT 형태가 아니다 — 레거시 service_role 키여야 한다');
+  const 키흠 = 저장소키흠(키);
+  if (키흠) {
+    console.error('[uploads-sign] STORAGE_SIGN_KEY 를 쓸 수 없다 —', 키흠);
     return 실패(500, {
       code: 'SERVER_ERROR', retryable: false,
-      message: 'STORAGE_SIGN_KEY 설정 오류입니다 — 레거시 service_role(JWT) 키가 필요합니다',
+      message: `STORAGE_SIGN_KEY 설정 오류입니다 — ${키흠}`,
     }, ver);
   }
   const r = await fetch(`${base}/storage/v1/object/upload/sign/${버킷}/${ref}`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${키}`, 'Content-Type': 'application/json' },
+    headers: { ...저장소헤더(키), 'Content-Type': 'application/json' },
     body: JSON.stringify({ expiresIn: 서명수명초 }),
   });
   if (!r.ok) {

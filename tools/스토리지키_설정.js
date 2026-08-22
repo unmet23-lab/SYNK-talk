@@ -1,19 +1,23 @@
 #!/usr/bin/env node
-/* 스토리지키_설정 — 함수 시크릿 `STORAGE_SIGN_KEY` 를 그 프로젝트의 **레거시 service_role
- * (JWT) 키**로 맞춘다.
+/* 스토리지키_설정 — 함수 시크릿 `STORAGE_SIGN_KEY` 를 그 프로젝트의 **신형 시크릿 키**로 맞춘다.
+ *   (없으면 레거시 service_role JWT 로 물러선다 — 둘 다 통한다. 아래 표가 근거.)
  *
- * ■ 왜 필요한가 (2026-08-06 리허설 실측)
- *   플랫폼이 함수에 넣어주는 `SUPABASE_SERVICE_ROLE_KEY` 의 값이 **새 형식(`sb_secret_…`)** 인데,
- *   Storage 는 그걸 거절한다 — `{"statusCode":"403","message":"Invalid Compact JWS"}`.
- *   헤더 조합 5가지를 전부 쏴 본 결과 **통과한 것은 레거시 JWT 키뿐**이었다:
- *       legacy · Authorization 단독   → 200
- *       legacy · apikey+Authorization → 200
- *       secret · Authorization 단독   → 400   secret · apikey 단독 → 400   secret · 둘 다 → 400
- *   증상은 「업로드만 안 됨」이고 함수는 502 만 냈다. **이름이 뜻하는 바가 플랫폼 사정으로
- *   조용히 바뀐 것**이라, 그 이름에 계속 기대는 대신 우리가 이름을 정해 명시로 받는다.
+ * ■ 왜 이 이름이 따로 있나 (2026-08-06)
+ *   플랫폼이 함수에 넣어주는 `SUPABASE_SERVICE_ROLE_KEY` 의 «뜻»이 플랫폼 사정으로 조용히
+ *   바뀌었고, 그날 Storage 는 그 새 값을 세 조합 모두 거절했다. 그래서 이름을 우리가 정해
+ *   명시로 받기로 했다 — 그 판단은 지금도 산다(모양까지 우리가 검사한다).
+ *
+ * ■ 🔴 그런데 «어느 키냐»는 뒤집혔다 (2026-08-22 재실측 · 리허설)
+ *                        Auth 단독      apikey 단독     **둘 다**
+ *     레거시 JWT             ✅            ❌            ✅
+ *     신형 sb_secret_        ❌ JWS오류     ✅            ✅
+ *   플랫폼이 그 사이 신형 키를 받기 시작했다. 통과 조합이 「둘 다」 하나이므로 헤더 만드는 자리를
+ *   `lib/업로드경로.js` 의 `저장소헤더` 하나로 모았고, 그 뒤로 **이 도구는 키 형식을 안 가린다.**
+ *   ⏳ 그리고 레거시 anon·service_role JWT 는 **2026년 말 폐기 예고**다 — 개원(2027-02)보다
+ *   앞이라, 이제 기본값은 신형 시크릿이다. 레거시로 두면 폐기일에 업로드가 통째로 죽는다.
  *
  * ■ 키는 저장소에 안 들어온다 — Management API 로 그때 받아 그 프로젝트 시크릿에만 넣는다.
- *   stdout 에도 안 찍는다(앞 6글자와 JWT 여부만 보여 준다).
+ *   stdout 에도 안 찍는다(모양과 길이만 보여 준다).
  *
  * 사용: SUPABASE_PROJECT_REF=<ref> node tools/스토리지키_설정.js [--적용]
  *   `--적용` 없이는 **무엇을 할지만** 보여 준다(시크릿 쓰기는 되돌리기가 번거롭다).
@@ -51,13 +55,17 @@ async function main() {
   const kr = await fetch(`${API}/${ref}/api-keys`, { headers: 헤더 });
   if (!kr.ok) die(`api-keys HTTP ${kr.status}`);
   const 키들 = JSON.parse(await kr.text());
+  /* 🔑 **신형 시크릿이 1순위다** — 레거시는 연말 폐기 예고라 그걸 넣으면 폐기일에 죽는다.
+   *   둘 다 통하므로(머리말 표) 물러섬은 안전하다. */
+  const 신형 = 키들.find((k) => String(k.api_key).startsWith('sb_secret_'));
   const legacy = 키들.find((k) => k.name === 'service_role' && String(k.api_key).split('.').length === 3);
-  if (!legacy) {
-    die('레거시 service_role(JWT) 키를 못 찾았다 — 이 프로젝트는 새 키만 있다.\n' +
-        '     그러면 Storage 서명이 안 된다(Invalid Compact JWS). 대시보드에서 레거시 키를 켜야 한다.');
+  const 고른 = 신형 || legacy;
+  if (!고른) {
+    die('쓸 수 있는 키가 없다 — 신형 시크릿(sb_secret_)도 레거시 service_role(JWT)도 못 찾았다.');
   }
-  const 값 = legacy.api_key;
-  console.log(`  넣을 값: ${값.slice(0, 6)}…  (JWT 형태 ✅ · 길이 ${값.length})`);
+  const 값 = 고른.api_key;
+  const 모양 = 신형 ? '신형 시크릿 ✅' : '레거시 JWT ⏳(연말 폐기 — 신형이 생기면 다시 돌려라)';
+  console.log(`  넣을 값: ${모양} · 길이 ${값.length}`);
 
   if (!적용) {
     console.log('  미리보기다 — 실제로 넣으려면 --적용');

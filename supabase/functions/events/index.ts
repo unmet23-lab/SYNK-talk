@@ -45,7 +45,9 @@ const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => strin
 const { 요청해시 } = 해시모듈 as { 요청해시: (e: unknown) => Promise<string> };
 const { 검증 } = 검증모듈 as { 검증: (e: unknown, c: unknown) => { ok: boolean; 오류들: string[] } };
 const { 사건출처 } = 출처모듈 as { 사건출처: (event_type: string) => string | null };
-const { 버킷, 경로검사 } = 경로모듈 as {
+const { 버킷, 경로검사, 저장소헤더, 저장소키흠 } = 경로모듈 as {
+  저장소헤더: (키: string) => Record<string, string>;
+  저장소키흠: (키: string) => string | null;
   버킷: string;
   경로검사: (ref: string, learner_id: string) => { ok: boolean; 이유: string | null };
 };
@@ -129,13 +131,14 @@ async function 헤더측정(ref: string): Promise<Record<string, unknown>> {
   const 키 = Deno.env.get('STORAGE_SIGN_KEY') ?? '';
   // 모양을 **먼저** 본다 — `SUPABASE_SERVICE_ROLE_KEY` 는 새 형식(`sb_secret_…`)이라 Storage 가
   // 거절하고, 증상은 「측정만 안 됨」이라 원인이 어디에도 안 남는다(2026-08-06 실측 · uploads 와 같은 자리).
-  if (!base || 키.split('.').length !== 3) {
-    console.error('[events] STORAGE_SIGN_KEY 가 JWT 형태가 아니다 — capture_meta.server 를 못 잰다');
+  const 키흠 = 저장소키흠(키);
+  if (!base || 키흠) {
+    console.error('[events] STORAGE_SIGN_KEY 를 쓸 수 없다 — capture_meta.server 를 못 잰다', 키흠 ?? 'SUPABASE_URL 없음');
     return 봉({ state: 'unmeasured', reason: 'storage_key' });
   }
   try {
     const r = await fetch(`${base}/storage/v1/object/${버킷}/${ref}`, {
-      headers: { Authorization: `Bearer ${키}`, Range: `bytes=0-${앞머리바이트 - 1}` },
+      headers: { ...저장소헤더(키), Range: `bytes=0-${앞머리바이트 - 1}` },
       signal: AbortSignal.timeout(측정제한밀리),
     });
     if (!r.ok) {
