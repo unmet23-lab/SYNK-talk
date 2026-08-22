@@ -97,6 +97,14 @@ const { 행들에서판 } = 계약판모듈 as { 행들에서판: (행들: unkno
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
 
+/* §12-20 계측 «장치» — 벽시계 3항(콜드 스타트 · claim 묶음 · 학생별 전처리/벤더/착지)을 응답에 «각각» 싣는다
+ * (합쳐 「학생당 N초」로 안 접는다 — 콜드 스타트는 호출당 1회라 학생 수로 나누면 값이 사라진다) · 분모(집은 수·
+ * 호출)를 동반한다 · 넷째 항 active CPU 는 코드가 못 잰다(Edge 런타임 — 플랫폼 함수 로그 `cpu_time_used` 가
+ * 진다 · 숫자 0 을 만들어 「쟀다」의 얼굴을 하지 않는다). 실측 «판정»은 #6 뒤 첫 실행이 한다 — 이 장치는 그날
+ * 재질 수 있게 미리 선다(안 실려 있으면 첫 실행이 아무것도 못 잰다). */
+const 모듈로드 = Date.now();
+let 첫요청 = true;
+
 type Job = {
   job_id: string; learner_id: string; assign_date: unknown; fence: string | number;
   status: string; branch_snapshot: Record<string, unknown>;
@@ -195,6 +203,12 @@ Deno.serve(async (req: Request) => {
   if (!서비스역할(req)) return 봉투(401, { error: 'service_role 만 부를 수 있습니다' });
 
   const 시작 = Date.now();
+  const 계측: { 콜드스타트_ms: number | null; claim_ms: number | null; 학생: Record<string, unknown>[]; cpu: string } = {
+    콜드스타트_ms: 첫요청 ? 시작 - 모듈로드 : null,   // isolate 의 첫 요청에서만 값이 있다 — warm 호출은 null
+    claim_ms: null, 학생: [],
+    cpu: '플랫폼 함수 로그 cpu_time_used 가 진다 — 코드 미측정(숫자 0 을 안 만든다)',
+  };
+  첫요청 = false;
   const 키 = Deno.env.get('ANTHROPIC_API_KEY') ?? '';
   const owner = `deliver-one:${crypto.randomUUID()}`;
   const 계수: Record<string, number> = {};
@@ -256,11 +270,13 @@ Deno.serve(async (req: Request) => {
     select ((now() at time zone ${시간대})::date)::text as d`)[0].d as string;
 
   /* 회수 — 임대 만료 job 을 큐로(별도 잡을 안 만든다 — 집기 직전 워커 자신이 · §3-2-a). */
+  const claim전 = Date.now();
   const 회수 = (await sql`select engine.jobs_reclaim(${오늘}::date) as n`)[0].n as number;
 
   const jobs = (await sql`
     select * from engine.jobs_claim(
       ${오늘}::date, ${owner}, ${워커학생상한}, ${임대_초}, null)`) as unknown as Job[];
+  계측.claim_ms = Date.now() - claim전;   // 회수+집기 묶음 1회(호출당) — 학생당으로 나누려면 집음 수가 분모다
 
   /* ── 집을 것 0 — B3 재호출 판정(§3-2-a v5.7 B3 · v5.8 셋째 갈래 · v5.12 · v5.13) ── */
   if (jobs.length === 0) {
@@ -296,7 +312,7 @@ Deno.serve(async (req: Request) => {
         }
       }
     }
-    return 봉투(200, { 날짜: 오늘, 회수, 집음: 0, 재호출, 계수, 오류: 오류들 });
+    return 봉투(200, { 날짜: 오늘, 회수, 집음: 0, 재호출, 계수, 오류: 오류들, 계측 });
   }
 
   /* ── 자기 실행판(호출당 1회 — job 마다 다시 계산하면 한 회차 안에서 판이 갈릴 수 있다) ── */
@@ -310,6 +326,10 @@ Deno.serve(async (req: Request) => {
       센다(계수, ok ? '반납' : '반납실패');
       continue;
     }
+    /* 학생별 계측 — 전처리(이력·렌더·열기) · 벤더 왕복 · 착지(닫기·finalize). 분기가 몇이든 한 자리(finally)에서 잰다. */
+    const 학생시작 = Date.now();
+    let 벤더전: number | null = null;
+    let 벤더후: number | null = null;
     try {
       const draft = j.event_draft ?? {};
 
@@ -375,6 +395,7 @@ Deno.serve(async (req: Request) => {
       /* ④ 벤더 왕복 — 타임아웃은 학생 예산 하나(§3-2). model 은 job 실행판(적용하려던 판). */
       let 원문: string | null = null;
       let 결과: string | null = null;   // attempts.result (부분집합 7)
+      벤더전 = Date.now();
       try {
         const r = await fetch(메시지경로, {
           method: 'POST',
@@ -389,6 +410,7 @@ Deno.serve(async (req: Request) => {
           ? '타임아웃' : '벤더오류';
         원문 = null;   // 받은 것이 없다(§4-2 — 타임아웃·전송 실패의 raw 는 null)
       }
+      벤더후 = Date.now();
       if (결과 == null && 원문 != null && 응답초과인가(원문)) 결과 = '응답초과';
 
       let 성공값: { sentence: string; question: string } | null = null;
@@ -444,8 +466,17 @@ Deno.serve(async (req: Request) => {
         센다(계수, '내부오류착지실패');
         오류들.push(`job ${j.job_id} 내부오류 착지 실패: ${String((e2 as Error)?.message ?? e2)}`);
       }
+    } finally {
+      const 끝 = Date.now();
+      계측.학생.push({
+        job_id: j.job_id,
+        전처리_ms: (벤더전 ?? 끝) - 학생시작,                                   // 이력·렌더·attempt_open (벤더 전 폴백 갈래는 전부 여기)
+        벤더_ms: 벤더전 != null && 벤더후 != null ? 벤더후 - 벤더전 : null,   // 안 부른 갈래는 null(0 이 아니다)
+        착지_ms: 벤더후 != null ? 끝 - 벤더후 : null,                           // attempt_close + jobs_finalize(성공·폴백)
+      });
     }
   }
 
-  return 봉투(200, { 날짜: 오늘, 회수, 집음: jobs.length, 계수, 오류: 오류들 });
+  console.log(`[deliver-one] 계측 — 콜드스타트 ${계측.콜드스타트_ms ?? 'warm'}ms · claim ${계측.claim_ms}ms · 학생 ${계측.학생.length}명`);
+  return 봉투(200, { 날짜: 오늘, 회수, 집음: jobs.length, 계수, 오류: 오류들, 계측 });
 });
