@@ -845,10 +845,27 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
   } catch (e) {
     console.error('[deliver] 학습자 상태 계산 실패(배달은 계속한다)', learner_id, String((e as Error)?.message ?? e));
   }
+  /* 🔴 **한 학생 = 한 왕복**(2026-08-22 수리). 옛 판은 `sql.begin` 안에서 다섯을 «차례로
+   *   기다렸다»: BEGIN · 개입 · 배정 · 제출 · COMMIT. 그 기다림이 학생당 553ms 였고(실측),
+   *   계산은 그중 거의 0 이었다 — 학급이 커지면 대기만으로 Edge 예산을 넘겼다.
+   * 🔑 트랜잭션 껍데기를 안 연다 — **한 문장은 그 자체로 원자**라 「개입과 배정은 같이 서거나
+   *   같이 없다」는 그대로다. `sql.begin` 은 여러 문장을 묶을 때 필요한 것이고, 문장이 하나면
+   *   그 껍데기는 왕복 둘(BEGIN·COMMIT)만 더한다.
+   * 🔑 CTE 는 전부 **같은 스냅샷**을 본다 — 그래서 아래 「있던 개입」 조회는 바로 위에서 넣은
+   *   행을 못 본다. 그게 맞다: 그 갈래는 «넣기 전부터 있던» 행을 찾는 자리이고, 넣기에
+   *   성공했으면 개입 CTE 가 값을 내므로 not exists 가 애초에 그 갈래를 막는다.
+   * 🔑 배정이 고리를 **from 절로** 받는다(스칼라 부속질의가 아니라). 부속질의로 받으면 고리가
+   *   비는 날 NULL 을 그대로 꽂지만, from 절이면 그날은 0행이라 아무 행도 안 선다 — 조용한
+   *   오염 대신 «아무 일도 안 함»이고, 그건 아래 duplicate 갈래가 그대로 읽는다.
+   * ⚠ 이 주석은 sql 템플릿 «밖»이다 — 안에 백틱이 한 글자라도 들어가면 리터럴이 끊기고 함수가
+   *   번들조차 안 된다(F180). 템플릿 «안» 주석은 「」로만 강조한다. */
   try {
-    return await sql.begin(async (tx) => {
-      // ① 무엇을 배달했나 — 강등이면 `ai` + `degraded` 조합이 「AI 자리인데 AI가 못 했다」를 담는다.
-      const 개입 = await tx`
+    const [r] = await sql`
+      with 개입 as (
+        /* 무엇을 배달했나 — 강등이면 ai + degraded 조합이 「AI 자리인데 AI가 못 했다」를 담는다.
+         * 상태 스탬프 셋(판·신뢰도·근거)과 policy_ver 의 근거는 이 파일 머리말 ⑦ 절에 있다 —
+         * 셋이 함께 있어야 나중에 다시 계산해 대조할 수 있고, policy_ver 는 「그 상태 위에서
+         * 무엇을 골랐나」라 축이 다르다. 값은 결정이 들고 온다(고른 자가 서명한다). */
         insert into engine.learning_events (
           learner_id, event_type, actor_kind, occurred_at, idempotency_key,
           level_snapshot, goal_snapshot, intervention_id, consent_ver, consent_id, degraded,
@@ -859,88 +876,77 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
           ${멱등키('intervention', learner_id, 오늘)},
           ${공통.level_snapshot}, ${공통.goal_snapshot}, ${intervention_id}::uuid,
           ${공통.consent_ver}, ${공통.consent_id}::uuid, ${결정.degraded},
-          /* ⑦ 상태 스탬프. 계약이 이 셋을 「추정에 반드시 따라붙는 것」으로 정했다(코어엔진
-           * §기록규격 · L0 스키마가 열까지 두고 writer 만 0 이던 자리). 셋이 함께 있어야
-           * 나중에 **다시 계산해서 대조**할 수 있다 — 판·신뢰도·근거 중 하나만 빠져도 그때
-           * 값이 왜 그랬는지 되짚을 길이 없다.
-           * 🔴 policy_ver 는 **넷째 칸이지 추정메타가 아니다**(2026-08-09 · 이 자리가 「비운다」
-           *   였던 것을 닫는다). 위 셋은 「상태를 **어떻게 쟀나**」고 이 칸은 「그 상태 위에서
-           *   **무엇을 골랐나**」다 — 한 칸에 담으면 추정식만 고친 날과 선택 규칙만 고친 날이
-           *   행에서 같은 모양이 되어, 개입-효과 짝(lib/성과회수.js)이 「무엇이 통했는지」를
-           *   규칙 단위로 못 가른다.
-           * ⚠ 백틱을 쓰지 않는다 — 이 주석은 sql 템플릿 리터럴 «안»이라 백틱 한 글자가 리터럴을
-           *   끊고, 증상은 이 자리에서 한참 떨어진 「Missing semicolon」이다(2026-08-09 실측).
-           * 🔑 값은 **결정이 들고 온다** — 고른 자가 서명한다. 여기서 상수를 다시 적으면
-           *   같은 판정이 두 곳에 살고, 갈라진 날 행에는 고른 적 없는 규칙 이름이 찍힌다.
-           * 🔑 상태 계산이 실패해도(위 try) 이 칸은 **그대로 찍힌다** — 상태를 못 쟀다는 것과
-           *   무슨 규칙으로 골랐는지는 별개고, 실제로 그날도 규칙은 골랐다. */
           ${상태?.estimator_version ?? null}, ${상태?.estimator_confidence ?? null},
           ${상태 ? sql.json(상태.evidence_refs) : null}, ${결정.policy_ver},
-          /* 이 두 행은 관측이 아니라 **추정**이다 — 오늘 이 문장을 준 것은 「이 학생에게
-           * 이게 맞겠다」는 판단이고, 판단이 틀린 날의 저조를 학생 특성으로 읽지 않으려면
-           * 그 사실이 행에 남아 있어야 한다(절단문서 ①-7 · lib/사건출처.js 가 표를 진다). */
           ${사건출처('intervention.delivered')}::engine.source_kind,
           ${sql.json({ ver: 1, output_text: 따라말하기문장(결정.task_snapshot) })}, ${ver}
         )
         on conflict (learner_id, idempotency_key) do nothing
-        returning event_id, intervention_id`;
-
-      // 이미 오늘 것이 있으면 **그 개입을 잇는다** — 새 uuid 로 갈아끼우면 재실행이 고리를 끊는다.
-      const 개입id = 개입.length
-        ? intervention_id
-        : (await tx`select intervention_id from engine.learning_events
-                     where learner_id = ${learner_id}::uuid
-                       and idempotency_key = ${멱등키('intervention', learner_id, 오늘)}`)[0].intervention_id;
-
-      // ② 배정 — 「제출 안 함」의 분모(P0 §2-1). 없으면 「안 온 날」과 「낼 게 없던 날」이 같은 모양이다.
-      const 배정 = await tx`
+        returning event_id, intervention_id
+      ), 개입고리 as (
+        /* 이미 오늘 것이 있으면 「그 개입을 잇는다」 — 새 uuid 로 갈아끼우면 재실행이 고리를 끊는다. */
+        select intervention_id from 개입
+        union all
+        select e.intervention_id from engine.learning_events e
+         where e.learner_id = ${learner_id}::uuid
+           and e.idempotency_key = ${멱등키('intervention', learner_id, 오늘)}
+           and not exists (select 1 from 개입)
+      ), 배정 as (
+        /* 「제출 안 함」의 분모(P0 §2-1). 없으면 「안 온 날」과 「낼 게 없던 날」이 같은 모양이다. */
         insert into engine.learning_events (
           learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
           level_snapshot, goal_snapshot, intervention_id, consent_ver, consent_id, degraded,
           retry_of_event_id, source_kind, payload, schema_ver
-        ) values (
-          ${learner_id}::uuid, 'task.assigned', ${통로}, ${공통.actor_kind}, ${지금}::timestamptz,
-          ${멱등키('task', learner_id, 오늘)},
-          ${공통.level_snapshot}, ${공통.goal_snapshot}, ${개입id}::uuid,
-          ${공통.consent_ver}, ${공통.consent_id}::uuid, ${결정.degraded},
-          ${재발화고리}::uuid,
-          ${사건출처('task.assigned')}::engine.source_kind, ${sql.json({ ver: 1 })}, ${ver}
         )
+        select ${learner_id}::uuid, 'task.assigned', ${통로}, ${공통.actor_kind}, ${지금}::timestamptz,
+               ${멱등키('task', learner_id, 오늘)},
+               ${공통.level_snapshot}, ${공통.goal_snapshot}, 고리.intervention_id,
+               ${공통.consent_ver}, ${공통.consent_id}::uuid, ${결정.degraded},
+               ${재발화고리}::uuid,
+               ${사건출처('task.assigned')}::engine.source_kind, ${sql.json({ ver: 1 })}, ${ver}
+          from 개입고리 고리
         on conflict (learner_id, idempotency_key) do nothing
-        returning event_id`;
-
-      if (!배정.length) {
-        // 재실행. 결정론적 키가 접었다 — 오류가 아니다(C0 §4-1 · §10-A-4).
-        return { learner_id, status: 'duplicate', degraded: 결정.degraded, 출처: 결정.출처 };
-      }
-
-      /* ③ 그날 학생이 볼 것 그대로 — task_format 은 비운다(호흡마다 다르다).
-       * 🔴 `due_at`·`due_ver` = **마감 시각·마감 판본**(c10 · 소급 불가 · 유호님 승인 08-08).
-       *   습관 축의 원신호는 「몇 시에 냈나」가 아니라 «마감까지 몇 분 남기고 냈나»다. 수업표가
-       *   바뀌면 그때 그 학생의 마감은 다시 계산할 근거가 사라지므로 **배정 순간에 박는다.**
-       *   `due.v1` = 배정일의 끝 = 배정일 다음날 00:00. 🔑 오프셋 상수를 안 적고 **DB 에게
-       *   시킨다**(`at time zone`) — 여기서 JS 로 계산하면 그 자리가 절단문서 ①-14 의 재발이다.
-       *   ⚠ `오늘` 은 배치가 도는 날이 아니라 `몽골날짜()` 가 낸 **배정 대상일**이라, 배치가
-       *   자정을 넘겨 돌아도 마감이 하루 밀리지 않는다. */
-      await tx`
+        returning event_id
+      ), 제출 as (
+        /* 그날 학생이 볼 것 그대로 — task_format 은 비운다(호흡마다 다르다).
+         * due_at·due_ver = 마감 시각·마감 판본(c10 · 소급 불가 · 유호님 승인 08-08). 습관 축의
+         * 원신호는 「몇 시에 냈나」가 아니라 «마감까지 몇 분 남기고 냈나»다. 수업표가 바뀌면 그때
+         * 그 학생의 마감은 다시 계산할 근거가 사라지므로 배정 순간에 박는다. 오프셋 상수를 안
+         * 적고 DB 에게 시킨다(at time zone) — 여기서 JS 로 계산하면 절단문서 ①-14 의 재발이다.
+         * 「오늘」은 배치가 도는 날이 아니라 몽골날짜()가 낸 배정 대상일이라, 배치가 자정을
+         * 넘겨 돌아도 마감이 하루 밀리지 않는다. */
         insert into engine.submissions (
           event_id, task_type, task_ref, task_snapshot, task_schema_ver, occurred_at, schema_ver,
           due_at, due_ver
-        ) values (
-          ${배정[0].event_id}::uuid, ${통로}, ${결정.task_ref},
-          ${sql.json(결정.task_snapshot)}, 'task.v1', ${지금}::timestamptz, ${ver},
-          (${오늘}::date + 1)::timestamp at time zone ${시간대}::text, 'due.v1'
-        )`;
+        )
+        select 배정.event_id, ${통로}, ${결정.task_ref},
+               ${sql.json(결정.task_snapshot)}, 'task.v1', ${지금}::timestamptz, ${ver},
+               (${오늘}::date + 1)::timestamp at time zone ${시간대}::text, 'due.v1'
+          from 배정
+        returning submission_id
+      )
+      select (select intervention_id from 개입고리) as 개입id,
+             (select event_id from 배정) as 배정id,
+             (select count(*) from 제출)::int as 제출수`;
 
-      return {
-        learner_id, status: 'assigned', event_id: 배정[0].event_id,
-        intervention_id: 개입id, degraded: 결정.degraded, 출처: 결정.출처,
-        /* 🔴 스탬프가 빈 채로 나간 배달이다(위 `상태` catch). 배달 자체는 **성공**이라 어느
-         *   status 로도 안 드러나는데, 못 적은 근거는 **소급 불가**다("근거 없이 지나간 날은
-         *   되살릴 수 없다" — 위 주석). 그래서 성공 응답에 표식을 남긴다. */
-        상태없음: 상태 === null,
-      };
-    });
+    if (!r || !r.배정id) {
+      // 재실행. 결정론적 키가 접었다 — 오류가 아니다(C0 §4-1 · §10-A-4).
+      return { learner_id, status: 'duplicate', degraded: 결정.degraded, 출처: 결정.출처 };
+    }
+    /* 🔴 배정은 섰는데 제출이 0 이면 큐가 «빈 배정»으로 선 것이다 — 앱이 그 행을 읽어도 보여줄
+     *   것이 없고, 다음 배달은 멱등이라 그 자리를 못 고친다. 한 문장이라 원리상 안 나지만,
+     *   그 「원리상」이 틀린 날을 조용히 넘기지 않는다. */
+    if (r.제출수 !== 1) {
+      console.error('[deliver] 🔴 배정은 섰는데 제출이 안 섰다', learner_id, r.배정id, r.제출수);
+    }
+    return {
+      learner_id, status: 'assigned', event_id: r.배정id,
+      intervention_id: r.개입id, degraded: 결정.degraded, 출처: 결정.출처,
+      /* 🔴 스탬프가 빈 채로 나간 배달이다(위 `상태` catch). 배달 자체는 **성공**이라 어느
+       *   status 로도 안 드러나는데, 못 적은 근거는 **소급 불가**다("근거 없이 지나간 날은
+       *   되살릴 수 없다" — 위 주석). 그래서 성공 응답에 표식을 남긴다. */
+      상태없음: 상태 === null,
+    };
   } catch (e) {
     /* 한 학생이 실패해도 나머지는 배달한다 — 전건을 4xx 로 접으면 그 한 명이 반 전체의
      * 큐를 막는다(C0 §4-1 이 head-of-line blocking 으로 못박은 그 형태). */
