@@ -72,6 +72,9 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
   const 보기뜬때 = useRef(경과시계());
 
   const [단계, set단계] = useState(시작단계); // 전략 | 쓰기 | 대기
+  /* 고른 전략의 «라벨» — 쓰기 단계에 재표시(자기 설명 «연결» 축: 고른 카드가 사라지면 「내가 뭘
+   * 골랐더라」가 끊긴다 · 유호 확정 08-22). 행 재료가 아니라 화면 전용이다(사건은 고르기가 이미 낸다). */
+  const [고른전략라벨, set고른전략라벨] = useState(null);
   const [로그, set로그] = useState([]);
   const [오류, set오류] = useState(null);
   const [게이지, set게이지] = useState(null);
@@ -149,6 +152,7 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
 
   const 고르기 = async (option_id) => {
     상태참조.current = { ...상태참조.current, 단계: '쓰기' };
+    set고른전략라벨(보기?.options_shown?.find((o) => o.option_id === option_id)?.label ?? null);
     set단계('쓰기');
     const 사건 = 전략선택사건(재료, {
       보기, 고른것: option_id, 시작: 보기뜬때.current, 끝: 경과시계(),
@@ -263,6 +267,10 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
         <>
           <View style={s.카드}>
             <Text style={s.카드라벨}>오늘의 미션</Text>
+            {/* 전체 그림 한 줄 — 처음 온 학생이 「이 게임이 통째로 뭔지」를 첫 카드에서 안다
+             * (유호 확정 08-22 「기능은 자기를 설명해야 완성 · 숙제는 반드시」 · 말하기 1bce99e 와
+             * 같은 처방 — 첫 걸음에만 · ⚠ 문구 초안, 카피 확정은 유호님 몫). */}
+            <Text style={s.메모}>메일 한 통이에요 — 다가갈 방법을 고르고, 교수님께 메일을 써서 보내요!</Text>
             <Text style={s.상황글}>{문항.질문}</Text>
             <Text style={s.본문글}>{문항.지시문}</Text>
           </View>
@@ -292,6 +300,8 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
       {단계 === '쓰기' && (
         <View style={s.카드}>
           <Text style={s.카드라벨}>받는 사람 · 교수님</Text>
+          {/* «연결» — 방금 고른 방법이 쓰기 화면에도 산다(고른 카드가 사라지면 연결이 끊긴다). */}
+          {고른전략라벨 && <Text style={s.메모}>내가 고른 방법 · {고른전략라벨}</Text>}
           <Text style={s.메모}>{문항.지시문}</Text>
           <TextInput
             style={s.본문입력}
