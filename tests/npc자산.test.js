@@ -20,12 +20,21 @@ const 폴더 = path.resolve(__dirname, '..', 'assets', 'npc');
 const 역들 = ['prof', 'lead', 'boss', 'insp'];
 const 상태들 = ['calm', 'lean', 'back', 'win'];
 
-// 킷 9색(디자인_토큰 v10 부분집합 — NPC 규격이 허용하는 전부) + 표기 변형 없음(대문자 HEX 고정)
-const 허용색 = new Set([
-  '#0F1730', '#131A32', '#1A2340', '#2A3358', // Navy 계열
-  '#8A93AD',                                   // Slate
-  '#FBF7EE', '#F6F1E8', '#EFE7D7', '#E7DDC7', // Paper·Cream 계열
-]);
+/* NPC 팔레트 — 양모 밤 7색(유호 확정 08-20 조항 ⓚ의 앱 다크 축 · 재채색 08-23).
+ * 🔴 «이름+값 쌍»으로 들고 아래에서 형제 저장소 토큰과 대조한다 — 옛 판(v10 Navy 9색)은
+ *   이름 없는 hex 화이트리스트라 원천 대조가 0이었고, 08-20 킷 개편 뒤에도 **퇴역 팔레트를
+ *   기계 고정**한 채 초록이었다(08-23 전수조사 1위 위험 — 「말하기 마스코트 금지」와 같은 꼴).
+ *   이름이 킷에서 사라지거나 값이 갈리면 아래 대조가 빨개진다 — 다음 개편은 여기 못 안 남는다. */
+const NPC팔레트 = Object.freeze({
+  'Ink Deep': '#080605', // 잉크 선·눈·접지 그림자(그라디언트)
+  'Ink': '#2B2320', // 옷 면
+  'Deep Wool': '#575046', // 소품 어두운 부속
+  'Ash Wool': '#8D857A', // 머리카락·눈썹
+  'Oat': '#EDE7DC', // 셔츠·boss 앞치마
+  'Paper': '#FBF7F0', // 피부·손
+  'Stitch': '#F0E3C8', // 서류·소품
+});
+const 허용색 = new Set(Object.values(NPC팔레트).map((h) => h.toUpperCase()));
 
 /** svg 문자열의 위반 목록을 낸다 — 검사 로직은 이 한 곳에만 산다. */
 function 위반(svg) {
@@ -57,11 +66,26 @@ test('NPC 자산 — README(그림 정본 선언)가 폴더에 같이 산다', (
   assert.ok(fs.existsSync(path.join(폴더, 'README.md')), 'README.md 가 없다 — 정본 선언·사용 규칙이 자산과 떨어진다');
 });
 
+test('NPC 팔레트 — 이름·값이 형제 저장소 킷(디자인_토큰)과 일치한다 (형제 없으면 skip · F296)', (t) => {
+  const 토큰경로 = path.resolve(__dirname, '..', '..', 'SYNK-appsscript', 'docs', '디자인_토큰.json');
+  if (!fs.existsSync(토큰경로)) { t.skip('형제 저장소가 이 판에 없다 — 셀 수 없다(0건이 아니다)'); return; }
+  const 킷 = JSON.parse(fs.readFileSync(토큰경로, 'utf8')).색.킷;
+  const 킷표 = new Map(킷.map((c) => [c.이름, String(c.hex).toUpperCase()]));
+  for (const [이름, hex] of Object.entries(NPC팔레트)) {
+    assert.ok(킷표.has(이름), `NPC 팔레트의 「${이름}」이 킷에 없다 — 킷 개편이 이 팔레트를 지나쳤다(퇴역 고정 재발)`);
+    assert.equal(킷표.get(이름), hex.toUpperCase(), `「${이름}」 값이 킷과 갈렸다 — NPC 재채색이 필요하다`);
+    const 직책 = 킷.find((c) => c.이름 === 이름).직책 || '';
+    assert.ok(!직책.includes('퇴역'), `「${이름}」이 퇴역(대기) 색이 됐다 — 앱 자산은 현행 축만 쓴다`);
+  }
+});
+
 test('탐지력 — 코랄 반입·<text>·class 를 심은 픽스처가 실제로 걸린다', () => {
   const 머리 = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140">';
   assert.ok(위반(`${머리}<rect fill="#FF6B5C"/></svg>`).some((v) => v.includes('#FF6B5C')), '코랄을 못 잡는다');
   assert.ok(위반(`${머리}<rect fill="#C8FF3D"/></svg>`).some((v) => v.includes('#C8FF3D')), '라임을 못 잡는다');
   assert.ok(위반(`${머리}<text x="1" y="1">3</text></svg>`).some((v) => v.includes('<text>')), '<text> 를 못 잡는다');
   assert.ok(위반(`${머리}<g class="eyes"/></svg>`).some((v) => v.includes('class')), 'class 를 못 잡는다');
-  assert.equal(위반(`${머리}<rect fill="#FBF7EE"/></svg>`).length, 0, '멀쩡한 svg 에 거짓양성');
+  assert.equal(위반(`${머리}<rect fill="#FBF7F0"/></svg>`).length, 0, '멀쩡한 svg 에 거짓양성');
+  /* 옛 팔레트(v10 Navy)가 «이제는 걸린다» — 퇴역 고정이 풀렸다는 증명(08-23 재채색). */
+  assert.ok(위반(`${머리}<rect fill="#0F1730"/></svg>`).some((v) => v.includes('#0F1730')), '퇴역 Navy 를 못 잡는다 — 옛 팔레트가 되살아날 길이 열린다');
 });

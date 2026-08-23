@@ -1,24 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140">
-<defs><radialGradient id="sh"><stop offset="0%" stop-color="#0F1730" stop-opacity=".55"/><stop offset="100%" stop-color="#0F1730" stop-opacity="0"/></radialGradient></defs>
+<defs><radialGradient id="sh"><stop offset="0%" stop-color="#080605" stop-opacity=".55"/><stop offset="100%" stop-color="#080605" stop-opacity="0"/></radialGradient></defs>
 <ellipse cx="60" cy="132" rx="26" ry="4.5" fill="url(#sh)"/>
-<rect x="38" y="78" width="44" height="52" rx="14" fill="#2A3358"/>
-<path d="M52 78 L60 91 L68 78 Z" fill="#F6F1E8"/>
-<rect x="49" y="94" width="22" height="26" rx="2" fill="#E7DDC7"/>
-<rect x="49" y="94" width="5" height="26" rx="1" fill="#1A2340"/>
-<circle cx="46" cy="112" r="4.5" fill="#FBF7EE"/>
-<circle cx="74" cy="112" r="4.5" fill="#FBF7EE"/>
-<circle cx="60" cy="48" r="30" fill="#FBF7EE"/>
-<path d="M31 42 Q28 56 34 63 Q37 52 35 42 Z" fill="#8A93AD"/>
-<path d="M89 42 Q92 56 86 63 Q83 52 85 42 Z" fill="#8A93AD"/>
-<path d="M50 20 Q60 15 70 20" stroke="#8A93AD" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-<path d="M42 35 Q48 31.5 54 35" stroke="#131A32" stroke-width="2.2" fill="none" stroke-linecap="round"/>
-<path d="M66 35 Q72 31.5 78 35" stroke="#131A32" stroke-width="2.2" fill="none" stroke-linecap="round"/>
-<circle cx="48" cy="50" r="8" stroke="#131A32" stroke-width="2.4" fill="none"/>
-<circle cx="72" cy="50" r="8" stroke="#131A32" stroke-width="2.4" fill="none"/>
-<path d="M56 50 H64" stroke="#131A32" stroke-width="2.4"/>
-<path d="M43.5 51 Q48 46 52.5 51" stroke="#131A32" stroke-width="2.8" fill="none" stroke-linecap="round"/>
-<path d="M67.5 51 Q72 46 76.5 51" stroke="#131A32" stroke-width="2.8" fill="none" stroke-linecap="round"/>
-<path d="M52 62 Q60 70 68 62" stroke="#131A32" stroke-width="2.6" fill="none" stroke-linecap="round"/>
-<path d="M24 30l1 2.8 2.8 1-2.8 1L24 37.6l-1-2.8-2.8-1 2.8-1Z" fill="#FBF7EE" opacity=".7"/>
-<path d="M94 24l.9 2.5 2.5.9-2.5.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9Z" fill="#FBF7EE" opacity=".55"/>
+<rect x="38" y="78" width="44" height="52" rx="14" fill="#2B2320"/>
+<path d="M52 78 L60 91 L68 78 Z" fill="#EDE7DC"/>
+<rect x="49" y="94" width="22" height="26" rx="2" fill="#F0E3C8"/>
+<rect x="49" y="94" width="5" height="26" rx="1" fill="#575046"/>
+<circle cx="46" cy="112" r="4.5" fill="#FBF7F0"/>
+<circle cx="74" cy="112" r="4.5" fill="#FBF7F0"/>
+<circle cx="60" cy="48" r="30" fill="#FBF7F0"/>
+<path d="M31 42 Q28 56 34 63 Q37 52 35 42 Z" fill="#8D857A"/>
+<path d="M89 42 Q92 56 86 63 Q83 52 85 42 Z" fill="#8D857A"/>
+<path d="M50 20 Q60 15 70 20" stroke="#8D857A" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+<path d="M42 35 Q48 31.5 54 35" stroke="#080605" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+<path d="M66 35 Q72 31.5 78 35" stroke="#080605" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+<circle cx="48" cy="50" r="8" stroke="#080605" stroke-width="2.4" fill="none"/>
+<circle cx="72" cy="50" r="8" stroke="#080605" stroke-width="2.4" fill="none"/>
+<path d="M56 50 H64" stroke="#080605" stroke-width="2.4"/>
+<path d="M43.5 51 Q48 46 52.5 51" stroke="#080605" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+<path d="M67.5 51 Q72 46 76.5 51" stroke="#080605" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+<path d="M52 62 Q60 70 68 62" stroke="#080605" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+<path d="M24 30l1 2.8 2.8 1-2.8 1L24 37.6l-1-2.8-2.8-1 2.8-1Z" fill="#FBF7F0" opacity=".7"/>
+<path d="M94 24l.9 2.5 2.5.9-2.5.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9Z" fill="#FBF7F0" opacity=".55"/>
 </svg>
