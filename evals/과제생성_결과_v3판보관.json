@@ -9,8 +9,8 @@
   "채점표_판": "채점표.v1",
   "quality_ver": "0d37285bbef6",
   "policy_ver": "오늘과제.v3+2f60018b42da",
-  "채점자": "(미채점)",
-  "시각": "2026-08-23T10:00:27.815Z"
+  "채점자": "유호",
+  "시각": "2026-08-23T11:29:52.222Z"
  },
  "행": [
   {
@@ -25,7 +25,7 @@
     "goal_use": 0,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "할머니 이야기를 따라 말했는데 갑자기 가족을 묻는다」와 「(학생이름)님은 가족과 밥을 먹고 나서 뭘 해요?처럼 부르면 자연스럽다」",
    "sentence": "할머니께서 저녁을 다 드시고 나서 좋아하시는 노래를 들으셨어요",
    "question": "가족이 밥을 먹고 나서 같이 하는 일이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKU96jNRQPRkrXB3Lo2M\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"할머니께서 저녁을 다 드시고 나서 좋아하시는 노래를 들으셨어요\\\", \\\"question\\\": \\\"가족이 밥을 먹고 나서 같이 하는 일이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2210,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":80,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -44,7 +44,7 @@
     "goal_use": 0,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "할머니 이야기를 따라 말했는데 갑자기 가족을 묻는다」와 「(학생이름)님은 가족과 밥을 먹고 나서 뭘 해요?처럼 부르면 자연스럽다」",
    "sentence": "할머니께서 저녁을 다 드시고 나서 좋아하시는 노래를 들으셨어요",
    "question": "가족이 밥을 먹고 나서 같이 하는 일이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKU9a5RUpz56QuKkqKzi\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"할머니께서 저녁을 다 드시고 나서 좋아하시는 노래를 들으셨어요\\\",\\\"question\\\":\\\"가족이 밥을 먹고 나서 같이 하는 일이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2210,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":79,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -54,16 +54,16 @@
   {
    "case_id": "P002#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "대체적으로 훌륭한 숙제인데 조금 더 구체화해서 질문을 구성해줘. 예를들어지금 듣기,따라말하기에서 저는 보통 버스타고 학교를 가는데 오늘은 날씨가 좋아서 친구를 만나서 같이 걸어갔어요. 이렇게 다채롭게 질문해줘. 이게 훨씬 자연스럽고 명품화야.",
    "sentence": "저는 버스로 학교를 가는데 오늘은 친구를 만나서 같이 걸어갔어요",
    "question": "평소에 무엇으로 학교나 회사를 가요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKU9kTkNhhZ7HqWcJ6LN\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 버스로 학교를 가는데 오늘은 친구를 만나서 같이 걸어갔어요\\\", \\\"question\\\": \\\"평소에 무엇으로 학교나 회사를 가요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2251,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":74,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -73,16 +73,16 @@
   {
    "case_id": "P002#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "일단 3번 문제랑 비슷한 결이라 좀 별로고 답변을 할때 너무 범위가 정해져있어. 예를들어 주말에 걸어다니고 산책하는 사람은 도대체 어떻게 답변해야할까? 무엇을 타고라는 전제 조건이 너무 많은걸 통제하는것같아.",
    "sentence": "주말에는 버스로 시내에 가서 옷을 좀 사려고 해요",
    "question": "보통 주말에는 무엇을 타고 어디에 가요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKU9vr5mGTz1fzazGuPL\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"주말에는 버스로 시내에 가서 옷을 좀 사려고 해요\\\",\\\"question\\\":\\\"보통 주말에는 무엇을 타고 어디에 가요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2251,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":66,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -92,16 +92,16 @@
   {
    "case_id": "P003#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "제일 완벽한 숙제야. 왜냐하면 자기성찰을 할수있는 숙제이고 학생 본인을 더 알수있는 질의응답인것같아. 그래서 이런 자기성찰을 할수있는 숙제를 늘려줬으면 해.",
    "sentence": "오늘은 피곤하지만 친구를 만나러 도서관에 갈 거예요",
    "question": "요즘 피곤해도 꼭 만나러 가고 싶은 사람이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUA74jvs17eVX4BWjy8\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"오늘은 피곤하지만 친구를 만나러 도서관에 갈 거예요\\\", \\\"question\\\": \\\"요즘 피곤해도 꼭 만나러 가고 싶은 사람이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2215,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":79,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -111,16 +111,16 @@
   {
    "case_id": "P003#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
     "fresh": 0,
-    "fun": 0,
+    "fun": 1,
     "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "일단 방금 5번문제가 똑같은 피곤함에대한 질문으로 시작해. 만약에 이어서 5번 6번 숙제를 한다면 사용자가 느낄때 이거 ai로 만들었구나 100% 생각할걸? 그리고 질문이나 답변의 맥락이 5번이랑 너무 유사해서 뻔하고 별로야.",
    "sentence": "오늘은 피곤하지만 친구를 만나러 시내에 나갈 거예요",
    "question": "많이 바빠도 꼭 만나러 나가고 싶은 사람이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUAPPFuqRHgH3K9Xqj4\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"오늘은 피곤하지만 친구를 만나러 시내에 나갈 거예요\\\", \\\"question\\\": \\\"많이 바빠도 꼭 만나러 나가고 싶은 사람이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2215,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":78,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -131,15 +131,15 @@
    "case_id": "P004#1",
    "axis_scores": {
     "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
+    "answerable": 1,
+    "level_fit": 1,
     "fresh": 0,
-    "fun": 0,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "답하기는 상당히 마음에 들어. 그런데 듣기 따라말하기 어휘가 부자연스러워. 지금 비가 오고있으면이라는게 많이 부자연스럽게 느껴져. 차라리 밖에 비가 오고있어서 우산을 가지고 나가야 해요 이러면 훨씬 자연스럽지 않을까 ?",
    "sentence": "지금 비가 오고 있으면 우산을 가지고 나가야 해요",
    "question": "밖에 나가기 전에 항상 확인하는 게 있으면 뭐예요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUAfDWbyoEnkDohcuPm\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"지금 비가 오고 있으면 우산을 가지고 나가야 해요\\\", \\\"question\\\": \\\"밖에 나가기 전에 항상 확인하는 게 있으면 뭐예요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2217,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":73,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -150,15 +150,15 @@
    "case_id": "P004#2",
    "axis_scores": {
     "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
+    "answerable": 1,
+    "level_fit": 1,
     "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "답변이 그냥 정해져있는데? 밥을 먹다가 배가 부르면 보통 어떻게해요? 이게 뭐라고 답해야하지? 당연히 안먹지않나? 너무 일관적으로 답변을 유도해놨어. 그리고 지금 밥을먹고있는데 배가 부르면 남길거에요 이것도 너무 부자연스러워. 지금을 빼고 그냥 밥을 먹고있는데 또는 친구랑 밥을 먹고 있는데 또는 부모님이랑 밥을 먹고있는데 또는 여자친구,남자친구랑 밥을 먹고 있는데 배가 부르면 남길거에요 이렇게 하는게 훨씬 자연스러워. 왜 굳이 지금을 넣는지 너무 부자연스럽다",
    "sentence": "지금 밥을 먹고 있는데 배가 부르면 남길 거예요",
    "question": "밥을 먹다가 배가 부르면 보통 어떻게 해요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUAv6TzmrprXSkSCW3G\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"지금 밥을 먹고 있는데 배가 부르면 남길 거예요\\\", \\\"question\\\": \\\"밥을 먹다가 배가 부르면 보통 어떻게 해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2217,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":70,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -168,16 +168,16 @@
   {
    "case_id": "P005#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "답하기 질문 의도는 좋은데 학생의 생각을 물어보는식으로 만들어나가면 좋을것같아. 앞으로의 새로운 질문을 만들때도 마찬가지야. 예를들어 바쁜날 딱 한 사람밖에 연락을 못했던적이 있어요? 왜 바빴는지 기억나요? 이런식으로 말이야.",
    "sentence": "주말에는 시간이 없어서 언니한테밖에 연락을 못 했어요",
    "question": "바빠서 딱 한 사람한테만 연락한 적 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUB7kStxexhqMT8sNmj\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"주말에는 시간이 없어서 언니한테밖에 연락을 못 했어요\\\",\\\"question\\\":\\\"바빠서 딱 한 사람한테만 연락한 적 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2184,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":70,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -187,16 +187,16 @@
   {
    "case_id": "P005#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "괜찮은데 이것도 어휘가 부자연스러워. 답하기에서 비밀이 있다면 가족 누구한테 먼저 말하고 싶나요? 이렇게 하는게 훨씬 자연스러울것같은데 ?",
    "sentence": "동생한테만 이 사실을 말했고 엄마께는 아직 말씀 안 드렸어요",
    "question": "가족 중에 누구한테만 먼저 말하고 싶은 비밀이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUBGyKhrymhNLzeANR2\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"동생한테만 이 사실을 말했고 엄마께는 아직 말씀 안 드렸어요\\\", \\\"question\\\": \\\"가족 중에 누구한테만 먼저 말하고 싶은 비밀이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2184,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":84,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -206,16 +206,16 @@
   {
    "case_id": "P021#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "훌륭해. 이번 질문이 지금까지의 질문중 가장 이해도 쉽고 직관적이고 교훈적이고 자기성찰까지 된다.",
    "sentence": "오늘은 숙제하고 청소를 해야 해서 친구랑 놀지 못해요",
    "question": "이번 주말에는 시간이 없어서 못 하는 일이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUBYyVrGSyC7nxfVzpu\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"오늘은 숙제하고 청소를 해야 해서 친구랑 놀지 못해요\\\",\\\"question\\\":\\\"이번 주말에는 시간이 없어서 못 하는 일이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2295,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":75,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -234,7 +234,7 @@
     "goal_use": 0,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "듣기 따라말하기 전부 이해가 전혀 안가 질문의 의도를 전혀 파악하지 못하겠어 ㅋㅋ  만약 니 의도를 내가 억지로 파악해서 자연스럽게 변형해본다면 오늘 숙제가 어려워서 저녁 먹기 전에는 끝나지 않을 것 같아요, 그래서 저녁식사하면서 숙제를 할 생각이에요. 이렇게 하면 그나마 자연스럽겠다. 그리고 답하기는 할 일이 많아서 못 끝낼 것 같을 때 보통 어떻게 해요? 이렇게 답변을 해야지, 지금 답변은 전혀 이해가 안가",
    "sentence": "오늘 숙제가 어려워서 저녁 먹기 전에는 끝나지 않을 것 같아요, 그러니까 밥하고 숙제를 같이 걱정하지 마세요",
    "question": "할 일이 많아서 못 끝낼 것 같을 때 보통 뭐하고 뭘 같이 걱정해요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUBjD9iup3aXRb9C2sf\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"오늘 숙제가 어려워서 저녁 먹기 전에는 끝나지 않을 것 같아요, 그러니까 밥하고 숙제를 같이 걱정하지 마세요\\\",\\\"question\\\":\\\"할 일이 많아서 못 끝낼 것 같을 때 보통 뭐하고 뭘 같이 걱정해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2295,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":127,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -245,15 +245,15 @@
    "case_id": "P022#1",
    "axis_scores": {
     "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "연결은 되지 않지만 질문이랑 답하기 둘 다 훌륭해. 너무 좋아. 조금 추가해본다면 답하기에서 방학이 시작되면 어떤걸 할 계획이에요? 이렇게 하는게 훨씬 좋지않을까?",
    "sentence": "저는 월요일부터 금요일까지 매일 학교에서 한국어를 공부해요",
    "question": "방학이 시작되면 아침부터 저녁까지 매일 뭘 하고 싶어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUC1BawkNi9vqP4Ea8R\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 월요일부터 금요일까지 매일 학교에서 한국어를 공부해요\\\", \\\"question\\\": \\\"방학이 시작되면 아침부터 저녁까지 매일 뭘 하고 싶어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2315,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":82,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -272,7 +272,7 @@
     "goal_use": 0,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "전이랑 똑같은 질문인데 아예 이해가 안가게 나왔어. 어느 요일부터 어느 요일까지 제일 바쁘게 지내요? 아예 답변을 할 수가 없는 답변이야 말이 안되거든",
    "sentence": "저는 월요일부터 금요일까지 매일 학교에서 한국어를 공부해요",
    "question": "어느 요일부터 어느 요일까지 제일 바쁘게 지내요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUCCwWa4fQvFDkCBMZ1\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"저는 월요일부터 금요일까지 매일 학교에서 한국어를 공부해요\\\",\\\"question\\\":\\\"어느 요일부터 어느 요일까지 제일 바쁘게 지내요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2315,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":75,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -282,16 +282,16 @@
   {
    "case_id": "P023#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "의도는 파악이 되는데 이해하기가 어려워 직관적이지못해. 어제는 비가 와서 등산을 못갔는데, 내일 날씨가 좋다면 등산을 갈 거에요. 이렇게 바꿔야 훨씬 자연스러워. 오케이? 그리고 답변에는 주말이라고 고정하지말고 최근에 날씨 때문에 계획이 바뀐 적이 있어요? 이렇게 해야지, 주말이 중요한게 아니잖아. 학생이 답변할수있는 폯을 넓게 생각해줘야지",
    "sentence": "어제는 비가 와서 우산을 썼는데, 내일은 날씨가 좋으면 등산을 갈 거예요.",
    "question": "지난 주말에 날씨 때문에 계획이 바뀐 적이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUCNZhqu9sNA3KWiKtn\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제는 비가 와서 우산을 썼는데, 내일은 날씨가 좋으면 등산을 갈 거예요.\\\", \\\"question\\\": \\\"지난 주말에 날씨 때문에 계획이 바뀐 적이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2343,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":91,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -301,16 +301,16 @@
   {
    "case_id": "P023#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "이것도 직전 질문과 너무 비슷한 느낌이야. 그런데 답변 의도는 좋아. 학생에게 질문해서 자가성찰을 할수있거든. 근데 여전히 듣기,따라말하기가 너무 부자연스러워. 내가 바꿔보자면 어제는 비가 와서 우산을 썼는데 내일은 날씨가 좋아서 우산을 쓸 필요가 없어요. 이렇게 해야 맥락이 훨씬 자연스럽지",
    "sentence": "어제는 비가 와서 우산을 썼고 내일은 날씨가 좋으면 산책할 거예요",
    "question": "이번 주말에 날씨가 좋으면 무엇을 할 거예요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUCfQycxUi9Y3g1D4HG\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"어제는 비가 와서 우산을 썼고 내일은 날씨가 좋으면 산책할 거예요\\\",\\\"question\\\":\\\"이번 주말에 날씨가 좋으면 무엇을 할 거예요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2343,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":81,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -320,16 +320,16 @@
   {
    "case_id": "P024#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "이것도 의도는 좋아.하지만 어휘가 부자연스러워. 내가 바꿔줄게 . 밥을 먹고 나서 숙제를 하려고 했는데 너무 졸려서 잠들었어요. 이렇게 해야 정당성이 있지. 그리고 답하기는 나쁘지않아 자연스러운편이야.",
    "sentence": "밥을 먹고 나서 숙제를 하려고 했는데 너무 졸려서 먼저 잠깐 잤어요",
    "question": "보통 저녁을 먹고 나서 자기 전에 무엇을 해요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUCrcfx62SukUG2PMk6\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"밥을 먹고 나서 숙제를 하려고 했는데 너무 졸려서 먼저 잠깐 잤어요\\\",\\\"question\\\":\\\"보통 저녁을 먹고 나서 자기 전에 무엇을 해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2384,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":88,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -339,16 +339,16 @@
   {
    "case_id": "P024#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "듣기 따라말하기가 부자연스러워. 내가 바꿔줄게. 배가 고파서 밥을 먹었어요. 그리고나서 바로 숙제를 마쳤어요. 그래서 마음이 편해요. 이렇게 해야지. 지금은 어휘가 너무 부자연스러워.",
    "sentence": "배가 고파서 밥을 먹고 나서 숙제를 했으니까 지금은 좀 쉴 수 있어요",
    "question": "오늘 뭘 하고 나서 마음이 편해졌어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUD5ovQp5NL4aNZGLZ4\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"배가 고파서 밥을 먹고 나서 숙제를 했으니까 지금은 좀 쉴 수 있어요\\\",\\\"question\\\":\\\"오늘 뭘 하고 나서 마음이 편해졌어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2384,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":83,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -358,16 +358,16 @@
   {
    "case_id": "P025#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "지금껏 본 숙제중 가장 훌륭해. 어색한곳이 하나도 없어. 너무 훌륭해",
    "sentence": "오늘은 날씨가 좋아서 저녁에 공원에서 산책할 거예요",
    "question": "이번 주말에는 시간이 있으면 무엇을 하고 싶어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUDHRAt1i1bPBXr3tss\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"오늘은 날씨가 좋아서 저녁에 공원에서 산책할 거예요\\\",\\\"question\\\":\\\"이번 주말에는 시간이 있으면 무엇을 하고 싶어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2271,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":75,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -386,7 +386,7 @@
     "goal_use": null,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "아예 말이 안돼. 오늘은 날씨가 추운데 왜 내일 두꺼운 옷을 입어? 오늘 입어야지 ㅋㅋ 오늘 추운데 왜 내일 두꺼운 옷을 입냐구. , 그리고 답하기도 아예 듣기 따라말하기랑 매칭이 전혀 안돼",
    "sentence": "오늘은 날씨가 추워서 내일은 두꺼운 옷을 입을 거예요",
    "question": "이번 주말에는 뭘 할 계획이에요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUDUYu7vVTGXpriCqpW\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"오늘은 날씨가 추워서 내일은 두꺼운 옷을 입을 거예요\\\",\\\"question\\\":\\\"이번 주말에는 뭘 할 계획이에요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2271,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":68,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -396,16 +396,16 @@
   {
    "case_id": "P041#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "의도는 좋은데 듣기,따라말하기 질문이 너무 부자연스러워. 내가 교정해줄게. 이 노래는 후렴구마다 가사가 너무 좋아요, 처음부터 끝까지랑 후렴구는 말이 아예 안되잖아. 이해돼 ? 그 숙제의 장점은 답하기는 참 훌륭한것같아.",
    "sentence": "이 노래는 처음부터 끝까지 후렴구마다 가사가 너무 좋아요",
    "question": "자주 듣는 노래가 있으면 어느 부분부터 어느 부분까지가 제일 좋아요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUDimuyCXkxcSsfy6xg\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"이 노래는 처음부터 끝까지 후렴구마다 가사가 너무 좋아요\\\",\\\"question\\\":\\\"자주 듣는 노래가 있으면 어느 부분부터 어느 부분까지가 제일 좋아요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2203,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":88,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -415,7 +415,7 @@
   {
    "case_id": "P041#2",
    "axis_scores": {
-    "connect": 0,
+    "connect": 1,
     "answerable": 0,
     "level_fit": 0,
     "fresh": 0,
@@ -424,7 +424,7 @@
     "goal_use": 0,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "전 질문이랑 완전 비슷해. 그리고 듣기 따라말하기는 너무 부자연스러워. 답하기는 여전히 훌륭한 답하기 질문이야. 근데 어휘가 좀 어색해 내가 교정해줄게 노래를 들었을때 노래 시작 부분이랑 마지막 부분에서 느낌이 다르게 다가온 적 있어요? 이게 그나마 자연스러운것같아. 하지만 아직도 여전히 부자연스러운게 있네",
    "sentence": "이 노래는 처음부터 끝까지 가사가 마음마다 다르게 다가와요",
    "question": "어떤 노래는 들을 때마다 느낌이 다르게 다가온 적 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUDvxPgKUxVPt9KB3jH\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"이 노래는 처음부터 끝까지 가사가 마음마다 다르게 다가와요\\\",\\\"question\\\":\\\"어떤 노래는 들을 때마다 느낌이 다르게 다가온 적 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2203,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":81,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -434,16 +434,16 @@
   {
    "case_id": "P042#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "이것도 지금까지 본 숙제중에 가장 완벽해. 너무 좋아. 훌륭해 , 하지만 하나만 발전시켜보자면 답하기부분에서 피곤해도 꼭 만나러 가고 싶은 사람이 있어요? 이게 더 듣기,따라말하기랑 맥락이 유지되면서 이해가 쉬울것같아.",
    "sentence": "오늘은 피곤하지만 친구를 만나러 도서관에 갈 거예요",
    "question": "몸이 힘들어도 꼭 만나러 가고 싶은 사람이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUEBCtqEKysnRt5MEm6\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"오늘은 피곤하지만 친구를 만나러 도서관에 갈 거예요\\\", \\\"question\\\": \\\"몸이 힘들어도 꼭 만나러 가고 싶은 사람이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2264,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":79,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -453,16 +453,16 @@
   {
    "case_id": "P042#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "듣기 따라말하기는 어휘가 자연스러워 좋아. 근데 답변이 조금 부족해. 이번 주말에 바빠도 꼭 하고싶은 일이 있어요? 이렇게 해야지.",
    "sentence": "숙제가 많지만 친구를 만나러 잠깐 나갈 거예요",
    "question": "이번 주말에 바빠도 꼭 하러 나가고 싶은 일이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUEMqcCy6HdigkrP6MT\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"숙제가 많지만 친구를 만나러 잠깐 나갈 거예요\\\", \\\"question\\\": \\\"이번 주말에 바빠도 꼭 하러 나가고 싶은 일이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2264,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":78,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -472,16 +472,16 @@
   {
    "case_id": "P043#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "좋아 훌륭해. 완전 이해가 가. 성향 파악도 잘 될것같은 질문과 답변이야.",
    "sentence": "지금 밖에 비가 오고 있으니까 우산이 있으면 같이 쓰고 가요",
    "question": "비가 갑자기 오면 보통 어떻게 해요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUEYYnAMuKxhJJHx7Qp\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"지금 밖에 비가 오고 있으니까 우산이 있으면 같이 쓰고 가요\\\", \\\"question\\\": \\\"비가 갑자기 오면 보통 어떻게 해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2193,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":73,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -491,16 +491,16 @@
   {
    "case_id": "P043#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "듣기 따라말하기는 좋아. 그런데 답하기에서 아예 이해가 안가는데? 집에에서 가족이 뭔가 하고 있을 때. 여기까지는 이해가 가는데 이어서 조용히 해야 하면 어떻게 해요? 이게 말이 안맞아. 이해가 안가잖아. 말이 안되는 말이야",
    "sentence": "동생이 지금 방에서 숙제를 하고 있으니까 조용히 하면 좋겠어요",
    "question": "집에서 가족이 뭔가 하고 있을 때 조용히 해야 하면 어떻게 해요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUEtDxyZPxeZrkp8Q6P\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"동생이 지금 방에서 숙제를 하고 있으니까 조용히 하면 좋겠어요\\\",\\\"question\\\":\\\"집에서 가족이 뭔가 하고 있을 때 조용히 해야 하면 어떻게 해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2193,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":90,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -511,15 +511,15 @@
    "case_id": "P044#1",
    "axis_scores": {
     "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "듣기랑 답하기랑 연결성은 없는데 별 문제 없이 잘 이해 돼. 이런 숙제도 훌륭해 마음에 들어. 연결성이 왜 없냐고 했냐면 듣기,따라말하기는 주말이라고 하는데 답하기에서는 학교 끝나고잖아. 주말에는 학교를 안하잖아 ㅋㅋ 그래도 이 숙제 자체의 퀄리티는 좋아. 의도도 좋고",
    "sentence": "저는 주말에 도서관에서 소설책을 빌려서 읽어요.",
    "question": "학교 끝나고 집에서 주로 무엇을 해요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUF7LkSLUt89cQAgjyG\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 주말에 도서관에서 소설책을 빌려서 읽어요.\\\", \\\"question\\\": \\\"학교 끝나고 집에서 주로 무엇을 해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2231,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":66,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -529,16 +529,16 @@
   {
    "case_id": "P044#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "훌륭해. 전체적으로 훌륭해. 굿이다",
    "sentence": "저는 주말에 도서관에서 책을 두 시간 동안 읽었어요",
    "question": "주말에 집이나 카페에서 시간을 보낼 때 보통 무엇을 해요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUFHtFkhMcb28p2spYh\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 주말에 도서관에서 책을 두 시간 동안 읽었어요\\\", \\\"question\\\": \\\"주말에 집이나 카페에서 시간을 보낼 때 보통 무엇을 해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2231,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":78,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -549,15 +549,15 @@
    "case_id": "P045#1",
    "axis_scores": {
     "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "연결성은 있다고 해야할까 없다고 해야할까 어쨋든 자연스럽진 못하는데 엄청 부자연스럽지는 않아. 그래도 전체적으로 괜찮은 숙제인데 아쉬운건 28번이랑 맥락이 비슷해 ㅋㅋ",
    "sentence": "저는 주말에 언니하고 시장에 가서 어머니께 드릴 과일을 샀어요",
    "question": "가족 중에서 누구한테 선물을 자주 사 드려요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUFUQ2Ta2igyZx7FUSv\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 주말에 언니하고 시장에 가서 어머니께 드릴 과일을 샀어요\\\", \\\"question\\\": \\\"가족 중에서 누구한테 선물을 자주 사 드려요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2199,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":76,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -567,16 +567,16 @@
   {
    "case_id": "P045#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "이 숙제 훌륭한데 듣기 답하기 전부 자연스럽고 훌륭해, 근데 28,29랑 너무 내용이 곂치는데? 이런 시스템적인부분이 아쉽지 숙제 자체는 훌륭한 구성이야. 마음에 들어",
    "sentence": "주말에 친구하고 놀이공원에 가서 엄마한테 줄 선물을 샀어요",
    "question": "가족 중에서 누구한테 선물을 주고 싶어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUFf5xhrWpj3GJWdeqX\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"주말에 친구하고 놀이공원에 가서 엄마한테 줄 선물을 샀어요\\\", \\\"question\\\": \\\"가족 중에서 누구한테 선물을 주고 싶어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2199,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":75,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -587,15 +587,15 @@
    "case_id": "P061#1",
    "axis_scores": {
     "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "연결성이 없다고해야하는건지 어휘가 부자연스러워서 그렇게 느껴지는것같은데 내가 교정해볼게. 듣기 부분은 이번 노래 가사는 한글로 써 있어서 저는 아직 후렴만 겨우 따라 부를 수 있어요. 이게 훨씬 자연스러워. 그리고 답하기는 아예 부자연스러워. 말이 안돼. 요즘 배우고있는 것 중에서 재미있는게 뭐에요? 라던지 요즘 배우고있는것중에서 더욱 집중해서 하고싶은게 있어요? 이렇게 질문을해야지. 지금 너의 답하기 질문은 아예 말이 안돼. 요즘 배우는것은 당연히 조금밖에 못하는데 뭘 물어봐 이걸 ;; 무슨 말인지 이해하지?",
    "sentence": "이번 노래 가사는 한글로 써 있는데 저는 후렴만 겨우 따라 부를 수 있어요",
    "question": "요즘 배우고 있는 것 중에서 아직 조금밖에 못 하는 게 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUFvURej9DvB2e3gyyq\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"이번 노래 가사는 한글로 써 있는데 저는 후렴만 겨우 따라 부를 수 있어요\\\", \\\"question\\\": \\\"요즘 배우고 있는 것 중에서 아직 조금밖에 못 하는 게 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2250,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":95,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -605,16 +605,16 @@
   {
    "case_id": "P061#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "이 숙제도 전체적으로 괜찮아. 그런데 듣기 부분이 많이 부자연스러워. 지금 듣기 부분을 내가 교정해주자면 아는 단어가 많지않아서 가사를 이해하기 어려워요. 그래서 저는 보통 번역기로 가사 뜻을 찾아봐요.",
    "sentence": "가사가 너무 어려워서 아는 단어밖에 안 들리니까 이제 번역기로 뜻을 찾아봐요",
    "question": "공부하다가 모르는 게 나오면 보통 무엇으로 찾아봐요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUGA3zdqJiTeqL2hKby\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"가사가 너무 어려워서 아는 단어밖에 안 들리니까 이제 번역기로 뜻을 찾아봐요\\\",\\\"question\\\":\\\"공부하다가 모르는 게 나오면 보통 무엇으로 찾아봐요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2250,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":93,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -624,16 +624,16 @@
   {
    "case_id": "P062#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "듣기에서 할머니는 어른이잖아. 근데 나가지 마세요가 뭐야. 이렇게 해야 훨씬 자연스러워 밤이 늦어서 할머니께서 오늘은 나가지 말라고 말씀하셨어요. 이렇게 해야 훨씬 자연스러워.",
    "sentence": "할머니께서 밤이 늦었으니까 오늘은 나가지 마세요 라고 말씀하셨어요",
    "question": "부모님이나 어른이 하지 말라고 하신 일이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUGPNS6LxyJcsE8M4YN\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"할머니께서 밤이 늦었으니까 오늘은 나가지 마세요 라고 말씀하셨어요\\\",\\\"question\\\":\\\"부모님이나 어른이 하지 말라고 하신 일이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2336,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":82,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -652,7 +652,7 @@
     "goal_use": 0,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "아예 이해가 안가. 완전 별로야. 어떻게 뭘하라는건지 답변도 이해가 안가",
    "sentence": "할머니께서 아직 진지를 안 드셔서 밥을 먼저 먹지 마세요",
    "question": "가족을 기다렸다가 같이 하는 일이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUGbLGX8CHuB76VwPGM\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"할머니께서 아직 진지를 안 드셔서 밥을 먼저 먹지 마세요\\\", \\\"question\\\": \\\"가족을 기다렸다가 같이 하는 일이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2336,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":74,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -662,16 +662,16 @@
   {
    "case_id": "P063#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "질문의 의도는 훌륭해. 그런데 듣기 부분이 너무 부자연스러워. 내가 교정해보자면 밥을 먹고 나서 설거지를 했더니 시간이 늦어서 숙제를 못 했어요. 이렇게 해야 훨씬 자연스럽지. 그리고 답하기 부분도 약간 어색해. 내가 뜻을 파악해서 교정해보자면 저녁에 식사를 하고 시간이 늦어서 해야 할 다른 일을 못 한 적이 있어요? 이렇게 해야 훨씬 자연스럽지",
    "sentence": "밥을 먹고 나서 설거지를 하니까 시간이 벌써 늦어서 숙제를 못 했어요",
    "question": "저녁에 뭘 하고 나서 시간이 부족해서 다른 일을 못 한 적 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUGqXYYHsHTdwrRSnNe\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"밥을 먹고 나서 설거지를 하니까 시간이 벌써 늦어서 숙제를 못 했어요\\\",\\\"question\\\":\\\"저녁에 뭘 하고 나서 시간이 부족해서 다른 일을 못 한 적 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2368,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":97,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -682,15 +682,15 @@
    "case_id": "P063#2",
    "axis_scores": {
     "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "연결성은 없는데 상관없어 답변할때 자연스럽게 할수있어. 다만 듣기 어휘가 너무 부자연스러워. 내가 교정해보자면 밖에 비가 와서 우산을 챙기고 집을 나갔어요.  이렇게 해야지, 그런데 답하기 부분은 학생이 자가성찰할수있는맥락이라 너무 좋아. 굿굿",
    "sentence": "밖에 비가 와서 우산을 챙기고 나서 집을 나갔어요",
    "question": "학교 가기 전에 꼭 챙기는 물건이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUH8s5k9Rxrpo6HCCQE\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"밖에 비가 와서 우산을 챙기고 나서 집을 나갔어요\\\",\\\"question\\\":\\\"학교 가기 전에 꼭 챙기는 물건이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2368,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":70,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -701,15 +701,15 @@
    "case_id": "P064#1",
    "axis_scores": {
     "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "이것도 연결성은 없는데 답하기 자연스러워. 다만 듣기가 또 너무 부자연스럽다. 내가 교정해줄게. 어제는 비가 와서 우산을 썼는데 내일은 날씨가 맑다고 해요. 이렇게 해야지. 답하기 질문은 좋아. 굿굿",
    "sentence": "어제는 비가 와서 우산을 썼는데 내일은 날씨가 맑을 거예요",
    "question": "이번 주말에 날씨가 좋으면 뭘 할 거예요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUHJmPhPs7yNyPJR7C8\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"어제는 비가 와서 우산을 썼는데 내일은 날씨가 맑을 거예요\\\",\\\"question\\\":\\\"이번 주말에 날씨가 좋으면 뭘 할 거예요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2392,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":76,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -719,16 +719,16 @@
   {
    "case_id": "P064#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "전체적으로 훌륭한 숙제야 너무 마음에 들어. 다만 조금 아쉬운 부분이 있다면 듣기 부분에서 어제는 늦게 일어나서 아침을 못 먹었는데 내일은 일찍 일어나서 아침을 꼭 먹을 거에요. 라고 하면 이해가 쉬울것같기도해 ! 하지만 전체적으로 마음에 들어 이해도가고 학생에게 도움도 되고 굿굿",
    "sentence": "어제는 늦게 일어나서 아침을 못 먹었는데 내일은 일찍 일어나서 꼭 먹을 거예요",
    "question": "요즘 못 지킨 습관 중에 내일부터 다시 시작하고 싶은 게 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUHW24jSwkSLbkvfnKK\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제는 늦게 일어나서 아침을 못 먹었는데 내일은 일찍 일어나서 꼭 먹을 거예요\\\", \\\"question\\\": \\\"요즘 못 지킨 습관 중에 내일부터 다시 시작하고 싶은 게 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2392,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":103,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -738,16 +738,16 @@
   {
    "case_id": "P065#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "너무너무 훌륭해. 베스트 숙제 중 하나야 . 굿굿",
    "sentence": "주말에 날씨가 좋으면 등산을 가고 싶지만 요즘 너무 바빠서 못 가요",
    "question": "요즘 바빠서 하고 싶어도 못 하는 일이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUHi8aWXQPr9JpDjK3q\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"주말에 날씨가 좋으면 등산을 가고 싶지만 요즘 너무 바빠서 못 가요\\\",\\\"question\\\":\\\"요즘 바빠서 하고 싶어도 못 하는 일이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2264,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":85,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -757,16 +757,16 @@
   {
    "case_id": "P065#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "이 숙제도 전체적으로 훌륭해 이해가 쉽고 직관적이야. 가장 마음에 드는건 답하기 부분에서 학생이 자가성찰을 할 수 있다는 부분 ! 굿굿",
    "sentence": "숙제가 많지만 주말이면 친구랑 꼭 놀러 나가요",
    "question": "할 일이 많아도 꼭 시간 내서 하는 일이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUHuyU5qX1ygdWVKmk3\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"숙제가 많지만 주말이면 친구랑 꼭 놀러 나가요\\\", \\\"question\\\": \\\"할 일이 많아도 꼭 시간 내서 하는 일이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2264,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":74,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -776,16 +776,16 @@
   {
    "case_id": "P081#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "훌륭해. 완전 이해가 쉽고 답하기도 쉽고 재미있어.",
    "sentence": "어제 친구가 노래방에서 케이팝 노래를 불렀고 저는 옆에서 듣고 있었어요",
    "question": "최근에 친구가 무언가를 하고 있을 때 옆에서 지켜본 적이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUJBvAYhhcNg3w9vbRg\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"어제 친구가 노래방에서 케이팝 노래를 불렀고 저는 옆에서 듣고 있었어요\\\",\\\"question\\\":\\\"최근에 친구가 무언가를 하고 있을 때 옆에서 지켜본 적이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2196,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":95,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -795,16 +795,16 @@
   {
    "case_id": "P081#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "너무너무 좋아. 직관적이고 쉽고 자가성찰도되고 너무 마음에 드는데?",
    "sentence": "어제 밤에 늦게까지 노래를 듣다가 가사를 못 알아들어서 계속 찾아보고 있었어요",
    "question": "요즘 궁금해서 계속 찾아보고 있는 게 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUJY67S8jBwQNkxSWxb\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"어제 밤에 늦게까지 노래를 듣다가 가사를 못 알아들어서 계속 찾아보고 있었어요\\\",\\\"question\\\":\\\"요즘 궁금해서 계속 찾아보고 있는 게 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2196,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":89,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -814,16 +814,16 @@
   {
    "case_id": "P082#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "너무 마음에 들어. 쉽고 의미있고 너무 훌륭해 굿",
    "sentence": "동생한테 용돈을 줬는데 동생은 고맙다는 말밖에 안 했어요",
    "question": "가족한테 뭔가 해 줬는데 반응이 아쉬웠던 적 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUJkpaWtfyTCTsNasBn\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"동생한테 용돈을 줬는데 동생은 고맙다는 말밖에 안 했어요\\\", \\\"question\\\": \\\"가족한테 뭔가 해 줬는데 반응이 아쉬웠던 적 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2235,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":85,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -833,16 +833,16 @@
   {
    "case_id": "P082#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "너무 좋은데 바로 윗 답변이랑 똑같은 숙제다.",
    "sentence": "동생한테 용돈을 줬는데 동생은 고맙다는 말밖에 안 했어요",
    "question": "가족이나 친구한테 뭔가 해 줬는데 반응이 아쉬웠던 적 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUJyXZTCCQ59nMpSUmf\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"동생한테 용돈을 줬는데 동생은 고맙다는 말밖에 안 했어요\\\", \\\"question\\\": \\\"가족이나 친구한테 뭔가 해 줬는데 반응이 아쉬웠던 적 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2235,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":90,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -852,16 +852,16 @@
   {
    "case_id": "P083#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "답하기가 너무 부자연스러워. 아니 부자연스럽다기보다 말이 안되는 느낌이야. 내가 교정해보자면 요즘 편의점에 간 적이 있어요? 편의점에서 어떤걸 구매하셨어요?",
    "sentence": "배가 고파서 편의점에 라면을 사러 갔어요",
    "question": "요즘 뭐가 먹고 싶어서 밖에 나가고 싶어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUKE2hLyU7WQJwdge98\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"배가 고파서 편의점에 라면을 사러 갔어요\\\", \\\"question\\\": \\\"요즘 뭐가 먹고 싶어서 밖에 나가고 싶어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2212,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":69,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -872,15 +872,15 @@
    "case_id": "P083#2",
    "axis_scores": {
     "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "일단 연걸성은 없어. 듣기부분은 이해가 가는데 답하기 부분이 아예 연결이 안돼. 이해가 안가. 별로야",
    "sentence": "배가 고파서 편의점에 라면을 사러 갔어요",
    "question": "요즘 뭐가 사고 싶어서 돈을 모으고 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUKWbqs252Lj2hg5F6C\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"배가 고파서 편의점에 라면을 사러 갔어요\\\", \\\"question\\\": \\\"요즘 뭐가 사고 싶어서 돈을 모으고 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2212,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":67,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -890,16 +890,16 @@
   {
    "case_id": "P084#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
     "fresh": 0,
-    "fun": 0,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "전체적으로 부자연스러워. 내가 교정해주자면 듣기부분은 오늘 아침부터 저녁까지 청소를 했어요. 덕분에 방은 깨끗해졌지만 다리가 너무 아파요. 답하기 부분은 자연스러워 굿굿",
    "sentence": "저는 아침부터 저녁까지 청소를 했는데 방은 깨끗해졌지만 다리가 너무 아파요",
    "question": "시간 가는 줄 모르고 아침부터 저녁까지 몰두했던 일이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUKi3g2voAMZJoB1Dtg\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 아침부터 저녁까지 청소를 했는데 방은 깨끗해졌지만 다리가 너무 아파요\\\", \\\"question\\\": \\\"시간 가는 줄 모르고 아침부터 저녁까지 몰두했던 일이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2241,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":97,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -909,16 +909,16 @@
   {
    "case_id": "P084#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "듣기는 자연스러워 그런데 답하기가 완전 부자연스러워. 내가 교정해줄게. 요즘 꾸준히 하고있는 일이 있어요? 이렇게 해야 훨씬 자연스럽지. 언제부터 언제까지가 말이 안되잖아.",
    "sentence": "월요일부터 금요일까지 저는 매일 아침마다 운동을 하는데 오늘은 비가 와서 못 갔어요",
    "question": "요즘 언제부터 언제까지 꾸준히 하고 있는 일이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUKxdm2V9MBacRNBwoN\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"월요일부터 금요일까지 저는 매일 아침마다 운동을 하는데 오늘은 비가 와서 못 갔어요\\\", \\\"question\\\": \\\"요즘 언제부터 언제까지 꾸준히 하고 있는 일이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2241,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":96,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -937,7 +937,7 @@
     "goal_use": null,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "아예 말이 안돼. 별로야",
    "sentence": "할머니께서 진지를 다 드시고 나서 저에게 용돈을 주셨어요",
    "question": "가족이 밥을 먹고 나서 같이 한 일이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUL9SQ2faUVSEYUzAfC\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"할머니께서 진지를 다 드시고 나서 저에게 용돈을 주셨어요\\\", \\\"question\\\": \\\"가족이 밥을 먹고 나서 같이 한 일이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2196,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":75,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -956,7 +956,7 @@
     "goal_use": null,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "이건 뭐 의견이 아니라 당연한걸 묻는거고 숙제의 의도를 모르겠어. 완전 별로야",
    "sentence": "할머니께서 진지를 다 드시고 나서 방에 들어가 쉬셨어요",
    "question": "가족 중에 누가 밥을 다 먹고 나서 꼭 쉬시나요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKULKuSBqZ7d7g1oFKK1\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"할머니께서 진지를 다 드시고 나서 방에 들어가 쉬셨어요\\\", \\\"question\\\": \\\"가족 중에 누가 밥을 다 먹고 나서 꼭 쉬시나요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2196,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":81,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -966,16 +966,16 @@
   {
    "case_id": "P101#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "의도는 상당히 괜찮아. 그런데 답하기가 너무 부자연스러워. 내가 교정해줄게. 이번 주말에는 뭘 할 예정이에요?",
    "sentence": "주말에는 숙제하고 청소를 해야 해서 친구를 만나지 못해요",
    "question": "이번 주말에는 뭐 하고 뭐 때문에 시간이 안 나요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKULgQyPSEtm4JpzQmmd\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"주말에는 숙제하고 청소를 해야 해서 친구를 만나지 못해요\\\",\\\"question\\\":\\\"이번 주말에는 뭐 하고 뭐 때문에 시간이 안 나요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2308,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":78,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -985,16 +985,16 @@
   {
    "case_id": "P101#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "듣기부분은 괜찮은데 조금 수정해보자면 오늘은 입맛이 없어서 평소보다 밥을 잘 못먹었어요. 이렇게 하는게 ㅜ헐씬 자연스럽고 답하기 부분도 부자연스러워. 내가 교정해보자면 가장 좋아하는 음식이 뭔가요? 혹시 입맛이 없을때도 가장 좋아하는 음식도 별로 먹기 싫어져요?",
    "sentence": "오늘은 밥맛이 없어서 밥하고 국을 다 먹지 못했어요",
    "question": "입맛이 없을 때는 보통 무엇하고 무엇을 못 먹어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKULx3aEkCHy9KBGThPa\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"오늘은 밥맛이 없어서 밥하고 국을 다 먹지 못했어요\\\",\\\"question\\\":\\\"입맛이 없을 때는 보통 무엇하고 무엇을 못 먹어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2308,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":79,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1004,16 +1004,16 @@
   {
    "case_id": "P102#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "자가성찰도되고 어휘도 자연스럽게 이해 돼.",
    "sentence": "주말에는 버스로 시내에 가서 친구를 만나기로 했어요",
    "question": "이번 주말에 어디로 가서 누구를 만나고 싶어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUM9YsQCjPGwirCXdJW\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"주말에는 버스로 시내에 가서 친구를 만나기로 했어요\\\", \\\"question\\\": \\\"이번 주말에 어디로 가서 누구를 만나고 싶어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2312,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":70,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1023,16 +1023,16 @@
   {
    "case_id": "P102#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "굿 낫베드 !",
    "sentence": "주말에는 버스로 시내에 가서 친구를 만날 거예요",
    "question": "보통 어디에 갈 때 무엇을 타고 가요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUMKkHrLdXAgv2twgMR\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"주말에는 버스로 시내에 가서 친구를 만날 거예요\\\",\\\"question\\\":\\\"보통 어디에 갈 때 무엇을 타고 가요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2312,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":63,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1042,16 +1042,16 @@
   {
    "case_id": "P103#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "지금까지 본 숙제중 베스트 중 하나야. 훌륭해. 자가성찰도되고 어휘도 자연스러워",
    "sentence": "주말에 시간이 있으면 청소를 하고 싶지만 자꾸 미루게 돼요",
    "question": "방학이 되면 꼭 해 보고 싶지만 자꾸 미루는 일이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUMXUjVgQqzRoYZwnUR\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"주말에 시간이 있으면 청소를 하고 싶지만 자꾸 미루게 돼요\\\",\\\"question\\\":\\\"방학이 되면 꼭 해 보고 싶지만 자꾸 미루는 일이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2321,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":87,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1061,16 +1061,16 @@
   {
    "case_id": "P103#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "이것도 정말 훌륭해. 지금까지 본 숙제중 베스트 중 하나야. 자가성찰도 되고 어휘도 자연스럽네 굿",
    "sentence": "주말에 날씨가 좋으면 등산을 가고 싶지만 요즘 너무 바빠서 못 가요",
    "question": "요즘 바빠서 하고 싶어도 못 하는 일이 있으면 뭐예요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUMpKzwBBgu7CXkSCQh\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"주말에 날씨가 좋으면 등산을 가고 싶지만 요즘 너무 바빠서 못 가요\\\",\\\"question\\\":\\\"요즘 바빠서 하고 싶어도 못 하는 일이 있으면 뭐예요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2321,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":91,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1080,16 +1080,16 @@
   {
    "case_id": "P104#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "이번 숙제도 훌륭한데 답하기 어휘가 약간 부자연스럽네. 내가 교정해줄게 다음 방학때 시간이 많다면 무엇을 하고 싶어요? 이렇게 해야지",
    "sentence": "이번 주말은 날씨가 좋으면 친구와 공원에 갈 거예요",
    "question": "다음 방학은 시간이 많으면 무엇을 하고 싶어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUN2KKkT9dUKQyTXudW\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"이번 주말은 날씨가 좋으면 친구와 공원에 갈 거예요\\\", \\\"question\\\": \\\"다음 방학은 시간이 많으면 무엇을 하고 싶어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2371,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":74,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1099,16 +1099,16 @@
   {
    "case_id": "P104#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "음 듣기 부분은 자연스러운데 답하기가 아예 말이 안돼. 내일 날씨가 좋은데 왜 뭘 챙기는건지 이해가 안가. 내가 교정해보자면 내일 날씨가 좋다면 어떤걸 할 예정이에요? 이렇게 하는게 연결성은 부족하지만 자연스럽고 좋아.",
    "sentence": "오늘은 하늘이 흐려서 우산을 챙길 거예요",
    "question": "내일 날씨가 좋으면 뭘 챙겨서 나갈 거예요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUNDfhHB1Qsp9Tq1Ujt\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"오늘은 하늘이 흐려서 우산을 챙길 거예요\\\", \\\"question\\\": \\\"내일 날씨가 좋으면 뭘 챙겨서 나갈 거예요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2371,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":72,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1118,16 +1118,16 @@
   {
    "case_id": "P105#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "자가성찰도 되고 마음에 드는 숙제야 의미가 있네.",
    "sentence": "학교에서 아침부터 저녁까지 시험을 봐서 정말 힘들었어요.",
    "question": "요즘 아침부터 저녁까지 계속 매달리는 일이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUNQEwSUsowgP2AgHtv\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"학교에서 아침부터 저녁까지 시험을 봐서 정말 힘들었어요.\\\", \\\"question\\\": \\\"요즘 아침부터 저녁까지 계속 매달리는 일이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2271,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":79,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1156,16 +1156,16 @@
   {
    "case_id": "P121#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "좋은데 어휘가 전체적으로 부자연스러워. 내가 교정해줄게. 듣기 부분은 가사만 봐서는 뜻을 이해하기 어려워서 인터넷으로 검색하는 편이에요. 답변은 훌륭해",
    "sentence": "가사만 봐서는 뜻을 몰라서 인터넷으로 검색해 볼 수밖에 없었어요",
    "question": "요즘 궁금한 게 생기면 뭐로 찾아봐요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUNqzk9uJD9WBxhZs8f\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"가사만 봐서는 뜻을 몰라서 인터넷으로 검색해 볼 수밖에 없었어요\\\", \\\"question\\\": \\\"요즘 궁금한 게 생기면 뭐로 찾아봐요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2218,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":84,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1175,16 +1175,16 @@
   {
    "case_id": "P121#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
     "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "괜찮은데 답하기 어휘를 조금 더 직관적으로 해야 이해할것가탕. 내가 교정해보자면 내가 좋아하는 일을 할때 잘 안되서 몇 번씩 다시 시도해본적이 있어요? 이렇게 해야 훨씬 자연스럽지",
    "sentence": "가사만 봐서는 뜻을 몰라서 노래를 계속 반복으로 들었어요",
    "question": "잘 몰라서 몇 번씩 다시 해 본 일이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUPBNozvxKrVNgvMtBQ\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"가사만 봐서는 뜻을 몰라서 노래를 계속 반복으로 들었어요\\\", \\\"question\\\": \\\"잘 몰라서 몇 번씩 다시 해 본 일이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2218,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":79,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1194,16 +1194,16 @@
   {
    "case_id": "P122#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "너무 좋은데 답하기 부분에서 조금 더 구체화된 답변 의도를 했으면 좋겠어. 예를들어.",
    "sentence": "주말에 언니하고 백화점에 가서 어머니께 드릴 선물을 샀어요",
    "question": "가족 중에서 누구한테 선물을 주고 싶어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUPSE2TxwaDusJ73JRL\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"주말에 언니하고 백화점에 가서 어머니께 드릴 선물을 샀어요\\\", \\\"question\\\": \\\"가족 중에서 누구한테 선물을 주고 싶어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2253,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":73,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1213,16 +1213,16 @@
   {
    "case_id": "P122#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "듣기는 너무 자연스러워 좋아. 답변을 조금 더 자연스럽게 바꿀수있을것같아. 가족 중 누구에게 선물을 자주 해주는 편인가요?",
    "sentence": "주말에 언니하고 백화점에 가서 엄마께 드릴 선물을 샀어요",
    "question": "가족 중에서 누구한테 선물을 자주 사 줘요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUPcMEgTKaCxtMVge2y\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"주말에 언니하고 백화점에 가서 엄마께 드릴 선물을 샀어요\\\", \\\"question\\\": \\\"가족 중에서 누구한테 선물을 자주 사 줘요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2253,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":74,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1241,7 +1241,7 @@
     "goal_use": 0,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "완전 이해가 안돼. 이건 그냥 별로야",
    "sentence": "월요일부터 금요일까지 매일 아침마다 학교는 일찍 시작해요",
    "question": "방학이 시작되면 하루는 보통 몇 시부터 시작해요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUPohcFwdgV9zp2vdJG\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"월요일부터 금요일까지 매일 아침마다 학교는 일찍 시작해요\\\", \\\"question\\\": \\\"방학이 시작되면 하루는 보통 몇 시부터 시작해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2194,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":75,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1260,7 +1260,7 @@
     "goal_use": 0,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "답하기가 아예 어휘가 부자연스러워.",
    "sentence": "월요일부터 금요일까지 학교는 아침마다 문을 일찍 열어요",
    "question": "학생은 보통 하루를 언제부터 언제까지 바쁘게 보내요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUQ5aLJFb7qc6HDwHBn\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"월요일부터 금요일까지 학교는 아침마다 문을 일찍 열어요\\\", \\\"question\\\": \\\"학생은 보통 하루를 언제부터 언제까지 바쁘게 보내요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2194,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":77,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1270,16 +1270,16 @@
   {
    "case_id": "P124#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "완전 자연스러워. 답변하기 좋고 자기성찰도 가능해",
    "sentence": "저는 주말에 도서관에서 한국어 책을 빌려요.",
    "question": "학생은 보통 주말에 어디에서 무엇을 해요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUQGySRYadsDhFMKo1X\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 주말에 도서관에서 한국어 책을 빌려요.\\\", \\\"question\\\": \\\"학생은 보통 주말에 어디에서 무엇을 해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2207,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":64,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1289,16 +1289,16 @@
   {
    "case_id": "P124#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "답하기가 너무 부자연스러워. 교정해보자면 주말에 어디를 자주가시나요? 그리고 그 곳에서 보통 무엇을 해요? 이렇게 해야 훨씬 자연스럽지",
    "sentence": "저는 주말에 도서관에서 한국어 책을 빌렸어요.",
    "question": "주말에 자주 가는 곳에서 무엇을 해요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUQSSCsPNnNk5GvjpPJ\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 주말에 도서관에서 한국어 책을 빌렸어요.\\\", \\\"question\\\": \\\"주말에 자주 가는 곳에서 무엇을 해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2207,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":65,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1309,15 +1309,15 @@
    "case_id": "P125#1",
    "axis_scores": {
     "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "답하기는 훌륭해 근데 듣기 부분이 너무 부자연스러워. 내가 교정해줄게. 어제 할머니와 같이 식사를 했어요. 그런데 갑자기 저에게 용돈을 주시면서 공부 열심히 하라고 하셨어요 ! 이게 훨씬 자연스러워",
    "sentence": "할머니께서 진지 다 드시고 나서 저한테 용돈을 주셨어요",
    "question": "가족 어른께 무언가 하고 나서 칭찬이나 선물을 받아 본 적 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUQbUBTuueBX11ntVKx\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"할머니께서 진지 다 드시고 나서 저한테 용돈을 주셨어요\\\", \\\"question\\\": \\\"가족 어른께 무언가 하고 나서 칭찬이나 선물을 받아 본 적 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2199,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":86,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1336,7 +1336,7 @@
     "goal_use": null,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "아예 별로여 듣기 답하기 전부 이해가 안가 특히 답하기는 아예 이해가 안가",
    "sentence": "할머니께서 저녁을 다 드시고 나서 텔레비전을 보러 방에 들어가셨어요",
    "question": "가족 중에서 밥을 다 먹고 나서 보통 무엇을 하시는 분이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUQoNHngXatmz315JG2\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"할머니께서 저녁을 다 드시고 나서 텔레비전을 보러 방에 들어가셨어요\\\", \\\"question\\\": \\\"가족 중에서 밥을 다 먹고 나서 보통 무엇을 하시는 분이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2199,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":94,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1347,15 +1347,15 @@
    "case_id": "P141#1",
    "axis_scores": {
     "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "전체적으로 괜찮은데 내가 교정해줄게. 듣기 부분은 어제 노래방에 친구랑 놀러가서 케이팝 노래를 불렀어요. 같이갔던 친구가 노래가 마음에 들었나봐요. 오늘 그 노래를 듣고 있더라구요. 답하기도 부자연스러워 내가 교정해줄게. 요즘 자꾸 생각나는 일이 있어요? 이렇게 해야 훨씬 자연스럽지 지금은 완전 부자연스러워",
    "sentence": "어제 노래방에서 케이팝 노래를 불렀는데 친구는 아직도 그 노래를 듣고 있어요",
    "question": "요즘 자꾸 생각나서 계속 하고 있는 일이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUR8dR5hgddPcR9vF11\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 노래방에서 케이팝 노래를 불렀는데 친구는 아직도 그 노래를 듣고 있어요\\\", \\\"question\\\": \\\"요즘 자꾸 생각나서 계속 하고 있는 일이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2266,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":90,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1365,16 +1365,16 @@
   {
    "case_id": "P141#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "답하기 부분이 부자연스러워. 내가 교정해보자면 친구랑 같이 놀 때 친구랑 뭘 하면서 노는 편이에요? 이렇게 해야 훨씬 자연스럽지",
    "sentence": "어제 노래방에서 케이팝 노래를 불렀는데 친구는 옆에서 계속 춤을 추고 있었어요",
    "question": "친구랑 같이 놀 때 친구가 뭘 하고 있었는지 기억나요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKURMBURxw7bFBVAG6Qj\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 노래방에서 케이팝 노래를 불렀는데 친구는 옆에서 계속 춤을 추고 있었어요\\\", \\\"question\\\": \\\"친구랑 같이 놀 때 친구가 뭘 하고 있었는지 기억나요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2266,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":96,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1393,7 +1393,7 @@
     "goal_use": 0,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "아까 나온 질문인것같기도한데 듣기랑 답하기가 전체적으로 부자연스럽고 이해가 안가",
    "sentence": "오늘은 피곤하지만 친구 생일을 축하하러 잠깐 나갈 거예요",
    "question": "요즘 몸이 힘들어도 꼭 나가고 싶은 약속이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKURYFUvgTAu1jSkTnez\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"오늘은 피곤하지만 친구 생일을 축하하러 잠깐 나갈 거예요\\\", \\\"question\\\": \\\"요즘 몸이 힘들어도 꼭 나가고 싶은 약속이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2317,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":85,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1403,16 +1403,16 @@
   {
    "case_id": "P142#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "듣기는 자연스럽고 좋아. 근데 답하기가 말이 안돼. 어휘가 완전 부자연스러워. ai같아",
    "sentence": "오늘 숙제가 많지만 친구를 만나러 잠깐 나갈 거예요",
    "question": "할 일이 많아도 꼭 하러 나가는 일이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKURjB4AgXS2nWuDWZtd\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"오늘 숙제가 많지만 친구를 만나러 잠깐 나갈 거예요\\\",\\\"question\\\":\\\"할 일이 많아도 꼭 하러 나가는 일이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2317,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":74,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1422,16 +1422,16 @@
   {
    "case_id": "P143#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "완전 자연스럽고 말이 돼. 좋아.",
    "sentence": "오늘은 날씨가 좋으니까 저녁에 친구랑 산책할 거예요",
    "question": "이번 주말에는 날씨가 좋으면 무엇을 하고 싶어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKURuF2uaDsTxsd4UbFK\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"오늘은 날씨가 좋으니까 저녁에 친구랑 산책할 거예요\\\",\\\"question\\\":\\\"이번 주말에는 날씨가 좋으면 무엇을 하고 싶어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2350,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":78,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1441,16 +1441,16 @@
   {
    "case_id": "P143#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "듣기는 괜찮은데 답하기가 부자연스러워. 내가 교정해보자면 주말에 날씨가 안 좋다고해요. 그럼 보통 주말 약속을 취소하는 편인가요?",
    "sentence": "오늘은 날씨가 흐려서 저녁에 우산을 챙길 거예요",
    "question": "주말에 날씨가 안 좋으면 계획을 어떻게 바꿀 거예요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUSBteYgJ8WDqXNrBaw\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"오늘은 날씨가 흐려서 저녁에 우산을 챙길 거예요\\\",\\\"question\\\":\\\"주말에 날씨가 안 좋으면 계획을 어떻게 바꿀 거예요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2350,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":79,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1469,7 +1469,7 @@
     "goal_use": null,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "아예 질문 이해가 안돼. 완전 별로고 어휘도 부자연스러워",
    "sentence": "오늘은 바빠서 친구하고 저녁을 못 먹었으니까 내일은 늦지 마세요",
    "question": "이번 주에 바빠서 하고 싶은데 못 한 일이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUSMa4qAYwFKjHE6Jmd\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"오늘은 바빠서 친구하고 저녁을 못 먹었으니까 내일은 늦지 마세요\\\",\\\"question\\\":\\\"이번 주에 바빠서 하고 싶은데 못 한 일이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2389,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":84,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1488,7 +1488,7 @@
     "goal_use": null,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "이것도 완전 억지로 ai로 만든 느낌이야. 아예 이해가 안돼",
    "sentence": "저는 아침에 바빠서 밥을 못 먹었고 커피하고 빵만 먹었어요",
    "question": "바빠서 아침에 못 챙기는 것이 또 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUSYrUQPB3eWPQz5XRc\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 아침에 바빠서 밥을 못 먹었고 커피하고 빵만 먹었어요\\\", \\\"question\\\": \\\"바빠서 아침에 못 챙기는 것이 또 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2389,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":77,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1498,16 +1498,16 @@
   {
    "case_id": "P145#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
     "fun": 0,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "답하기는 괜찮아 자연스럽고 좋은데 듣기가 부자연스러워. 내가 교정해줄게. 밥을 급하게 먹었더니 배가 아파요. 아마 체한것같아요. 그래서 약을 먹을 예정이에요. 이렇게 해야 훠씬 자연스럽지",
    "sentence": "밥을 먹고 나서 배가 아파서 약을 먹기 전에 좀 쉬었어요",
    "question": "몸이 안 좋아서 하려던 일을 미룬 적이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUSmJ5R99vcqfgv5QE4\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"밥을 먹고 나서 배가 아파서 약을 먹기 전에 좀 쉬었어요\\\",\\\"question\\\":\\\"몸이 안 좋아서 하려던 일을 미룬 적이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2252,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":80,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1517,16 +1517,16 @@
   {
    "case_id": "P145#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "듣기 예시가 살짝 부자연스럽지만 이해는 가. 내가 교정을 해보자면 밥을 먹고나서 바로 숙제까지 마치니 뿌듯해요. 마음이 편해졌어요. 이렇게 하면 훨씬 자연스럽지",
    "sentence": "밥을 먹고 나서 숙제를 하니까 마음이 편해요",
    "question": "보통 뭘 하고 나서 하면 마음이 편해져요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeKUSxkQSo7jqyPvekWpD\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"밥을 먹고 나서 숙제를 하니까 마음이 편해요\\\", \\\"question\\\": \\\"보통 뭘 하고 나서 하면 마음이 편해져요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2252,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":67,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
