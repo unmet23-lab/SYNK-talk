@@ -426,6 +426,44 @@ test('탐지력 픽스처 — 읽기라 선언한 자리에 생긴 쓰기 경로
   assert.deepEqual(쓰기경로("// 여기서 method: 'POST' 는 안 친다\nawait fetch(u, { headers: 헤더 });"), []);
 });
 
+/** 질의읽기(08-24 신설) 도구의 소스 약속 — «질의 API 로 select 만».
+ *  읽기:true 와 약속이 다르다: POST·database/query 가 «필요해서» 이 층이 생겼다. 대신
+ *  ①질의전용() 런타임 게이트를 실제로 부르는가(전역이 잴 수 있는 것은 「한 번도 안 부른다」뿐 —
+ *  순서·내용은 그 도구의 회귀가 진다) ②PUT/PATCH/DELETE 는 여전히 금지다. */
+function 질의읽기위반(원문) {
+  const 걸린것 = [];
+  const 글 = 주석빼기(원문);
+  if (!/질의전용\s*\(/.test(글)) 걸린것.push('질의전용 게이트를 한 번도 안 부른다');
+  if (/method:\s*['"](PUT|PATCH|DELETE)['"]/i.test(글)) 걸린것.push('쓰기 메서드');
+  return 걸린것;
+}
+
+test('탐지력 픽스처 — 질의읽기 도구의 약속 위반을 반드시 잡는다', () => {
+  const 선언 = "const e = 자격증명.읽기('가짜', { 질의읽기: true });";
+  const 게이트 = "자격증명.질의전용(sql, '가짜');";
+  const 질의 = "await fetch(`${API}/${ref}/database/query`, { method: 'POST' });";
+  assert.deepEqual(질의읽기위반(`${선언}\n${게이트}\n${질의}`), [], '약속을 지키는 도구를 잡으면 거짓양성이다');
+  assert.deepEqual(질의읽기위반(`${선언}\n${질의}`), ['질의전용 게이트를 한 번도 안 부른다']);
+  assert.deepEqual(질의읽기위반(`${선언}\n${게이트}\nawait fetch(u, { method: 'DELETE' });`), ['쓰기 메서드']);
+  assert.deepEqual(질의읽기위반(`${선언}\n/* 자격증명.질의전용 을 부를 것 */\n${질의}`),
+    ['질의전용 게이트를 한 번도 안 부른다'], '주석을 게이트 호출로 셌다');
+});
+
+test('실저장소 — 질의읽기를 선언한 도구는 질의전용을 지나고 쓰기 메서드가 없다', () => {
+  const 선언한것 = [];
+  const 위반 = [];
+  for (const f of fs.readdirSync(TOOLS).filter((n) => n.endsWith('.js'))) {
+    const 글원 = fs.readFileSync(path.join(TOOLS, f), 'utf8');
+    if (!/자격증명\.읽기\s*\([^)]*질의읽기\s*:\s*true/.test(주석빼기(글원))) continue;
+    선언한것.push('tools/' + f);
+    const 걸린것 = 질의읽기위반(글원);
+    if (걸린것.length) 위반.push(`tools/${f}: ${걸린것.join('·')}`);
+  }
+  // 🔴 분모부터 밝힌다 — 0건을 잰 것과 통과는 같은 모양이다(F207).
+  assert.ok(선언한것.length >= 1, '질의읽기 선언 도구를 하나도 못 찾았다(실측 08-24 = 회차장부) — 정규식이 깨졌다');
+  assert.deepEqual(위반, [], `질의읽기라 선언했는데 약속을 어겼다: ${위반.join(' · ')}`);
+});
+
 test('실저장소 — 읽기를 선언한 도구에 쓰기 경로가 생기면 빨개진다', () => {
   /* ⚠ 대상은 **`읽기: true` 리터럴을 적은 도구뿐**이다. `원격SQL.js` 는 SQL 을 보고 실행마다
    *   판정하므로(`읽기: 읽기전용(sql) && !적용`) 정적으로는 쓰기 경로가 있는 게 정상이다 —
@@ -438,7 +476,7 @@ test('실저장소 — 읽기를 선언한 도구에 쓰기 경로가 생기면 
   const 위반 = [];
   for (const [이름, p] of 파일들) {
     const 글 = fs.readFileSync(p, 'utf8');
-    if (!/자격증명\.읽기\s*\([^)]*읽기\s*:\s*true/.test(주석빼기(글))) continue;
+    if (!/자격증명\.읽기\s*\([^)]*(?<!질의)읽기\s*:\s*true/.test(주석빼기(글))) continue;
     선언한것.push(이름);
     const 걸린것 = 쓰기경로(글);
     if (걸린것.length) 위반.push(`${이름}: ${걸린것.join('·')}`);

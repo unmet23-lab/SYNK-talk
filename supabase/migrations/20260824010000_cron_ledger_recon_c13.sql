@@ -1,11 +1,114 @@
+/* 회차 장부 — 대조 뷰 수리: SQL 직접 잡의 «가짜 안적힘» (20260815080000 후속 · ops 층 · v5.14 시점)
+ *
+ * ■ 무엇 — `ops.회차_대조` 재정의 «하나»: 돈것(cron.job_run_details)에 «장부경유» 판별을 더해,
+ *   `ops.발사` 를 지나도록 등록된 잡만 «안적힘» 으로 센다. SQL 직접 잡(ops-harvest ·
+ *   generate-deadline · 활성 뒤 deliver-check)은 장부를 지나지 않는 것이 **설계**라
+ *   그 회차는 안적힘이 아니다 — 다만 그 잡들의 SQL층실패는 계속 센다(그건 진짜 신호다).
+ *
+ * ■ 왜 — 실측 2026-08-24(운영): `ops-harvest` 가 매일 288회 돌고 장부엔 0회 적혀
+ *   **안적힘 288 로 영구 적색**이었다. 수확 잡은 순수 SQL(`select ops.수확()`)이라 장부를
+ *   지나지 않는 것이 c11 자신의 설계인데, c11 의 대조 뷰가 자기 수확 잡을 «침묵»으로 셌다 —
+ *   양치기 적색은 진짜 침묵(이 뷰가 잡으려던 그것)을 덮는다.
+ *   ⚠이 오탐이 아무에게도 안 보였던 까닭이 더 나쁘다: 자동 독자(형제 저장소 rot-check)가
+ *   리허설만 보고 있어 **운영 장부는 reader 0** 이었다 — 「writer 만 세우고 reader 0」(c11 머리말이
+ *   고치려던 병)이 한 층 위에서 재발한 모양이다. 독자 재조준은 형제 저장소 커밋이 진다.
+ *
+ * ■ 판별이 «이름표»가 아니라 «명령 본문»인 까닭 — 잡 이름 목록으로 가르면 새 SQL 직접 잡마다
+ *   이 뷰를 다시 부어야 하고, 잊으면 그 잡이 영구 적색이 된다(같은 병의 재발). 등록 명령에
+ *   `ops.발사(` 가 있는가는 «장부를 지나기로 했는가» 그 자체라 목록 유지가 필요 없다.
+ *
+ * 되돌림: 20260815080000 의 ops.회차_대조 정의를 다시 부으면 전 판으로 돌아간다. */
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260824010000';
+  migration_name constant text := '20260824010000_cron_ledger_recon_c13.sql';
+  expected_checksum constant text := '2f7cc6b9394cebc7503cb931344ca0d60211cd02dc86054cff4ef6f335d88e60'; -- migration-checksum
+  base_version constant text := '20260822150000';   -- 체인 규약: 직전 조각(estimate_responded_c13). 뷰의 의미 의존은 20260815080000(cron_ledger_c11)이고 그 실재는 아래 to_regclass 가 따로 잰다
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 합본 위에서만 돈다 — engine.schema_migrations 가 없다(빈 DB 면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      'migration % 는 % 위에서만 돈다 — 체인이 끊겼다',
+      migration_version, base_version;
+  end if;
+
+  if to_regclass('ops.cron_runs') is null then
+    raise exception
+      'migration % 는 장부 판(20260815080000 cron_ledger_c11) 위에서만 돈다 — ops.cron_runs 가 없다',
+      migration_version;
+  end if;
+
+  /* 원문(20260815080000)과 다른 곳은 «장부경유» 한 축뿐이다 — 열 이름·차례는 그대로 두고
+   * 끝에만 더한다(create or replace view 의 제약이자, 읽는 쪽(tools/회차장부.js)의 안전선). */
+  create or replace view ops.회차_대조 as
+  with 돈것 as (
+    select j.jobname, count(*) as 돈횟수, max(d.start_time) as 마지막회차,
+           count(*) filter (where d.status <> 'succeeded') as SQL층실패,
+           (j.command like '%ops.발사(%') as 장부경유
+      from cron.job_run_details d
+      join cron.job j on j.jobid = d.jobid
+     where d.start_time > now() - interval '24 hours'
+     group by j.jobname, j.command
+  ), 적힌것 as (
+    select jobname, count(*) as 적힌횟수
+      from ops.cron_runs
+     where queued_at > now() - interval '24 hours'
+     group by jobname
+  )
+  select coalesce(돈것.jobname, 적힌것.jobname)                  as jobname,
+         coalesce(돈횟수, 0)                                    as 돈횟수,
+         coalesce(적힌횟수, 0)                                   as 적힌횟수,
+         /* SQL 직접 잡(장부경유 false)의 회차는 «안 적히는 것이 옳다» — 0 으로 못박는다.
+          * 장부에만 남은 잡(돈것 없음 · 장부경유 null)은 원문 셈을 그대로 둔다(음수 = 잡이 걷힌 흔적). */
+         case when 장부경유 is false then 0
+              else coalesce(돈횟수, 0) - coalesce(적힌횟수, 0) end as 안적힌횟수,
+         coalesce(SQL층실패, 0)                                 as SQL층실패,
+         마지막회차,
+         coalesce(장부경유, true)                                as 장부경유
+    from 돈것 full join 적힌것 on 돈것.jobname = 적힌것.jobname;
+
+end
+$migration$;
+
+do $migration2$
+declare
+  expected_checksum constant text := '2f7cc6b9394cebc7503cb931344ca0d60211cd02dc86054cff4ef6f335d88e60'; -- migration-checksum
+begin
+  if not exists (select 1 from engine.schema_migrations where version = '20260824010000') then
+    insert into engine.schema_migrations(version, name, checksum)
+    values ('20260824010000', '20260824010000_cron_ledger_recon_c13.sql', expected_checksum);
+  end if;
+end
+$migration2$;
+
+commit;
+
 -- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
---
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
 -- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -331,3 +434,39 @@ select case when 테이블수=21 and RLS켜짐=21 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
   from 셈;
+*/
+-- 사후 메모:
+-- ① 이 조각의 몫은 jobs_load 활성일 가드 «하나»다(v5.13-d) — CHECK 를 만들지도 지우지도 않는다.
+-- ② 아래 기대 목록은 generation_c13 가 세운 현행 그대로다(변경 0 — 마지막 조각이 이 줄을 든다).
+--    ⚠ 이 줄은 마지막 조각이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    ⚠ `season_no_overlap_c11`(EXCLUDE) · `…_once_c11`(UNIQUE) · `companion_qa_*_fkey` 는 여기
+--      없다 — CHECK 가 아니라 이 줄의 대상이 아니고, 이름도 c11 그대로 산다(값목록이 없어
+--      판 판별과 무관하다 · 위 기대제약 목록에는 그 이름 그대로 들어 있다).
+--    기대: attempts_gate_values_c13 · attempts_response_present_c13 · attempts_result_gate_c13
+--         · attempts_ver_nonempty_c13 · batch_runs_counts_order_c13 · batch_runs_counts_pair_c13
+--         · batch_runs_enrolled_nonneg_c13 · batch_runs_finished_cols_c13
+--         · batch_runs_level_dist_ok_c13 · batch_runs_partial_pair_c13
+--         · batch_runs_partial_range_c13 · batch_runs_roster_equation_c13
+--         · batch_runs_skipped_range_c13 · batch_runs_ver_nonempty_c13 · broadcast_segment_kind_c13
+--         · classes_key_nonblank_c13 · companion_qa_answer_paired_c13
+--         · companion_qa_question_nonblank_c13 · corrections_promotion_intent_c13
+--         · corrections_supersedes_not_self_c13 · corrections_verdict_c13 · cron_runs_outcome_c13
+--         · jobs_anchor_present_c13 · jobs_claim_cols_c13 · jobs_deciding_pair_c13
+--         · jobs_deciding_result_matches_c13 · jobs_deciding_scope_c13 · jobs_draft_present_c13
+--         · jobs_idle_cols_c13 · jobs_load_failed_cols_c13 · jobs_nontarget_cols_c13
+--         · jobs_nonterminal_cols_c13 · jobs_skill_ids_present_c13 · jobs_status_outcome_pairs_c13
+--         · jobs_terminal_cols_c13 · jobs_ver_nonempty_c13 · jobs_winner_fence_current_c13
+--         · jobs_winner_fence_pair_c13 · jobs_winner_only_success_c13 · jobs_winner_present_c13
+--         · jobs_winner_result_only_success_c13 · jobs_winner_result_pair_c13 · learners_gender_c13
+--         · learners_goal_track_c13 · learners_group_no_c13 · learners_home_aimag_c13
+--         · learners_seat_no_c13 · learners_signup_attempts_nonneg_c13
+--         · learners_temp_password_paired_c13 · learning_events_correction_target_c13
+--         · learning_events_event_type_c13 · learning_events_task_type_c13
+--         · pipeline_jobs_discard_reason_c13 · season_compass_answers_c13 · season_dates_c13
+--         · season_review_decided_c13 · season_review_self_c13 · season_review_verdict_c13
+--         · staff_role_c13 · submissions_due_paired_c13 · submissions_task_format_c13
+--         · submissions_translation_source_c13 · teacher_notes_body_nonblank_c13
+--         · teacher_notes_disposition_c13 · teacher_notes_origin_c13
+

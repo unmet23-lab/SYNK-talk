@@ -125,6 +125,22 @@ test('🔑 수확은 몇 건을 옮겼는지 돌려준다 — 0이 «없었다»
   assert.match(몸통, /jsonb_build_object\([^)]*'수확'/, '수확 건수를 반환값에 안 싣는다');
 });
 
+// ── ②-b 대조 뷰 수리판(20260824010000) — SQL 직접 잡을 «안적힘»으로 안 센다 ─────
+const 수리SQL = fs.readFileSync(
+  path.join(마이그방, '20260824010000_cron_ledger_recon_c13.sql'), 'utf8');
+
+test('🔑 대조 뷰가 «장부경유» 를 명령 본문으로 판별한다 — 이름 목록이면 새 SQL 잡마다 영구 적색', () => {
+  /* 실측 08-24(운영): ops-harvest(순수 SQL)가 매일 288회 «안적힘» 으로 서 있었다 — 양치기 적색은
+   * 진짜 침묵을 덮는다. 판별이 이름 목록으로 되무르면 같은 병이 새 잡마다 재발한다. */
+  assert.ok(수리SQL.includes("j.command like '%ops.발사(%'"),
+    '장부경유 판별이 명령 본문(ops.발사)이 아니다');
+  assert.match(수리SQL, /case when 장부경유 is false then 0/,
+    'SQL 직접 잡의 회차를 0 으로 못박는 갈래가 없다 — harvest 가 다시 영구 적색이 된다');
+  assert.ok(!/where[^)]*ops\.발사[^)]*\)\s*group/s.test(수리SQL.split('돈것 as (')[1].split('), 적힌것')[0])
+    || 수리SQL.includes('SQL층실패'),
+    'SQL 직접 잡을 where 로 통째로 걸렀다 — 그 잡들의 SQL층실패 신호까지 같이 죽는다');
+});
+
 // ── ③ 등록층 — 잡이 늘면 여기서 드러난다 ──────────────────────────────────
 
 /** 마이그레이션 전량에서 `cron.schedule('<이름>'` 의 잡 이름을 뽑는다(URL 유무와 무관). */

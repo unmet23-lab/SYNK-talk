@@ -55,6 +55,12 @@ test('활성 조각 ② — 실행 주체·함수·인자(스케줄만 맞고 �
     '활성 뒤 deliver 는 맥락(배치) 필수 — 누락도 400 이라 첫 배치가 통째로 죽는다(§3-1 v5.8)');
   // generate-worker → Edge `deliver-one`(워커 실물 이름 — §3-2-a 실행 주체 칸).
   assert.ok(잡몸('generate-worker').includes("|| '/deliver-one'"), 'generate-worker 가 deliver-one 을 안 부른다');
+  // HTTP 잡 둘은 ops.발사 를 지난다(장부 c11 · 08-24 수리) — http_post 직접이면 회차 장부가
+  // 그 잡에 눈멀고, 활성 날 이 조각이 운영의 장부 경유를 조용히 되무른다(리허설 잔존이 그 실측).
+  assert.ok(daily.includes("ops.발사('deliver-daily'"), 'deliver-daily 가 ops.발사 를 안 지난다(회차 장부 침묵)');
+  assert.ok(잡몸('generate-worker').includes("ops.발사('generate-worker'"), 'generate-worker 가 ops.발사 를 안 지난다');
+  assert.ok(!daily.includes('net.http_post') && !잡몸('generate-worker').includes('net.http_post'),
+    'HTTP 잡이 net.http_post 를 직접 부른다 — 발사 경유가 되물러졌다');
   // generate-deadline → SQL 직접 + 집합 RPC + UB 날짜 식(v5.5 B1 — UTC ::date 면 매일 전날로 귀속).
   const dl = 잡몸('generate-deadline');
   assert.ok(dl.includes("engine.jobs_finalize_due((now() at time zone 'Asia/Ulaanbaatar')::date)"),

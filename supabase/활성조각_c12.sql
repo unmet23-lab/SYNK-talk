@@ -96,26 +96,21 @@ begin
    where jobname in ('deliver-daily', 'deliver-check', 'generate-worker', 'generate-deadline');
 
   /* ① 오케스트레이터 — 기존 잡 재사용 · 몸이 바뀐 것은 URL 의 `맥락=배치`(퍼센트 인코딩 ·
-   *    함수 쪽 URLSearchParams 가 되돌려 읽는다 — c10 `?점검` 선례) 하나다. */
+   *    함수 쪽 URLSearchParams 가 되돌려 읽는다 — c10 `?점검` 선례) 하나다.
+   * 🔑 `ops.발사` 경유(장부 20260815080000 c11) — http_post 직접이면 회차 장부가 이 잡에 눈멀고,
+   *    c11 이 운영에 걸어 둔 장부 경유를 **활성 날 이 조각이 조용히 되무른다**(실측 08-24:
+   *    리허설 잔존 cron 이 정확히 그 모양으로 9일 침묵했다). 헤더·서비스키는 발사가 안에서 진다. */
   perform cron.schedule('deliver-daily', '5 16 * * *', $job$
-    select net.http_post(
-      url     := (select decrypted_secret from vault.decrypted_secrets where name = 'functions_base_url') || '/deliver?%EB%A7%A5%EB%9D%BD=%EB%B0%B0%EC%B9%98',
-      headers := jsonb_build_object(
-                   'Content-Type',  'application/json',
-                   'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'service_role_key')),
-      body    := '{}'::jsonb);
+    select ops.발사('deliver-daily',
+      (select decrypted_secret from vault.decrypted_secrets where name = 'functions_base_url') || '/deliver?%EB%A7%A5%EB%9D%BD=%EB%B0%B0%EC%B9%98');
   $job$);
 
   /* ② 워커 재진입 — 36회 창 ≫ 필요 6회(F2). 겹침은 jobs_claim 이 막고, 큐가 비면 0행 즉시
    *    종료라 넉넉함이 안전선이지 낭비가 아니다. B3 재호출(미완·적재실패 이어받기)은 워커
    *    자신이 진다 — cron 은 부르기만 한다. */
   perform cron.schedule('generate-worker', '*/10 16-21 * * *', $job$
-    select net.http_post(
-      url     := (select decrypted_secret from vault.decrypted_secrets where name = 'functions_base_url') || '/deliver-one',
-      headers := jsonb_build_object(
-                   'Content-Type',  'application/json',
-                   'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'service_role_key')),
-      body    := '{}'::jsonb);
+    select ops.발사('generate-worker',
+      (select decrypted_secret from vault.decrypted_secrets where name = 'functions_base_url') || '/deliver-one');
   $job$);
 
   /* ③ 마감 스윕 — SQL 직접(벤더 0 · Edge Fn 불요). 대상은 「오늘」이 아니라 마감 지난 «전량»

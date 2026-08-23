@@ -90,6 +90,7 @@ select jsonb_build_object(
 const 존재질의 = `select to_regclass('ops.cron_runs') is not null as 섰나;`;
 
 async function 쏘기(sql, ref, 토큰) {
+  자격증명.질의전용(sql, '회차장부');   // 질의읽기 약속의 런타임 반쪽 — 어기면 여기서 던진다
   const res = await fetch(`${API}/${ref}/database/query`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${토큰}`, 'Content-Type': 'application/json' },
@@ -152,12 +153,13 @@ async function main() {
   const json = args.includes('--json');
   조용 = json;
 
-  /* ⚠ `{읽기:true}` 를 **안 붙인다.** 그 선언은 「fetch 에 POST 도 `database/query` 도 없다」는
-   *   약속인데(`tests/자격증명.test.js`), Supabase 질의 API 는 원리상 그 둘을 다 쓴다 —
-   *   붙이면 지킬 수 없는 약속이 되고 그 가드가 곧 꺼진다(F103). 그래서 `성과계기판` 과 같이
-   *   과녁 게이트를 그대로 상속한다. 안전은 「이 파일의 SQL 이 select 뿐」이 진다(위 두 상수).
+  /* `{질의읽기:true}`(08-24 신설) — 질의 API 로 «select 만» 보내는 도구의 읽기 선언.
+   *   `{읽기:true}` 는 못 쓴다: 그 약속이 「fetch 에 POST 도 database/query 도 없다」라 질의 도구는
+   *   원리상 못 지킨다. 그 모순 탓에 이 도구가 운영을 못 읽었고, **운영 장부(447행)는 reader 0**
+   *   이었다 — c11 이 고치려던 「writer 만 세우고 reader 0」이 한 층 위에서 재발한 모양.
+   *   약속의 두 반쪽: 런타임 = 쏘기() 첫 줄 `질의전용()` · 소스 = tests/자격증명.test.js 스캔.
    *   운영을 읽을 땐 `SUPABASE_PROJECT_REF` 덮어쓰기다 — `--운영` 은 쓰기 승인이라 안 붙인다(F462). */
-  const e = 자격증명.읽기('회차장부');
+  const e = 자격증명.읽기('회차장부', { 질의읽기: true });
   const 토큰 = e.SUPABASE_ACCESS_TOKEN;
   const ref = e.SUPABASE_PROJECT_REF;
   if (!토큰 || !ref) die('.env 에 SUPABASE_ACCESS_TOKEN·SUPABASE_PROJECT_REF 가 필요하다 (설정 절차 = tools/원격SQL.js)');
