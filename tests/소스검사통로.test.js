@@ -267,7 +267,6 @@ const 잔여명단 = new Map([
   ['tests/동봉신호.test.js', [1, '']],
   ['tests/동의게이트.test.js', [5, '']],
   ['tests/동의발급.test.js', [1, '']],
-  ['tests/라디오낭독.test.js', [2, '']],
   ['tests/마감시각.test.js', [3, '']],
   ['tests/말하기로직.test.js', [17, '']],
   ['tests/멱등충돌.test.js', [9, '']],

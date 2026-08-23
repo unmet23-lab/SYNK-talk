@@ -62,18 +62,27 @@ const 밤인가 = (시각) => { const h = 시각.getHours(); return h >= 22 || h
  *   않는다 — 강사판 = lib/마스코트강사말). 확률 없이 그대로 말하되 멈춤·줄임 게이트는 지난다.
  * @param {boolean} [props.잡담] false 면 idle 혼잣말·방치말·탭 수다를 잠근다(표정·몸짓은
  *   그대로) — 강사판은 말할순간 표에 idle 줄이 없다(표 밖 발화 금지 · 말할순간 §1-1).
+ * @param {{대본: Array, 채움?: object, 끝나면?: Function}|null} [props.연출] 화면이 시키는
+ *   «대본 연기» 한 벌(유호 확정 08-23 — 숙제 인트로는 동영상이 아니라 그 자리 연기다).
+ *   대본은 lib/마스코트생명.연출대본 에서만 온다(문구를 여기·화면에서 짓지 않는다 — 혼잣말과
+ *   같은 규칙). `@질문` 걸음은 채움.질문(실제 숙제 콘텐츠)으로 치환한다. 확률 0 · 순차 재생 ·
+ *   탭 = 건너뛰기(매일 보는 학생에게 강제 관람은 소음이다) · 끝나면() 은 스킵·게이트 포함
+ *   **반드시 한 번** 불린다 — 화면은 그걸 받고 마스코트를 내린다(한시 등장 · 상주 금지).
  */
-export default function 마스코트({ 사건 = null, 자리 = null, 말건네기 = null, 잡담 = true }) {
+export default function 마스코트({ 사건 = null, 자리 = null, 말건네기 = null, 잡담 = true, 연출 = null }) {
   const [표정, set표정] = useState('기본');
   const [깜빡중, set깜빡중] = useState(false);
   const [졸림, set졸림] = useState(false);
   const [말, set말] = useState(null);
   const [줄임, set줄임] = useState(false);
+  const [연출중, set연출중] = useState(false);
 
   const 부유 = useRef(new Animated.Value(0)).current; // 0→1 사인 반주기
   const 튐 = useRef(new Animated.Value(0)).current; // px (음수 = 위)
   const 기울기 = useRef(new Animated.Value(0)).current; // -10..10 (deg)
+  const 크기 = useRef(new Animated.Value(1)).current; // 다가옴 1.14 · 사라짐 0 (연출 어휘)
   const 타이머들 = useRef([]).current;
+  const 연출타이머들 = useRef([]).current; // 스킵이 이것만 걷는다 — 깜빡임·idle 타이머는 산다
   const 마지막입력 = useRef(Date.now());
 
   const 예약 = (fn, ms) => { const t = setTimeout(fn, ms); 타이머들.push(t); return t; };
@@ -147,6 +156,12 @@ export default function 마스코트({ 사건 = null, 자리 = null, 말건네�
       Animated.spring(튐, { toValue: 0, friction: 4, tension: 90, useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
   };
+  /* 다가옴·물러남·사라짐 — 유호 확정 몸짓 어휘(08-14 「다가옴/물러남」) 안의 크기 축.
+     다가옴은 스프링(젤리 몸의 탄성) · 사라짐은 timing(예측 가능한 퇴장 — unmount 직전 걸음). */
+  const 크기로 = (v, 퇴장) => {
+    if (퇴장) Animated.timing(크기, { toValue: v, duration: 500, easing: Easing.in(Easing.quad), useNativeDriver: Platform.OS !== 'web' }).start();
+    else Animated.spring(크기, { toValue: v, friction: 6, tension: 60, useNativeDriver: Platform.OS !== 'web' }).start();
+  };
   const 기울이기 = (각도, 지속) => {
     Animated.timing(기울기, { toValue: 각도, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web' }).start();
     예약(() => Animated.timing(기울기, { toValue: 0, duration: 320, useNativeDriver: Platform.OS !== 'web' }).start(), 지속 || 때.몸짓지속);
@@ -154,10 +169,46 @@ export default function 마스코트({ 사건 = null, 자리 = null, 말건네�
   const 깨우기 = () => { 마지막입력.current = Date.now(); if (졸림 && !밤인가(new Date())) set졸림(false); };
   const 기본복귀 = (ms) => 예약(() => set표정('기본'), ms || 때.기본복귀);
 
+  /* 연출 시퀀서 — 대본 걸음을 순차 재생한다(말건네기의 타임라인판 · 확률 0).
+   * · 시작 400ms 지연: reduce-motion 판정(비동기)이 첫 프레임엔 아직 없다 — 숨 하나 쉬고
+   *   시작하면 판정이 도착해 있고, 등장으로도 그게 자연스럽다.
+   * · 걸음마다 멈춤()을 다시 본다 — 연기 도중 녹음이 시작되면 남은 걸음은 조용히 접힌다
+   *   (08-12 실측 「코랄 몸 × 녹음 버튼 신호 충돌」의 정신 — 녹음 국면에 몸이 없다).
+   * · 끝나면() 은 어느 길로든 한 번 — 화면이 이걸 받아 마스코트를 내린다(한시 등장). */
+  useEffect(() => {
+    if (!연출 || !연출.대본 || !연출.대본.length) return undefined;
+    const 연출예약 = (fn, ms) => { const t = setTimeout(fn, ms); 연출타이머들.push(t); return t; };
+    const 끝 = () => { set연출중(false); set표정('기본'); set말(null); if (연출.끝나면) 연출.끝나면(); };
+    연출예약(() => {
+      if (멈춤() || 지금녹음중()) { 끝(); return; }
+      set연출중(true);
+      let 시각 = 0;
+      for (const 걸음 of 연출.대본) {
+        연출예약(() => {
+          if (멈춤()) return; // 남은 걸음은 접는다 — 종료 예약이 끝을 맡는다
+          if (걸음.표정) set표정(걸음.표정);
+          if (걸음.몸짓 === '점프') 점프(10);
+          else if (걸음.몸짓 === '기울임') 기울이기(7, 걸음.지속);
+          else if (걸음.몸짓 === '끄덕') 기울이기(3, Math.min(걸음.지속, 1100));
+          else if (걸음.몸짓 === '다가옴') 크기로(1.14);
+          else if (걸음.몸짓 === '물러남') 크기로(1);
+          else if (걸음.몸짓 === '사라짐') 크기로(0.001, true);
+          if (걸음.말) {
+            const 글 = 걸음.말 === '@질문' ? (연출.채움 && 연출.채움.질문) || null : 걸음.말;
+            if (글) { set말(글); 연출예약(() => set말(null), Math.max(걸음.지속 - 200, 400)); }
+          }
+        }, 시각);
+        시각 += 걸음.지속 || 0;
+      }
+      연출예약(끝, 시각);
+    }, 400);
+    return () => { for (const t of 연출타이머들) clearTimeout(t); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps — 연출은 조건부 렌더로 살았다 사라지는 한시 존재다(마운트 1회)
+
   /* 사건 반응 — 화면이 넘긴 최신 1건에만 반응한다(반응 지도 §2 의 이 화면 몫 세 줄).
      🔴 오류 순간에는 말·기쁨이 없다 — 몸을 카드 쪽으로 기울여 «같이 들여다본다»가 전부다(§1-3). */
   useEffect(() => {
-    if (!사건 || 줄임 || 지금녹음중()) return;
+    if (!사건 || 줄임 || 연출중 || 지금녹음중()) return;
     깨우기();
     if (사건.이름 === '무오류첫열람') {
       set표정('놀람');
@@ -176,7 +227,7 @@ export default function 마스코트({ 사건 = null, 자리 = null, 말건네�
   useEffect(() => {
     if (줄임) return undefined;
     const 두리번 = setInterval(() => {
-      if (멈춤() || 말) return;
+      if (멈춤() || 말 || 연출중) return;
       const 지금 = new Date();
       const 자야함 = 밤인가(지금) || Date.now() - 마지막입력.current > 때.방치문턱;
       if (자야함 !== 졸림) { set졸림(자야함); if (자야함) 가끔말하기(혼잣말.방치); return; }
@@ -186,17 +237,24 @@ export default function 마스코트({ 사건 = null, 자리 = null, 말건네�
       else if (r < 0.6) 기울이기(3, 1100); // 끄덕임꼴
     }, 때.idle주기);
     const 중얼 = setInterval(() => {
-      if (!잡담 || 멈춤() || 말 || 졸림 || 표정 !== '기본') return;
+      if (!잡담 || 멈춤() || 말 || 졸림 || 연출중 || 표정 !== '기본') return;
       말하기(혼잣말.idle);
     }, 때.idle혼잣말주기);
     return () => { clearInterval(두리번); clearInterval(중얼); };
-  }, [줄임, 졸림, 말, 표정]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [줄임, 졸림, 말, 표정, 연출중]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* 타이머 청소 — 화면을 떠날 때 전부 걷는다(떠난 화면의 표정을 바꾸는 유령 타이머 방지). */
   useEffect(() => () => { for (const t of 타이머들) clearTimeout(t); }, [타이머들]);
 
   const 탭 = () => {
     if (줄임 || 지금녹음중()) return;
+    /* 연출 중 탭 = 건너뛰기 — 남은 걸음을 걷고 바로 끝낸다(놀람 반응이 아니라 스킵이다). */
+    if (연출중) {
+      for (const t of 연출타이머들) clearTimeout(t);
+      set연출중(false); set표정('기본'); set말(null);
+      if (연출 && 연출.끝나면) 연출.끝나면();
+      return;
+    }
     깨우기();
     set표정('놀람');
     예약(() => set표정(Math.random() < 0.5 ? '기쁨' : '눈웃음'), 300);
@@ -216,6 +274,7 @@ export default function 마스코트({ 사건 = null, 자리 = null, 말건네�
         transform: [
           { translateY: Animated.add(부유.interpolate({ inputRange: [0, 1], outputRange: [0, -진폭] }), 튐) },
           { rotate: 기울기.interpolate({ inputRange: [-10, 10], outputRange: ['-10deg', '10deg'] }) },
+          { scale: 크기 }, // 연출 어휘(다가옴·사라짐) — 평시엔 1 그대로
         ],
       }]}
     >
@@ -238,6 +297,7 @@ const s = StyleSheet.create({
   말풍선: {
     marginTop: 6, backgroundColor: 색.바탕띄움, borderRadius: 10,
     paddingHorizontal: 10, paddingVertical: 6,
+    maxWidth: 230, // 연출 `@질문`(최대 90자)이 화면 밖으로 밀리지 않게 — 혼잣말(1~4어절)은 영향 없다
   },
   말글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 19, color: 색.잉크_서브 },
 });
