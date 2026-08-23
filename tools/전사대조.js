@@ -90,9 +90,18 @@ function 판정(온평균, 클평균, 표본수, 문턱 = 0.05) {
 }
 
 function main() {
+  /* --뼈대: 대본(docs/전사대조_대본_v1.json)을 빈 표본으로 펼친다 — 실기기 날 두 전사 결과만 채우면 된다. */
+  if (process.argv[2] === '--뼈대') {
+    const 대본길 = process.argv[3] || 'docs/전사대조_대본_v1.json';
+    const 대본 = JSON.parse(fs.readFileSync(대본길, 'utf8'));
+    const 뼈대 = 대본.문장.map((s2) => ({ id: s2.id, 대본: s2.대본, 온디바이스: '', 클라우드: '' }));
+    process.stdout.write(`${JSON.stringify(뼈대, null, 2)}
+`);
+    return;
+  }
   const 길 = process.argv[2];
   if (!길 || !fs.existsSync(길)) {
-    console.error('사용: node tools/전사대조.js <표본.json>  — 형식은 파일 머리말.');
+    console.error('사용: node tools/전사대조.js <표본.json>  |  --뼈대 [대본.json]  — 형식은 파일 머리말.');
     process.exit(2);
   }
   const 표본 = JSON.parse(fs.readFileSync(길, 'utf8'));
