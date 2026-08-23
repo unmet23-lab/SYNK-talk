@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "synk-talk-web",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["expo", "start", "--web", "--port", "8081"],
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["tools/앱시작.js", "start", "--web", "--port", "8081"],
       "port": 8081
     }
   ]
