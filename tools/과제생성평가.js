@@ -247,6 +247,21 @@ if (값('--채점')) {
       console.log('  03답하기 「이번엔 내 말로 답해요 — 방금 따라 말한 문장처럼 하면 딱 좋아요!」');
       console.log(`      ${행.question}`);
       if (목표없음) console.log('  ⓘ 이 사례는 목표가 없다 — ⑦ 자리엔 아무 값이나 넣으면 «분모에서 뺌»으로 기록된다(0점이 아니다).');
+      /* 🔴 «쌍둥이 회차» — 같은 사례의 다른 회차가 글자까지 같으면 두 번 매기는 것이 낭비다
+       * (유호 실측 08-23: 40쌍 중 1쌍이 완전 동일 · 하필 첫 사례라 「1,2번이 똑같은 질문」).
+       * 규격을 안 건드린다 — 행은 그대로 둘이고 «사람이 여는 횟수»만 준다(§8-B F3 이 센 그 수).
+       * 자기 불일치 방지이기도 하다: 같은 문장에 다른 점수가 나오면 그게 채점자 흔들림이다. */
+      const 짝 = 결과.행.find((x) => x !== 행 && x.case_id.split('#')[0] === base
+        && x.sentence === 행.sentence && x.question === 행.question && x.grader_note !== '미채점'
+        && !String(x.grader_note).startsWith('0점 고정'));
+      if (짝) {
+        console.log(`  ⓘ ${짝.case_id} 과 문장·질문이 «글자까지 같다» — 그 회차의 점수를 그대로 잇는다(다시 안 묻는다).`);
+        행.axis_scores = { ...짝.axis_scores };
+        행.grader_note = 짝.grader_note;
+        결과.동봉 = { ...(결과.동봉 || {}), 채점자, 시각: new Date().toISOString() };
+        쓰기(파일, 결과);
+        continue;
+      }
       const 입력 = await 물음(`  여덟 자리 > `);
       if (입력 === 'q') break;
       if (!입력) continue;
