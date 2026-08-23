@@ -536,7 +536,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12, padding: 12, minHeight: 120,
   },
 
-  /* 기본 버튼 = 크림 면 + Navy 2 글자(테마 머리말) — 코랄은 판정 오류 표시 하나뿐이다. */
+  /* 기본 버튼 = Paper 면 + Ink Deep 글자(테마 머리말) — 코랄은 판정 오류 표시 하나뿐이다. */
   제출버튼: { backgroundColor: 색.잉크, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
   제출_대기: { opacity: 0.35 },
   제출글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.바탕 },

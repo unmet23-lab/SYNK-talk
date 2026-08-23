@@ -48,7 +48,7 @@ import { 효과음 } from './소리.js';
  *   「관찰이 없다」와 「관찰을 못 잰다」가 같은 모양이 된다.
  *
  * ■ 신호 1점 = **짚은 어절**(코랄 면 · `테마.신호자리.보고서교정`) — 발주 §4-2 「탭하면 그
- *   어절이 Coral Wash 면으로」의 다크판 실물이다. 그래서 제출 버튼은 크림 면 + Navy 2 글자
+ *   어절이 Coral Wash 면으로」의 다크판 실물이다. 그래서 제출 버튼은 Paper 면 + Ink Deep 글자
  *   (테마 머리말의 기본 버튼)다 — 둘 다 코랄이면 한 화면에 신호가 둘이 된다(R1 위반).
  *
  * ■ 몽골어 병기 0 — 팩 `검수확정=false` 라 `mn` 이 없다(발주_게임콘텐츠팩 §3). 지어내지 않는다.
@@ -409,12 +409,12 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 10,
     paddingVertical: 10, paddingHorizontal: 12,
   },
-  /* 신호 1점 — 짚은 어절만 코랄 면. 코랄 면 위 글자는 Navy 2 만 쓴다(테마 규칙 그대로). */
+  /* 신호 1점 — 짚은 어절만 코랄 면. 코랄 면 위 글자는 Ink Deep 만 쓴다(테마 규칙 그대로). */
   어절_짚힘: { backgroundColor: 색.신호, borderColor: 색.신호 },
   어절글: { fontFamily: 폰트.본문, fontSize: 17, color: 색.잉크 },
   어절글_짚힘: { fontFamily: 폰트.강조, color: 색.바탕 },
 
-  /* 기본 버튼 = 크림 면 + Navy 2 글자(테마 머리말) — 코랄은 짚은 어절 자리 하나뿐이다. */
+  /* 기본 버튼 = Paper 면 + Ink Deep 글자(테마 머리말) — 코랄은 짚은 어절 자리 하나뿐이다. */
   없음버튼: {
     borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 14,
     paddingVertical: 14, alignItems: 'center',

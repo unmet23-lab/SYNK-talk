@@ -313,7 +313,7 @@ const s = StyleSheet.create({
   메모: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 21, color: 색.잉크_보조 },
 
   버튼줄: { flexDirection: 'row', gap: 12 },
-  /* 인증 화면과 같은 버튼이다 — Cream 면 + Navy 2 글자(대비 15.74). 두 벌로 적으면 갈라진다. */
+  /* 인증 화면과 같은 버튼이다 — Paper 면 + Ink Deep 글자(대비 18.93 · 테마 잉크 실측). 두 벌로 적으면 갈라진다. */
   버튼: {
     flex: 1, backgroundColor: 색.잉크, borderRadius: 14, height: 52,
     alignItems: 'center', justifyContent: 'center',

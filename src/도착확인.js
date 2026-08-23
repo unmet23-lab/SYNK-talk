@@ -219,7 +219,7 @@ const s = StyleSheet.create({
   확인머리: { fontFamily: 폰트.강조, fontSize: 15, color: 색.잉크 },
   가로: { flexDirection: 'row', justifyContent: 'space-between' },
   /* 🔴 이 화면의 **신호 1점**이다(테마 `신호자리.도착확인`) — 되돌리기 어려운 자리는 여기
-     하나뿐이라 성립한다. 면이 아니라 글자에 쓴다(면 위 글자는 킷이 Ink·Navy 2 로 묶는다). */
+     하나뿐이라 성립한다. 면이 아니라 글자에 쓴다(코랄 면 위 글자는 Ink Deep 계열만 — 테마 규칙). */
   나가기글: { fontFamily: 폰트.강조, fontSize: 14, color: 색.신호 },
   // 🚫 알림은 코랄이 아니다 — 1점을 둘로 만들면 R1 이 깨지고, 이 글은 방금 누른 것에 대한
   //    응답이라 이미 시선이 그 자리에 있다.

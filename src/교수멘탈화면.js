@@ -445,7 +445,7 @@ const s = StyleSheet.create({
   게이지이름_참: { fontFamily: 폰트.강조, color: 색.잉크 },
   게이지힌트: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조, lineHeight: 18, marginTop: 8 },
 
-  /* 신호 1점 — 코랄 면 위 글자는 Navy 2(색.바탕)만 쓴다(테마 규칙 그대로). */
+  /* 신호 1점 — 코랄 면 위 글자는 Ink Deep(색.바탕)만 쓴다(테마 규칙 그대로). */
   보내기버튼: { backgroundColor: 색.신호, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
   보내기_대기: { opacity: 0.35 },
   보내기글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.바탕 },

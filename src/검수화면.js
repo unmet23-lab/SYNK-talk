@@ -48,7 +48,7 @@
  *     들어라」가 된다(§5-2).
  *
  * ■ 디자인 (`테마.js` R1)
- *   신호 1점 = **확정 버튼**(코랄 면 위 Navy 2 글자). 이 화면엔 녹음이 없어 성립한다.
+ *   신호 1점 = **확정 버튼**(코랄 면 위 Ink Deep 글자). 이 화면엔 녹음이 없어 성립한다.
  *   🚫 폐기를 코랄로 칠하지 않는다 — 신호가 둘이 되면 R1 이 깨지고, 무엇보다 이 화면에서
  *   가장 자주 눌러야 할 것은 폐기가 아니라 확정이다.
  */
@@ -921,7 +921,7 @@ const s = StyleSheet.create({
   체크: { fontFamily: 폰트.모노, fontSize: 14, color: 색.잉크_서브 },
   체크글: { fontFamily: 폰트.캡션, fontSize: 14, color: 색.잉크_서브 },
 
-  /* 신호 1점 — 코랄 면 위 글자는 Navy 2 만 허용이다(`테마.js`). */
+  /* 신호 1점 — 코랄 면 위 글자는 Ink Deep(색.바탕)만 허용이다(`테마.js`). */
   확정: {
     flex: 1, backgroundColor: 색.신호, borderRadius: 14, height: 50,
     alignItems: 'center', justifyContent: 'center',

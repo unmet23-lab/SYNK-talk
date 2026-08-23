@@ -16,7 +16,7 @@ import * as API from './인증API';
  *   네 벌이 되고, 네 벌이 되는 순간 갈라진다.
  *
  * 🔑 **신호 1점 = 오류 메시지**다(테마 `신호자리`). 이 화면엔 녹음 버튼이 없어서 성립한다.
- *   버튼은 코랄이 아니라 Cream 면 + Navy 2 글자다 — 코랄 면 위에 흰 글자를 얹는 세상의
+ *   버튼은 코랄이 아니라 Paper 면 + Ink Deep 글자다 — 코랄 면 위에 흰 글자를 얹는 세상의
  *   기본값이 킷에서는 대비 미달이라, 그 조합을 아예 만들지 않는다.
  *
  * 말투: 앱 UI = **이미 온 사람이 읽는 안내물**이라 설득 분량이 0이다(Y1).
@@ -269,7 +269,7 @@ const s = StyleSheet.create({
   칸: { gap: 7 },
   칸머리: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   칸라벨: { fontFamily: 폰트.본문, fontSize: 13, color: 색.잉크_서브 },
-  // 3번째 글자 층 — 밀도로는 더 못 내려가는 자리라 Slate 를 쓴다(바닥이 Navy 2 라 허용).
+  // 3번째 글자 층 — 밀도로는 더 못 내려가는 자리라 Stone 을 쓴다(바닥이 Ink Deep 이라 허용).
   칸도움말: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조 },
   입력: {
     backgroundColor: 색.바탕띄움,

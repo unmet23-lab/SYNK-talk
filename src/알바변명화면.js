@@ -210,7 +210,7 @@ const s = StyleSheet.create({
   상황글: { fontFamily: 폰트.헤드, fontSize: 21, lineHeight: 32, color: 색.잉크 },
   본문글: { fontFamily: 폰트.본문, fontSize: 15, lineHeight: 24, color: 색.잉크_서브 },
 
-  /* 기본 버튼 = 크림 면 + Navy 2 글자(테마 머리말) — 이 화면의 코랄은 녹음카드의 녹음 버튼뿐이다. */
+  /* 기본 버튼 = Paper 면 + Ink Deep 글자(테마 머리말) — 이 화면의 코랄은 녹음카드의 녹음 버튼뿐이다. */
   주버튼: { backgroundColor: 색.잉크, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
   주버튼글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.바탕 },
   눌림: { opacity: 0.75 },
