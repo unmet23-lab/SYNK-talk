@@ -77,6 +77,16 @@ function 대조(표본) {
   return { 행들, 온평균: 평균(값들('온')), 클평균: 평균(값들('클')) };
 }
 
+/** 표본 자체가 성한가 — 클라우드(성숙한 기준선)조차 CER 25% 를 넘으면 전사기 대결이 아니라
+ *  낭독·녹음이 무너진 것이다. 그 표본의 판정은 두 후보를 «같이 나쁘게» 만들어 차이를 지운다. */
+function 표본경고(클평균) {
+  if (클평균 != null && 클평균 > 0.25) {
+    return '⚠표본 의심 — 클라우드 CER ' + (클평균 * 100).toFixed(1)
+      + '% (> 25%). 낭독이 무너졌거나 녹음이 깨졌을 수 있다. 판정 전에 녹음을 귀로 듣고, 무너진 문장은 다시 읽어 채운다.';
+  }
+  return null;
+}
+
 /** 판정 — 정찰 S1 규약(≤5%p). 표본이 30 미만이면 «참고»로 강등한다(작은 표본으로 단정 금지). */
 function 판정(온평균, 클평균, 표본수, 문턱 = 0.05) {
   if (온평균 == null || 클평균 == null) return { 말: '못 잼(빈 표본)', 코드: 2 };
@@ -92,11 +102,20 @@ function 판정(온평균, 클평균, 표본수, 문턱 = 0.05) {
 function main() {
   /* --뼈대: 대본(docs/전사대조_대본_v1.json)을 빈 표본으로 펼친다 — 실기기 날 두 전사 결과만 채우면 된다. */
   if (process.argv[2] === '--뼈대') {
+    /* 둘째 인자 = 대본 경로(선택) · 셋째 인자 = **저장 경로**(선택 · 권장).
+     * 셸 리디렉션(> 표본.json)은 Windows 에서 셸 코드페이지(CP949)를 타 한글이 깨질 수 있다 —
+     * 이 기계에서 두 번 실측한 함정이라, 파일은 도구가 직접 UTF-8 로 쓴다. */
     const 대본길 = process.argv[3] || 'docs/전사대조_대본_v1.json';
+    const 저장길 = process.argv[4] || null;
     const 대본 = JSON.parse(fs.readFileSync(대본길, 'utf8'));
     const 뼈대 = 대본.문장.map((s2) => ({ id: s2.id, 대본: s2.대본, 온디바이스: '', 클라우드: '' }));
-    process.stdout.write(`${JSON.stringify(뼈대, null, 2)}
-`);
+    const 몸 = JSON.stringify(뼈대, null, 2) + '\n';
+    if (저장길) {
+      fs.writeFileSync(저장길, 몸, 'utf8');
+      console.error('[전사대조] 뼈대 ' + 뼈대.length + '문장 → ' + 저장길 + ' (UTF-8 직접 저장)');
+    } else {
+      process.stdout.write(몸);
+    }
     return;
   }
   const 길 = process.argv[2];
@@ -110,10 +129,12 @@ function main() {
   for (const r of 행들) {
     console.log(`${String(r.id).padEnd(7)} ${퍼(r.온)}    ${퍼(r.클)}    (${퍼(r.온공백)} · ${퍼(r.클공백)})`);
   }
+  const 경고 = 표본경고(클평균);
+  if (경고) console.log('\n' + 경고);
   const v = 판정(온평균, 클평균, 행들.length);
   console.log(`\n${v.말}`);
   process.exit(v.코드);
 }
 
 if (require.main === module) main();
-module.exports = { 정규화, 편집거리, CER, 대조, 판정 };
+module.exports = { 정규화, 편집거리, CER, 대조, 판정, 표본경고 };

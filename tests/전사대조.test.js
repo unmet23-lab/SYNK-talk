@@ -2,7 +2,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
-const { 정규화, 편집거리, CER, 대조, 판정 } = require('../tools/전사대조.js');
+const { 정규화, 편집거리, CER, 대조, 판정, 표본경고 } = require('../tools/전사대조.js');
 
 test('정규화 — NFC·부호 제거·공백 제거가 발음 동일문을 같게 만든다', () => {
   assert.equal(정규화('안녕하세요!'), 정규화('안녕 하세요'));
@@ -36,4 +36,19 @@ test('대조 — 표본에 대본이 없으면 죽는다(기준 진실 없는 �
   const r = 대조([{ id: 's1', 대본: '학교에 갔다', 온디바이스: '학교에 갔다', 클라우드: '학교에 간다' }]);
   assert.equal(r.온평균, 0);
   assert.ok(r.클평균 > 0);
+});
+
+test('표본경고 — 클라우드 기준선이 무너진 표본을 잡는다(무너진 표본의 판정은 차이를 지운다)', () => {
+  assert.equal(표본경고(0.10), null);
+  assert.match(표본경고(0.30), /표본 의심/);
+  assert.equal(표본경고(null), null);
+});
+
+test('뼈대 재료 — 대본이 30문장·id 유일·급소 실림(판정 규약 «표본 30»과 한 벌)', () => {
+  const fs2 = require('node:fs');
+  const path2 = require('node:path');
+  const 대본 = JSON.parse(fs2.readFileSync(path2.join(__dirname, '..', 'docs', '전사대조_대본_v1.json'), 'utf8'));
+  assert.equal(대본.문장.length, 30, '대본이 30문장이 아니다');
+  assert.equal(new Set(대본.문장.map((s) => s.id)).size, 30, '대본 id 가 겹친다');
+  for (const s of 대본.문장) assert.ok(s.대본 && s.급소, `${s.id} 에 대본/급소가 없다`);
 });
