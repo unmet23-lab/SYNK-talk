@@ -68,8 +68,12 @@ test('§12-29 ④ — achieve 효과음 게이트의 판정 입력은 녹음 상
 /* T1·T2 봉인(엔진심문 0822 — 활성 날 사고 예약) — ts 층은 배선 «앵커»로 잰다(배포대조 본체판정 규율).
  * 앵커가 사라지면 그 처방이 걷힌 것이니 이 시험이 먼저 빨개진다. */
 test('심문 T1·T2 — 재호출 맥락 열쇠 · 상태오류 강등 배선이 산다', () => {
-  const 워커 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'deliver-one', 'index.ts'), 'utf8');
-  const 생성 = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'deliver', '생성모드.ts'), 'utf8');
+  /* ts 는 «코드만»으로 읽는다(소스검사통로 래칫) — 원문이면 낱말이 코드에서 사라져도 바로 위
+   * 주석이 그 낱말을 들고 있는 한 영원히 초록이다(F401 첫 사례 그 꼴). sql(조각)은 주석 문법이
+   * 달라 그대로 두되, 겨눈 열쇠가 퍼센트 인코딩이라 주석에 살 낱말이 아니다. */
+  const { 코드만 } = require('./lib/소스검사.js');
+  const 워커 = 코드만(fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'deliver-one', 'index.ts'), 'utf8'));
+  const 생성 = 코드만(fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'deliver', '생성모드.ts'), 'utf8'));
   const 조각 = fs.readFileSync(path.join(ROOT, 'supabase', '활성조각_c12.sql'), 'utf8');
 
   /* T1 — B3 재호출 URL 에 맥락=배치(퍼센트 인코딩). cron 등록(활성조각)과 «같은 바이트»여야

@@ -67,8 +67,12 @@ test('확인사건 — 카드 다섯 값 되싣기 · 값록(맞다|아니다) �
 test('부정 키 형식 — 한 원천(lib 부정키) · 서버 SQL 은 구분자를 다시 적지 않는다', () => {
   const { 부정키 } = require('../lib/성향확인.js');
   assert.equal(부정키('리듬', '여유제출'), '리듬:여유제출');
-  const 원문 = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'progress', 'index.ts'), 'utf8');
-  assert.ok(!/\|\|\s*':'\s*\|\|/.test(원문),
+  /* «코드만»으로 읽는다(소스검사통로 래칫 · F401) — 원문이면 부정키() 호출이 코드에서 사라져도
+   * 주석의 「부정키(」 언급 하나로 영원히 초록이고, 반대로 주석에 옛 `|| ':' ||` 를 인용만 해도
+   * 멀쩡한 코드가 빨개진다. */
+  const { 코드만 } = require('./lib/소스검사.js');
+  const 소스 = 코드만(fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'progress', 'index.ts'), 'utf8'));
+  assert.ok(!/\|\|\s*':'\s*\|\|/.test(소스),
     'progress SQL 이 부정 키 구분자를 문자열로 다시 적었다 — 형식의 원천은 lib 부정키 하나다(G13)');
-  assert.ok(/부정키\(/.test(원문), 'progress 가 lib 부정키() 로 조립하지 않는다 — 형식이 두 벌로 갈 위험');
+  assert.ok(/부정키\(/.test(소스), 'progress 가 lib 부정키() 로 조립하지 않는다 — 형식이 두 벌로 갈 위험');
 });
