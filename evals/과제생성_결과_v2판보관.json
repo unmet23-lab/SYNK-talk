@@ -9,8 +9,8 @@
   "채점표_판": "채점표.v1",
   "quality_ver": "0d37285bbef6",
   "policy_ver": "오늘과제.v3+2f60018b42da",
-  "채점자": "(미채점)",
-  "시각": "2026-08-22T11:39:29.115Z"
+  "채점자": "유호",
+  "시각": "2026-08-23T09:41:03.597Z"
  },
  "행": [
   {
@@ -25,7 +25,7 @@
     "goal_use": 0,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "이해가 안감,무슨 의도인지 무슨 말인지 젼혀 모르겠음",
    "sentence": "선생님께서 노래를 다 들으시고 나서 가사의 뜻을 설명해 주셨어요",
    "question": "좋아하는 케이팝 노래를 듣고 나서 무엇을 했어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeHiXa1BktwpAGVBgETvJ\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"선생님께서 노래를 다 들으시고 나서 가사의 뜻을 설명해 주셨어요\\\", \\\"question\\\": \\\"좋아하는 케이팝 노래를 듣고 나서 무엇을 했어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1253,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":84,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -35,16 +35,16 @@
   {
    "case_id": "P001#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
     "fun": 0,
     "accuracy": 0,
-    "goal_use": 0,
+    "goal_use": 1,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "케이팝을 과연 항상 좋아할까? 오히려 일상생활에서 생기는 예시를 넣는게 더 좋아보여 .",
    "sentence": "선생님께서 노래방에 가기 전에 좋아하는 케이팝 가사를 먼저 외우고 나서 부르라고 하셨어요",
    "question": "노래방에 가기 전에 어떤 케이팝 노래 가사를 먼저 외우고 싶어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeHiXqiVso522CKzKsnJz\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"선생님께서 노래방에 가기 전에 좋아하는 케이팝 가사를 먼저 외우고 나서 부르라고 하셨어요\\\", \\\"question\\\": \\\"노래방에 가기 전에 어떤 케이팝 노래 가사를 먼저 외우고 싶어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1253,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":108,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -54,16 +54,16 @@
   {
    "case_id": "P002#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
     "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "지금까지의 문제중 가장 직관적이고 어떻게 하는지 이해가 가능해서 좋은데 너무 k드라마로 한정지어서 약간은 뻔한 느낌임. 하지만 괜찮음",
    "sentence": "이번 주말에는 한국 드라마를 노트북으로 볼 거예요",
    "question": "이번 주말에 어떤 드라마를 무엇으로 볼 계획이에요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeHiY3asorBdnbYeXnWV6\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"이번 주말에는 한국 드라마를 노트북으로 볼 거예요\\\", \\\"question\\\": \\\"이번 주말에 어떤 드라마를 무엇으로 볼 계획이에요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1294,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":74,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -73,16 +73,16 @@
   {
    "case_id": "P002#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "학생을 파악하기도 좋고 전체적으로 좋은것같은데 너무 k팝 드라마를 보고있다고 확정하고 말하는것같아. 요즘 한국드라마를 안보는 사람은 어떻게 대답해야하는거지?",
    "sentence": "저는 한국 드라마를 자막 없이 보려고 이어폰으로 대사를 반복해서 들어요.",
    "question": "요즘 한국 드라마를 볼 때 무엇으로 대사 연습을 하고 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeHiYJd17QNgV6VbaqVsR\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 한국 드라마를 자막 없이 보려고 이어폰으로 대사를 반복해서 들어요.\\\", \\\"question\\\": \\\"요즘 한국 드라마를 볼 때 무엇으로 대사 연습을 하고 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1294,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":93,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -92,16 +92,16 @@
   {
    "case_id": "P003#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "완벽! 하기 쉽고 이해하기도 쉬웠어. 다만 니가 내는 문제에대해 조금 경험을 해봐야 하기 쉬울것같아.",
    "sentence": "오늘은 비가 오지만 친구를 만나러 카페에 갈 거예요",
    "question": "오늘 날씨가 안 좋아도 꼭 하고 싶은 일이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeHiYXZd8bV6uWk1D1HmT\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"오늘은 비가 오지만 친구를 만나러 카페에 갈 거예요\\\", \\\"question\\\": \\\"오늘 날씨가 안 좋아도 꼭 하고 싶은 일이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1258,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":79,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -111,16 +111,16 @@
   {
    "case_id": "P003#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "이것도 완벽 ! 하기 쉽고 이해하기 쉽고 공부도 되. 좋아. 그런데 전 문제와 마찬가지로 문제에대해 조금 경험을 해봐야 하기 쉬울것같아",
    "sentence": "오늘 좀 피곤하지만 친구를 만나러 카페에 갈 거예요",
    "question": "오늘 피곤해도 꼭 하고 싶은 일이 있어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeHiYrLERusDF8uxg1PET\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"오늘 좀 피곤하지만 친구를 만나러 카페에 갈 거예요\\\", \\\"question\\\": \\\"오늘 피곤해도 꼭 하고 싶은 일이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1258,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":75,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -130,16 +130,16 @@
   {
    "case_id": "P004#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "완벽! 이정도면 하기 쉽고 날씨가 달라도 숙제하면서 어휘가 늘수있고 하기 쉬워. 좋아",
    "sentence": "지금 밖에 비가 오고 있으면 우산을 가지고 나가야 해요",
    "question": "오늘 날씨가 어떤지, 우산이 필요한지 말해 볼까요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeHiZ2tUo7gLHdbx1zwa5\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"지금 밖에 비가 오고 있으면 우산을 가지고 나가야 해요\\\", \\\"question\\\": \\\"오늘 날씨가 어떤지, 우산이 필요한지 말해 볼까요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1260,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":78,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -149,16 +149,16 @@
   {
    "case_id": "P004#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "문제 의도 자체는 좋아. 학생의 성향 파악도 될것같은데 시스템화 해놓은거까지 도달되는거 맞지? 그리고 말이 조금 이상해. 답하기에서 지금 밖에 비가 오고있으면이라는게 이해가 좀 어려워. 불필요한 어휘라고 생각해.",
    "sentence": "지금 비가 오고 있으면 우산을 가지고 나가야 해요",
    "question": "지금 밖에 비가 오고 있으면 어떻게 하고 나갈 거예요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeHiZGcEiLLijDvoLh6qV\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"지금 비가 오고 있으면 우산을 가지고 나가야 해요\\\", \\\"question\\\": \\\"지금 밖에 비가 오고 있으면 어떻게 하고 나갈 거예요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1260,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":75,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -168,16 +168,16 @@
   {
    "case_id": "P005#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "의도는 좋아. 가족 생각을 할 수 있는 방향이라 마음에 들어. 그런데 듣기,따라말하기 질문이 좀 이해가 안가게 만든것같은데? 동생한테 줄 선물은 이것밖에 없어서 형한테만 따로 사 줬어요 라는 말이 한국인인 나도 이해가 안가. 그런데 답하기 질문은 참 괜찮네",
    "sentence": "동생한테 줄 선물은 이것밖에 없어서 형한테만 따로 사 줬어요",
    "question": "가족 중에 누구한테 선물을 자주 주고 싶어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeHiZWG28yeS6v7Zqu851\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"동생한테 줄 선물은 이것밖에 없어서 형한테만 따로 사 줬어요\\\", \\\"question\\\": \\\"가족 중에 누구한테 선물을 자주 주고 싶어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1227,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":77,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -196,7 +196,7 @@
     "goal_use": null,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "무슨 말인지 전혀 이해가 안가. 그리고 니 질문 어휘가 ai티나 너무 나는데? 오늘 누구한테만 비밀을 이야기했어요? 라는게 한국인 입장에서 너무 부자연스러워. 그리고 오늘은 친구한테만 이 비밀을 말했고 선생님께는 밖에 나가서야 말씀드렸어요. 이것도 한국어가 아닌것같아 너무 부자연스럽다",
    "sentence": "오늘은 친구한테만 이 비밀을 말했고 선생님께는 밖에 나가서야 말씀드렸어요",
    "question": "오늘 누구한테만 비밀을 이야기했어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeHiZjRnVyrFcuZaRJnPw\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"오늘은 친구한테만 이 비밀을 말했고 선생님께는 밖에 나가서야 말씀드렸어요\\\", \\\"question\\\": \\\"오늘 누구한테만 비밀을 이야기했어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1227,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":82,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -215,7 +215,7 @@
     "goal_use": 0,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "진짜 무슨 말인지 모르겠어. 가사하고 발음이 안 어려우면이 아니라 가사하고 발음이 쉬우면 이라고 어휘를 써야지 너무 부자연스러워, 답하기는 그나마 이해가 되지만 별로야.",
    "sentence": "가사하고 발음이 안 어려우면 그 노래를 걱정하지 마세요, 곧 다 외워요.",
    "question": "요즘 가사하고 발음 중에서 뭐가 더 안 외워져요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeHia2r2gNMdiHUCwtpc4\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"가사하고 발음이 안 어려우면 그 노래를 걱정하지 마세요, 곧 다 외워요.\\\", \\\"question\\\": \\\"요즘 가사하고 발음 중에서 뭐가 더 안 외워져요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1338,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":87,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -234,7 +234,7 @@
     "goal_use": 0,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "뻔한 k팝 클리셰는 조금 줄여도 될것같아. 그리고 이것 역시 듣기,따라말하기 이해가 안가. 듣기 따라말하기의 의도를 내가 억지로 파악해본다면 이것같아. 가사하고 발음이 쉬웠으면 좋겠는데, 이 노래는 가사하고 발음이 어려워서 따라부르기 별로라고 친구가 말했어요",
    "sentence": "가사하고 발음이 안 어려우면 좋겠는데, 이 노래는 쉽지 않아서 따라 부르지 마세요라고 친구가 말했어요",
    "question": "요즘 따라 부르기 힘든 케이팝 가사가 있어요? 어떤 부분이 어려워요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeHiaG7zhkZZpwxWruNaQ\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"가사하고 발음이 안 어려우면 좋겠는데, 이 노래는 쉽지 않아서 따라 부르지 마세요라고 친구가 말했어요\\\", \\\"question\\\": \\\"요즘 따라 부르기 힘든 케이팝 가사가 있어요? 어떤 부분이 어려워요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1338,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":117,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -263,16 +263,16 @@
   {
    "case_id": "P022#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "이건 k 드라마 클리셰를 그래도 괜찮게 활용했네. 그리고 문장들도 이해가 잘 가서 어렵지 않고 좋아.",
    "sentence": "집에서 저녁마다 자막 없이 드라마를 보는데 처음부터 끝까지 다 이해되는 날이 오면 좋겠어요.",
    "question": "집에서 드라마를 볼 때 몇 시부터 몇 시까지 보고 싶어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeHiasRGrhuF9LEJmv3Cn\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"집에서 저녁마다 자막 없이 드라마를 보는데 처음부터 끝까지 다 이해되는 날이 오면 좋겠어요.\\\",\\\"question\\\":\\\"집에서 드라마를 볼 때 몇 시부터 몇 시까지 보고 싶어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1358,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":105,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -282,16 +282,16 @@
   {
    "case_id": "P023#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "좋아. 이런문제는 topik 합격에도 좋고 직관적이고 어렵지않아. 나이스",
    "sentence": "어제는 비가 와서 우산을 썼는데, 내일은 날씨가 좋으면 자전거를 탈 거예요",
    "question": "어제 날씨는 어땠고, 내일은 뭐 할 거예요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeHib54kr73dKPXawSD2d\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\":\\\"어제는 비가 와서 우산을 썼는데, 내일은 날씨가 좋으면 자전거를 탈 거예요\\\",\\\"question\\\":\\\"어제 날씨는 어땠고, 내일은 뭐 할 거예요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1386,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":87,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -301,16 +301,16 @@
   {
    "case_id": "P023#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "좋은데 답하기 어휘가 좀 부자연스러워. 어제 날씨는 어땠고 내일은 뭘 할 예정인가요? 이렇게 모든 질문을 바꿔줘. 지금 내일은 뭘 하고 싶어요? 이게 니가 봐도 부자연스럽지않아? 학생이 어제는 비가 와서 우산을 썼는데 내일은 날씨가 좋으면 자전거를 탈 거예요라고 말한게 아니라 니가 질문한거잖아. 니가 질문한걸 답하는건데 이걸 학생에게 어제 날씨는 어땠고 내일은 뭘 하고싶냐고 물어보면 안되지 ㅋㅋ 이해가 안가잖아. 무슨 말인지 알겠어? 자연스럽지못해. 차라리 듣기,따라말하기에있는 예시에 어제 날씨는 어떘고 내일은 뭘 하고싶다고 했나요? 이렇게하면 그나마 자연스럽지, 하지만 방금 내가 예시로 말한게 조리있게 말 하지못했지만 니가 내가 지금 무슨의미로 말하는지 파악해줬으면 해",
    "sentence": "어제는 비가 와서 우산을 썼는데 내일은 날씨가 좋으면 자전거를 탈 거예요",
    "question": "어제 날씨는 어땠고 내일은 뭘 하고 싶어요?",
    "raw_response": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CeHibQjwGXYRDEoLbDReH\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제는 비가 와서 우산을 썼는데 내일은 날씨가 좋으면 자전거를 탈 거예요\\\", \\\"question\\\": \\\"어제 날씨는 어땠고 내일은 뭘 하고 싶어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1386,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":88,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
