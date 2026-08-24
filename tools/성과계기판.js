@@ -240,21 +240,32 @@ async function 질의실행(기간일, 상한) {
    * 제어 사건이라 event_type 도달 장부에서는 원리상 영원히 사유 처리다(안 빨개진다). 개원 전
    * 0 = 0 은 자연이고, 의사가 쌓이는데 사건이 0 인 날부터 이 두 수가 갈라진다. 기간 필터를 안
    * 거는 이유: 승격은 창이 아니라 «누적 빚»이다 — 옛 의사도 발행 전까지는 빚으로 남는다. */
+  /* 개입 스탬프(Temper 개입로그 규격 v1 §③ⓑ · 08-24)도 같은 왕복에 얹는다 — 규격 ① 이 「계산이
+   * 실패해도 개입은 나간다」를 허용한 대가가 이 측정이다: 배선이 멀쩡해도 런타임 폴백(null)이
+   * 잦아지는 것은 CI(tests/개입스탬프 — 소스 층)가 원리상 못 보고, 여기 실행 행만이 안다.
+   * 승격과 같은 이유로 기간 필터 밖(누적) — 스탬프는 소급 불가라 옛 미비도 영원한 미비다. */
   const 승격res = await fetch(`${API}/${ref}/database/query`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${토큰}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ query: `
       select jsonb_build_object(
         '의사', (select count(*) from engine.corrections where promotion_intent = true),
-        '사건', (select count(*) from engine.learning_events where event_type = 'data_use.granted')
+        '사건', (select count(*) from engine.learning_events where event_type = 'data_use.granted'),
+        '스탬프전체', (select count(*) from engine.learning_events where event_type = 'intervention.delivered'),
+        '스탬프미비', (select count(*) from engine.learning_events where event_type = 'intervention.delivered'
+                        and (estimator_version is null or estimator_confidence is null or evidence_refs is null
+                             or policy_ver is null or intervention_id is null))
       ) as 값;` }),
   });
   if (!승격res.ok) die(`HTTP ${승격res.status}(승격 계수) — ${(await 승격res.text()).slice(0, 300)}`);
   const 승격rows = JSON.parse(await 승격res.text());
   const 승 = (승격rows && 승격rows[0] && 승격rows[0].값) || { 의사: 0, 사건: 0 };
   const 승격 = { 의사: Number(승.의사) || 0, 사건: Number(승.사건) || 0, 격차: (Number(승.의사) || 0) - (Number(승.사건) || 0) };
+  const 전체 = Number(승.스탬프전체) || 0;
+  const 미비 = Number(승.스탬프미비) || 0;
+  const 스탬프 = { 전체, 완비: 전체 - 미비, 미비 };
 
-  return { 행들: 값, 승격, ref };
+  return { 행들: 값, 승격, 스탬프, ref };
 }
 
 /* ── 산출 ─────────────────────────────────────────────────────────────────── */
@@ -289,6 +300,11 @@ function 요약찍기(계수, { ref, 잘림 }) {
   const 승 = 계수.승격;
   console.log(`  ⑥승격  의사 ${승.의사} · data_use.granted ${승.사건} · 격차 ${승.격차}`
     + (승.격차 > 0 ? ' 🔴 발행 안 된 승격 의사가 쌓여 있다(생산자 = [자동] 4단 — 아직 0)' : ' (0=0 은 개원 전 자연)'));
+  /* 개입 스탬프 — 승격과 같은 누적 축(질의실행 주석 · Temper 규격 v1). 합계 = 완비 + 미비. */
+  const 스 = 계수.스탬프;
+  console.log(`  개입 스탬프  delivered ${스.전체} = 완비 ${스.완비} + 미비 ${스.미비}`
+    + (스.미비 > 0 ? ' 🔴 상태 계산 폴백이 남긴 구멍이다 — deliver 로그 「학습자 상태 계산 실패」부터'
+      : ' (0=0+0 은 개원 전 자연 · 소급 불가)'));
 }
 
 /* 🔴 JS 로 그리지 않는다 — 스크립트를 안 돌리는 뷰어(앱 미리보기·메일·PDF)에서 빈 화면이 된다.
@@ -366,6 +382,14 @@ ${뺀것.length ? `<h2>세지 않은 개입</h2><table><tbody>${뺀것.map(([k, 
 <div class="card"><div class="t">격차${계수.승격.격차 > 0 ? ' 🔴' : ''}</div><div class="n">${계수.승격.격차}</div></div>
 </div>
 <p class="note">검수자가 「훈련에 써도 된다」고 누른 수 대 실제 승격 사건 수 — 격차가 0보다 크면 발행 안 된 승격 의사가 쌓여 있는 것입니다(생산자 = [자동] 4단 · 아직 0). 0 = 0 은 개원 전 자연입니다.</p>
+
+<h2>개입 스탬프 <span class="muted">(누적 — Temper 개입로그 규격 v1)</span></h2>
+<div class="ext">
+<div class="card"><div class="t">intervention.delivered</div><div class="n">${계수.스탬프.전체}</div></div>
+<div class="card"><div class="t">스탬프 완비 (다섯 칸)</div><div class="n">${계수.스탬프.완비}</div></div>
+<div class="card"><div class="t">미비${계수.스탬프.미비 > 0 ? ' 🔴' : ''}</div><div class="n">${계수.스탬프.미비}</div></div>
+</div>
+<p class="note">개입 행 중 상태 스탬프(estimator_version · estimator_confidence · evidence_refs · policy_ver · intervention_id)가 전부 실린 수 — 미비는 배달 시점 상태 계산이 실패해 null 로 남은 행이고, 그 순간의 상태는 소급해 되살릴 수 없습니다. 미비가 늘면 deliver 로그의 「학습자 상태 계산 실패」부터 봅니다.</p>
 </body></html>`;
 }
 
@@ -390,7 +414,7 @@ async function main() {
   if (!Number.isFinite(Date.parse(기준시각))) die(`--기준 을 못 읽었다: ${기준시각}`);
   const 출력 = 출력검사(값('--출력', path.join(os.tmpdir(), 'synk-성과계기판')));
 
-  const { 행들, 승격, ref } = await 질의실행(기간일, 상한);
+  const { 행들, 승격, 스탬프, ref } = await 질의실행(기간일, 상한);
   const 잘림 = 행들.length >= 상한;
 
   /* 개입 대상 창 = 질의 창에서 기준선 30일을 뺀 만큼(머리말). 기준시각이 아니라 «지금» 에서
@@ -398,6 +422,7 @@ async function main() {
   const 개입최소시각 = new Date(Date.now() - (기간일 - 기준선창) * 일).toISOString();
   const 계수 = 계수내기(행들, { 기준시각, 개입최소시각: 기간일 > 기준선창 ? 개입최소시각 : null });
   계수.승격 = 승격;   // ⑥승격 격차(G10) — 계수내기(사건 행 집계)와 재료가 달라 여기서 싣는다
+  계수.스탬프 = 스탬프; // 개입 스탬프(Temper 규격 v1) — 같은 이유(누적 질의 재료)로 여기서 싣는다
 
   요약찍기(계수, { ref, 잘림 });
   fs.mkdirSync(출력, { recursive: true });
