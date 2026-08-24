@@ -34,7 +34,13 @@ PSQL=(psql "$DATABASE_URL" -X -q -v ON_ERROR_STOP=1)
 fail() { echo "검증 실패: $*" >&2; exit 1; }
 scalar() { "${PSQL[@]}" -Atc "$1"; }
 run_file() { "${PSQL[@]}" -f "$1" >/dev/null; }
-drop_engine() { "${PSQL[@]}" -c 'drop schema if exists engine cascade' >/dev/null; }
+# «처음부터 다시»는 합본이 만드는 스키마 **전부**를 지워야 한다 — 이름이 engine 만 말하던
+# 옛 판(drop_engine)은 08-24 실측에서 혼합 상태를 스스로 만들었다: 이력(engine.schema_migrations)은
+# 지워지는데 ops 실물(뷰)은 살아남아, 재건이 옛 판 뷰로 「내려가기」 replace 를 치다
+# `cannot drop columns from view` 로 죽는다(v2 뷰 위에 v1 을 다시 얹는 자리 · run 32717172049).
+# 합본 소유 스키마는 셋이다: engine · ops(20260815080000) · radio. 새 스키마를 만드는 조각이
+# 생기면 여기에도 한 줄 — 안 넣으면 ③④⑥ 이 그 스키마의 잔존을 «전 판 실물»로 들고 돈다.
+drop_synk() { "${PSQL[@]}" -c 'drop schema if exists engine cascade; drop schema if exists ops cascade; drop schema if exists radio cascade' >/dev/null; }
 
 expect_file_failure() {
   local file="$1" label="$2"
@@ -173,7 +179,7 @@ expect_file_failure "$BUNDLE" 'checksum 불일치'
   "update engine.schema_migrations set checksum='$good_checksum' where version='$BASE_VERSION'" >/dev/null
 
 echo '③ commit 전 실패 주입 — 전부 롤백'
-drop_engine
+drop_synk
 awk '{print} /SYNK_MIGRATION_FAILURE_INJECTION_POINT/ {print "  raise exception '\''CI injected failure'\'';"}' \
   "$BUNDLE" >"$TMP/fail-before-commit.sql"
 expect_file_failure "$TMP/fail-before-commit.sql" '중간 실패'
@@ -182,13 +188,13 @@ run_file "$BUNDLE"
 assert_postcheck '중간 실패 복구'
 
 echo '④ 롤백 경로 실측 + 다시 세우기'
-drop_engine
+drop_synk
 [[ "$(scalar "select to_regnamespace('engine') is null")" == 't' ]] || fail 'drop schema 롤백 경로가 작동하지 않았다'
 run_file "$BUNDLE"
 assert_postcheck '롤백 뒤 재적용'
 
 echo '⑥ 정확한 c3 → c6 ALTER + 기존 데이터 보존'
-drop_engine
+drop_synk
 run_file "$C3"
 seed_lower c3
 run_file "$BUNDLE"
@@ -196,7 +202,7 @@ assert_postcheck 'c3 부트스트랩'
 assert_lower_survived c3
 
 echo '⑥ 정확한 c4 → c6 ALTER + 기존 데이터 보존'
-drop_engine
+drop_synk
 run_file "$C3"
 run_file "$C4_DELTA"
 seed_lower c4
@@ -205,14 +211,14 @@ assert_postcheck 'c4 부트스트랩'
 assert_lower_survived c4
 
 echo '부트스트랩 중단 — 부분 상태'
-drop_engine
+drop_synk
 "${PSQL[@]}" -c 'create schema engine; create table engine.learners(id integer primary key)' >/dev/null
 expect_file_failure "$BUNDLE" '부분 상태'
 [[ "$(scalar "select to_regclass('engine.learners') is not null")" == 't' ]] || fail '부분 상태 원본을 건드렸다'
 [[ "$(scalar "select to_regclass('engine.schema_migrations') is null")" == 't' ]] || fail '부분 상태에 이력을 남겼다'
 
 echo '부트스트랩 중단 — c3/c4 혼합 상태'
-drop_engine
+drop_synk
 run_file "$C3"
 "${PSQL[@]}" -c \
   'alter table engine.learning_events rename constraint learning_events_event_type_c3 to learning_events_event_type_c4' >/dev/null
@@ -220,7 +226,7 @@ expect_file_failure "$BUNDLE" '혼합 상태'
 [[ "$(scalar "select to_regclass('engine.schema_migrations') is null")" == 't' ]] || fail '혼합 상태에 이력을 남겼다'
 
 echo '부트스트랩 중단 — 이력 없는 현행 c6 전용 갈래 없음'
-drop_engine
+drop_synk
 run_file "$BUNDLE"
 "${PSQL[@]}" -c "delete from engine.schema_migrations where version='$BASE_VERSION'" >/dev/null
 expect_file_failure "$BUNDLE" '이력 없는 현행판'
