@@ -5,6 +5,12 @@ import { useFonts } from 'expo-font';
 import 말하기화면 from './src/말하기화면';
 import 답장화면 from './src/답장화면';
 import 어제의나, { 진행받기 } from './src/어제의나';
+/* 검수문 — 개발 빌드 전용(`src/검수문.js` 머리말).
+ * 🔴 **정적 import 를 쓰지 않는다.** Metro 는 tree-shaking 을 완전히 하지 않아 최상단 import 는
+ *   프로덕션 번들에 «코드가 남을» 수 있다(진입이 `__DEV__` 안이라 실행은 안 되지만, 안 남는다고
+ *   말하려면 이 형태여야 한다). `__DEV__` 는 빌드 때 상수로 접히므로 이 require 는 프로덕션에서
+ *   도달 불가가 되어 제거된다. */
+const 검수문 = __DEV__ ? require('./src/검수문').default : null;
 import 도착확인 from './src/도착확인';
 import 인증화면, { 단계 } from './src/인증화면';
 import 원장초기화 from './src/원장초기화';
@@ -225,6 +231,10 @@ export default function App() {
         <회고화면 토큰={세션.access_token} 돌아가기={() => set화면('시스템')} />
       )}
       {화면 === '어제' && <어제의나 값={견줌값?.견줌 ?? null} 돌아가기={() => set화면('말하기')} />}
+      {/* 🔴 검수문 — **개발 빌드에서만**(`src/검수문.js` 머리말 · 위 조건부 require).
+          왜 필요한가: 화면들이 전부 서버 데이터가 있어야 닿아서, 박자·연기 같은 «움직임»을
+          눈으로 볼 자리가 없었다(08-24 실측 — 에뮬레이터를 띄워도 로그인 화면뿐이었다). */}
+      {__DEV__ && 화면 === '검수문' && <검수문 돌아가기={() => set화면('말하기')} />}
       {화면 === '말하기' && (
         <Pressable onPress={() => set화면('시스템')} style={s.시스템링크} hitSlop={8}>
           <Text style={s.시스템글}>SYSTEM</Text>
@@ -259,6 +269,12 @@ export default function App() {
           )}
         </View>
       )}
+      {/* 검수문 입구 — 개발 빌드에서만. 겉테 오른쪽 끝에 붙여 학생 흐름(동사 하나)을 안 건드린다. */}
+      {__DEV__ && 화면 === '말하기' && (
+        <Pressable onPress={() => set화면('검수문')} style={s.검수문링크} hitSlop={8}>
+          <Text style={s.검수문글}>검수문</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -273,6 +289,16 @@ const s = StyleSheet.create({
   // 같은 줄의 링크(잉크_서브)보다 한 층 위 — 색을 안 바꾸고 밝기만으로 먼저 읽히게 한다.
   미달글: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크 },
   시스템링크: { position: 'absolute', top: 34, right: 24, opacity: 0.8 },
+  /* 검수문 링크 — SYSTEM 과 **같은 줄, 그 왼쪽**(개발 빌드 전용).
+     🔴 이 줄(y34~50)은 겉테가 쓰고 마스코트는 top 64 부터다 — 여기 y 를 내리면 몽글 몸이
+     링크를 덮어 탭을 가로챈다(08-23 시연 실측에서 이미 한 번 났다). */
+  검수문링크: { position: 'absolute', top: 34, right: 84, opacity: 0.8 },
+  검수문글: {
+    fontFamily: 폰트.모노,
+    fontSize: 10,
+    letterSpacing: 모노트래킹.라벨,
+    color: 색.잉크_메타,
+  },
   시스템글: {
     fontFamily: 폰트.모노,
     fontSize: 10,
