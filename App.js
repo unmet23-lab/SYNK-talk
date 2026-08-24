@@ -24,6 +24,7 @@ import { 교정목록받기 } from './src/교정API';
 import { 배치미달받기 } from './src/과제API';
 import { 세션읽기, 세션쓰기, 세션지우기 } from './src/저장';
 import { 색, 폰트, 모노트래킹 } from './src/테마';
+import 기호 from './src/기호';
 
 /**
  * 앱 루트 — 말하기(기본) / 도착확인(시스템) / 인증.
@@ -145,8 +146,15 @@ export default function App() {
   if (!fontsLoaded || 복원중) {
     /* 폰트 전에 글자를 그리면 시스템 폰트로 한 번 번쩍인다 — 빈 Navy 화면이 낫다.
        세션 복원도 같은 이유로 여기서 기다린다: 먼저 로그인 화면을 띄웠다가 지우면,
-       이미 로그인된 학생에게 「로그아웃됐나?」 하는 순간을 매번 보여주게 된다. */
-    return <View style={s.로딩} />;
+       이미 로그인된 학생에게 「로그아웃됐나?」 하는 순간을 매번 보여주게 된다.
+       🔑 그 «빈 화면»에 브랜드 기호를 세운다(로고 승격 08-24 — 「로딩 = 큰 기호」가 정본 자리).
+          기호는 View 로만 그려서 **폰트를 안 탄다** — 이 화면이 기다리는 그 폰트 말이다.
+          🚫 코랄 아님: 이 앱의 신호 1점은 화면마다 못박혀 있다(테마 `신호자리`). */
+    return (
+      <View style={[s.로딩, s.로딩가운데]}>
+        <기호 크기={56} />
+      </View>
+    );
   }
 
   // 🔴 로그인 전에는 다른 화면을 그리지 않는다 — 쓰기 통로가 전부 토큰을 요구하므로,
@@ -282,6 +290,7 @@ export default function App() {
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: 색.바탕 },
   로딩: { flex: 1, backgroundColor: 색.바탕 },
+  로딩가운데: { alignItems: 'center', justifyContent: 'center' },
   /* 겉테 두 링크는 같은 띠에 마주 놓는다 — 말하기 화면 본문은 paddingTop 68 아래에서 시작해
      이 띠와 겹치지 않는다. 🚫 코랄로 칠하지 않는다: 그 화면의 신호 1점은 녹음 버튼이다. */
   겉테줄: { position: 'absolute', top: 34, left: 24, flexDirection: 'row', gap: 18 },
