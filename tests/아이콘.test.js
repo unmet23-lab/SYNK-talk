@@ -23,6 +23,7 @@ const A = (f) => path.join(ROOT, 'assets', f);
 const NAVY2 = '#080605'; // Ink Deep(바탕)
 const CREAM = '#FBF7F0'; // Paper(잉크)
 const CORAL = '#F96859'; // Coral(신호)
+const CORAL_SOFT = '#FBB7A3'; // Coral Soft — 알록판 색실의 코랄 계열(펠트 램프 색)
 
 let sharp;
 try {
@@ -110,7 +111,9 @@ for (const { f, size, 배경, 알록 } of 파일들) {
           실땀에는 펠트 필터(feTurbulence + feDisplacementMap)가 걸려 있어 **정확한 hex 가
           한 픽셀도 안 남는다**(08-25 실측: #F96859 0개 · 근방 ±26 은 2.13%). 그래도 브랜드
           색은 살아 있으므로 눈금을 근방으로 옮기되, 면적 규율(5% 미만)은 그대로 건다. */
-    const 신호면적 = 알록 ? s.근방(CORAL) : s.비율(CORAL);
+    /* 알록 «소프트» 정본(유호 08-25)은 색실이 전부 파스텔이라 **원색 코랄이 한 픽셀도 없다**
+       (실측: Coral 근방 0 · Coral Soft 근방 0.09%). 코랄 계열이면 신호가 산 것으로 본다. */
+    const 신호면적 = 알록 ? s.근방(CORAL) + s.근방(CORAL_SOFT) : s.비율(CORAL);
     assert.ok(신호면적 < 0.05, `${f} Coral 면적 ${(신호면적 * 100).toFixed(2)}% — R1 위반`);
 
     // monochrome 은 OS 가 칠하므로 브랜드색이 없는 게 정상
