@@ -33,15 +33,32 @@ test('L0_스키마.sql = 정렬한 마이그레이션 조각 이음 + 멱등화 
   assertByteIdentical(actual, expected, 'supabase/L0_스키마.sql');
 });
 
-/* 멱등화의 판정력 — 「자기 이름을 안 지우는 add」가 있으면 반드시 drop 이 끼워지고,
- * 이미 있으면 1바이트도 안 바뀐다(두 번 돌려도 같다 = 멱등화 자신도 멱등). */
-test('멱등화 — 자기 이름 drop 을 끼워 넣고, 두 번 돌리면 그대로다', () => {
+/* 멱등화의 판정력 — 규칙 ① 「자기 이름을 안 지우는 add」에 drop 이 끼워지고, 규칙 ②
+ * 「가드 없는 리터럴판 이력 insert」가 if not exists 로 감싸이며, 이미 처리된 산출물은
+ * 1바이트도 안 바뀐다(두 번 돌려도 같다 = 멱등화 자신도 멱등). */
+test('멱등화 ① — 자기 이름 drop 을 끼워 넣고, 두 번 돌리면 그대로다', () => {
   const 결함 = Buffer.from(
     'alter table t\n  drop constraint if exists x_c12,\n  add constraint x_c13 check (true);\n',
   );
   const 한번 = 멱등화(결함).toString('utf8');
   assert.match(한번, /drop constraint if exists x_c13,\n  add constraint x_c13/);
   assert.equal(멱등화(Buffer.from(한번)).toString('utf8'), 한번, '멱등화가 자기 산출물을 또 바꾼다');
+});
+
+test('멱등화 ② — 가드 없는 이력 insert 는 감싸고, 이미 가드된 것·변수판은 안 건드린다', () => {
+  const 무가드 = Buffer.from(
+    "  insert into engine.schema_migrations(version, name, checksum)\n"
+    + "  values ('20260822150000', 'x.sql', expected_checksum);\n",
+  );
+  const 한번 = 멱등화(무가드).toString('utf8');
+  assert.match(한번, /if not exists \(select 1 from engine\.schema_migrations where version = '20260822150000'\) then/);
+  assert.match(한번, /end if;/);
+  assert.equal(멱등화(Buffer.from(한번)).toString('utf8'), 한번, '감싼 것을 또 감쌌다');
+
+  const 변수판 = "  insert into engine.schema_migrations(version, name, checksum)\n"
+    + "  values (migration_version, migration_name, expected_checksum);\n";
+  assert.equal(멱등화(Buffer.from(변수판)).toString('utf8'), 변수판,
+    '변수 판번호는 머리 가드 안이다 — 감싸면 이중 가드다');
 });
 
 test('각 마이그레이션 checksum은 checksum 슬롯만 0으로 치환한 파일 SHA-256이다', () => {

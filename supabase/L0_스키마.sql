@@ -14659,8 +14659,10 @@ do $migration2$
 declare
   expected_checksum constant text := '3f3b49afc63cdcf71d3ec2078e0df3fbc47b492dfd59be1272263ff6234317a5'; -- migration-checksum
 begin
-  insert into engine.schema_migrations(version, name, checksum)
-  values ('20260822150000', '20260822150000_estimate_responded_c13.sql', expected_checksum);
+  if not exists (select 1 from engine.schema_migrations where version = '20260822150000') then
+    insert into engine.schema_migrations(version, name, checksum)
+    values ('20260822150000', '20260822150000_estimate_responded_c13.sql', expected_checksum);
+  end if;
 end
 $migration2$;
 

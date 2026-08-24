@@ -120,32 +120,60 @@ function syncCheckFile(bundle) {
  * alter 가 조건 가드 do-블록 «안»이라서다(재실행이면 통째로 건너뜀) — c13 은 밖이었다.
  * 조각을 고치는 길은 둘 다 막혀 있다: 파일 수정은 위 checksum 가드가 거절하고(운영 이력 소급),
  * 새 조각 덧붙이기는 안 통한다(합본은 그 앞줄에서 죽는다). 그래서 «굽는 자리»에서 고친다:
- * drop 이 하나라도 있는 alter 사슬의 add 앞에, 자기 이름 drop 이 없으면 끼워 넣는다.
+ * 규칙은 둘이다(둘 다 같은 병 — c13 조각은 몸이 머리 가드 «밖»이라 재실행에도 돈다.
+ * 가드의 return 은 do-블록만 빠져나가지, 그 뒤의 평문 SQL 은 못 막는다):
+ *   ① 제약 사슬 — drop 이 하나라도 있는 alter 사슬의 add 앞에, 자기 이름 drop 이 없으면 끼운다.
+ *   ② 이력 기록 — 리터럴 판번호로 schema_migrations 에 넣는 insert 가 「이미 적혔나」 가드 없이
+ *      서 있으면 `if not exists (…) then … end if;` 로 감싼다(20260824020000 조각이 쓰는 그 모양).
+ *      ②-b(checksum 불일치 중단)는 안 깎인다 — 그 중단은 조각 «머리» 가드의 raise 가 쥐고 있고,
+ *      여기서 감싸는 것은 «꼬리»의 중복 insert 뿐이다.
  * 빈 DB 첫 적용엔 no-op(NOTICE 한 줄) · 가드 안 사슬에 들어가도 무해 · checksum 슬롯은
  * 안 건드리므로 DB 이력 대조(②-b)도 그대로다. 조각 파일은 1바이트도 안 바뀐다. */
 const ALTER_시작 = /^\s*alter table\b/;
 const 문장끝 = /;\s*\r?$/;
 const 제약드롭 = /^\s*drop constraint if exists ([A-Za-z0-9_]+),\s*\r?$/;
 const 제약추가 = /^(\s*)add constraint ([A-Za-z0-9_]+)\b/;
+const 이력기록 = /^(\s*)insert into engine\.schema_migrations\(version, name, checksum\)\s*\r?$/;
+const 이력값줄 = /^\s*values \('(\d{14})'.*;\s*\r?$/;
+const 이력가드 = /if not exists .*schema_migrations where version = '(\d{14})'/;
 
 function 멱등화(bundle) {
   const lines = bundle.toString('utf8').split('\n');
   const out = [];
   let 사슬 = null;   // 여러 줄 alter 문이 열려 있는 동안만 Set(그 문이 지운 이름들)
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
     if (사슬 === null) {
-      if (ALTER_시작.test(line) && !문장끝.test(line)) 사슬 = new Set();
-    } else {
-      const 드롭 = 제약드롭.exec(line);
-      if (드롭) 사슬.add(드롭[1]);
-      const 추가 = 제약추가.exec(line);
-      if (추가 && 사슬.size > 0 && !사슬.has(추가[2])) {
-        const cr = line.endsWith('\r') ? '\r' : '';
-        out.push(`${추가[1]}drop constraint if exists ${추가[2]},${cr}`);
-        사슬.add(추가[2]);
+      if (ALTER_시작.test(line) && !문장끝.test(line)) { 사슬 = new Set(); out.push(line); continue; }
+
+      /* 규칙 ② — 리터럴 판번호의 이력 insert 를 「이미 적혔나」로 감싼다(머리말 참조). */
+      const 기록 = 이력기록.exec(line);
+      const 값 = 기록 && i + 1 < lines.length ? 이력값줄.exec(lines[i + 1]) : null;
+      if (기록 && 값) {
+        const 직전 = out.filter((l) => l.trim() !== '').at(-1) || '';
+        if (!이력가드.test(직전)) {
+          const [, indent] = 기록;
+          const cr = line.endsWith('\r') ? '\r' : '';
+          out.push(`${indent}if not exists (select 1 from engine.schema_migrations where version = '${값[1]}') then${cr}`);
+          out.push(`  ${line}`);
+          out.push(`  ${lines[i + 1]}`);
+          out.push(`${indent}end if;${cr}`);
+          i += 1;
+          continue;
+        }
       }
-      if (문장끝.test(line)) 사슬 = null;
+      out.push(line);
+      continue;
     }
+    const 드롭 = 제약드롭.exec(line);
+    if (드롭) 사슬.add(드롭[1]);
+    const 추가 = 제약추가.exec(line);
+    if (추가 && 사슬.size > 0 && !사슬.has(추가[2])) {
+      const cr = line.endsWith('\r') ? '\r' : '';
+      out.push(`${추가[1]}drop constraint if exists ${추가[2]},${cr}`);
+      사슬.add(추가[2]);
+    }
+    if (문장끝.test(line)) 사슬 = null;
     out.push(line);
   }
   return Buffer.from(out.join('\n'), 'utf8');
