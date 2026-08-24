@@ -32,8 +32,16 @@ function 오디오() { return require('expo-audio'); }
  *   플레이어가 샌다. 증상이 무음이라(08-25 「소리가 안 나」) 원인 후보에서 먼저 지운다. */
 const 플레이어들 = {};
 
-/** 효과음 — 킷 4종만. 게이트 거부는 조용히 무음(오류가 아니라 설계다). */
-export function 효과음(이름) {
+/**
+ * 효과음 — 킷 4종만. 게이트 거부는 조용히 무음(오류가 아니라 설계다).
+ *
+ * @param {string} 이름 킷 이름(earn·achieve·notify·mongle)
+ * @param {number} [속도] 재생 속도 — **몽글 목소리의 «표정»이 이 값이다**(유호 확정 08-25 ·
+ *   판정은 `lib/몽글목소리.js`). 🔑 `shouldCorrectPitch=false` 를 함께 세운다: 피치 보정이
+ *   켜져 있으면 속도만 변하고 음높이가 그대로라 «표정»이 아니라 «빨리 감기»가 된다.
+ *   🚫 킷 3종에는 안 쓴다 — 그 셋은 밸런스가 파일에 박혀 있다(볼륨·속도 재조정 금지).
+ */
+export function 효과음(이름, 속도) {
   const 답 = 게이트.판정('sfx', 이름);
   if (!답.허용) return false;
   if (!플레이어들[이름]) {
@@ -41,6 +49,12 @@ export function 효과음(이름) {
     플레이어들[이름] = createAudioPlayer(효과음자산[이름]());
   }
   const p = 플레이어들[이름];
+  if (속도 && 속도 !== 1) {
+    /* 기기·버전에 따라 이 API 가 없을 수 있다 — 없으면 «표정 없는 기본 속도»로 난다.
+       소리가 아예 안 나는 것보다 낫고, 침묵은 게이트만 정한다(마스코트 머리말과 같은 규율). */
+    try { p.setPlaybackRate(속도, 'low'); } catch { /* 표정 없이 그대로 */ }
+    try { p.shouldCorrectPitch = false; } catch { /* 피치 보정 기본값 유지 */ }
+  }
   p.seekTo(0);
   p.play();
   return true;
