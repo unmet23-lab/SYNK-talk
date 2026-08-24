@@ -47,7 +47,17 @@ async function 픽셀통계(file) {
     const k = hex(data[i], data[i + 1], data[i + 2]);
     cnt[k] = (cnt[k] || 0) + 1;
   }
-  return { cnt, n, 투명, w: info.width, h: info.height, 비율: (c) => (cnt[c] || 0) / n };
+  const 근방 = (c, tol = 26) => {
+    const r = parseInt(c.slice(1, 3), 16), g = parseInt(c.slice(3, 5), 16), b = parseInt(c.slice(5, 7), 16);
+    let 합 = 0;
+    for (const k in cnt) {
+      if (Math.abs(parseInt(k.slice(1, 3), 16) - r) < tol
+        && Math.abs(parseInt(k.slice(3, 5), 16) - g) < tol
+        && Math.abs(parseInt(k.slice(5, 7), 16) - b) < tol) 합 += cnt[k];
+    }
+    return 합 / n;
+  };
+  return { cnt, n, 투명, w: info.width, h: info.height, 비율: (c) => (cnt[c] || 0) / n, 근방 };
 }
 
 const 파일들 = [
@@ -55,7 +65,7 @@ const 파일들 = [
   { f: 'android-icon-foreground.png', size: 1024, 배경: null },
   { f: 'android-icon-background.png', size: 1024, 배경: NAVY2 },
   { f: 'android-icon-monochrome.png', size: 1024, 배경: null },
-  { f: 'splash-icon.png', size: 1024, 배경: null },
+  { f: 'splash-icon.png', size: 1024, 배경: null, 알록: true },
   { f: 'favicon.png', size: 64, 배경: NAVY2 },
 ];
 
@@ -76,7 +86,7 @@ test('app.json 의 배경색이 정본 Ink Deep 과 같다', () => {
 // sharp 가 없는 환경에서는 픽셀 검사를 건너뛴다 — 다만 **조용히 통과시키지 않고 skip 으로 남긴다**.
 const 픽셀검사 = sharp ? test : test.skip;
 
-for (const { f, size, 배경 } of 파일들) {
+for (const { f, size, 배경, 알록 } of 파일들) {
   픽셀검사(`${f} — 규격·정본색·R1`, async () => {
     const s = await 픽셀통계(A(f));
     assert.equal(s.w, size, `${f} 가로 규격`);
@@ -95,13 +105,18 @@ for (const { f, size, 배경 } of 파일들) {
       assert.ok(s.투명 / s.n > 0.5, `${f} 는 투명 배경이어야 한다`);
     }
 
-    // R1 — 신호색은 한 점, 면적 5% 미만
-    assert.ok(s.비율(CORAL) < 0.05, `${f} Coral 면적 ${(s.비율(CORAL) * 100).toFixed(2)}% — R1 위반`);
+    /* R1 — 신호색은 한 점, 면적 5% 미만.
+       🔑 **알록판은 «근방»으로 잰다**(유호 확정 08-25 — 스플래시 = 알록). 알록의 신호는 색실이고
+          실땀에는 펠트 필터(feTurbulence + feDisplacementMap)가 걸려 있어 **정확한 hex 가
+          한 픽셀도 안 남는다**(08-25 실측: #F96859 0개 · 근방 ±26 은 2.13%). 그래도 브랜드
+          색은 살아 있으므로 눈금을 근방으로 옮기되, 면적 규율(5% 미만)은 그대로 건다. */
+    const 신호면적 = 알록 ? s.근방(CORAL) : s.비율(CORAL);
+    assert.ok(신호면적 < 0.05, `${f} Coral 면적 ${(신호면적 * 100).toFixed(2)}% — R1 위반`);
 
     // monochrome 은 OS 가 칠하므로 브랜드색이 없는 게 정상
     if (f !== 'android-icon-monochrome.png' && f !== 'android-icon-background.png') {
-      assert.ok(s.비율(CREAM) > 0, `${f} 에 잉크 ${CREAM} 이 없다`);
-      assert.ok(s.비율(CORAL) > 0, `${f} 에 신호 ${CORAL} 이 없다`);
+      assert.ok((알록 ? s.근방(CREAM) : s.비율(CREAM)) > 0, `${f} 에 잉크 ${CREAM} 이 없다`);
+      assert.ok(신호면적 > 0, `${f} 에 신호 ${CORAL} 이 없다`);
     }
   });
 }
