@@ -22,10 +22,11 @@
  *   위계는 밀도로 준다(R2) — **늘어난 칸만 잉크 100%**, 나머지는 서브 층이다.
  *   숫자는 DM Mono(숫자 전용) · 한글 라벨은 SUIT(모노에 한글 글리프가 없다).
  */
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { 색, 폰트, 모노트래킹 } from './테마';
 import { 부르기 } from './사건통로.js';
 import { 견줌, 늘어난말 } from '../lib/견줌.js';
+import { use등장 } from '../lib/모션.js';
 
 /**
  * 오늘·어제를 읽어 **화면이 그릴 모양**으로 준다. `null` 이면 비교할 어제가 없다(첫날).
@@ -51,6 +52,14 @@ function 견줌줄({ 이름, 축 }) {
   );
 }
 
+/* 표 «다음»에 오는 결론 줄 — 표가 자리 잡은 뒤 눈이 이리로 오게 한 박자 늦는다.
+ * 두 줄은 서로 다른 지연을 받아 차례로 선다(고리 → 늘어남): 둘이 동시에 뜨면 어느 쪽이
+ * 결론인지 흐려진다. reduce-motion 이면 지연도 애니메이션도 0이다(`lib/모션.js`). */
+function 뒤따르는줄({ style, 지연, children }) {
+  const 등장 = use등장({ 올라옴: 4, 시간: 220, 지연 });
+  return <Animated.Text style={[style, 등장]}>{children}</Animated.Text>;
+}
+
 /**
  * @param {object} props
  * @param {object|null} props.값 `진행받기` 결과. 없으면 **화면 자체가 안 뜬다**(App.js 가 링크를 안 그린다).
@@ -58,12 +67,17 @@ function 견줌줄({ 이름, 축 }) {
  */
 export default function 어제의나({ 값, 돌아가기 }) {
   const 늘었다 = 값 ? 늘어난말(값) : null;
+  /* 등장 한 박자(08-24 · `lib/모션.js` 머리말) — 이 화면은 포인트·리그가 없는 앱에서 **동기 축을
+   * 혼자 지는 자리**인데(위 머리말) 박자가 0이라 표가 순간 팝으로 섰다.
+   * 🚫 숫자를 세어 올리지 않는다 — 그건 「위계는 밀도로」(R2)가 아니라 게임화 쪽 결정이라
+   *    철학 게이트를 따로 지나야 한다. 여기서는 자리 잡음까지다. */
+  const 카드등장 = use등장();
   return (
     <View style={s.wrap}>
       <Text style={s.머리}>어제의 나</Text>
 
       {값 ? (
-        <View style={s.카드}>
+        <Animated.View style={[s.카드, 카드등장]}>
           <View style={s.줄}>
             <Text style={s.이름} />
             <Text style={s.칸이름}>어제</Text>
@@ -76,11 +90,11 @@ export default function 어제의나({ 값, 돌아가기 }) {
           {/* 🔑 이 한 줄이 지금 설계의 **유일한 결과 변수**다(L0 §9-2) — 「연습을 많이 했다」와
               다른 축이라 위 표에 숫자로 섞지 않는다. 오늘 이어졌을 때만 말한다. */}
           {값.교정재발화.오늘 ? (
-            <Text style={s.고리}>어제 받은 교정을 오늘 다시 말했어요.</Text>
+            <뒤따르는줄 style={s.고리} 지연={110}>어제 받은 교정을 오늘 다시 말했어요.</뒤따르는줄>
           ) : null}
 
-          {늘었다 ? <Text style={s.늘어남}>{늘었다}</Text> : null}
-        </View>
+          {늘었다 ? <뒤따르는줄 style={s.늘어남} 지연={170}>{늘었다}</뒤따르는줄> : null}
+        </Animated.View>
       ) : null}
 
       <Pressable onPress={돌아가기} style={({ pressed }) => [s.back, pressed && { opacity: 0.7 }]}>

@@ -46,13 +46,14 @@
  *   🚫 코랄 **면**을 만들지 않는다(그 위에 얹을 수 있는 글자색이 킷에 없다).
  */
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { 색, 폰트, 모노트래킹, 몽골어 } from './테마';
 import { 교정앉음, 열람사건, 응답사건, 교정사건보내기, 학생응답값 } from './교정API.js';
 import { 항목추가, 응답값, 전송기록, 보낼것 } from '../lib/교정로그.js';
 import { 무오류인가, 무오류표식 } from '../lib/꼬리.js';
 import { 교정로그읽기, 교정로그쓰기 } from './저장.js';
 import { 효과음 } from './소리.js';
+import { use등장 } from '../lib/모션.js';
 import 막힘카드 from './막힘카드.js';
 /* 마스코트 — 이 화면이 «보는 화면»이라 캐릭터가 산다(생명감 설계 §5 배치 = 홈·답장 ·
    말하기 화면은 상주 금지·연기 한시 등장만(08-12 실측 → 08-23 유호 확정으로 갱신) —
@@ -65,6 +66,23 @@ const 고친이 = { teacher: '선생님이 고쳐 줬어요', ai: 'AI 가 고쳐
 
 /** 버튼 문구 — 값은 계약 값목록(`학생응답값`)이고 문구는 이 화면 것이다. */
 const 답문구 = { 채택: '알겠어요', 수정: '다시 말해 볼래요' };
+
+/* 교정 카드의 틀 — 등장 한 박자(08-24 · `lib/모션.js` 머리말)를 지는 자리.
+ * 🔑 **틀을 따로 세우는 이유**: 교정은 조회가 끝나야 도착한다. 훅을 화면 최상위에 두면
+ *   화면이 뜨는 순간 박자가 시작돼 «카드가 오기 전에» 끝난다 — 그러면 도착이 순간 팝이다.
+ *   이 틀이 마운트되는 때가 곧 교정이 도착한 때라, 박자가 그 순간에 붙는다.
+ * 🚫 세기를 더 올리지 않는다 — 이 화면의 신호 1점은 태그(코랄)다(아래 렌더 주석). */
+function 교정카드틀({ children }) {
+  const 등장 = use등장();
+  return <Animated.View style={[s.카드, 등장]}>{children}</Animated.View>;
+}
+
+/* 「답했어요」 — 버튼 셋이 사라지고 이 한 줄로 바뀌는 자리. 학생이 **방금 누른** 것에 대한
+ * 유일한 화면 응답이라 즉각 팝이면 눌린 줄도 모른다. 지연 0 — 이건 뒤따름이 아니라 응답이다. */
+function 답한줄({ 글 }) {
+  const 등장 = use등장({ 올라옴: 6, 시간: 200 });
+  return <Animated.Text style={[s.답한줄, 등장]}>{글}</Animated.Text>;
+}
 
 /**
  * @param {object} props
@@ -194,7 +212,7 @@ export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = nu
       <Text style={s.머리}>답장</Text>
 
       {교정 ? (
-        <View style={s.카드}>
+        <교정카드틀>
           <Text style={s.고친이}>{고친이[교정.actor_kind] || '고쳐 줬어요'}</Text>
 
           {교정.corrected_text ? (
@@ -232,7 +250,7 @@ export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = nu
           ) : null}
 
           <Text style={s.메모}>내일 따라 말하기는 이 문장이에요.</Text>
-        </View>
+        </교정카드틀>
       ) : null}
 
       {/* 🔴 막힘이 **버튼보다 앞선다** — 누를 수 있게 두면 답이 로그에만 남고 화면은
@@ -243,7 +261,7 @@ export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = nu
       {막힘 ? (
         <막힘카드 막힘={막힘} 학생번호={학생번호} />
       ) : 답한값 ? (
-        <Text style={s.답한줄}>{답문구[답한값] || 답한값} — 답했어요</Text>
+        <답한줄 글={`${답문구[답한값] || 답한값} — 답했어요`} />
       ) : (
         <View style={s.버튼줄}>
           {학생응답값
