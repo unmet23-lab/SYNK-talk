@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>과제 생성 채점 — SYNK</title>
+<!--
+  채점 화면 (§8-B · 2026-08-25) — 규칙은 lib/과제채점.js, 저장은 tools/과제채점.js.
+  킷 = 앱 «양모 밤»(src/테마.js 그대로): 바탕 Ink Deep #080605 · 카드 Ink #2B2320 · 글자 Paper #FBF7F0
+  · 보조 Stone #C7BFB2 · 신호 1점 = Coral #F96859(면적 5% 미만 — 진행바·뒤집힌 X 면·오류 글자만)
+  · X 면 = 눌림 Coral 3 #AE322A(면 전용) · 완주 표시 = 성장 Meadow Soft #D3E8BE(면 없이 글자).
+  기본 버튼 = Paper 면 + Ink Deep 글자(코랄 면 + 흰 글자는 이 킷에서 대비 미달 — 테마.js 원문).
+  순백·순검정 0 · 이모지 0 · 한글 keyframes 없음(애니메이션 자체가 없다 — 전환만, 300ms 상한).
+  초안 = 축 여덟 전부 O 로 미리 눌러 둔다(문항검수 선례 「사람 손은 확정 하나」) — 유호님은
+  흠 있는 축만 X 로 뒤집고 저장한다. CLI 의 「11111111」 습관과 같은 무게다.
+-->
+<style>
+  :root {
+    --bg: #080605; --card: #2B2320; --paper: #FBF7F0;
+    --tag: rgba(251,247,240,.75); --sub: rgba(251,247,240,.72); --meta: rgba(251,247,240,.62);
+    --stone: #C7BFB2; --coral: #F96859; --coral2: #FD9C87; --pressed: #AE322A; --grow: #D3E8BE;
+    --line: rgba(251,247,240,.14);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--paper);
+    font: 16px/1.6 "Inter Tight","SUIT Variable",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    display: flex; flex-direction: column; align-items: center; word-break: keep-all;
+  }
+  header {
+    width: 100%; border-bottom: 1px solid var(--line); padding: 13px 20px;
+    display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap;
+  }
+  h1 { font-size: 15px; font-weight: 800; margin: 0; letter-spacing: .01em; }
+  .분모 { color: var(--stone); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .분모 b { color: var(--paper); font-weight: 600; }
+  .이름칸 { margin-left: auto; display: flex; gap: 8px; align-items: center; color: var(--meta); font-size: 13px; }
+  .이름칸 input {
+    background: transparent; border: 1px solid var(--line); border-radius: 8px; color: var(--paper);
+    font: inherit; font-size: 14px; padding: 5px 10px; width: 6em;
+  }
+  main { width: 100%; max-width: 780px; padding: 24px 20px 72px; }
+
+  .진행 { height: 4px; background: var(--card); border-radius: 2px; overflow: hidden; margin-bottom: 22px; }
+  .진행 i { display: block; height: 100%; background: var(--coral); width: 0; transition: width 180ms ease; }
+
+  .머리 { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+  .id { color: var(--meta); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .기술 { color: var(--stone); font-size: 13px; }
+
+  .학생판 { background: var(--card); border-radius: 14px; padding: 18px 20px 20px; margin: 10px 0 14px; }
+  .걸음 { color: var(--meta); font-size: 12.5px; margin: 0 0 2px; letter-spacing: .02em; }
+  .문장 { font-size: 23px; font-weight: 600; line-height: 1.5; margin: 0 0 16px; }
+  .문장.질문끝 { margin-bottom: 2px; }
+  .목표 { color: var(--sub); font-size: 14px; margin: 0 0 12px; }
+  .목표 b { color: var(--paper); font-weight: 600; }
+
+  details { margin: 0 0 14px; }
+  details summary {
+    cursor: pointer; color: var(--stone); font-size: 13px; letter-spacing: .03em;
+    list-style: none; min-height: 40px; display: flex; align-items: center;
+  }
+  details summary::before { content: "▸ "; margin-right: 4px; }
+  details[open] summary::before { content: "▾ "; }
+  .상태본문 {
+    white-space: pre-wrap; color: var(--sub); font-size: 14px; line-height: 1.7;
+    border-left: 2px solid var(--line); padding: 4px 0 4px 14px; margin: 6px 0 0;
+  }
+
+  .축들 { display: grid; gap: 6px; margin: 0 0 6px; }
+  .축 {
+    display: flex; align-items: center; gap: 10px;
+    border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px;
+  }
+  .축 .이름 { flex: 1; font-size: 15px; }
+  .축 .이름 small { color: var(--meta); font-size: 12.5px; margin-left: 8px; }
+  .축 kbd { color: var(--meta); font-size: 11px; font-family: inherit; min-width: 1em; text-align: center; }
+  .토글 { display: flex; gap: 6px; }
+  .토글 button {
+    font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+    min-width: 52px; min-height: 40px; border-radius: 9px;
+    background: transparent; color: var(--meta); border: 1px solid var(--line);
+    transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+  }
+  .토글 button[aria-pressed="true"].O { background: rgba(251,247,240,.14); color: var(--paper); border-color: rgba(251,247,240,.35); }
+  .토글 button[aria-pressed="true"].X { background: var(--pressed); color: var(--paper); border-color: var(--pressed); }
+  .축.뺌 { opacity: .55; }
+  .축.뺌 .뺌표 { color: var(--meta); font-size: 13px; }
+  .앵커 { border: 0; margin: -2px 0 6px; padding: 0 12px; }
+  .앵커 .상태본문 { font-size: 13.5px; }
+  .앵커 b { color: var(--paper); font-weight: 600; }
+
+  .이유 { margin: 10px 0 16px; }
+  .이유 label { display: block; color: var(--stone); font-size: 13px; margin-bottom: 6px; }
+  .이유 label.필수 { color: var(--coral2); }
+  textarea {
+    width: 100%; min-height: 58px; resize: vertical; border-radius: 12px;
+    background: var(--card); border: 1px solid var(--line); color: var(--paper);
+    font: inherit; font-size: 15px; line-height: 1.6; padding: 10px 14px;
+  }
+
+  .단추들 { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  button.주 {
+    background: var(--paper); color: var(--bg); border: 0; border-radius: 12px;
+    padding: 13px 26px; font: inherit; font-weight: 700; font-size: 16px; cursor: pointer; min-height: 44px;
+  }
+  button.보조 {
+    background: transparent; color: var(--paper); border: 1px solid var(--line);
+    border-radius: 12px; padding: 13px 20px; font: inherit; font-size: 15px; cursor: pointer; min-height: 44px;
+  }
+  button:active { transform: scale(.96); }
+  button:disabled { opacity: .4; cursor: default; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+  .힌트 { color: var(--meta); font-size: 12px; margin-left: auto; }
+
+  .상태 { margin-top: 18px; font-size: 14px; color: var(--stone); min-height: 1.6em; }
+  .상태.나쁨 { color: var(--coral); }
+
+  .끝 { padding: 40px 0 20px; }
+  .끝 h2 { font-size: 21px; margin: 0 0 8px; }
+  .끝 p { color: var(--stone); margin: 0 0 18px; }
+  table.집계 { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; margin: 0 0 18px; }
+  table.집계 th, table.집계 td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); font-size: 14.5px; font-weight: 400; }
+  table.집계 th { color: var(--meta); font-size: 12.5px; letter-spacing: .04em; }
+  td.통과 { color: var(--grow); }
+  td.미달 { color: var(--coral2); }
+  code { font-family: "DM Mono",ui-monospace,Consolas,monospace; font-size: .92em; color: var(--sub); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } button:active { transform: none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>과제 생성 채점</h1>
+  <span class="분모" id="분모">불러오는 중</span>
+  <span class="이름칸"><label for="채점자">채점자</label><input id="채점자" value="유호"></span>
+</header>
+<main>
+  <div class="진행"><i id="진행"></i></div>
+  <div id="판"></div>
+  <p class="상태" id="상태"></p>
+</main>
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+let 재료 = null, 대기 = [], 지금행 = null, 점수 = [], 보냄 = false;
+
+function 글자(부모, 태그, 값, 클래스) {
+  const el = document.createElement(태그);
+  if (값 != null) el.textContent = 값;   // 데이터는 언제나 텍스트로 — 화면에 마크업을 안 만든다
+  if (클래스) el.className = 클래스;
+  부모.appendChild(el);
+  return el;
+}
+
+async function 불러오기() {
+  const r = await fetch('/api/data');   // 경로는 ASCII — 한글 경로는 퍼센트 인코딩으로 어긋난다
+  재료 = await r.json();
+  대기 = 재료.행들.filter((x) => x.미채점);
+  const 이름 = 재료.동봉 && 재료.동봉.채점자;
+  if (이름 && 이름 !== '(미채점)') $('채점자').value = 이름;
+  분모그리기(재료.진행);
+  다음();
+}
+
+function 분모그리기(p) {
+  $('분모').textContent = '';
+  const 문 = `전체 ${p.전체} = 매김 ${p.매김} + 남음 ${p.미채점}` + (p.고정 ? ` + 0점 고정 ${p.고정}` : '');
+  글자($('분모'), 'b', 문);
+  const 분모 = p.전체 - p.고정;
+  $('진행').style.width = (분모 ? (p.매김 / 분모) * 100 : 0) + '%';
+  재료.진행 = p;
+}
+
+function 다음() {
+  지금행 = 대기.shift() || null;
+  점수 = 재료.축키들.map(() => 1);   // 초안 = 전부 O — 사람 손은 흠 있는 축 뒤집기 + 저장
+  그리기();
+}
+
+function 그리기() {
+  const 판 = $('판');
+  판.textContent = '';
+  if (!지금행) return 끝그리기(판);
+  const q = 지금행;
+
+  const 머리 = 글자(판, 'div', null, '머리');
+  글자(머리, 'span', `${q.case_id} · ${q.칸} · 남음 ${대기.length + 1}`, 'id');
+  글자(머리, 'span', '겨냥 문법: ' + (q.기술들.join(' / ') || '—'), '기술');
+
+  const 학생판 = 글자(판, 'div', null, '학생판');
+  글자(학생판, 'p', '01듣기·02따라 「오늘의 문장이에요 — 딱 세 걸음이에요: 듣고, 따라 말하고, 내 말로 답해요!」', '걸음');
+  글자(학생판, 'p', q.sentence, '문장');
+  글자(학생판, 'p', '03답하기 「이번엔 내 말로 답해요 — 방금 따라 말한 문장처럼 하면 딱 좋아요!」', '걸음');
+  글자(학생판, 'p', q.question, '문장 질문끝');
+
+  const 목표 = 글자(판, 'p', null, '목표');
+  글자(목표, 'span', '목표: ');
+  글자(목표, 'b', q.목표없음 ? '(없음)' : q.goal);
+  if (q.목표없음) 글자(목표, 'span', ' — ⑦목표활용은 분모에서 뺀다(0점이 아니다)');
+
+  const 상태 = 재료.상태들[q.case_id.split('#')[0]];
+  const 접기 = 글자(판, 'details');
+  접기.open = true;
+  글자(접기, 'summary', '모델이 본 학생 상태 — ⑧상태활용은 이걸 보고 매긴다');
+  글자(접기, 'div', 상태 || '(못 읽었다 — 본문 템플릿이 바뀌었을 수 있다 · ⑧은 이 사례에서 판단 보류)', '상태본문');
+
+  const 축들 = 글자(판, 'div', null, '축들');
+  재료.축키들.forEach((k, i) => {
+    const 뺌 = k === 재료.null허용축 && q.목표없음;
+    const 줄 = 글자(축들, 'div', null, '축' + (뺌 ? ' 뺌' : ''));
+    글자(줄, 'kbd', String(i + 1));
+    const 이름 = 글자(줄, 'div', null, '이름');
+    글자(이름, 'span', 재료.축이름[i]);
+    if (k === 'accuracy') 글자(이름, 'small', '자연스러운 한국어');
+    if (뺌) { 글자(줄, 'span', '분모에서 뺌', '뺌표'); return; }
+    const 토글 = 글자(줄, 'div', null, '토글');
+    const O = 글자(토글, 'button', 'O', 'O');
+    const X = 글자(토글, 'button', 'X', 'X');
+    O.onclick = () => 축값(i, 1);
+    X.onclick = () => 축값(i, 0);
+    O.dataset.축 = X.dataset.축 = String(i);
+  });
+  const 앵 = 재료.앵커;
+  const 앵커 = 글자(판, 'details', null, '앵커');
+  글자(앵커, 'summary', '⑤재미의 잣대 — ' + 앵.채점자질문);
+  const 본 = 글자(앵커, 'div', null, '상태본문');
+  앵['0점조건'].forEach((z) => { 글자(본, 'b', z.anchor_id + ' ' + z.조건); 글자(본, 'span', ` — 「${z.sentence} / ${z.question}」\n`); });
+  앵['1점앵커'].forEach((a) => { 글자(본, 'b', a.anchor_id + ' ' + a.기준); 글자(본, 'span', ` — 「${a.sentence} / ${a.question}」\n`); });
+  글자(본, 'span', '중간이면: ' + 앵.중간사례기준);
+
+  const 이유 = 글자(판, 'div', null, '이유');
+  const 라벨 = 글자(이유, 'label', '메모(없으면 비워 둔다)');
+  라벨.id = '이유라벨'; 라벨.htmlFor = '이유칸';
+  const 칸 = 글자(이유, 'textarea');
+  칸.id = '이유칸'; 칸.placeholder = 'X 가 있으면 이유가 필수다 — 왜 0점인지 한 줄';
+
+  const 단추 = 글자(판, 'div', null, '단추들');
+  const 저장 = 글자(단추, 'button', '저장하고 다음', '주');
+  저장.id = '저장'; 저장.onclick = 보내기;
+  const 나중 = 글자(단추, 'button', '나중에', '보조');
+  나중.onclick = () => { 대기.push(지금행); 알림(`${지금행.case_id} 는 맨 뒤로 — 나중에 다시 만난다`, false); 다음(); };
+  글자(단추, 'span', '1~8 축 뒤집기 · Enter 저장 · S 나중에', '힌트');
+
+  점수그리기();
+}
+
+function 축값(i, v) {
+  점수[i] = v;
+  점수그리기();
+}
+
+function 점수그리기() {
+  document.querySelectorAll('.토글 button').forEach((b) => {
+    const i = Number(b.dataset.축);
+    const 눌림 = b.className.includes('O') ? 점수[i] === 1 : 점수[i] === 0;
+    b.setAttribute('aria-pressed', String(눌림));
+  });
+  const 영점 = 재료.축키들.some((k, i) => !(k === 재료.null허용축 && 지금행.목표없음) && 점수[i] === 0);
+  const 라벨 = $('이유라벨');
+  if (라벨) {
+    라벨.textContent = 영점 ? '0점 이유(필수) — 안 적으면 저장이 안 된다' : '메모(없으면 비워 둔다)';
+    라벨.className = 영점 ? '필수' : '';
+  }
+}
+
+async function 보내기() {
+  if (!지금행 || 보냄) return;
+  const 채점자 = $('채점자').value.trim();
+  if (!채점자) { 알림('채점자 이름이 비었다 — 오른쪽 위 칸에 넣는다', true); return; }
+  const note = $('이유칸') ? $('이유칸').value : '';
+  const 영점 = 재료.축키들.some((k, i) => !(k === 재료.null허용축 && 지금행.목표없음) && 점수[i] === 0);
+  if (영점 && !note.trim()) { 알림('X 가 있는데 이유가 비었다 — 이유 칸에 한 줄', true); $('이유칸').focus(); return; }
+  보냄 = true;
+  try {
+    const r = await fetch('/api/score', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ case_id: 지금행.case_id, 점수들: 점수, note, 채점자 }),
+    });
+    const 답 = await r.json();
+    if (!답.ok) throw new Error(답.오류 || '저장 실패');
+    const 이음 = 답.적용.filter((id) => id !== 지금행.case_id);
+    대기 = 대기.filter((x) => !답.적용.includes(x.case_id));
+    분모그리기(답.진행);
+    알림(`${지금행.case_id} 저장` + (이음.length ? ` · 쌍둥이 ${이음.join(',')} 도 같은 점수로 이었다` : '') + ` · 남음 ${답.진행.미채점}`, false);
+    다음();
+  } catch (e) {
+    // 저장이 실패했는데 다음으로 넘어가면 그 매김은 «조용히» 사라진다 — 멈추고 알린다
+    알림('저장 실패 — 넘어가지 않았다: ' + e.message, true);
+  } finally { 보냄 = false; }
+}
+
+async function 끝그리기(판) {
+  const r = await fetch('/api/data');   // 완주 시점의 집계·계약을 서버가 다시 계산해 준다
+  재료 = await r.json();
+  분모그리기(재료.진행);
+  const 끝 = 글자(판, 'div', null, '끝');
+  if (재료.진행.미채점 > 0) {
+    글자(끝, 'h2', '이 판은 다 봤는데 남음이 있다');
+    글자(끝, 'p', `남음 ${재료.진행.미채점}행 — 새로고침하면 그 행들이 다시 줄을 선다(딴 통로가 매겼으면 줄어든다).`);
+    return;
+  }
+  글자(끝, 'h2', '채점 완주');
+  글자(끝, 'p', `${재료.진행.전체}행 전부 매겼다` + (재료.진행.고정 ? ` (0점 고정 ${재료.진행.고정}행 포함 — 그건 규율의 몫)` : '') + '. 아래는 사례 단위 AND 집계 — 정식 판정은 세션이 잇는다.');
+  if (재료.계약사유 && 재료.계약사유.length) {
+    글자(끝, 'p', '기계 계약 사유가 남아 있다(파일 전체 무효 위험): ' + 재료.계약사유.join(' / '), '상태 나쁨');
+  }
+  if (재료.집계) {
+    const 표 = 글자(끝, 'table', null, '집계');
+    const 머리 = 글자(표, 'tr');
+    ['축', '사례 합/분모', '비율', '통과선', '판정'].forEach((h) => 글자(머리, 'th', h));
+    재료.축키들.forEach((k, i) => {
+      const a = 재료.집계.축[k];
+      const 줄 = 글자(표, 'tr');
+      글자(줄, 'td', 재료.축이름[i]);
+      글자(줄, 'td', `${a.합}/${a.분모}`);
+      글자(줄, 'td', a.비율 == null ? '—' : a.비율.toFixed(2));
+      글자(줄, 'td', String(재료.통과선[k]));
+      글자(줄, 'td', a.통과 ? '통과' : '미달', a.통과 ? '통과' : '미달');
+    });
+    if (재료.집계.셀미달 && 재료.집계.셀미달.length) {
+      글자(끝, 'p', '⑥정확성 급수 셀 미달: ' + 재료.집계.셀미달.join(', ') + ' — 한 급수라도 미달이면 전체 미통과(V6-26)', '상태 나쁨');
+    }
+  }
+  const 다음일 = 글자(끝, 'p');
+  글자(다음일, 'span', '정식 판정 명령: ');
+  글자(다음일, 'code', 'node tools/과제생성평가.js --판정 evals/과제생성_결과.json');
+}
+
+function 알림(문구, 나쁨) {
+  const el = $('상태');
+  el.textContent = String(문구 == null ? '' : 문구);
+  el.className = '상태' + (나쁨 ? ' 나쁨' : '');
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); 보내기(); }
+    return;
+  }
+  if (!지금행) return;
+  if (e.key === 'Enter') { e.preventDefault(); 보내기(); return; }
+  if (/^[1-8]$/.test(e.key)) {
+    const i = Number(e.key) - 1;
+    if (재료.축키들[i] === 재료.null허용축 && 지금행.목표없음) return;   // 분모에서 뺀 축은 안 뒤집힌다
+    축값(i, 점수[i] === 1 ? 0 : 1);
+    return;
+  }
+  if (e.key === 's' || e.key === 'S') { 대기.push(지금행); 다음(); }
+});
+
+불러오기().catch((e) => 알림('재료를 못 불러왔다: ' + e.message, true));
+</script>
+</body>
+</html>
