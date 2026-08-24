@@ -10,7 +10,7 @@
   "quality_ver": "fc032b131ff7",
   "policy_ver": "오늘과제.v3+58e3e4eeae8e",
   "채점자": "유호",
-  "시각": "2026-08-24T20:39:50.466Z"
+  "시각": "2026-08-24T21:38:52.265Z"
  },
  "행": [
   {
@@ -40,7 +40,7 @@
     "level_fit": 1,
     "fresh": 1,
     "fun": 1,
-    "accuracy": 1,
+    "accuracy": 0,
     "goal_use": 1,
     "state_use": 1
    },
