@@ -106,25 +106,24 @@ seed_lower() {
   "${PSQL[@]}" <<SQL >/dev/null
 insert into engine.learners(learner_id, student_code, schema_ver)
 values ('10000000-0000-4000-8000-000000000001', 'CI-${label}', '${label}');
-/* ⚠ recorded_by 를 넣지 않는다 — 이 씨앗은 «그 열이 생기기 전» 시대(c3/c4)를 흉내낸다.
- * 그 열은 뒤 조각이 add column 으로 얹고, 합본 스스로 「null 은 이 열이 생기기 전에 선
- * 행이다」라고 못박았다 — 그러니 여기 null 로 남는 것이 사실이고, ⑥ 이 그 유산 경로를
- * 실측하게 된다. 08-10 에 seed_current 와 함께 여기에도 넣었던 것이 시대착오였다
- * (column does not exist · CI 는 08-14 부터 꺼져 있어 08-24 에야 드러났다). */
+-- ⚠ 이 씨앗은 «recorded_by·consent_id 가 생기기 전» 시대(c3/c4)를 흉내낸다 — 그 열들로
+-- 심으면 column does not exist 로 죽는다(08-10 에 넣은 시대착오 · CI 가 꺼져 있어 08-24 발견).
+-- 합본 스스로 「null 은 이 열이 생기기 전에 선 행이다」라 못박은 유산 경로를 ⑥ 이 실측한다.
+-- 동의귀속:시대이전 — c3/c4 스키마에는 recorded_by 가 없다
 insert into engine.consents(
   consent_id, learner_id, consent_ver, agreed_at, schema_ver
 ) values (
   '10000000-0000-4000-8000-000000000401',
   '10000000-0000-4000-8000-000000000001', 'v1', now(), '${label}'
 );
+-- 동의귀속:시대이전 — c3/c4 스키마에는 consent_id 열이 없다(consent_ver 는 그때도 not null)
 insert into engine.learning_events(
   event_id, learner_id, event_type, task_type, occurred_at,
-  idempotency_key, consent_ver, consent_id, schema_ver
+  idempotency_key, consent_ver, schema_ver
 ) values (
   '10000000-0000-4000-8000-000000000101',
   '10000000-0000-4000-8000-000000000001',
-  'submission.created', '숙제제출', now(), 'ci-${label}-event', 'v1',
-  '10000000-0000-4000-8000-000000000401', '${label}'
+  'submission.created', '숙제제출', now(), 'ci-${label}-event', 'v1', '${label}'
 );
 insert into engine.submissions(
   submission_id, event_id, task_type, body_original, occurred_at, schema_ver

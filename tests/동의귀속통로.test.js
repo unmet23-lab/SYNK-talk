@@ -57,6 +57,14 @@ function 소스들() {
  * 순수 판정 — 어느 INSERT 가 그 열을 빠뜨렸나. 픽스처로 탐지력을 못박기 위해 분리한다.
  * @returns {{건수: number, 위반: string[]}}
  */
+/* «시대이전» 예외 — 이 표식이 INSERT 바로 위 3줄 안에 있으면 그 한 건만 면제한다.
+ * 왜 있어야 하나(08-24 실측): 검증기 ⑥ 의 seed_lower 는 **그 열이 생기기 전**(c3/c4)
+ * 스키마에 심는 타임머신이다 — 스탬프하면 column does not exist 로 죽고, 안 하면 이
+ * 검사가 빨갛다. 두 진실이 다 옳으니 예외는 목록이 아니라 **그 자리 표식**으로 뚫는다
+ * (목록은 파일 개명에 낡고, 표식은 리뷰 diff 에 그대로 보인다). 합본 스스로
+ * 「null 은 이 열이 생기기 전에 선 행이다」라 못박은 그 유산 경로가 이것이다. */
+const 시대이전표식 = '동의귀속:시대이전';
+
 function 검사(소스들, 표, 열) {
   const re = new RegExp(`insert\\s+into\\s+engine\\.${표}\\s*\\(([^)]*)\\)`, 'gi');
   let 건수 = 0;
@@ -66,10 +74,11 @@ function 검사(소스들, 표, 열) {
     re.lastIndex = 0;
     while ((m = re.exec(글))) {
       건수 += 1;
+      const 앞줄들 = 글.slice(0, m.index).split('\n');
+      if (앞줄들.slice(-4).some((l) => l.includes(시대이전표식))) continue;
       const 열들 = m[1].split(',').map((s) => s.trim());
       if (!열들.includes(열)) {
-        const 줄 = 글.slice(0, m.index).split('\n').length;
-        위반.push(`${이름}:${줄} — engine.${표} INSERT 에 ${열} 이 없다`);
+        위반.push(`${이름}:${앞줄들.length} — engine.${표} INSERT 에 ${열} 이 없다`);
       }
     }
   }
@@ -129,6 +138,17 @@ test('픽스처 — 열이 있으면 통과한다(거짓양성 없음)', () => {
 test('픽스처 — 훑을 소스가 없으면 「위반 0」이 아니라 건수 0으로 드러난다', () => {
   assert.equal(검사([], 'consents', 'recorded_by').건수, 0);
   assert.equal(검사([['빈 파일', '']], 'learning_events', 'consent_id').건수, 0);
+});
+
+test('픽스처 — «시대이전» 표식은 그 한 건만 면제하고, 멀리 있으면 안 통한다', () => {
+  const 면제 = `# ${시대이전표식}: c3 스키마에 심는 씨앗\ninsert into engine.consents (learner_id, consent_ver)\nvalues (1)`;
+  const r1 = 검사([['픽스처', 면제]], 'consents', 'recorded_by');
+  assert.equal(r1.건수, 1, '면제해도 분모에는 센다 — 훑기가 죽은 것과 가른다');
+  assert.deepEqual(r1.위반, []);
+  /* 표식이 3줄보다 위에 있으면 무효 — 파일 머리에 한 번 적고 전 건을 면제받는 구멍을 막는다. */
+  const 멀리 = `# ${시대이전표식}\n\n\n\n\ninsert into engine.consents (learner_id, consent_ver)\nvalues (1)`;
+  assert.equal(검사([['픽스처', 멀리]], 'consents', 'recorded_by').위반.length, 1,
+    '멀리 있는 표식이 통했다 — 파일 단위 면제가 된다');
 });
 
 // ── 정본 무결성 — 술어가 한 곳에서 파생되는가 ──
