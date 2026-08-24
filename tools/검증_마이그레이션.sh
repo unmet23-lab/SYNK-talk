@@ -106,11 +106,16 @@ seed_lower() {
   "${PSQL[@]}" <<SQL >/dev/null
 insert into engine.learners(learner_id, student_code, schema_ver)
 values ('10000000-0000-4000-8000-000000000001', 'CI-${label}', '${label}');
+/* ⚠ recorded_by 를 넣지 않는다 — 이 씨앗은 «그 열이 생기기 전» 시대(c3/c4)를 흉내낸다.
+ * 그 열은 뒤 조각이 add column 으로 얹고, 합본 스스로 「null 은 이 열이 생기기 전에 선
+ * 행이다」라고 못박았다 — 그러니 여기 null 로 남는 것이 사실이고, ⑥ 이 그 유산 경로를
+ * 실측하게 된다. 08-10 에 seed_current 와 함께 여기에도 넣었던 것이 시대착오였다
+ * (column does not exist · CI 는 08-14 부터 꺼져 있어 08-24 에야 드러났다). */
 insert into engine.consents(
-  consent_id, learner_id, consent_ver, agreed_at, schema_ver, recorded_by
+  consent_id, learner_id, consent_ver, agreed_at, schema_ver
 ) values (
   '10000000-0000-4000-8000-000000000401',
-  '10000000-0000-4000-8000-000000000001', 'v1', now(), '${label}', 'tools/검증_마이그레이션.sh'
+  '10000000-0000-4000-8000-000000000001', 'v1', now(), '${label}'
 );
 insert into engine.learning_events(
   event_id, learner_id, event_type, task_type, occurred_at,
