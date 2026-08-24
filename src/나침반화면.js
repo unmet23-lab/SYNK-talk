@@ -35,9 +35,10 @@
  *   · 저장 성공을 낙관적으로 그리기 — 서버가 준 `적힌시각` 만 「적혔다」로 그린다.
  */
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { 색, 폰트, 모노트래킹 } from './테마';
 import { 열기, 저장하기 } from './나침반API.js';
+import { use등장 } from '../lib/모션.js';
 
 /** 회차 코드 — 정본은 `lib/나침반문항.js` 의 `종류` 다.
  *  🔑 없앨 수 없는 사본(서버가 이 어휘를 값목록으로 내주는 경로가 없다)이라 **기계에 물린다** —
@@ -208,7 +209,10 @@ export default function 나침반화면({ 토큰, 돌아가기 }) {
       ))}
 
       {오류 && <Text style={오류.운영 ? s.안내글 : s.오류글}>{오류.말}</Text>}
-      {적힌시각 && <Text style={s.안내글}>적혔어요 — {적힌시각}</Text>}
+      {/* 「적혔어요」 — 서버가 준 `적힌시각` 이 도착한 그 순간에만 선다(위 머리말: 낙관적으로
+          그리지 않는다). 시즌에 한 번뿐이고 **소급이 원리상 불가능한** 입력이라(§8 ①), 학생이
+          「적혔다」를 놓치면 안 적힌 것과 같아진다 — 그래서 이 줄은 박자를 갖는다(08-24). */}
+      {적힌시각 && <적혔어요줄 글={`적혔어요 — ${적힌시각}`} />}
 
       {세션 && (
         <Pressable
@@ -237,6 +241,13 @@ const 입력바탕 = {
   paddingVertical: 10,
   minHeight: 44,
 };
+
+/* 저장 응답 줄 — 서버 왕복이 끝나야 마운트되므로 훅이 화면 최상위에 있으면 안 된다
+ * (답장 교정카드틀과 같은 이유: 응답이 오기 전에 박자가 끝나 버린다). */
+function 적혔어요줄({ 글 }) {
+  const 등장 = use등장({ 올라옴: 6, 시간: 200 });
+  return <Animated.Text style={[s.안내글, 등장]}>{글}</Animated.Text>;
+}
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: 색.바탕 },

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
 import { 색, 폰트, 모노트래킹 } from './테마';
+import { use등장 } from '../lib/모션.js';
 import { 제출재료 } from '../lib/알바변명제출.js';
 /* 발화 사슬의 판정들 — 「냈다」(학습출석 = ③답하기 submitted)와 「닿았다」(배달상태 = 서버가
  * 받은 것만)를 말하기 화면과 **같은 함수**로 읽는다. 여기 다시 적으면 갈라진 쪽이 조용히
@@ -163,7 +164,7 @@ export default function 알바변명화면({
       )}
 
       {단계 === '끝' && (
-        <View style={s.카드}>
+        <끝카드>
           {/* 교정·판정 표시 0(§4-3 ⑥) — 답장은 다음 날 교정 카드 몫이다. 즉답처럼 보이지 않는다. */}
           <Text style={s.카드라벨}>{냈다 ? '다 냈어요' : '오늘의 미션 · 끝'}</Text>
           <Text style={s.끝제목}>{냈다 ? '사장님이 듣고 있어요' : '오늘은 여기까지예요'}</Text>
@@ -179,10 +180,19 @@ export default function 알바변명화면({
           {배달.못보냄 > 0 && (
             <Text style={s.오류}>목소리를 보내지 못했어요. 선생님께 알려 주세요.</Text>
           )}
-        </View>
+        </끝카드>
       )}
     </ScrollView>
   );
+}
+
+/* 끝 카드의 틀 — 말하기 화면 완료카드의 **형제**인데 08-24 전수 점검 전까지 박자가 갈려 있었다
+ * (저쪽은 자리 잡음, 이쪽은 순간 팝). 같은 «다 냈다»의 순간이니 같은 세기로 선다.
+ * 🔑 이미 낸 날 다시 열어도 이 카드다(위 `학습출석` 게이트) — 재접속에도 어색하지 않은 세기가
+ *   여기까지인 이유이고, 축하는 몽글·소리킷 몫이라는 규율도 저쪽과 같다. */
+function 끝카드({ children }) {
+  const 등장 = use등장();
+  return <Animated.View style={[s.카드, 등장]}>{children}</Animated.View>;
 }
 
 function 머리() {

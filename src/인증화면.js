@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Platform, Pressable,
+  ActivityIndicator, Animated, KeyboardAvoidingView, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { 색, 폰트, 모노트래킹 } from './테마';
+import { use등장 } from '../lib/모션.js';
 import { 학생번호맞나 } from '../lib/학생계정.js';
 import { 문항, 답검사 } from '../lib/가입문항.js';
 import * as API from './인증API';
@@ -164,8 +165,13 @@ export default function 인증화면({ 로그인성공, 시작단계 = 단계.�
           </View>
         )}
 
-        {/* 🔑 이 화면의 신호 1점 — 자리를 늘 비워 두면 글자가 떴다 사라져도 아래가 안 밀린다. */}
-        <View style={s.오류칸}>{오류 ? <Text style={s.오류}>{오류}</Text> : null}</View>
+        {/* 🔑 이 화면의 신호 1점 — 자리를 늘 비워 두면 글자가 떴다 사라져도 아래가 안 밀린다.
+            등장 박자(08-24): 자리가 늘 비어 있어 글자만 툭 바뀌던 자리다 — 같은 오류를 두 번
+            만나면 «바뀐 줄도 모른다». 위 `눌렀다` 가 매번 `set오류('')` 로 비우고 다시 채우므로
+            같은 문구가 반복돼도 재마운트가 확실히 일어나 박자가 매번 돈다.
+            🚫 흔들지 않는다 — 실패에 하강 버저를 안 쓰는 것과 같은 규율(저장소 규약 §5)이다.
+               학생을 탓하는 몸짓 대신, 읽으라고 «세우는» 박자만 준다. */}
+        <View style={s.오류칸}>{오류 ? <오류줄 글={오류} /> : null}</View>
 
         <Pressable
           testID="인증-제출"
@@ -203,6 +209,12 @@ export { 단계 };
 /* `id` 는 **자동 밟기(Maestro)가 잡는 손잡이**다 — 라벨(카피)과 갈라 둔 이유가 이것이다.
    라벨로 잡으면 카피 한 줄만 다듬어도 흐름이 통째로 깨진다(카피 감사가 52곳을 한 번에
    바꾼 이력이 있다). 규약·전량 목록은 `tests/자동밟기손잡이.test.js` 가 정본으로 든다. */
+/* 오류 한 줄 — 위 오류칸 주석의 박자를 지는 자리. 세기는 다른 화면의 «응답» 줄과 같다. */
+function 오류줄({ 글 }) {
+  const 등장 = use등장({ 올라옴: 6, 시간: 200 });
+  return <Animated.Text style={[s.오류, 등장]}>{글}</Animated.Text>;
+}
+
 function 칸({ id, 라벨, 값, 바꾸기, 자리표시, 비밀, 숫자, 이메일, 모노, 최대, 자동대문자, 도움말 }) {
   return (
     <View style={s.칸}>

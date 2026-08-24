@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { 색, 폰트, 모노트래킹 } from './테마';
+import { use등장 } from '../lib/모션.js';
 import {
   빈칸제출사건, 모름제출사건, 변환제출사건, 이탈사건, 이탈닻,
 } from '../lib/서류관문제출.js';
@@ -434,7 +435,7 @@ export default function 서류관문화면({
 
       {단계 === '결과' && 재도전턴 === null && (
         <>
-          <View style={s.카드}>
+          <결과카드>
             <Text style={s.카드라벨}>되돌아보기</Text>
             {벌.map((원소, i) => {
               if (!빈칸턴인가(원소)) return null;
@@ -462,8 +463,8 @@ export default function 서류관문화면({
                 </View>
               );
             })}
-          </View>
-          <View style={s.카드}>
+          </결과카드>
+          <결과카드 지연={130}>
             <Text style={s.카드라벨}>바꿔 쓴 문장</Text>
             {(() => {
               const 변환원소 = 벌.find((원소) => !빈칸턴인가(원소));
@@ -474,11 +475,22 @@ export default function 서류관문화면({
             })()}
             {/* 열린 산출은 즉답이 없다 — 검수 큐 몫(§6-1). 즉답처럼 보이게 하지 않는다(G2 문구). */}
             <Text style={s.본문글}>바꿔 쓴 문장은 선생님이 보고 알려줄게. 알려줄 말이 생기면 「답장」에서 볼 수 있어요.</Text>
-          </View>
+          </결과카드>
         </>
       )}
     </ScrollView>
   );
+}
+
+/* 결과 카드의 틀 — 마지막 답을 낸 순간 화면이 통째로 «되돌아보기»로 바뀌는 자리다(08-24 ·
+ * `lib/모션.js` 머리말). 카드 둘이 동시에 툭 서면 어디부터 읽어야 할지 모른다 — 되돌아보기가
+ * 먼저 자리 잡고 「바꿔 쓴 문장」이 130ms 뒤따른다(읽는 순서 = 서는 순서).
+ * 🚫 통과 라벨 하나하나를 튀게 하지 않는다 — 이 단계는 축하가 아니라 **복기**다(§9-1 ⓐ: 모르는
+ *    것·비운 것을 틀렸다로 그리지 않는다). 신호 1점(축오답 코랄)도 그대로 둔다 — 모션은 색과
+ *    직교해서, 여기서 세기를 더하면 그 코랄 한 점의 자리를 뺏는다. */
+function 결과카드({ 지연 = 0, children }) {
+  const 등장 = use등장({ 지연 });
+  return <Animated.View style={[s.카드, 등장]}>{children}</Animated.View>;
 }
 
 /* 문장틀 렌더 — `{빈칸}` 자리를 밑줄 칸(또는 채운 답)으로 편다. 팩 문장틀의 나머지 글자는
