@@ -205,8 +205,13 @@ drop_synk
 run_file "$C3"
 seed_lower c3
 run_file "$BUNDLE"
-assert_postcheck 'c3 부트스트랩'
+# 보존 실측이 먼저다 — 그 다음 씨앗 자국(합성 스킬)을 걷어야 사후 대조가 선다.
+# 스킬시드수 셀은 「정확히 30」(08-12 진입 · CI 는 08-11 부터 죽어 있어 ⑥ 과 처음 만난 게
+# 08-24 다)이고, 씨앗의 ci-lower-skill 이 +1 을 만든다. 대조를 씨앗에 맞춰 늘리지 않는다 —
+# 그 파일은 유호님이 운영 DB 를 재는 창이라, 늘리면 운영의 「진짜 31」을 못 잡는다.
 assert_lower_survived c3
+"${PSQL[@]}" -c "delete from engine.skills where skill_id='ci-lower-skill'" >/dev/null
+assert_postcheck 'c3 부트스트랩'
 
 echo '⑥ 정확한 c4 → c6 ALTER + 기존 데이터 보존'
 drop_synk
@@ -214,8 +219,9 @@ run_file "$C3"
 run_file "$C4_DELTA"
 seed_lower c4
 run_file "$BUNDLE"
-assert_postcheck 'c4 부트스트랩'
 assert_lower_survived c4
+"${PSQL[@]}" -c "delete from engine.skills where skill_id='ci-lower-skill'" >/dev/null   # c3 갈래와 같은 사유
+assert_postcheck 'c4 부트스트랩'
 
 echo '부트스트랩 중단 — 부분 상태'
 drop_synk
