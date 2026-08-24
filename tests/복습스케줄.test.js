@@ -106,7 +106,11 @@ test('⑦ 소비자 명부 — 파생층이 생기면 이 목록부터 는다(G7
   const fs = require('node:fs');
   const path = require('node:path');
   const ROOT = path.resolve(__dirname, '..');
-  const 아는소비자 = ['tests/복습스케줄.test.js'];   // 자기 시험뿐 = 소비자 0 (import 축 — 문자열 언급은 안 센다)
+  const 아는소비자 = [
+    'tests/복습스케줄.test.js',
+    'tests/복습파생.test.js',   // 08-24 파생층(§8 명세 집행) — 인수 5(파생 산출 → 버린수 0)가 계산기를 문다
+    'tools/복습병행.js',        // 08-24 병행 출력 — 파생층+계산기를 이어 학생별 due 를 «보여만» 준다(ⓓ 교체 아님)
+  ];
   const 훑을곳 = ['lib', 'src', 'tools', 'contents', 'supabase', 'tests'];
   const 실소비자 = [];
   const 걷기 = (d) => {
