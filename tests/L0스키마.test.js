@@ -34,16 +34,24 @@ const SQL = 원문.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--.*$/gm, '');
  *   ① 뒤 조각이 drop 한 제약은 최종 상태에 없다 — 세면 「옛 이름이 살아 있다」는 **거짓 판정**이 된다.
  *   ② 확인 블록·안내 주석은 **마지막 조각의 것**이 현행이다.
  * 2026-08-06 c7(체인의 첫 두 번째 조각) 착지에서 실측: 안 지키면 3개가 빨개진다.
- * 탐지력은 안 깎인다 — 뒤 조각이 옛 제약을 drop 하지 않으면 그 이름이 그대로 살아 남아 잡힌다. */
-const drop된제약 = new Set(
-  [...SQL.matchAll(/drop constraint (?:if exists )?(\w+)/g)].map((m) => m[1]));
+ * 탐지력은 안 깎인다 — 뒤 조각이 옛 제약을 drop 하지 않으면 그 이름이 그대로 살아 남아 잡힌다.
+ * ⚠ ①의 「drop = 죽음」은 08-24 부터 그대로면 틀린다 — 합본 생성기가 멱등화 층을 얹어
+ * 모든 add 앞에 **자기 이름 drop** 을 끼우므로(생성기 머리말), 산 제약도 drop 을 한 번 맞는다.
+ * 죽음의 판정은 «마지막 연산»이다: 마지막 drop 뒤에 정의가 다시 오면 산 것이고, 안 오면 죽은 것.
+ * (c12 이름: 정의(c12 조각) < drop(c13 조각) → 죽음 ✓ · c13 이름: 자기 drop < 정의 → 삶 ✓) */
+const 마지막드롭 = new Map();
+for (const m of SQL.matchAll(/drop constraint (?:if exists )?(\w+)/g)) 마지막드롭.set(m[1], m.index);
 /* ⚠ 이름과 `check` 사이는 **줄바꿈일 수 있다** — 값목록이 길면 그렇게 쓰게 된다.
  * 옛 정규식은 공백 한 칸만 봐서 그런 제약을 통째로 못 봤고, 못 보면 아래 「이름이 계약 버전을
  * 달고 있다」가 그 제약에 대해 **영원히 통과**한다(빠진 것은 위반이 아니라 무존재로 보인다).
  * 2026-08-06 실측: `staff_role_c7` 을 두 줄로 적었더니 탐지에서 사라졌다. 픽스처로 못박는다. */
 const CHECK정의 = /constraint (\w+)\s+check/g;
+const 마지막정의 = new Map();
+for (const m of SQL.matchAll(CHECK정의)) 마지막정의.set(m[1], m.index);
+const 죽은제약 = new Set(
+  [...마지막드롭].filter(([n, i]) => (마지막정의.get(n) ?? -1) < i).map(([n]) => n));
 const 살아있는CHECK = (원천 = SQL) =>
-  [...원천.matchAll(CHECK정의)].map((m) => m[1]).filter((n) => !drop된제약.has(n));
+  [...원천.matchAll(CHECK정의)].map((m) => m[1]).filter((n) => !죽은제약.has(n));
 const 꼬리시작 = 원문.lastIndexOf('확인 (한 번에)');
 const 최종꼬리 = 꼬리시작 === -1 ? '' : 원문.slice(꼬리시작);
 

@@ -13,6 +13,7 @@ const {
   concatenate,
   migrationFiles,
   validateChecksum,
+  멱등화,
 } = require('../tools/마이그레이션_합본');
 
 test('파일명 정렬이 실행 순서이고 모든 조각이 명명 규칙을 따른다', () => {
@@ -23,10 +24,24 @@ test('파일명 정렬이 실행 순서이고 모든 조각이 명명 규칙을 
   assert.deepEqual(names.filter((name) => !FILE_NAME.test(name)), []);
 });
 
-test('L0_스키마.sql = 정렬한 마이그레이션 조각 이음 (바이트 동일)', () => {
-  const expected = concatenate();
+/* 08-24 부터 합본 = 조각 이음 «그대로»가 아니라 + 멱등화 한 겹이다(생성기 멱등화 머리말).
+ * 변형은 이 한 가지뿐이어야 한다 — 기대값을 같은 통로(멱등화∘concatenate)로 만들어 대조하므로,
+ * 생성기가 다른 변형을 몰래 더하면 여기가 아니라 손굽기·CI 대조에서 갈라진다. */
+test('L0_스키마.sql = 정렬한 마이그레이션 조각 이음 + 멱등화 (바이트 동일)', () => {
+  const expected = 멱등화(concatenate());
   const actual = fs.readFileSync(OUTPUT);
   assertByteIdentical(actual, expected, 'supabase/L0_스키마.sql');
+});
+
+/* 멱등화의 판정력 — 「자기 이름을 안 지우는 add」가 있으면 반드시 drop 이 끼워지고,
+ * 이미 있으면 1바이트도 안 바뀐다(두 번 돌려도 같다 = 멱등화 자신도 멱등). */
+test('멱등화 — 자기 이름 drop 을 끼워 넣고, 두 번 돌리면 그대로다', () => {
+  const 결함 = Buffer.from(
+    'alter table t\n  drop constraint if exists x_c12,\n  add constraint x_c13 check (true);\n',
+  );
+  const 한번 = 멱등화(결함).toString('utf8');
+  assert.match(한번, /drop constraint if exists x_c13,\n  add constraint x_c13/);
+  assert.equal(멱등화(Buffer.from(한번)).toString('utf8'), 한번, '멱등화가 자기 산출물을 또 바꾼다');
 });
 
 test('각 마이그레이션 checksum은 checksum 슬롯만 0으로 치환한 파일 SHA-256이다', () => {

@@ -113,8 +113,46 @@ function syncCheckFile(bundle) {
   return 새것;
 }
 
+/* 🩹 합본은 조각 이음에 딱 한 가지 변형만 얹는다 — «제약 갈아끼우기 사슬의 재실행 멱등화».
+ * 2026-08-24 실측(push 복원 첫 CI · run 32714974980): c13 조각의
+ * `drop constraint if exists X_c12, add constraint X_c13` 65벌이 자기 이름(X_c13)을 안 지워
+ * 재실행 시험 ②가 `already exists` 로 죽었다. c12 조각이 같은 모양으로도 살아남은 것은
+ * alter 가 조건 가드 do-블록 «안»이라서다(재실행이면 통째로 건너뜀) — c13 은 밖이었다.
+ * 조각을 고치는 길은 둘 다 막혀 있다: 파일 수정은 위 checksum 가드가 거절하고(운영 이력 소급),
+ * 새 조각 덧붙이기는 안 통한다(합본은 그 앞줄에서 죽는다). 그래서 «굽는 자리»에서 고친다:
+ * drop 이 하나라도 있는 alter 사슬의 add 앞에, 자기 이름 drop 이 없으면 끼워 넣는다.
+ * 빈 DB 첫 적용엔 no-op(NOTICE 한 줄) · 가드 안 사슬에 들어가도 무해 · checksum 슬롯은
+ * 안 건드리므로 DB 이력 대조(②-b)도 그대로다. 조각 파일은 1바이트도 안 바뀐다. */
+const ALTER_시작 = /^\s*alter table\b/;
+const 문장끝 = /;\s*\r?$/;
+const 제약드롭 = /^\s*drop constraint if exists ([A-Za-z0-9_]+),\s*\r?$/;
+const 제약추가 = /^(\s*)add constraint ([A-Za-z0-9_]+)\b/;
+
+function 멱등화(bundle) {
+  const lines = bundle.toString('utf8').split('\n');
+  const out = [];
+  let 사슬 = null;   // 여러 줄 alter 문이 열려 있는 동안만 Set(그 문이 지운 이름들)
+  for (const line of lines) {
+    if (사슬 === null) {
+      if (ALTER_시작.test(line) && !문장끝.test(line)) 사슬 = new Set();
+    } else {
+      const 드롭 = 제약드롭.exec(line);
+      if (드롭) 사슬.add(드롭[1]);
+      const 추가 = 제약추가.exec(line);
+      if (추가 && 사슬.size > 0 && !사슬.has(추가[2])) {
+        const cr = line.endsWith('\r') ? '\r' : '';
+        out.push(`${추가[1]}drop constraint if exists ${추가[2]},${cr}`);
+        사슬.add(추가[2]);
+      }
+      if (문장끝.test(line)) 사슬 = null;
+    }
+    out.push(line);
+  }
+  return Buffer.from(out.join('\n'), 'utf8');
+}
+
 function generate({ check = false } = {}) {
-  const bundle = concatenate();
+  const bundle = 멱등화(concatenate());
   if (check) {
     if (!fs.existsSync(OUTPUT)) throw new Error('생성된 supabase/L0_스키마.sql이 없다');
     assertByteIdentical(fs.readFileSync(OUTPUT), bundle, 'supabase/L0_스키마.sql');
@@ -162,5 +200,6 @@ module.exports = {
   firstDifference,
   generate,
   migrationFiles,
+  멱등화,
   validateChecksum,
 };

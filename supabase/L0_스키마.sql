@@ -870,24 +870,28 @@ begin
   alter table engine.learning_events
     drop constraint if exists learning_events_event_type_c6,
     drop constraint if exists learning_events_task_type_c6,
+    drop constraint if exists learning_events_event_type_c7,
     add constraint learning_events_event_type_c7 check (event_type in (
       'submission.created', 'quiz.answered', 'choice.selected',
       'correction.responded', 'correction.viewed', 'preference.stated',
       'session.abandoned', 'intervention.delivered', 'data_use.granted', 'data_use.revoked',
       'task.assigned', 'exam.result'
     )),
+    drop constraint if exists learning_events_task_type_c7,
     add constraint learning_events_task_type_c7 check (task_type is null or task_type in (
       '숙제제출', '다시쓰기', '퀴즈응답', '대화턴', '발화녹음', '출석발화'
     ));
 
   alter table engine.submissions
     drop constraint if exists submissions_task_format_c6,
+    drop constraint if exists submissions_task_format_c7,
     add constraint submissions_task_format_c7 check (task_format is null or task_format in (
       '낭독', '응답', '자유발화', '모의면접', '높임전환', '쓰기첨삭', '번역'
     )),
     -- 병렬 쌍의 왼쪽이 실제로 저장되게 만든다. 값만 늘리면 「번역인데 몽골어 원문이 없는 행」이
     -- 통과하고, 그건 코퍼스가 아니라 그냥 한국어 문장이다 — 그리고 제시문은 **그때만** 남길 수 있다
     -- (문항이 수정되면 학생이 무엇을 보고 답했는지 사라진다 = c4가 task_ref/task_snapshot 을 가른 이유).
+    drop constraint if exists submissions_translation_source_c7,
     add constraint submissions_translation_source_c7 check (
       task_format is distinct from '번역'
       or nullif(btrim(task_snapshot->>'mn'), '') is not null
@@ -895,6 +899,7 @@ begin
 
   alter table engine.corrections
     drop constraint if exists corrections_verdict_c6,
+    drop constraint if exists corrections_verdict_c7,
     add constraint corrections_verdict_c7 check (verdict is null or verdict in (
       'AI 교정이 맞다', '고칠 곳이 있다', '원문이 이미 맞다'
     ));
@@ -1869,12 +1874,14 @@ begin
   alter table engine.learning_events
     drop constraint if exists learning_events_event_type_c7,
     drop constraint if exists learning_events_task_type_c7,
+    drop constraint if exists learning_events_event_type_c8,
     add constraint learning_events_event_type_c8 check (event_type in (
       'submission.created', 'quiz.answered', 'choice.selected',
       'correction.responded', 'correction.viewed', 'preference.stated',
       'session.abandoned', 'intervention.delivered', 'data_use.granted', 'data_use.revoked',
       'task.assigned', 'exam.result'
     )),
+    drop constraint if exists learning_events_task_type_c8,
     add constraint learning_events_task_type_c8 check (task_type is null or task_type in (
       '숙제제출', '다시쓰기', '퀴즈응답', '대화턴', '발화녹음', '출석발화'
     ));
@@ -1882,9 +1889,11 @@ begin
   alter table engine.submissions
     drop constraint if exists submissions_task_format_c7,
     drop constraint if exists submissions_translation_source_c7,
+    drop constraint if exists submissions_task_format_c8,
     add constraint submissions_task_format_c8 check (task_format is null or task_format in (
       '낭독', '응답', '자유발화', '모의면접', '높임전환', '쓰기첨삭', '번역'
     )),
+    drop constraint if exists submissions_translation_source_c8,
     add constraint submissions_translation_source_c8 check (
       task_format is distinct from '번역'
       or nullif(btrim(task_snapshot->>'mn'), '') is not null
@@ -1892,6 +1901,7 @@ begin
 
   alter table engine.corrections
     drop constraint if exists corrections_verdict_c7,
+    drop constraint if exists corrections_verdict_c8,
     add constraint corrections_verdict_c8 check (verdict is null or verdict in (
       'AI 교정이 맞다', '고칠 곳이 있다', '원문이 이미 맞다'
     ));
@@ -1899,12 +1909,15 @@ begin
   alter table engine.learners
     drop constraint if exists learners_signup_attempts_nonneg_c7,
     drop constraint if exists learners_temp_password_paired_c7,
+    drop constraint if exists learners_signup_attempts_nonneg_c8,
     add constraint learners_signup_attempts_nonneg_c8 check (signup_attempts >= 0),
+    drop constraint if exists learners_temp_password_paired_c8,
     add constraint learners_temp_password_paired_c8
       check (temp_password_hash is null or temp_password_expires_at is not null);
 
   alter table engine.staff
     drop constraint if exists staff_role_c7,
+    drop constraint if exists staff_role_c8,
     add constraint staff_role_c8 check (role in ('teacher', 'inspector', 'director'));
 
   insert into engine.schema_migrations(version, name, checksum)
@@ -3431,18 +3444,21 @@ begin
     drop constraint if exists learning_events_event_type_c8,
     drop constraint if exists learning_events_task_type_c8,
     drop constraint if exists learning_events_correction_target_c8,
+    drop constraint if exists learning_events_event_type_c9,
     add constraint learning_events_event_type_c9 check (event_type in (
       'submission.created', 'quiz.answered', 'choice.selected',
       'correction.responded', 'correction.viewed', 'preference.stated',
       'session.abandoned', 'intervention.delivered', 'data_use.granted', 'data_use.revoked',
       'task.assigned', 'exam.result', 'content.viewed'
     )),
+    drop constraint if exists learning_events_task_type_c9,
     add constraint learning_events_task_type_c9 check (task_type is null or task_type in (
       '숙제제출', '다시쓰기', '퀴즈응답', '대화턴', '발화녹음', '출석발화'
     )),
     -- 🔑 술어는 c8 과 한 글자도 같다. `content.viewed` 는 교정 사건이 아니므로 else 가지로
     --    떨어져 `correction_id is null` 을 요구한다 — 그게 옳다(그 행의 대상은 correction 이
     --    아니라 `parent_event_id` 다 · lib/이벤트검증.js 이벤트별필수).
+    drop constraint if exists learning_events_correction_target_c9,
     add constraint learning_events_correction_target_c9 check (
       case when event_type in ('correction.viewed', 'correction.responded')
            then correction_id is not null
@@ -3453,9 +3469,11 @@ begin
   alter table engine.submissions
     drop constraint if exists submissions_task_format_c8,
     drop constraint if exists submissions_translation_source_c8,
+    drop constraint if exists submissions_task_format_c9,
     add constraint submissions_task_format_c9 check (task_format is null or task_format in (
       '낭독', '응답', '자유발화', '모의면접', '높임전환', '쓰기첨삭', '번역'
     )),
+    drop constraint if exists submissions_translation_source_c9,
     add constraint submissions_translation_source_c9 check (
       task_format is distinct from '번역'
       or nullif(btrim(task_snapshot->>'mn'), '') is not null
@@ -3463,6 +3481,7 @@ begin
 
   alter table engine.corrections
     drop constraint if exists corrections_verdict_c8,
+    drop constraint if exists corrections_verdict_c9,
     add constraint corrections_verdict_c9 check (verdict is null or verdict in (
       'AI 교정이 맞다', '고칠 곳이 있다', '원문이 이미 맞다'
     ));
@@ -3470,12 +3489,15 @@ begin
   alter table engine.learners
     drop constraint if exists learners_signup_attempts_nonneg_c8,
     drop constraint if exists learners_temp_password_paired_c8,
+    drop constraint if exists learners_signup_attempts_nonneg_c9,
     add constraint learners_signup_attempts_nonneg_c9 check (signup_attempts >= 0),
+    drop constraint if exists learners_temp_password_paired_c9,
     add constraint learners_temp_password_paired_c9
       check (temp_password_hash is null or temp_password_expires_at is not null);
 
   alter table engine.staff
     drop constraint if exists staff_role_c8,
+    drop constraint if exists staff_role_c9,
     add constraint staff_role_c9 check (role in ('teacher', 'inspector', 'director'));
 
   insert into engine.schema_migrations(version, name, checksum)
@@ -3760,15 +3782,18 @@ begin
     drop constraint if exists learning_events_event_type_c9,
     drop constraint if exists learning_events_task_type_c9,
     drop constraint if exists learning_events_correction_target_c9,
+    drop constraint if exists learning_events_event_type_c10,
     add constraint learning_events_event_type_c10 check (event_type in (
       'submission.created', 'quiz.answered', 'choice.selected',
       'correction.responded', 'correction.viewed', 'preference.stated',
       'session.abandoned', 'intervention.delivered', 'data_use.granted', 'data_use.revoked',
       'task.assigned', 'exam.result', 'content.viewed'
     )),
+    drop constraint if exists learning_events_task_type_c10,
     add constraint learning_events_task_type_c10 check (task_type is null or task_type in (
       '숙제제출', '다시쓰기', '퀴즈응답', '대화턴', '발화녹음', '출석발화'
     )),
+    drop constraint if exists learning_events_correction_target_c10,
     add constraint learning_events_correction_target_c10 check (
       case when event_type in ('correction.viewed', 'correction.responded')
            then correction_id is not null
@@ -3779,21 +3804,25 @@ begin
   alter table engine.submissions
     drop constraint if exists submissions_task_format_c9,
     drop constraint if exists submissions_translation_source_c9,
+    drop constraint if exists submissions_task_format_c10,
     add constraint submissions_task_format_c10 check (task_format is null or task_format in (
       '낭독', '응답', '자유발화', '모의면접', '높임전환', '쓰기첨삭', '번역'
     )),
+    drop constraint if exists submissions_translation_source_c10,
     add constraint submissions_translation_source_c10 check (
       task_format is distinct from '번역'
       or nullif(btrim(task_snapshot->>'mn'), '') is not null
     ),
     -- 🔑 시각만 있고 판본이 없으면 그 값은 **읽을 수 없는 값**이다(무슨 규칙인지 모른다).
     --    판본만 있고 시각이 없으면 규칙만 있고 결과가 없다. 반쪽은 둘 다 사고라 짝으로 건다.
+    drop constraint if exists submissions_due_paired_c10,
     add constraint submissions_due_paired_c10 check (
       (due_at is null) = (due_ver is null)
     );
 
   alter table engine.corrections
     drop constraint if exists corrections_verdict_c9,
+    drop constraint if exists corrections_verdict_c10,
     add constraint corrections_verdict_c10 check (verdict is null or verdict in (
       'AI 교정이 맞다', '고칠 곳이 있다', '원문이 이미 맞다'
     ));
@@ -3801,12 +3830,15 @@ begin
   alter table engine.learners
     drop constraint if exists learners_signup_attempts_nonneg_c9,
     drop constraint if exists learners_temp_password_paired_c9,
+    drop constraint if exists learners_signup_attempts_nonneg_c10,
     add constraint learners_signup_attempts_nonneg_c10 check (signup_attempts >= 0),
+    drop constraint if exists learners_temp_password_paired_c10,
     add constraint learners_temp_password_paired_c10
       check (temp_password_hash is null or temp_password_expires_at is not null);
 
   alter table engine.staff
     drop constraint if exists staff_role_c9,
+    drop constraint if exists staff_role_c10,
     add constraint staff_role_c10 check (role in ('teacher', 'inspector', 'director'));
 
   /* ── 마감은 **배정 순간에만 참이다** — 자물쇠에 두 칸을 더한다.
@@ -6607,13 +6639,16 @@ begin
     drop constraint if exists learning_events_event_type_c10,
     drop constraint if exists learning_events_task_type_c10,
     drop constraint if exists learning_events_correction_target_c10,
+    drop constraint if exists learning_events_event_type_c11,
     add constraint learning_events_event_type_c11 check (event_type in (
       'submission.created', 'quiz.answered', 'choice.selected', 'correction.responded', 'correction.viewed', 'preference.stated', 'session.abandoned', 'intervention.delivered', 'data_use.granted', 'data_use.revoked', 
       'task.assigned', 'exam.result', 'content.viewed', 'affect.reported'
     )),
+    drop constraint if exists learning_events_task_type_c11,
     add constraint learning_events_task_type_c11 check (task_type is null or task_type in (
       '숙제제출', '다시쓰기', '퀴즈응답', '대화턴', '발화녹음', '출석발화', '라디오퀴즈', '목표선언', '자습체크인'
     )),
+    drop constraint if exists learning_events_correction_target_c11,
     add constraint learning_events_correction_target_c11 check (
       case when event_type in ('correction.viewed', 'correction.responded')
            then correction_id is not null
@@ -6625,13 +6660,16 @@ begin
     drop constraint if exists submissions_task_format_c10,
     drop constraint if exists submissions_translation_source_c10,
     drop constraint if exists submissions_due_paired_c10,
+    drop constraint if exists submissions_task_format_c11,
     add constraint submissions_task_format_c11 check (task_format is null or task_format in (
       '낭독', '응답', '자유발화', '모의면접', '높임전환', '쓰기첨삭', '번역'
     )),
+    drop constraint if exists submissions_translation_source_c11,
     add constraint submissions_translation_source_c11 check (
       task_format is distinct from '번역'
       or nullif(btrim(task_snapshot->>'mn'), '') is not null
     ),
+    drop constraint if exists submissions_due_paired_c11,
     add constraint submissions_due_paired_c11 check (
       (due_at is null) = (due_ver is null)
     );
@@ -6641,6 +6679,7 @@ begin
    *   추출이 다음 「));」(직원 role 목록)까지 흘러 들어가 대조가 거짓 적색이 된다(08-12 실측). */
   alter table engine.corrections
     drop constraint if exists corrections_verdict_c10,
+    drop constraint if exists corrections_verdict_c11,
     add constraint corrections_verdict_c11 check (verdict is null or verdict in (
       'AI 교정이 맞다', '고칠 곳이 있다', '원문이 이미 맞다'
     ));
@@ -6648,24 +6687,30 @@ begin
   alter table engine.corrections
     drop constraint if exists corrections_supersedes_not_self_c10,
     drop constraint if exists corrections_promotion_intent_c10,
+    drop constraint if exists corrections_supersedes_not_self_c11,
     add constraint corrections_supersedes_not_self_c11
       check (supersedes is null or supersedes <> correction_id),
+    drop constraint if exists corrections_promotion_intent_c11,
     add constraint corrections_promotion_intent_c11
       check (promotion_intent = false or actor_kind = 'teacher');
 
   alter table engine.learners
     drop constraint if exists learners_signup_attempts_nonneg_c10,
     drop constraint if exists learners_temp_password_paired_c10,
+    drop constraint if exists learners_signup_attempts_nonneg_c11,
     add constraint learners_signup_attempts_nonneg_c11 check (signup_attempts >= 0),
+    drop constraint if exists learners_temp_password_paired_c11,
     add constraint learners_temp_password_paired_c11
       check (temp_password_hash is null or temp_password_expires_at is not null);
 
   alter table engine.staff
     drop constraint if exists staff_role_c10,
+    drop constraint if exists staff_role_c11,
     add constraint staff_role_c11 check (role in ('teacher', 'inspector', 'director'));
 
   alter table engine.pipeline_jobs
     drop constraint if exists pipeline_jobs_discard_reason_c10,
+    drop constraint if exists pipeline_jobs_discard_reason_c11,
     add constraint pipeline_jobs_discard_reason_c11
       check (discard_reason is null
              or (status = 'discarded'
@@ -6674,6 +6719,7 @@ begin
 
   alter table radio.broadcast_segment
     drop constraint if exists broadcast_segment_kind_c10,
+    drop constraint if exists broadcast_segment_kind_c11,
     add constraint broadcast_segment_kind_c11
       check (kind in ('radio_loop', 'live_lecture', 'asmr_mode', 'other'));
 
@@ -11217,13 +11263,16 @@ begin
     drop constraint if exists learning_events_event_type_c11,
     drop constraint if exists learning_events_task_type_c11,
     drop constraint if exists learning_events_correction_target_c11,
+    drop constraint if exists learning_events_event_type_c12,
     add constraint learning_events_event_type_c12 check (event_type in (
       'submission.created', 'quiz.answered', 'choice.selected', 'correction.responded', 'correction.viewed', 'preference.stated', 'session.abandoned', 'intervention.delivered', 'data_use.granted', 'data_use.revoked',
       'task.assigned', 'exam.result', 'content.viewed', 'affect.reported'
     )),
+    drop constraint if exists learning_events_task_type_c12,
     add constraint learning_events_task_type_c12 check (task_type is null or task_type in (
       '숙제제출', '다시쓰기', '퀴즈응답', '대화턴', '발화녹음', '출석발화', '라디오퀴즈', '목표선언', '자습체크인'
     )),
+    drop constraint if exists learning_events_correction_target_c12,
     add constraint learning_events_correction_target_c12 check (
       case when event_type in ('correction.viewed', 'correction.responded')
            then correction_id is not null
@@ -11236,13 +11285,16 @@ begin
     drop constraint if exists submissions_task_format_c11,
     drop constraint if exists submissions_translation_source_c11,
     drop constraint if exists submissions_due_paired_c11,
+    drop constraint if exists submissions_task_format_c12,
     add constraint submissions_task_format_c12 check (task_format is null or task_format in (
       '낭독', '응답', '자유발화', '모의면접', '높임전환', '쓰기첨삭', '번역'
     )),
+    drop constraint if exists submissions_translation_source_c12,
     add constraint submissions_translation_source_c12 check (
       task_format is distinct from '번역'
       or nullif(btrim(task_snapshot->>'mn'), '') is not null
     ),
+    drop constraint if exists submissions_due_paired_c12,
     add constraint submissions_due_paired_c12 check (
       (due_at is null) = (due_ver is null)
     );
@@ -11252,6 +11304,7 @@ begin
    *   추출이 다음 「));」 까지 흘러 들어가 대조가 거짓 적색이 된다(c11 조각 실측 그대로). */
   alter table engine.corrections
     drop constraint if exists corrections_verdict_c11,
+    drop constraint if exists corrections_verdict_c12,
     add constraint corrections_verdict_c12 check (verdict is null or verdict in (
       'AI 교정이 맞다', '고칠 곳이 있다', '원문이 이미 맞다'
     ));
@@ -11259,8 +11312,10 @@ begin
   alter table engine.corrections
     drop constraint if exists corrections_supersedes_not_self_c11,
     drop constraint if exists corrections_promotion_intent_c11,
+    drop constraint if exists corrections_supersedes_not_self_c12,
     add constraint corrections_supersedes_not_self_c12
       check (supersedes is null or supersedes <> correction_id),
+    drop constraint if exists corrections_promotion_intent_c12,
     add constraint corrections_promotion_intent_c12
       check (promotion_intent = false or actor_kind = 'teacher');
 
@@ -11273,29 +11328,38 @@ begin
     drop constraint if exists learners_home_aimag_c11,
     drop constraint if exists learners_group_no_c11,
     drop constraint if exists learners_seat_no_c11,
+    drop constraint if exists learners_signup_attempts_nonneg_c12,
     add constraint learners_signup_attempts_nonneg_c12 check (signup_attempts >= 0),
+    drop constraint if exists learners_temp_password_paired_c12,
     add constraint learners_temp_password_paired_c12
       check (temp_password_hash is null or temp_password_expires_at is not null),
+    drop constraint if exists learners_gender_c12,
     add constraint learners_gender_c12
       check (gender is null or gender in ('female', 'male', 'undisclosed')),
+    drop constraint if exists learners_goal_track_c12,
     add constraint learners_goal_track_c12
       check (goal_track is null or goal_track in ('study', 'work', 'culture')),
+    drop constraint if exists learners_home_aimag_c12,
     add constraint learners_home_aimag_c12
       check (home_aimag is null or home_aimag in (
         'ulaanbaatar', 'arkhangai', 'bayan-olgii', 'bayankhongor', 'bulgan', 'darkhan-uul',
         'dornod', 'dornogovi', 'dundgovi', 'govi-altai', 'govisumber', 'khentii',
         'khovd', 'khovsgol', 'omnogovi', 'orkhon', 'ovorkhangai', 'selenge',
         'sukhbaatar', 'tov', 'uvs', 'zavkhan')),
+    drop constraint if exists learners_group_no_c12,
     add constraint learners_group_no_c12 check (group_no between 1 and 20),
+    drop constraint if exists learners_seat_no_c12,
     add constraint learners_seat_no_c12 check (seat_no between 1 and 20);
 
   -- ── staff 1 · pipeline_jobs 1 · radio 1 · classes 1 · ops 1 ──
   alter table engine.staff
     drop constraint if exists staff_role_c11,
+    drop constraint if exists staff_role_c12,
     add constraint staff_role_c12 check (role in ('teacher', 'inspector', 'director'));
 
   alter table engine.pipeline_jobs
     drop constraint if exists pipeline_jobs_discard_reason_c11,
+    drop constraint if exists pipeline_jobs_discard_reason_c12,
     add constraint pipeline_jobs_discard_reason_c12
       check (discard_reason is null
              or (status = 'discarded'
@@ -11304,25 +11368,30 @@ begin
 
   alter table radio.broadcast_segment
     drop constraint if exists broadcast_segment_kind_c11,
+    drop constraint if exists broadcast_segment_kind_c12,
     add constraint broadcast_segment_kind_c12
       check (kind in ('radio_loop', 'live_lecture', 'asmr_mode', 'other'));
 
   alter table engine.classes
     drop constraint if exists classes_key_nonblank_c11,
+    drop constraint if exists classes_key_nonblank_c12,
     add constraint classes_key_nonblank_c12 check (btrim(class_key) <> '');
 
   alter table ops.cron_runs
     drop constraint if exists cron_runs_outcome_c11,
+    drop constraint if exists cron_runs_outcome_c12,
     add constraint cron_runs_outcome_c12 check (outcome in
       ('대기', '성공', '실패', '타임아웃', '전송오류', '상태없음', '유실', '발사실패'));
 
   -- ── season 1 · season_compass 1 · season_review 3 ──
   alter table engine.season
     drop constraint if exists season_dates_c11,
+    drop constraint if exists season_dates_c12,
     add constraint season_dates_c12 check (ends_on is null or ends_on >= starts_on);
 
   alter table engine.season_compass
     drop constraint if exists season_compass_answers_c11,
+    drop constraint if exists season_compass_answers_c12,
     add constraint season_compass_answers_c12 check (
       (
         self_in_5y_changed is null
@@ -11339,10 +11408,13 @@ begin
     drop constraint if exists season_review_verdict_c11,
     drop constraint if exists season_review_self_c11,
     drop constraint if exists season_review_decided_c11,
+    drop constraint if exists season_review_verdict_c12,
     add constraint season_review_verdict_c12
       check (verdict is null or verdict in ('closer', 'same', 'redirected')),
+    drop constraint if exists season_review_self_c12,
     add constraint season_review_self_c12
       check (verdict_by_self is null or verdict_by_self in ('closer', 'same', 'redirected')),
+    drop constraint if exists season_review_decided_c12,
     add constraint season_review_decided_c12 check (
       (verdict is null and note is null and decided_by is null and decided_at is null)
       or (verdict is not null and decided_by is not null and decided_at is not null
@@ -11354,16 +11426,21 @@ begin
     drop constraint if exists teacher_notes_origin_c11,
     drop constraint if exists teacher_notes_disposition_c11,
     drop constraint if exists teacher_notes_body_nonblank_c11,
+    drop constraint if exists teacher_notes_origin_c12,
     add constraint teacher_notes_origin_c12
       check (origin in ('as_is', 'edited', 'written')),
+    drop constraint if exists teacher_notes_disposition_c12,
     add constraint teacher_notes_disposition_c12
       check (disposition in ('confirmed', 'retry')),
+    drop constraint if exists teacher_notes_body_nonblank_c12,
     add constraint teacher_notes_body_nonblank_c12 check (btrim(body) <> '');
 
   alter table engine.companion_qa
     drop constraint if exists companion_qa_question_nonblank_c11,
     drop constraint if exists companion_qa_answer_paired_c11,
+    drop constraint if exists companion_qa_question_nonblank_c12,
     add constraint companion_qa_question_nonblank_c12 check (btrim(question) <> ''),
+    drop constraint if exists companion_qa_answer_paired_c12,
     add constraint companion_qa_answer_paired_c12 check (handoff or btrim(answer) <> '');
 
   insert into engine.schema_migrations(version, name, checksum)
@@ -14252,6 +14329,7 @@ $migration$;
 -- 살아 있는 CHECK 65개 — c12 본문 그대로 이름만 c13(값이 는 것은 event_type 하나 · +estimate.responded).
 alter table engine.learning_events
   drop constraint if exists learning_events_event_type_c12,
+  drop constraint if exists learning_events_event_type_c13,
   add constraint learning_events_event_type_c13 check (event_type in (
     'submission.created', 'quiz.answered', 'choice.selected', 'correction.responded', 'correction.viewed', 'preference.stated', 'session.abandoned', 'intervention.delivered', 'data_use.granted', 'data_use.revoked',
     'task.assigned', 'exam.result', 'content.viewed', 'affect.reported',
@@ -14259,258 +14337,322 @@ alter table engine.learning_events
   ));
 alter table engine.generation_attempts
   drop constraint if exists attempts_gate_values_c12,
+  drop constraint if exists attempts_gate_values_c13,
   add constraint attempts_gate_values_c13 check ( gate_failed_reasons is null or gate_failed_reasons <@ array[ '길이','한국어비율','빈출력','금칙서식','질문형태','식별자역유입','중복']::text[] );
 
 alter table engine.generation_attempts
   drop constraint if exists attempts_response_present_c12,
+  drop constraint if exists attempts_response_present_c13,
   add constraint attempts_response_present_c13 check ( result is null or result not in ('성공','검문탈락','응답파손','응답초과') or (raw_response is not null and responded_at is not null) );
 
 alter table engine.generation_attempts
   drop constraint if exists attempts_result_gate_c12,
+  drop constraint if exists attempts_result_gate_c13,
   add constraint attempts_result_gate_c13 check ( case when result = '검문탈락' then gate_failed_reasons is not null and cardinality(gate_failed_reasons) >= 1 else gate_failed_reasons is null end );
 
 alter table engine.generation_attempts
   drop constraint if exists attempts_ver_nonempty_c12,
+  drop constraint if exists attempts_ver_nonempty_c13,
   add constraint attempts_ver_nonempty_c13 check ( btrim(model) <> '' and btrim(prompt_ver) <> '' and btrim(policy_ver) <> '' and btrim(estimator_version) <> '' and btrim(schema_ver) <> '' and btrim(skill_taxonomy_ver) <> '' );
 
 alter table engine.generation_batch_runs
   drop constraint if exists batch_runs_counts_order_c12,
+  drop constraint if exists batch_runs_counts_order_c13,
   add constraint batch_runs_counts_order_c13 check ( target_count is null or (target_count >= 0 and loaded_count <= enrolled_count) );
 
 alter table engine.generation_batch_runs
   drop constraint if exists batch_runs_counts_pair_c12,
+  drop constraint if exists batch_runs_counts_pair_c13,
   add constraint batch_runs_counts_pair_c13 check ((target_count is null) = (loaded_count is null));
 
 alter table engine.generation_batch_runs
   drop constraint if exists batch_runs_enrolled_nonneg_c12,
+  drop constraint if exists batch_runs_enrolled_nonneg_c13,
   add constraint batch_runs_enrolled_nonneg_c13 check (enrolled_count >= 0);
 
 alter table engine.generation_batch_runs
   drop constraint if exists batch_runs_finished_cols_c12,
+  drop constraint if exists batch_runs_finished_cols_c13,
   add constraint batch_runs_finished_cols_c13 check ( finished_at is null or (target_count is not null and loaded_count is not null and partial_count is not null and skipped_game_count is not null and skipped_existing_count is not null) );
 
 alter table engine.generation_batch_runs
   drop constraint if exists batch_runs_level_dist_ok_c12,
+  drop constraint if exists batch_runs_level_dist_ok_c13,
   add constraint batch_runs_level_dist_ok_c13 check (engine.level_dist_ok(level_distribution, enrolled_count));
 
 alter table engine.generation_batch_runs
   drop constraint if exists batch_runs_partial_pair_c12,
+  drop constraint if exists batch_runs_partial_pair_c13,
   add constraint batch_runs_partial_pair_c13 check ((partial_count is null) = (loaded_count is null));
 
 alter table engine.generation_batch_runs
   drop constraint if exists batch_runs_partial_range_c12,
+  drop constraint if exists batch_runs_partial_range_c13,
   add constraint batch_runs_partial_range_c13 check ( partial_count is null or (partial_count >= 0 and partial_count <= enrolled_count) );
 
 alter table engine.generation_batch_runs
   drop constraint if exists batch_runs_roster_equation_c12,
+  drop constraint if exists batch_runs_roster_equation_c13,
   add constraint batch_runs_roster_equation_c13 check ( finished_at is null or run_kind <> '배치' or (loaded_count + skipped_game_count + skipped_existing_count = enrolled_count) );
 
 alter table engine.generation_batch_runs
   drop constraint if exists batch_runs_skipped_range_c12,
+  drop constraint if exists batch_runs_skipped_range_c13,
   add constraint batch_runs_skipped_range_c13 check ( (skipped_game_count is null or (skipped_game_count >= 0 and skipped_game_count <= enrolled_count)) and (skipped_existing_count is null or (skipped_existing_count >= 0 and skipped_existing_count <= enrolled_count)) );
 
 alter table engine.generation_batch_runs
   drop constraint if exists batch_runs_ver_nonempty_c12,
+  drop constraint if exists batch_runs_ver_nonempty_c13,
   add constraint batch_runs_ver_nonempty_c13 check ( btrim(model) <> '' and btrim(prompt_ver) <> '' and btrim(policy_ver) <> '' and btrim(estimator_version) <> '' and btrim(schema_ver) <> '' and btrim(skill_taxonomy_ver) <> '' );
 
 alter table radio.broadcast_segment
   drop constraint if exists broadcast_segment_kind_c12,
+  drop constraint if exists broadcast_segment_kind_c13,
   add constraint broadcast_segment_kind_c13 check (kind in ('radio_loop', 'live_lecture', 'asmr_mode', 'other'));
 
 alter table engine.classes
   drop constraint if exists classes_key_nonblank_c12,
+  drop constraint if exists classes_key_nonblank_c13,
   add constraint classes_key_nonblank_c13 check (btrim(class_key) <> '');
 
 alter table engine.companion_qa
   drop constraint if exists companion_qa_answer_paired_c12,
+  drop constraint if exists companion_qa_answer_paired_c13,
   add constraint companion_qa_answer_paired_c13 check (handoff or btrim(answer) <> '');
 
 alter table engine.companion_qa
   drop constraint if exists companion_qa_question_nonblank_c12,
+  drop constraint if exists companion_qa_question_nonblank_c13,
   add constraint companion_qa_question_nonblank_c13 check (btrim(question) <> '');
 
 alter table engine.corrections
   drop constraint if exists corrections_promotion_intent_c12,
+  drop constraint if exists corrections_promotion_intent_c13,
   add constraint corrections_promotion_intent_c13 check (promotion_intent = false or actor_kind = 'teacher');
 
 alter table engine.corrections
   drop constraint if exists corrections_supersedes_not_self_c12,
+  drop constraint if exists corrections_supersedes_not_self_c13,
   add constraint corrections_supersedes_not_self_c13 check (supersedes is null or supersedes <> correction_id);
 
 alter table engine.corrections
   drop constraint if exists corrections_verdict_c12,
+  drop constraint if exists corrections_verdict_c13,
   add constraint corrections_verdict_c13 check (verdict is null or verdict in ( 'AI 교정이 맞다', '고칠 곳이 있다', '원문이 이미 맞다' ));
 
 alter table ops.cron_runs
   drop constraint if exists cron_runs_outcome_c12,
+  drop constraint if exists cron_runs_outcome_c13,
   add constraint cron_runs_outcome_c13 check (outcome in ('대기', '성공', '실패', '타임아웃', '전송오류', '상태없음', '유실', '발사실패'));
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_anchor_present_c12,
+  drop constraint if exists jobs_anchor_present_c13,
   add constraint jobs_anchor_present_c13 check ( status not in ('착지','마감폴백','대상아님') or assigned_event_id is not null );
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_claim_cols_c12,
+  drop constraint if exists jobs_claim_cols_c13,
   add constraint jobs_claim_cols_c13 check (status <> 'claimed' or (owner is not null and lease_until is not null));
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_deciding_pair_c12,
+  drop constraint if exists jobs_deciding_pair_c13,
   add constraint jobs_deciding_pair_c13 check ((deciding_attempt_id is null) = (deciding_result is null));
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_deciding_result_matches_c12,
+  drop constraint if exists jobs_deciding_result_matches_c13,
   add constraint jobs_deciding_result_matches_c13 check (deciding_result is null or deciding_result = outcome);
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_deciding_scope_c12,
+  drop constraint if exists jobs_deciding_scope_c13,
   add constraint jobs_deciding_scope_c13 check ( case when outcome is null then deciding_attempt_id is null when outcome in ('검문탈락','타임아웃','벤더오류','응답파손','입력초과','응답초과') then deciding_attempt_id is not null else deciding_attempt_id is null end );
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_draft_present_c12,
+  drop constraint if exists jobs_draft_present_c13,
   add constraint jobs_draft_present_c13 check (status = '적재실패' or event_draft is not null);
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_idle_cols_c12,
+  drop constraint if exists jobs_idle_cols_c13,
   add constraint jobs_idle_cols_c13 check (status <> '대기' or (owner is null and lease_until is null));
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_load_failed_cols_c12,
+  drop constraint if exists jobs_load_failed_cols_c13,
   add constraint jobs_load_failed_cols_c13 check ( status <> '적재실패' or (outcome = '내부오류' and assigned_event_id is null and event_draft is null and load_error is not null) );
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_nontarget_cols_c12,
+  drop constraint if exists jobs_nontarget_cols_c13,
   add constraint jobs_nontarget_cols_c13 check (status <> '대상아님' or not_target_reason is not null);
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_nonterminal_cols_c12,
+  drop constraint if exists jobs_nonterminal_cols_c13,
   add constraint jobs_nonterminal_cols_c13 check ( status in ('착지','마감폴백','대상아님','적재실패') or (outcome is null and closed_at is null and assigned_event_id is null and winning_attempt_id is null) );
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_skill_ids_present_c12,
+  drop constraint if exists jobs_skill_ids_present_c13,
   add constraint jobs_skill_ids_present_c13 check ( status = '적재실패' or not_target_reason is not null or cardinality(skill_ids) between 1 and 2 );
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_status_outcome_pairs_c12,
+  drop constraint if exists jobs_status_outcome_pairs_c13,
   add constraint jobs_status_outcome_pairs_c13 check ( case status when '대상아님' then outcome = '대상아님' when '마감폴백' then outcome = '예산소진' when '적재실패' then outcome = '내부오류' when '착지' then outcome is null or outcome not in ('대상아님','예산소진') else true end );
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_terminal_cols_c12,
+  drop constraint if exists jobs_terminal_cols_c13,
   add constraint jobs_terminal_cols_c13 check ( status not in ('착지','마감폴백','대상아님','적재실패') or (outcome is not null and closed_at is not null) );
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_ver_nonempty_c12,
+  drop constraint if exists jobs_ver_nonempty_c13,
   add constraint jobs_ver_nonempty_c13 check ( btrim(model) <> '' and btrim(prompt_ver) <> '' and btrim(policy_ver) <> '' and btrim(estimator_version) <> '' and btrim(schema_ver) <> '' and btrim(skill_taxonomy_ver) <> '' );
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_winner_fence_current_c12,
+  drop constraint if exists jobs_winner_fence_current_c13,
   add constraint jobs_winner_fence_current_c13 check (winning_fence is null or winning_fence = fence);
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_winner_fence_pair_c12,
+  drop constraint if exists jobs_winner_fence_pair_c13,
   add constraint jobs_winner_fence_pair_c13 check ((winning_attempt_id is null) = (winning_fence is null));
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_winner_only_success_c12,
+  drop constraint if exists jobs_winner_only_success_c13,
   add constraint jobs_winner_only_success_c13 check (winning_attempt_id is null or outcome = '성공');
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_winner_present_c12,
+  drop constraint if exists jobs_winner_present_c13,
   add constraint jobs_winner_present_c13 check (outcome <> '성공' or winning_attempt_id is not null);
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_winner_result_only_success_c12,
+  drop constraint if exists jobs_winner_result_only_success_c13,
   add constraint jobs_winner_result_only_success_c13 check (winning_result is null or winning_result = '성공');
 
 alter table engine.generation_jobs
   drop constraint if exists jobs_winner_result_pair_c12,
+  drop constraint if exists jobs_winner_result_pair_c13,
   add constraint jobs_winner_result_pair_c13 check ((winning_attempt_id is null) = (winning_result is null));
 
 alter table engine.learners
   drop constraint if exists learners_gender_c12,
+  drop constraint if exists learners_gender_c13,
   add constraint learners_gender_c13 check (gender is null or gender in ('female', 'male', 'undisclosed'));
 
 alter table engine.learners
   drop constraint if exists learners_goal_track_c12,
+  drop constraint if exists learners_goal_track_c13,
   add constraint learners_goal_track_c13 check (goal_track is null or goal_track in ('study', 'work', 'culture'));
 
 alter table engine.learners
   drop constraint if exists learners_group_no_c12,
+  drop constraint if exists learners_group_no_c13,
   add constraint learners_group_no_c13 check (group_no between 1 and 20);
 
 alter table engine.learners
   drop constraint if exists learners_home_aimag_c12,
+  drop constraint if exists learners_home_aimag_c13,
   add constraint learners_home_aimag_c13 check (home_aimag is null or home_aimag in ( 'ulaanbaatar', 'arkhangai', 'bayan-olgii', 'bayankhongor', 'bulgan', 'darkhan-uul', 'dornod', 'dornogovi', 'dundgovi', 'govi-altai', 'govisumber', 'khentii', 'khovd', 'khovsgol', 'omnogovi', 'orkhon', 'ovorkhangai', 'selenge', 'sukhbaatar', 'tov', 'uvs', 'zavkhan'));
 
 alter table engine.learners
   drop constraint if exists learners_seat_no_c12,
+  drop constraint if exists learners_seat_no_c13,
   add constraint learners_seat_no_c13 check (seat_no between 1 and 20);
 
 alter table engine.learners
   drop constraint if exists learners_signup_attempts_nonneg_c12,
+  drop constraint if exists learners_signup_attempts_nonneg_c13,
   add constraint learners_signup_attempts_nonneg_c13 check (signup_attempts >= 0);
 
 alter table engine.learners
   drop constraint if exists learners_temp_password_paired_c12,
+  drop constraint if exists learners_temp_password_paired_c13,
   add constraint learners_temp_password_paired_c13 check (temp_password_hash is null or temp_password_expires_at is not null);
 
 alter table engine.learning_events
   drop constraint if exists learning_events_correction_target_c12,
+  drop constraint if exists learning_events_correction_target_c13,
   add constraint learning_events_correction_target_c13 check ( case when event_type in ('correction.viewed', 'correction.responded') then correction_id is not null else correction_id is null end );
 
 alter table engine.learning_events
   drop constraint if exists learning_events_task_type_c12,
+  drop constraint if exists learning_events_task_type_c13,
   add constraint learning_events_task_type_c13 check (task_type is null or task_type in ( '숙제제출', '다시쓰기', '퀴즈응답', '대화턴', '발화녹음', '출석발화', '라디오퀴즈', '목표선언', '자습체크인' ));
 
 alter table engine.pipeline_jobs
   drop constraint if exists pipeline_jobs_discard_reason_c12,
+  drop constraint if exists pipeline_jobs_discard_reason_c13,
   add constraint pipeline_jobs_discard_reason_c13 check (discard_reason is null or (status = 'discarded' and discard_reason in ('무음', '손상', '중복', '과제 불일치', '타인 음성', '판정 불가')));
 
 alter table engine.season_compass
   drop constraint if exists season_compass_answers_c12,
+  drop constraint if exists season_compass_answers_c13,
   add constraint season_compass_answers_c13 check ( ( self_in_5y_changed is null and answers ?& array['why_learning', 'self_in_5y', 'topik_use', 'season_goal'] and answers - array['why_learning', 'self_in_5y', 'topik_use', 'season_goal'] = '{}'::jsonb ) or ( self_in_5y_changed is not null and answers ?& array['self_in_5y', 'season_goal'] and answers - array['self_in_5y', 'season_goal'] = '{}'::jsonb ) );
 
 alter table engine.season
   drop constraint if exists season_dates_c12,
+  drop constraint if exists season_dates_c13,
   add constraint season_dates_c13 check (ends_on is null or ends_on >= starts_on);
 
 alter table engine.season_review
   drop constraint if exists season_review_decided_c12,
+  drop constraint if exists season_review_decided_c13,
   add constraint season_review_decided_c13 check ( (verdict is null and note is null and decided_by is null and decided_at is null) or (verdict is not null and decided_by is not null and decided_at is not null and note is not null and btrim(note) <> '') );
 
 alter table engine.season_review
   drop constraint if exists season_review_self_c12,
+  drop constraint if exists season_review_self_c13,
   add constraint season_review_self_c13 check (verdict_by_self is null or verdict_by_self in ('closer', 'same', 'redirected'));
 
 alter table engine.season_review
   drop constraint if exists season_review_verdict_c12,
+  drop constraint if exists season_review_verdict_c13,
   add constraint season_review_verdict_c13 check (verdict is null or verdict in ('closer', 'same', 'redirected'));
 
 alter table engine.staff
   drop constraint if exists staff_role_c12,
+  drop constraint if exists staff_role_c13,
   add constraint staff_role_c13 check (role in ('teacher', 'inspector', 'director'));
 
 alter table engine.submissions
   drop constraint if exists submissions_due_paired_c12,
+  drop constraint if exists submissions_due_paired_c13,
   add constraint submissions_due_paired_c13 check ( (due_at is null) = (due_ver is null) );
 
 alter table engine.submissions
   drop constraint if exists submissions_task_format_c12,
+  drop constraint if exists submissions_task_format_c13,
   add constraint submissions_task_format_c13 check (task_format is null or task_format in ( '낭독', '응답', '자유발화', '모의면접', '높임전환', '쓰기첨삭', '번역' ));
 
 alter table engine.submissions
   drop constraint if exists submissions_translation_source_c12,
+  drop constraint if exists submissions_translation_source_c13,
   add constraint submissions_translation_source_c13 check ( task_format is distinct from '번역' or nullif(btrim(task_snapshot->>'mn'), '') is not null );
 
 alter table engine.teacher_notes
   drop constraint if exists teacher_notes_body_nonblank_c12,
+  drop constraint if exists teacher_notes_body_nonblank_c13,
   add constraint teacher_notes_body_nonblank_c13 check (btrim(body) <> '');
 
 alter table engine.teacher_notes
   drop constraint if exists teacher_notes_disposition_c12,
+  drop constraint if exists teacher_notes_disposition_c13,
   add constraint teacher_notes_disposition_c13 check (disposition in ('confirmed', 'retry'));
 
 alter table engine.teacher_notes
   drop constraint if exists teacher_notes_origin_c12,
+  drop constraint if exists teacher_notes_origin_c13,
   add constraint teacher_notes_origin_c13 check (origin in ('as_is', 'edited', 'written'));
 
 do $migration2$
