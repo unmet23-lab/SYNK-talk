@@ -26,7 +26,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { 색, 폰트, 모노트래킹 } from './테마';
 import { 견줌 } from '../lib/견줌.js';
 import { 연출대본 } from '../lib/마스코트생명.js';
-import { 표정속도, 목소리판정 } from '../lib/몽글목소리.js';
+import { 배치, 목소리판정 } from '../lib/몽글목소리.js';
 import { 효과음 } from './소리.js';
 import 어제의나 from './어제의나';
 import 마스코트 from './마스코트';
@@ -35,12 +35,13 @@ import 마스코트 from './마스코트';
    어제 1 → 오늘 3 (두 칸 오름) · 다시 말한 것 0 → 1 · 교정 재발화 있음 = 결론 두 줄이 다 선다. */
 /* 표정별 «쓰이는 자리» — 화면이 이 말을 짓지 않는다. 배치의 정본은 `src/마스코트.js` 의
    사건 갈래이고, 여기 적는 것은 그 자리를 사람 말로 옮긴 안내다(값이 아니라 설명). */
-const 표정줄 = [
-  { 이름: '기쁨', 쓰임: '틀린 데 없는 답장을 처음 열 때 · 완료 축하 · 다시 도전할 때' },
-  { 이름: '물음', 쓰임: '몽글이 질문할 때 · 화면이 한마디 건넬 때' },
+const 상황줄 = [
   { 이름: '기본', 쓰임: '몸을 톡 누를 때 · 평상시 혼잣말' },
-  { 이름: '안심', 쓰임: '고칠 데가 남은 답장 — 낮고 느리게(밝은 소리를 안 쓰는 자리)' },
-  { 이름: '잠결', 쓰임: '한참 안 만졌거나 밤일 때 · 몽글이 졸릴 때' },
+  { 이름: '기쁨', 쓰임: '틀린 데 없는 답장을 처음 열 때 · 다시 도전할 때' },
+  { 이름: '물음', 쓰임: '몽글이 질문할 때 · 화면이 한마디 건넬 때' },
+  { 이름: '안심', 쓰임: '고칠 데가 남은 답장 — 내려앉는 소리만 씁니다' },
+  { 이름: '잠결', 쓰임: '한참 안 만졌거나 밤일 때' },
+  { 이름: '완료축하', 쓰임: '숙제를 다 냈을 때 — 하루 한 번뿐이라 가장 깁니다' },
 ];
 
 const 견줌픽스처 = 견줌({
@@ -62,11 +63,18 @@ export default function 검수문({ 돌아가기 }) {
      여기서 효과음을 직접 부르면 이 지면만 다른 소리가 나고, 그때 검수는 거짓말이 된다.
      겹침막기 때문에 빠르게 두 번 누르면 두 번째가 조용한 것이 «정상»이다. */
   const 마지막 = useRef(0);
-  const 표정듣기 = (표정) => {
-    const 답 = 목소리판정({ 표정, 지금: Date.now(), 마지막: 마지막.current, 흔들: Math.random() });
-    if (!답.낼까) return;
+  const 직전 = useRef(null);
+  const [난소리, set난소리] = useState(null);   // 방금 어느 소리가 났는지 화면에 보인다
+  const 상황듣기 = (상황) => {
+    const 답 = 목소리판정({
+      상황, 지금: Date.now(), 마지막: 마지막.current, 직전소리: 직전.current,
+      고르기: Math.random(), 흔들: Math.random(),
+    });
+    if (!답.낼까) { set난소리({ 상황, 소리: '…', 막힘: true }); return; }
     마지막.current = Date.now();
-    효과음('mongle', 답.속도);
+    직전.current = 답.소리;
+    set난소리({ 상황, 소리: 답.소리, 속도: 답.속도 });
+    효과음(답.자산, 답.속도);
   };
 
   return (
@@ -120,23 +128,29 @@ export default function 검수문({ 돌아가기 }) {
             같은 버튼을 두 번 눌러도 똑같이 들리지 않는 것이 정상이다. */}
         <View style={s.칸}>
           <View style={s.칸머리}>
-            <Text style={s.칸이름}>③ 목소리 표정 다섯</Text>
+            <Text style={s.칸이름}>③ 목소리 — 상황마다 다른 소리</Text>
           </View>
           <Text style={s.눈금}>
-            같은 소리를 속도로 갈랐습니다. 앱에서는 아래 «쓰이는 자리»에서 저절로 납니다 —
-            여기서는 확인하려고 손으로 눌러 봅니다.
+            상황마다 «다른 소리»가 나고, 같은 상황에서도 둘을 번갈아 냅니다. 여러 번 눌러
+            보세요 — 같은 소리가 연달아 나지 않습니다. 빠르게 두 번 누르면 두 번째가 조용한 것도
+            정상입니다(겹침막기 0.7초).
           </Text>
-          {표정줄.map(({ 이름, 쓰임 }) => (
+          {상황줄.map(({ 이름, 쓰임 }) => (
             <Pressable
               key={이름}
-              onPress={() => 표정듣기(이름)}
+              onPress={() => 상황듣기(이름)}
               style={({ pressed }) => [s.표정칸, pressed && s.눌림]}
             >
               <Text style={s.표정이름}>{이름}</Text>
-              <Text style={s.표정속도}>×{표정속도[이름].toFixed(2)}</Text>
+              <Text style={s.표정속도}>{배치[이름].join('·')}</Text>
               <Text style={s.표정쓰임}>{쓰임}</Text>
             </Pressable>
           ))}
+          {난소리 ? (
+            <Text style={s.눈금}>
+              방금: {난소리.상황} → {난소리.막힘 ? '겹침막기로 건너뜀' : `「${난소리.소리}」 ×${난소리.속도}`}
+            </Text>
+          ) : null}
         </View>
 
         {/* ── ④ 몽글 «그 자리 연기» — 트랙에 유호님 눈검수로 대기 중이던 자리 ── */}
@@ -215,8 +229,8 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: 색.바탕띄움, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14,
   },
-  표정이름: { fontFamily: 폰트.강조, fontSize: 15, color: 색.잉크, width: 42 },
-  표정속도: { fontFamily: 폰트.모노, fontSize: 12, color: 색.실땀, width: 44 },
+  표정이름: { fontFamily: 폰트.강조, fontSize: 14, color: 색.잉크, width: 58 },
+  표정속도: { fontFamily: 폰트.캡션, fontSize: 11, color: 색.실땀, width: 76 },
   표정쓰임: { flex: 1, fontFamily: 폰트.캡션, fontSize: 12, lineHeight: 17, color: 색.잉크_메타 },
 
   버튼: {

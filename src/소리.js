@@ -19,7 +19,21 @@ const 효과음자산 = {
   earn: () => require('../assets/sfx/synk-sound-earn.wav'),
   achieve: () => require('../assets/sfx/synk-sound-achieve.wav'),
   notify: () => require('../assets/sfx/synk-sound-notify.wav'),
-  mongle: () => require('../assets/sfx/synk-sound-mongle.wav'), // 마스코트 탭 반응(유호 08-25)
+  /* 몽글 목소리 12종 — 상황마다 다른 소리다(유호 확정 08-25 · 배치 = lib/몽글목소리.js).
+     🔑 Metro 는 require 를 정적으로 읽는다 — 이름을 코드로 파생할 수 없어 손 지도가 필요하고,
+        그 지도가 게이트 화이트리스트와 갈라지는 것은 tests/소리.test.js 가 잡는다. */
+  mu: () => require('../assets/sfx/synk-voice-mu.wav'),
+  ppuu: () => require('../assets/sfx/synk-voice-ppuu.wav'),
+  myang: () => require('../assets/sfx/synk-voice-myang.wav'),
+  miyu: () => require('../assets/sfx/synk-voice-miyu.wav'),
+  ppoo: () => require('../assets/sfx/synk-voice-ppoo.wav'),
+  ppong: () => require('../assets/sfx/synk-voice-ppong.wav'),
+  mii: () => require('../assets/sfx/synk-voice-mii.wav'),
+  miyuu: () => require('../assets/sfx/synk-voice-miyuu.wav'),
+  uung: () => require('../assets/sfx/synk-voice-uung.wav'),
+  muum: () => require('../assets/sfx/synk-voice-muum.wav'),
+  moong: () => require('../assets/sfx/synk-voice-moong.wav'),
+  muu: () => require('../assets/sfx/synk-voice-muu.wav'),
 };
 
 let bgm플레이어 = null;
@@ -33,12 +47,12 @@ function 오디오() { return require('expo-audio'); }
 const 플레이어들 = {};
 
 /**
- * 효과음 — 킷 4종만. 게이트 거부는 조용히 무음(오류가 아니라 설계다).
+ * 효과음 — 킷 3종 + 목소리 12종만. 게이트 거부는 조용히 무음(오류가 아니라 설계다).
  *
- * @param {string} 이름 킷 이름(earn·achieve·notify·mongle)
+ * @param {string} 이름 자산 키(earn·achieve·notify · 목소리 mu·ppuu·myang…)
  * @param {number} [속도] 재생 속도 — **몽글 목소리의 «표정»이 이 값이다**(유호 확정 08-25 ·
- *   판정은 `lib/몽글목소리.js`). 🔑 `shouldCorrectPitch=false` 를 함께 세운다: 피치 보정이
- *   켜져 있으면 속도만 변하고 음높이가 그대로라 «표정»이 아니라 «빨리 감기»가 된다.
+ *   판정은 `lib/몽글목소리.js`). 지금은 ±3% «미세 변주»뿐이다 — 표정은 소리 자체가 진다.
+ *   🔑 `shouldCorrectPitch=false` 를 함께 세운다: 보정이 켜지면 음높이가 그대로라 변주가 죽는다.
  *   🚫 킷 3종에는 안 쓴다 — 그 셋은 밸런스가 파일에 박혀 있다(볼륨·속도 재조정 금지).
  */
 export function 효과음(이름, 속도) {
