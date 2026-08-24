@@ -26,12 +26,22 @@ let bgm플레이어 = null;
 
 function 오디오() { return require('expo-audio'); }
 
+/* 플레이어 캐시 — 이름당 하나를 만들어 두고 되감아 다시 쓴다.
+ * 🔴 매 호출 createAudioPlayer 는 두 가지로 «조용히» 죽을 수 있다: ①참조를 아무도 안 쥐면
+ *   짧은 소리가 로드 끝나기 전에 수거될 수 있고 ②하루 수십 번(몽글 탭) 만들면 네이티브
+ *   플레이어가 샌다. 증상이 무음이라(08-25 「소리가 안 나」) 원인 후보에서 먼저 지운다. */
+const 플레이어들 = {};
+
 /** 효과음 — 킷 4종만. 게이트 거부는 조용히 무음(오류가 아니라 설계다). */
 export function 효과음(이름) {
   const 답 = 게이트.판정('sfx', 이름);
   if (!답.허용) return false;
-  const { createAudioPlayer } = 오디오();
-  const p = createAudioPlayer(효과음자산[이름]());
+  if (!플레이어들[이름]) {
+    const { createAudioPlayer } = 오디오();
+    플레이어들[이름] = createAudioPlayer(효과음자산[이름]());
+  }
+  const p = 플레이어들[이름];
+  p.seekTo(0);
   p.play();
   return true;
 }

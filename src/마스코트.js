@@ -93,6 +93,16 @@ export default function 마스코트({ 사건 = null, 자리 = null, 말건네�
   const 예약 = (fn, ms) => { const t = setTimeout(fn, ms); 타이머들.push(t); return t; };
   const 멈춤 = () => 줄임 || 지금녹음중(); // 정지 조건은 이 한 곳 — 늘리면 여기서 늘린다
 
+  /* 옹알이 — 몽글의 목소리(유호 08-25 2차 「말하는 듯한 귀여운 소리」). 두 자리에서 난다:
+   * ①탭 ②말풍선이 설 때(말 = 소리). 탭이 말까지 부르면 둘이 겹치므로 400ms 안 중복은
+   * 한 번만 낸다 — 소리 자체가 300ms 옹알이라 겹치면 웅얼거림이 된다. */
+  const 마지막옹알 = useRef(0);
+  const 옹알이 = () => {
+    if (Date.now() - 마지막옹알.current < 400) return;
+    마지막옹알.current = Date.now();
+    효과음('mongle');
+  };
+
   /* reduce-motion — 켜져 있으면 «정지 화면»이다: 타이머·애니메이션 전부 0 (생명감 §1-3). */
   useEffect(() => {
     let 살아있음 = true;
@@ -139,6 +149,7 @@ export default function 마스코트({ 사건 = null, 자리 = null, 말건네�
   const 말하기 = (풀) => {
     if (!풀 || !풀.length || 멈춤()) return;
     set말(풀[Math.floor(Math.random() * 풀.length)]);
+    옹알이(); // 말풍선 = 목소리 — 몽글이 말할 때는 항상 소리가 함께 난다(유호 08-25)
     예약(() => set말(null), 때.말지속);
   };
   /* «가끔» — 사건 혼잣말은 그 사건에 최대 1회, 그마저 절반만 말한다(무언이 기본 · §1-1).
@@ -152,6 +163,7 @@ export default function 마스코트({ 사건 = null, 자리 = null, 말건네�
     if (!말건네기 || !말건네기.글 || 멈춤()) return;
     깨우기();
     set말(말건네기.글);
+    옹알이();
     예약(() => set말(null), 때.말지속 + 1800);
   }, [말건네기 && 말건네기.때]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -209,7 +221,7 @@ export default function 마스코트({ 사건 = null, 자리 = null, 말건네�
           else if (걸음.몸짓 === '사라짐') 크기로(0.001, true);
           if (걸음.말) {
             const 글 = 걸음.말 === '@질문' ? (연출.채움 && 연출.채움.질문) || null : 걸음.말;
-            if (글) { set말(글); 연출예약(() => set말(null), Math.max(걸음.지속 - 200, 400)); }
+            if (글) { set말(글); 옹알이(); 연출예약(() => set말(null), Math.max(걸음.지속 - 200, 400)); }
           }
         }, 시각);
         시각 += 걸음.지속 || 0;
@@ -274,7 +286,7 @@ export default function 마스코트({ 사건 = null, 자리 = null, 말건네�
      * 소리는 어댑터 게이트를 지난다 — 녹음 중이면 위에서 이미 걸러졌지만, 게이트가 최종 판정자다.
      * 가끔(1/3)은 쫀득에 살짝 튐도 얹는다 — 매번 같은 반응은 기계 티가 난다(자발성 §2). */
     쫀득하기();
-    효과음('mongle');
+    옹알이();
     if (Math.random() < 0.34) 점프(8);
     set표정('놀람');
     예약(() => set표정(Math.random() < 0.5 ? '기쁨' : '눈웃음'), 300);
