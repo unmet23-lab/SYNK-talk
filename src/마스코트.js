@@ -29,7 +29,10 @@ import {
   AccessibilityInfo, Animated, Easing, Platform, Pressable, StyleSheet, Text,
 } from 'react-native';
 import { 색, 폰트 } from './테마.js';
-import { 지금녹음중 } from './소리.js';
+/* 효과음은 src/소리.js 어댑터를 지나서만 낸다(단일 게이트 — 녹음 중 무음·킷 화이트리스트가
+   그 한 곳에 산다). 옛 규칙 「마스코트는 소리를 안 낸다」는 유호 지시 08-25(탭 반응음)로
+   바뀌었다 — 지금 금지는 「expo-audio 를 직접 잡는 것」이다(배선 회귀가 그걸 지킨다). */
+import { 지금녹음중, 효과음 } from './소리.js';
 import { 표정컷, 혼잣말 } from '../lib/마스코트생명.js';
 
 /* Metro 는 require 를 정적으로 읽는다 — 목록을 코드로 파생할 수 없어 손 지도가 필요하고,
@@ -82,6 +85,7 @@ export default function 마스코트({ 사건 = null, 자리 = null, 말건네�
   const 튐 = useRef(new Animated.Value(0)).current; // px (음수 = 위)
   const 기울기 = useRef(new Animated.Value(0)).current; // -10..10 (deg)
   const 크기 = useRef(new Animated.Value(1)).current; // 다가옴 1.14 · 사라짐 0 (연출 어휘)
+  const 쫀득 = useRef(new Animated.Value(0)).current; // 0→1 눌림(가로↑세로↓) — 펠트 젤리의 눌린 몸
   const 타이머들 = useRef([]).current;
   const 연출타이머들 = useRef([]).current; // 스킵이 이것만 걷는다 — 깜빡임·idle 타이머는 산다
   const 마지막입력 = useRef(Date.now());
@@ -155,6 +159,15 @@ export default function 마스코트({ 사건 = null, 자리 = null, 말건네�
     Animated.sequence([
       Animated.timing(튐, { toValue: -높이, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web' }),
       Animated.spring(튐, { toValue: 0, friction: 4, tension: 90, useNativeDriver: Platform.OS !== 'web' }),
+    ]).start();
+  };
+  /* 쫀득 — 눌린 펠트가 «뽁» 하고 돌아온다(유호 08-25 「귀여운 모션」). 눌림 90ms 는 손가락이
+   * 닿은 순간의 반동처럼 짧게, 복원은 스프링이 살짝 넘치며(overshoot = 젤리) 돌아온다.
+   * 가로가 늘고 세로가 줄어드는 squash — 몸이 뜨는 점프와 달리 «눌렸다»가 읽히는 몸짓이다. */
+  const 쫀득하기 = () => {
+    Animated.sequence([
+      Animated.timing(쫀득, { toValue: 1, duration: 90, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web' }),
+      Animated.spring(쫀득, { toValue: 0, friction: 3.6, tension: 160, useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
   };
   /* 다가옴·물러남·사라짐 — 유호 확정 몸짓 어휘(08-14 「다가옴/물러남」) 안의 크기 축.
@@ -257,6 +270,12 @@ export default function 마스코트({ 사건 = null, 자리 = null, 말건네�
       return;
     }
     깨우기();
+    /* 탭 반응 = 쫀득 + 반응음 + 표정 (유호 08-25 「반응음 + 귀여운 모션」).
+     * 소리는 어댑터 게이트를 지난다 — 녹음 중이면 위에서 이미 걸러졌지만, 게이트가 최종 판정자다.
+     * 가끔(1/3)은 쫀득에 살짝 튐도 얹는다 — 매번 같은 반응은 기계 티가 난다(자발성 §2). */
+    쫀득하기();
+    효과음('mongle');
+    if (Math.random() < 0.34) 점프(8);
     set표정('놀람');
     예약(() => set표정(Math.random() < 0.5 ? '기쁨' : '눈웃음'), 300);
     가끔말하기(혼잣말.탭);
@@ -280,13 +299,52 @@ export default function 마스코트({ 사건 = null, 자리 = null, 말건네�
       }]}
     >
       <Pressable onPress={탭} hitSlop={10} accessibilityLabel="마스코트">
-        <Animated.Image source={컷그림[그릴컷]} style={s.몸} resizeMode="contain" />
+        <Animated.Image
+          source={컷그림[그릴컷]}
+          style={[s.몸, {
+            /* 쫀득은 몸에만 건다 — 말풍선까지 눌리면 라벨이 종이가 아니라 고무가 된다. */
+            transform: [
+              { scaleX: 쫀득.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] }) },
+              { scaleY: 쫀득.interpolate({ inputRange: [0, 1], outputRange: [1, 0.88] }) },
+            ],
+          }]}
+          resizeMode="contain"
+        />
       </Pressable>
-      {말 ? (
-        <Animated.View style={s.말풍선} pointerEvents="none">
-          <Text style={s.말글}>{말}</Text>
-        </Animated.View>
-      ) : null}
+      {/* 🔑 key={말} — 문구가 바뀌면 라벨을 새로 세워 등장 박자가 매번 돈다(재사용하면 첫 말만 박자). */}
+      {말 ? <말풍선 key={말} 글={말} 줄임={줄임} /> : null}
+    </Animated.View>
+  );
+}
+
+/* 말풍선 — 펠트 인형에 실로 단 «천 라벨»(08-25 유호 지적 「붕 떠 있고 AI 스럽다」의 처방).
+ *
+ * ■ 왜 이 모양인가 — 몽글의 세계는 펠트다. 유리같은 말풍선 대신, 봉제인형 옆에 실땀(Stitch
+ *   #F0E3C8)으로 밑단을 두른 태그가 몸에 «달려» 있다: 점선 테두리 = 자수 한 땀,
+ *   꼬리 = 라벨이 몸에 닿는 자리. 색·서체 전부 킷이다(실땀·Ink 면·SUIT Medium).
+ * ■ 자리 — 몸 «아래»가 아니라 **얼굴 옆(왼쪽)** 이다. 말은 입에서 나온다 — 아래 붙은 상자가
+ *   「붕 떠 있다」로 읽힌 이유다. 화면 배치(오른쪽 위)상 왼쪽이 열린 방향이다.
+ * ■ 등장 — 입에서 «뽁» 나오듯: 살짝 작게+아래에서 스프링으로 선다(즉시 팝이면 또 붕 뜬다).
+ *   reduce-motion 이면 박자 없이 바로 선다(정지 화면이 곧 진실 — lib/모션.js 와 같은 규율). */
+function 말풍선({ 글, 줄임 }) {
+  const 등장 = useRef(new Animated.Value(줄임 ? 1 : 0)).current;
+  useEffect(() => {
+    if (줄임) { 등장.setValue(1); return; }
+    Animated.spring(등장, { toValue: 1, friction: 6, tension: 140, useNativeDriver: Platform.OS !== 'web' }).start();
+  }, [줄임, 등장]);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[s.말풍선, {
+        opacity: 등장,
+        transform: [
+          { translateY: 등장.interpolate({ inputRange: [0, 1], outputRange: [5, 0] }) },
+          { scale: 등장.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) },
+        ],
+      }]}
+    >
+      <Text style={s.말글}>{글}</Text>
+      <Animated.View style={s.말꼬리} />
     </Animated.View>
   );
 }
@@ -295,10 +353,19 @@ const s = StyleSheet.create({
   /* 기본 자리 = 오른쪽 위(답장 화면 겉테) — 화면이 `자리` 로 덮어쓴다. 신호색 0 · 면 0. */
   자리: { position: 'absolute', top: 52, right: 20, alignItems: 'flex-end' },
   몸: { width: 84, height: 84 },
+  /* 천 라벨 — 얼굴 옆(왼쪽)에 단다. right = 몸 84 + 틈 10. 점선 = 실땀 자수 한 땀. */
   말풍선: {
-    marginTop: 6, backgroundColor: 색.바탕띄움, borderRadius: 10,
-    paddingHorizontal: 10, paddingVertical: 6,
+    position: 'absolute', right: 94, top: 16,
+    backgroundColor: 색.바탕띄움, borderRadius: 13,
+    borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(240,227,200,0.55)', // 실땀 55%
+    paddingHorizontal: 12, paddingVertical: 8,
     maxWidth: 230, // 연출 `@질문`(최대 90자)이 화면 밖으로 밀리지 않게 — 혼잣말(1~4어절)은 영향 없다
   },
-  말글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 19, color: 색.잉크_서브 },
+  /* 꼬리 — 라벨이 몸에 닿는 자리(45° 돌린 같은 색 면). 점선 테두리는 안 두른다 — 몸에
+     묻히는 쪽이라 실땀까지 돌리면 «붙어 있음»이 아니라 «떠 있는 다이아»가 된다. */
+  말꼬리: {
+    position: 'absolute', right: -4, top: 14, width: 9, height: 9,
+    backgroundColor: 색.바탕띄움, transform: [{ rotate: '45deg' }],
+  },
+  말글: { fontFamily: 폰트.본문, fontSize: 13, lineHeight: 20, color: 색.잉크 },
 });

@@ -2,7 +2,7 @@
  *
  * ■ 무엇을 지키나
  *   ① **녹음 중 소리·햅틱 0** — §3-1 🔴 의 기계판. 게이트가 한 곳이라 여기만 재면 전부다.
- *   ② **효과음은 킷 3종뿐** — 리프레이밍 무음(§3-3 7번)·실패음 부재(규칙 ②)가 「이름이 없어서」
+ *   ② **효과음은 킷 4종뿐** — 리프레이밍 무음(§3-3 7번)·실패음 부재(규칙 ②)가 「이름이 없어서」
  *      원리상 못 지나가는 구조를 못박는다. 탐지력은 픽스처(가짜 이름)가 진다.
  *   ③ **SFX 는 사운드킷과 같은 바이트** — 형제 저장소(as)가 있으면 대조, 없으면 skip
  *      (fail 로 짜면 CI 에서 남의 배포를 막는다 — §3-1 ⚠ 그대로).
@@ -49,7 +49,7 @@ test('게이트 ① — BGM 이 꺼져 있으면 녹음 경계 조치가 0건(�
 
 test('게이트 ② — 킷 밖 이름은 원리상 못 지나간다(리프레이밍·실패음의 기계판)', () => {
   const g = 만들기();
-  assert.deepEqual([...효과음이름], ['earn', 'achieve', 'notify']);
+  assert.deepEqual([...효과음이름], ['earn', 'achieve', 'notify', 'mongle']); // mongle = 마스코트 탭(유호 08-25)
   for (const 가짜 of ['reframe', 'fail', 'buzzer', 'BGM', '']) {
     const 답 = g.판정('sfx', 가짜);
     assert.equal(답.허용, false, `킷 밖 소리가 지나갔다: ${가짜}`);
@@ -57,8 +57,8 @@ test('게이트 ② — 킷 밖 이름은 원리상 못 지나간다(리프레�
   }
 });
 
-test('SFX ③ — 3종이 있고, 형제 저장소가 있으면 사운드킷과 바이트 동일', (t) => {
-  const 이름들 = ['synk-sound-earn.wav', 'synk-sound-achieve.wav', 'synk-sound-notify.wav'];
+test('SFX ③ — 4종이 있고, 형제 저장소가 있으면 사운드킷과 바이트 동일', (t) => {
+  const 이름들 = ['synk-sound-earn.wav', 'synk-sound-achieve.wav', 'synk-sound-notify.wav', 'synk-sound-mongle.wav'];
   for (const 이름 of 이름들) {
     assert.ok(fs.existsSync(path.join(뿌리, 'assets', 'sfx', 이름)), `assets/sfx/${이름} 이 없다`);
   }

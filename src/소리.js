@@ -19,13 +19,14 @@ const 효과음자산 = {
   earn: () => require('../assets/sfx/synk-sound-earn.wav'),
   achieve: () => require('../assets/sfx/synk-sound-achieve.wav'),
   notify: () => require('../assets/sfx/synk-sound-notify.wav'),
+  mongle: () => require('../assets/sfx/synk-sound-mongle.wav'), // 마스코트 탭 반응(유호 08-25)
 };
 
 let bgm플레이어 = null;
 
 function 오디오() { return require('expo-audio'); }
 
-/** 효과음 — 킷 3종만. 게이트 거부는 조용히 무음(오류가 아니라 설계다). */
+/** 효과음 — 킷 4종만. 게이트 거부는 조용히 무음(오류가 아니라 설계다). */
 export function 효과음(이름) {
   const 답 = 게이트.판정('sfx', 이름);
   if (!답.허용) return false;
