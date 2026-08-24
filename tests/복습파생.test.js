@@ -13,6 +13,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { 확정판, 리뷰파생 } = require('../lib/복습파생.js');
+const { 카드키 } = require('../lib/태그기술표.js');   // S6 확정(08-24) — 카드 키는 표를 지난다
 const { 학생카드접기, due카드들 } = require('../lib/복습스케줄.js');
 const { VERDICT } = require('../lib/검수확정.js');
 const { G4스냅샷모양판 } = require('../lib/게임스냅샷.js');
@@ -52,7 +53,10 @@ test('① R1 — 확정판 태그가 그 제출 시각의 실패 리뷰다 · �
     교정들: [교정('c1', 's1', { tags: [주격, 시제, '오류없음'] })],
   });
   assert.equal(리뷰들.length, 2);
-  assert.deepEqual(리뷰들.map((r) => r.card_id).sort(), [시제, 주격].sort());
+  /* S6 뒤 카드 키는 표를 지난다 — 주격은 skill 로, 시제(대응없음)는 태그 그대로.
+   * 아래 첫 줄은 «키 교체가 실제로 일어났나»의 하드 닻이다(표 import 로만 재면 교체를 안 해도 초록). */
+  assert.ok(리뷰들.some((r) => r.card_id === 'skill-ko-grammar-particle-topic'), '주격 카드가 skill 키로 안 갔다 — ⓐ 키 교체가 죽었다');
+  assert.deepEqual(리뷰들.map((r) => r.card_id).sort(), [카드키(시제), 카드키(주격)].sort());
   for (const r of 리뷰들) {
     assert.equal(r.정답, false); assert.equal(r.확신도, null);
     assert.equal(r.at, '2026-08-20T10:00:00Z', 'at 은 교정 시각이 아니라 제출 occurred_at 이다(§8-2)');
@@ -64,7 +68,7 @@ test('① R1 — 확정판 태그가 그 제출 시각의 실패 리뷰다 · �
   /* 계약 밖 문자열은 카드가 아니다 — 리허설 실측(08-24)에서 왕복 픽스처의 「조사 오류」류가
    * due 재료로 새는 것을 봤다. 새면 교체일에 그 문자열이 재출제 지시로 올라간다. */
   const 헐거움 = 리뷰파생({ 행들: [제출행('e1', 's1')], 교정들: [교정('c1', 's1', { tags: ['조사 오류', 주격] })] });
-  assert.deepEqual(헐거움.리뷰들.map((r) => r.card_id), [주격], '계약 밖 태그가 카드로 샜다');
+  assert.deepEqual(헐거움.리뷰들.map((r) => r.card_id), [카드키(주격)], '계약 밖 태그가 카드로 샜다');
   assert.equal(헐거움.셈.버림.계약밖태그, 1, '계약 밖 태그는 세어 드러나야 한다 — 조용한 삼킴 금지');
 });
 
@@ -111,7 +115,7 @@ test('③ R2 — 사라진 태그만 성공이다 · 교정 미착은 «재제�
   });
   const 성공 = 리뷰들.filter((r) => r.정답 === true);
   assert.equal(성공.length, 1);
-  assert.equal(성공[0].card_id, 주격, '사라진 태그(주격)만 성공이다 — 남은 시제는 성공이 아니다');
+  assert.equal(성공[0].card_id, 카드키(주격), '사라진 태그(주격)만 성공이다 — 남은 시제는 성공이 아니다(키는 표를 지난다)');
   assert.equal(성공[0].at, '2026-08-22T10:00:00Z', '성공의 시각은 재제출의 occurred_at 이다');
   assert.equal(셈.리뷰.재제출성공, 1);
   assert.equal(리뷰들.filter((r) => r.정답 === false).length, 3, 's1 두 태그 + s2 시제 = R1 실패 셋');
@@ -142,12 +146,37 @@ test('④ R3(G4) — 맞음/축오답/모름 · skipped 는 회피 · 카드는 
   const 성공 = 리뷰들.find((r) => r.원천.event_id === 'q1');
   assert.equal(성공.정답, true);
   assert.equal(성공.확신도, 'low', 'G4 확신도가 등급 재료로 실려야 한다(§8-5)');
-  assert.equal(성공.card_id, 빈칸.재는축, '맞음의 카드는 「오류없음」이 아니라 재는축이다 — S1 다리의 요체');
+  assert.equal(성공.card_id, 카드키(빈칸.재는축), '맞음의 카드는 「오류없음」이 아니라 재는축(표를 지나 skill)이다 — S1 다리의 요체');
   assert.equal(리뷰들.find((r) => r.원천.event_id === 'q2').정답, false);
   assert.equal(셈.버림.미상, 1);
   assert.equal(셈.버림.회피, 1);
   assert.equal(셈.버림.축없음, 1, 'skill 축 행이 태그 카드로 새면 안 된다(E2 전 매핑 0)');
   assert.ok(리뷰들.every((r) => r.card_id !== '오류없음'));
+});
+
+test('④-b R3(퀴즈) — skill 축 정오가 카드에 합류한다(S6 확정) · 선택·정답 없으면 미상', () => {
+  const 퀴즈행 = (event_id, { 정답, 고른, confidence, skills = ['skill-ko-grammar-particle-topic'] } = {}) => ({
+    event_id, learner_id: 'L1', event_type: 'quiz.answered', occurred_at: '2026-08-21T09:00:00Z',
+    skill_ids: skills,
+    payload: { ver: 1, ...(고른 ? { selected_option: 고른 } : {}), ...(confidence ? { confidence } : {}) },
+    submission: { submission_id: 'sub-' + event_id, task_snapshot: { ...(정답 ? { 정답 } : {}) } },
+  });
+  const { 리뷰들, 셈 } = 리뷰파생({
+    행들: [
+      퀴즈행('r1', { 정답: 'o2', 고른: 'o2', confidence: 'guess' }),   // 맞음 — 찍맞이 Hard 재료로 실린다
+      퀴즈행('r2', { 정답: 'o1', 고른: 'o3' }),                        // 틀림
+      퀴즈행('r3', { 고른: 'o1' }),                                    // 정답없음 — 미상
+      퀴즈행('r4', { 정답: 'o1' }),                                    // 선택없음 — 미상
+    ],
+    교정들: [],
+  });
+  assert.equal(셈.리뷰.퀴즈축, 2);
+  const 맞음 = 리뷰들.find((r) => r.원천.event_id === 'r1');
+  assert.equal(맞음.정답, true);
+  assert.equal(맞음.확신도, 'guess', '찍어서 맞힘이 등급 재료로 안 실렸다');
+  assert.equal(맞음.card_id, 'skill-ko-grammar-particle-topic', '퀴즈 카드는 skill 키 그대로다');
+  assert.equal(리뷰들.find((r) => r.원천.event_id === 'r2').정답, false);
+  assert.equal(셈.버림.미상, 2, '선택없음·정답없음이 미상으로 안 세어졌다 — 지어내면 안 된다(S2)');
 });
 
 test('⑤ S2 — 파생 산출을 계산기에 넣으면 버린수 0 (미상은 여기까지 오지 않는다)', () => {

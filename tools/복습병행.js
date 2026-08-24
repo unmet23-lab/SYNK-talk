@@ -46,6 +46,7 @@ const 질의 = `
 with 행 as (
   select coalesce(jsonb_agg(to_jsonb(t) order by t.event_id), '[]'::jsonb) as v from (
     select e.event_id, e.learner_id, e.event_type, e.occurred_at, e.retry_of_event_id, e.payload,
+           e.skill_ids,
            l.student_code,
            case when s.submission_id is null then null else jsonb_build_object(
              'submission_id', s.submission_id, 'task_schema_ver', s.task_schema_ver,
