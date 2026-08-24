@@ -53,7 +53,10 @@ assert_postcheck() {
   local label="$1" row verdict version checksum
   row="$("${PSQL[@]}" -AtF '|' -f "$POSTCHECK")"
   IFS='|' read -r verdict version checksum _rest <<<"$row"
-  [[ "$verdict" == '✅ 전부 통과' ]] || fail "$label: 사후 판정=$verdict"
+  # ❌ 는 「기대」만 말하고 실측을 숨기고 있었다(08-24 ⑥ 진단에서 실측) — 어느 칸이 갈렸는지
+  # 없이는 CI 로그가 진단 재료가 못 된다. 실패할 때 행 전체(실측 포함)를 그대로 찍는다.
+  [[ "$verdict" == '✅ 전부 통과' ]] || fail "$label: 사후 판정=$verdict
+  실측 행 전체: $row"
   [[ "$version" == "$LATEST_VERSION" ]] || fail "$label: 현재버전=$version (기대 $LATEST_VERSION)"
   [[ "$checksum" =~ ^[0-9a-f]{64}$ ]] || fail "$label: checksum 형식 오류"
 }
