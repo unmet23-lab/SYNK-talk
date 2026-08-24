@@ -13,20 +13,22 @@ name: CI
 #    즉 push 마다 크레딧을 태우면서 아무도 안 읽는 답을 만들고 있었다. 필요할 때 부른다:
 #      gh workflow run CI --repo unmet23-lab/SYNK-talk   (또는 Actions 탭 → Run workflow)
 #    ⚠ 되돌리려면 build 의 `if:` 한 줄만 지우면 된다.
-# ⏸ 2026-08-14: `push:` 트리거 일시 중지 (복원 예약 = 하네스 scheduled-tasks `talk-ci-push-restore-0901` · 2026-09-01 발화.
-#    옛 참조 #Q77 은 08-20 큐 전량 소멸로 죽은 포인터라 08-22 에 걷었다).
-#    Actions 3,000분 소진(리셋 9/1 · 유호 「돈 안 쓴다」 08-09) — 소진 상태에선 run 이 기동 없이
-#    실패하며 실패 알림만 하루 ~16통 나간다(텔레그램 답 수거를 죽이던 자리). 분을 태운 주범이
-#    이 저장소 supabase job 이다(push 마다 Docker Postgres · 9일에 3,000분 ≈ 하루 330분).
-#    복원할 때 supabase job 에 경로 조건(supabase/ · tools/검증_마이그레이션.sh · tests/supabase/)을
-#    **한 벌로** 붙인다 — 그래야 리셋 뒤 3,000분이 오래 간다. 그동안 원격 확인이 필요하면:
-#      gh workflow run CI --repo unmet23-lab/SYNK-talk
-#    ⚠ 이 중지가 틀릴 때의 모습: 복원을 잊으면 「push 해도 CI 0건」이 정상 얼굴로 굳는다 — 그래서 하네스에 9/1 예약을 걸었다(08-22).
-#    ⚠ 이 저장소는 **private** 이라 분 상한(3,000/월)이 실재한다 — appsscript 의 08-18 「셀프호스티드로 간다」(Q77 종결)는
-#      public 전환 사정(ubuntu-latest 무료 무제한 · 러너 실물 0)이라 여기엔 그대로 안 옮는다. 되살리기 전 분 잔량 확인이 먼저다.
+# ✅ 2026-08-24: `push:` 복원. 08-14 중지(⏸)의 종결이다 — 다만 **예약된 9/1 복원이 아니라 사정이 바뀌었다.**
+#    유호 확정 08-24 「지금은 공개전환으로 하고 개원 직전에 비공개로 바꿀꺼야」 → 이 저장소를 **public 으로 돌렸다.**
+#    public + GitHub 표준 러너 = 분을 **아예 안 센다.** 그래서 08-14 중지의 사유가 통째로 사라졌다.
+#    ↳ 같은 이유로 **supabase job 에 경로 조건을 붙이지 않았다.** 그건 「분 아끼기」가 목적이었는데
+#      목적이 없어졌고, 안 붙이는 쪽이 **매 push 마다 마이그레이션 회귀를 받는다**(검증이 늘어난다).
+#      분이 다시 문제가 되는 날은 비공개로 돌아가는 날이다 — 그때 여기 경로 조건을 붙인다(아래 ⚠).
+#    ⚠ **개원 직전 비공개 복귀가 예정돼 있다**(유호 확정 08-24). 비공개로 돌리는 손이 **같은 자리에서**
+#      둘을 함께 해야 한다: ① supabase job 에 경로 조건(supabase/ · tools/검증_마이그레이션.sh · tests/supabase/)
+#      ② 분 잔량 확인. 안 그러면 08-14 가 그대로 반복된다(소진 → run 이 기동 없이 죽고 실패 알림만 하루 ~16통).
+#    ⚠ 분 잔량을 재는 법: 빌링 API 는 이 계정에서 **안 통한다**(개인 소유 → 404 · 토큰에 user 스코프 없음).
+#      손 실행 1회를 던져 check-run 주석을 읽는다 — 소진이면 잡이 **스텝 0개 · 2초**로 죽고
+#      「The job was not started because recent account payments have failed or your spending limit needs to be increased」가 뜬다(08-24 실측 run 32713518701).
+#    ⚠ 그때 가려지지 않는 것 하나: 저 문구는 「분 소진」과 「결제 실패」를 **같은 색으로** 말한다.
 on:
-  # push:                ← ⏸ 리셋(9/1) 뒤 되살린다 (하네스 예약 talk-ci-push-restore-0901 · supabase 경로 조건과 한 벌)
-  #   branches: [master]
+  push:
+    branches: [master]
   pull_request:
   workflow_dispatch:
 
