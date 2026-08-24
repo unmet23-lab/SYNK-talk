@@ -147,7 +147,9 @@ begin
       -- ②-a 배치 완주(v5.6 B1) — 완주 0 = 안 돌았거나 전부 죽었다(전멸이 ① 에서 초록인 자리).
       select count(*)::int into n from engine.generation_batch_runs
        where assign_date = 오늘 and run_kind = '배치' and finished_at is not null;
-      if n = 0 then 적색 := 적색 || '②-a 배치 완주 0건'; end if;
+      -- ::text 필수 — 맨 리터럴이면 text[]||unknown 이 «배열 이어붙이기»로 읽혀 malformed array
+      -- literal 로 블록 전체가 죽는다(A9 실측 08-24 — 다른 항들이 산 것은 format() 이 타입을 확정해서다).
+      if n = 0 then 적색 := 적색 || '②-a 배치 완주 0건'::text; end if;
 
       -- ②-b 죽은 실행(v5.9 갈래 16) — 여유는 ⓪ 리더 게이트와 «한 원천»(engine.gen_leader_grace).
       select count(*)::int into n from engine.generation_batch_runs

@@ -78,17 +78,43 @@ if (!활성인가()) {
     const 결과 = 결과정본;
     const 시험지 = JSON.parse(fs.readFileSync(시험지경로, 'utf8'));
     const 전문 = fs.readFileSync(프롬프트경로, 'utf8');
-    const 사유 = 평가.결과검증(결과, 시험지, 전문);
-    assert.deepEqual(사유, [], `결과 파일 무효(E2 — 한 행만 버리지 않는다): ${사유.slice(0, 5).join(' / ')}`);
-    /* model 의 원천은 env GENERATION_MODEL 뿐이라(② · 리터럴 0) env 없는 로컬·CI 에선 그 칸을
-     * «못 잰다» — 조용히 통과로 접지 않고 비교 대상에서 뺐음을 여기 적는다(F296 · 0건이 아니다).
-     * --판정 도구는 env 필수라 게이트 실행에서는 이 칸이 늘 잰다. */
-    const 다름 = 평가.비교축차이(결과.동봉, 현행판());
+    /* 판정 산술은 «결과한벌» 하나 — --판정·왕복시험 A7 과 같은 함수(각자 조립하다 A7 이
+     * existsSync 로 얕아진 것이 심문 G2). model 의 원천은 env GENERATION_MODEL 뿐이라(② ·
+     * 리터럴 0) env 없는 로컬·CI 에선 그 칸을 «못 잰다» — 조용히 통과로 접지 않고 비교에서
+     * 뺐음을 여기 적는다(F296 · 0건이 아니다). --판정 도구는 env 필수라 거기서는 늘 잰다. */
     const 못잼 = String(process.env.GENERATION_MODEL || '').trim() ? [] : ['model'];
-    assert.deepEqual(다름.filter((k) => !못잼.includes(k)), [],
-      `옛 실행판의 결과다 — 다른 칸 ${다름.join(',')}(V6-23 · 옛 초록 재사용 차단)`);
+    const 판 = 평가.결과한벌({ 결과, 시험지, 전문, 현행: 현행판(), 비교제외: 못잼 });
+    assert.deepEqual(판.무효사유, [], `결과 파일 무효(E2 — 한 행만 버리지 않는다): ${판.무효사유.slice(0, 5).join(' / ')}`);
+    assert.deepEqual(판.다름, [], `옛 실행판의 결과다 — 다른 칸 ${판.다름.join(',')}(V6-23 · 옛 초록 재사용 차단)`);
     for (const k of 평가.존재축) assert.ok(String(결과.동봉[k] ?? '').trim(), `존재축 ${k} 가 비었다`);
-    const 집 = 평가.집계(결과, 시험지);
-    assert.ok(집.통과, `§8-B 미통과 — 축: ${평가.축키들.filter((k) => !집.축[k].통과).join(',') || '(전부 통과)'} · ⑥ 셀 미달: ${집.셀미달.join(',') || '없음'}`);
+    assert.ok(판.집.통과, `§8-B 미통과 — 축: ${평가.축키들.filter((k) => !판.집.축[k].통과).join(',') || '(전부 통과)'} · ⑥ 셀 미달: ${판.집.셀미달.join(',') || '없음'}`);
+    assert.ok(판.한벌, `결과한벌 미성립 — ${판.사유}`);
   });
 }
+
+/* 결과한벌 변이 회귀 — 실물 정본(위 ③)이 어느 국면이든, «존재 ≠ 1벌»의 두 급소는 픽스처로 상시 잰다.
+ * (심문 G2: A7 이 파일 존재만 재서 미채점 80 인 채 4/4 — 「운영 붓기 차단」 문구가 꺼져 있었다) */
+test('결과한벌 — 미채점 ≥1행이면 한벌 false · 사유가 「깨짐」이 아니라 「미채점」을 앞세운다(비교축 어긋남보다도 먼저)', () => {
+  if (!활성인가() || !정본있음) return;   // 실물 정본을 변이 재료로 쓴다(합성 시험지 조립 비용 0)
+  const 시험지 = JSON.parse(fs.readFileSync(시험지경로, 'utf8'));
+  const 전문 = fs.readFileSync(프롬프트경로, 'utf8');
+  const 변이 = JSON.parse(JSON.stringify(결과정본));
+  const 첫 = 변이.행.find((r) => r.grader_note === '미채점') || 변이.행[0];
+  첫.grader_note = '미채점';
+  변이.동봉.prompt_ver = '과제생성.v0+000000000000';   // 비교축도 함께 어긋내 순서를 잰다
+  const 판 = 평가.결과한벌({ 결과: 변이, 시험지, 전문, 현행: 현행판() });
+  assert.equal(판.한벌, false);
+  assert.match(String(판.사유), /^미채점 \d+행/, '미채점의 집계 전멸을 「축 미달」·「옛 실행판」으로 말하면 안 쟀다가 깨졌다로 읽힌다');
+});
+test('결과한벌 — 비교축 하나만 달라도 한벌 false(옛 실행판 차단 · V6-23)', () => {
+  if (!활성인가() || !정본있음) return;
+  const 시험지 = JSON.parse(fs.readFileSync(시험지경로, 'utf8'));
+  const 전문 = fs.readFileSync(프롬프트경로, 'utf8');
+  const 변이 = JSON.parse(JSON.stringify(결과정본));
+  for (const r of 변이.행) if (r.grader_note === '미채점') { r.grader_note = '픽스처 매김'; r.axis_scores = Object.fromEntries(평가.축키들.map((k) => [k, r.axis_scores[k] === null ? null : 1])); }
+  변이.동봉.estimator_version = '학습자상태.v0';
+  const 판 = 평가.결과한벌({ 결과: 변이, 시험지, 전문, 현행: { ...현행판(), estimator_version: '학습자상태.v999' }, 비교제외: 평가.비교축.filter((k) => k !== 'estimator_version') });
+  assert.equal(판.한벌, false);
+  assert.deepEqual(판.다름, ['estimator_version']);
+  assert.match(String(판.사유), /옛 실행판/);
+});

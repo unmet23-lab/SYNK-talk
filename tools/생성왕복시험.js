@@ -169,11 +169,15 @@ async function main() {
 
   /* A1 재적용 멱등 — 이미 적용된 리허설 «위에» generation_c12 부터의 전 조각을 «버전 순»으로
    * 통째 재적용한다. 하나만 부으면 뒤 판의 create or replace 를 앞 판이 덮는다(B6 실측 08-22 —
-   * 재적용이 남긴 DB 가 «현행»이어야 B·C 층 전체가 옳은 몸을 잰다). */
+   * 재적용이 남긴 DB 가 «현행»이어야 B·C 층 전체가 옳은 몸을 잰다).
+   * 🩹 조각은 합본과 같은 «멱등화»를 지나 붓는다 — c13 조각의 제약 갈아끼우기 사슬(drop c12 ·
+   * add c13)이 자기 이름을 안 지워 원문 재적용은 42710 로 죽는다(08-24 CI run 32714974980 와
+   * 같은 결함 — 처방도 같은 함수 하나다: 파일·checksum 은 불변, 굽는 자리에서만 고친다). */
   {
+    const { 멱등화 } = require(path.join(__dirname, '마이그레이션_합본.js'));
     const 전 = (await sql(`select count(*)::int as n from engine.schema_migrations where version >= '20260821120000'`))[0].n;
     for (const p of 재적용경로들) {
-      const r = await 실행(fs.readFileSync(p, 'utf8'));
+      const r = await 실행(멱등화(fs.readFileSync(p)).toString('utf8'));
       확인(`A1 재적용 멱등 — ${path.basename(p)} 재적용 오류 0(§12-21)`, r.ok, r.메시지 && r.메시지.slice(0, 300));
     }
     const 후 = (await sql(`select count(*)::int as n from engine.schema_migrations where version >= '20260821120000'`))[0].n;
@@ -200,23 +204,38 @@ async function main() {
       const 넘침 = [...실제].filter((c) => !기대.has(c));
       확인(`A2 ${표이름} 칼럼 집합 = 마이그 파일(빠짐 0·넘침 0)`, !빠짐.length && !넘침.length, { 빠짐, 넘침 });
     }
-    /* `create constraint trigger` 의 «trigger» 는 제약 이름이 아니다(1차 실측 오탐). */
-    const 파일제약 = new Set([...마이그.matchAll(/constraint ([a-z_0-9]+)/g)].map((m) => m[1])
-      .filter((n) => n !== 'trigger'));
+    /* 제약 이름의 기준은 «전 조각을 지난 최종 이름»이다 — c13 조각(20260822150000)이 살아 있는
+     * CHECK 를 «전 표»에 걸쳐 이름째 c12→c13 으로 갈았으므로, 첫 조각(c12) 하나로 대조하면 DB
+     * 실물(c13)과 전량 어긋난 헛빨강이 뜬다(08-24 실측 — 34개가 «전부 부재»로 보였다). 이름별
+     * «마지막 사건»(드랍이면 죽고 선언이면 산다)을 등장 순서로 접는다 — 집합 둘로 접으면 c12
+     * 첫 선언(과거)이 c13 조각의 드랍(미래)을 «재추가»로 덮는 순서 결함이 있었다(2차 실측).
+     * 조회도 engine 전 표로 — 개명 조각이 generation 3표 밖 이름을 대량으로 들고 온다.
+     * `create constraint trigger` 의 «trigger» 는 제약 이름이 아니다(1차 실측 오탐 — 필터 유지). */
+    const 전조각 = 재적용경로들.map((p) => fs.readFileSync(p, 'utf8')).join('\n');
+    const 살았다 = new Map();
+    for (const m of 전조각.matchAll(/drop constraint if exists ([a-z_0-9]+)|constraint ([a-z_0-9]+)/g)) {
+      if (m[1]) 살았다.set(m[1], false);
+      else if (m[2] !== 'trigger') 살았다.set(m[2], true);
+    }
+    const 파일제약 = new Set([...살았다].filter(([, v]) => v).map(([k]) => k));
     const 실제제약 = new Set((await sql(`
-      select conname from pg_constraint
-       where conrelid in ('engine.generation_jobs'::regclass, 'engine.generation_attempts'::regclass,
-                          'engine.generation_batch_runs'::regclass)`)).map((r) => r.conname));
+      select c.conname from pg_constraint c
+        join pg_class t on t.oid = c.conrelid
+        join pg_namespace n on n.oid = t.relnamespace
+       where n.nspname !~ '^pg_' and n.nspname <> 'information_schema'`)).map((r) => r.conname));
     const 제약빠짐 = [...파일제약].filter((c) => !실제제약.has(c));
-    확인('A2 이름 있는 제약 전량이 DB 에 실재한다', !제약빠짐.length, 제약빠짐);
+    확인('A2 이름 있는 제약 전량이 DB 에 실재한다(전 조각 최종 이름 · 사용자 스키마 전체 — c13 조각은 radio·ops 까지 간다)', !제약빠짐.length, 제약빠짐);
     /* 정의 «표류» — `if not exists` 가드는 제자리 수정을 조용히 삼킨다(§12-21 「재적용의 성공은
-     * 동일성의 증거가 아니다」). 전 정의의 텍스트 동치는 카탈로그 정규화 때문에 못 재고, 이 판이
-     * 실제로 고친 자리(v5.13-c counts_order)를 갈래로 잰다 — 옛 판이면 target<=loaded 가 남아 있다. */
-    const 순서정의 = (await sql(`
+     * 동일성의 증거가 아니다」). 전 정의의 텍스트 동치는 카탈로그 정규화 때문에 못 재고, 그 판이
+     * 실제로 고친 자리(v5.13-c counts_order)를 갈래로 잰다 — 옛 판이면 target<=loaded 가 남아 있다.
+     * 이름 접미는 판마다 오르므로(c12→c13→…) 현행 접미를 탐색하고, 부재면 죽지 않고 ❌ 로 남긴다. */
+    const 순서행 = await sql(`
       select pg_get_constraintdef(oid) as d from pg_constraint
-       where conrelid='engine.generation_batch_runs'::regclass and conname='batch_runs_counts_order_c12'`))[0].d;
+       where conrelid='engine.generation_batch_runs'::regclass and conname ~ '^batch_runs_counts_order_c[0-9]+$'
+       order by conname desc limit 1`);
     확인('A2 counts_order 가 v5.13-c 판이다(target≤loaded 부재 — 재실행을 안 죽인다)',
-      !/target_count\s*<=\s*loaded_count/.test(순서정의), 순서정의);
+      순서행.length === 1 && !/target_count\s*<=\s*loaded_count/.test(순서행[0].d),
+      순서행.length ? 순서행[0].d : '제약 부재');
   }
 
   /* A3 값목록 기계 대조(B3) — DDL CHECK 리터럴 집합 == DB 제약 원문 == 픽스처 레지스트리. */
@@ -288,15 +307,35 @@ async function main() {
    * 관리자 직접 INSERT 는 어느 문도 아니므로 여기서 던지지 않는다(안 재는 것을 잰 척하지 않는다). */
   console.log('  ▸ A6 검증기 왕복 — 이벤트 API 층은 tests/계약c12왕복.test.js(15검사) · DB 물리 층은 B4 원자 주입이 잰다');
 
-  /* A7 §16-1 선행 «필수» n/4 (§12-31) — 실물 존재를 한 자리에서 센다. */
+  /* A7 §16-1 선행 «필수» n/4 (§12-31) — 실물을 한 자리에서 센다.
+   * #6 은 «파일 존재»가 아니라 «결과 1벌»(채점 완주·기계 계약·비교축 일치·집계 통과)로 잰다 —
+   * 존재만 세면 미채점 80 인 채 4/4 가 되어 「운영 붓기 차단」 문구가 꺼진다(심문 G2 · F207
+   * 「미실행」과 「통과」가 같은 얼굴). 판정 함수는 차단기 회귀(tests/과제생성게이트.test.js ③)·
+   * 채점 CLI(--판정)와 같은 하나다 — lib/과제생성평가.결과한벌. */
   {
     const n1 = 판 >= 'c12';
     const n3 = /ingested_at <= /.test(fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'deliver', 'index.ts'), 'utf8'));
     let n5 = false;
     try { n5 = typeof require('../lib/판독기.js').정책지문 === 'function' && typeof require('../lib/실행판.js').실행판조립 === 'function'; } catch { /* 부재 = false */ }
-    const n6 = fs.existsSync(path.join(__dirname, '..', 'evals', '과제생성_결과.json'));
+    let n6 = false;
+    let n6말 = '결과 정본 0벌';
+    try {
+      const 평가lib = require('../lib/과제생성평가.js');
+      const { 경로: 평가경로, 현행판: 평가현행판 } = require('../lib/과제생성현행판.js');
+      if (fs.existsSync(평가경로.결과)) {
+        const 못잼 = String(process.env.GENERATION_MODEL || '').trim() ? [] : ['model'];   // env 없는 자리 — 차단기 회귀와 같은 «못잼» 처리(F296)
+        const 한벌 = 평가lib.결과한벌({
+          결과: JSON.parse(fs.readFileSync(평가경로.결과, 'utf8')),
+          시험지: JSON.parse(fs.readFileSync(평가경로.시험지, 'utf8')),
+          전문: fs.readFileSync(평가경로.프롬프트, 'utf8'),
+          현행: 평가현행판(), 비교제외: 못잼,
+        });
+        n6 = 한벌.한벌;
+        n6말 = 한벌.사유 || '1벌';
+      }
+    } catch (e) { n6말 = `판정 불능 — ${String(e && e.message ? e.message : e).slice(0, 80)}`; }
     const n = [n1, n3, n5, n6].filter(Boolean).length;
-    console.log(`  ▸ §16-1 선행 필수 ${n}/4 — #1 c12계약 ${n1 ? '✓' : '✗'} · #3 늦적재조회층 ${n3 ? '✓' : '✗'} · #5 판독기 ${n5 ? '✓' : '✗'} · #6 §8-B결과 ${n6 ? '✓' : '✗'}`);
+    console.log(`  ▸ §16-1 선행 필수 ${n}/4 — #1 c12계약 ${n1 ? '✓' : '✗'} · #3 늦적재조회층 ${n3 ? '✓' : '✗'} · #5 판독기 ${n5 ? '✓' : '✗'} · #6 §8-B결과 ${n6 ? '✓' : `✗(${n6말})`}`);
     if (n < 4) console.log('  ▸ 🔒 4/4 아님 — §12 항31: 운영 붓기 차단(리허설까지가 상한)');
     확인('A7 선행 n/4 — 엔진 몫 셋(#1·#3·#5)은 서 있다(#6 은 유호님 몫)', n1 && n3 && n5, { n1, n3, n5, n6 });
   }

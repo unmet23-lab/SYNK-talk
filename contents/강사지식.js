@@ -23,7 +23,7 @@
  *   · 자주 묻는 질문(정본) — as:docs/자주묻는질문_정본.md
  *     커밋 e601b25d8a48a6e1a2e325e40f008905ec406be0 · 게이트 ⛔주제만 · 7,338자
  *   · SYNK FAQ(대외 완성 문장) — as:docs/정본/SYNK/SYNK FAQ.txt
- *     커밋 3a27f0c331535c8b16abffb25828d84f0b44323d · 7,217자
+ *     커밋 b35a0826d9e04354cd2da91db855613a8ed27108 · 7,217자
  *   · M2 라벨 회로 설계 — talk:docs/M2_라벨회로_설계.md
  *     커밋 416088f902853df5283d8cd5ed22bd8c5656edc8 · 13,117자
  *   · 검수 내부 계약 — talk:docs/검수_내부계약.md
@@ -116,7 +116,7 @@ const 출처대장 = [
     "이름": "SYNK FAQ(대외 완성 문장)",
     "저장소": "as",
     "경로": "docs/정본/SYNK/SYNK FAQ.txt",
-    "커밋": "3a27f0c331535c8b16abffb25828d84f0b44323d",
+    "커밋": "b35a0826d9e04354cd2da91db855613a8ed27108",
     "게이트": null
   },
   {
