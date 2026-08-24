@@ -164,6 +164,7 @@ test('HTML — 스크립트 없이 렌더되고, 학생 식별자는 안 실린�
     개입('LEARNER-비밀-1', 10, { policy_ver: '오늘과제.v1' }),
     ...배정제출('LEARNER-비밀-1', 8), ...배정제출('LEARNER-비밀-1', 10.2),
   ], { 기준시각: t(12) });
+  계수.승격 = { 의사: 16, 사건: 0, 격차: 16 };   // ⑥승격(G10)은 별도 질의 재료라 main 이 싣는다 — 화면 계약만 여기서 잰다
   const h = HTML만들기({ 계수, ref: 'testref', 잘림: true });
 
   assert.ok(!/<script/i.test(h), 'HTML 에 <script> 가 있다 — 스크립트 없는 뷰어에서 빈 화면이 된다');
@@ -171,7 +172,7 @@ test('HTML — 스크립트 없이 렌더되고, 학생 식별자는 안 실린�
   assert.ok(!h.includes('LEARNER-비밀-1'), '학생 식별자가 산출물에 실렸다 — 계기판이 답하는 것은 「누가」가 아니다');
   assert.ok(h.includes('오늘과제.v1'), '규칙별 절이 안 그려졌다');
   assert.ok(h.includes('상한에 걸렸'), '잘림 경고가 화면에 없다 — 부분 집계가 전체로 읽힌다');
-  for (const s of ['미도래', '표본0', '연결률']) assert.ok(h.includes(s), `«${s}» 가 화면에 없다`);
+  for (const s of ['미도래', '표본0', '연결률', '훈련 승격', 'data_use.granted']) assert.ok(h.includes(s), `«${s}» 가 화면에 없다`);
   // 미도래가 분모 밖이라는 설명이 화면에 남아 있어야 한다(읽는 사람이 분모를 오해하는 것이 이 값의 유일한 실패 모드다).
   assert.match(h, /분모에 미도래는 안 들어갑니다|미도래 제외/);
 });

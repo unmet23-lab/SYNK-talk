@@ -47,15 +47,16 @@ import 학생계정 from './학생계정.mjs';
 import 로그인코드 from './로그인코드.mjs';
 import 계약 from './수집_교정_계약.json' with { type: 'json' };
 
-const { 머리글자리, 표읽기, 행별가르기, 반미배정, 계획 } = 명부규칙 as {
+const { 머리글자리, 표읽기, 행별가르기, 반미배정, 계획, 급수정규화 } = 명부규칙 as {
   머리글자리: (표: string[][]) => { 오류: string[] };
   표읽기: (표: string[][]) => {
-    행들: Array<{ 번호: string; 전화: string; 이름: string; 역할: string; 반: string; 줄: number }>;
+    행들: Array<{ 번호: string; 전화: string; 이름: string; 역할: string; 반: string; 급수: string; 줄: number }>;
     대상아닌행?: Array<{ 역할: string }>;
     오류: string[];
   };
+  급수정규화: (값: unknown) => string | null;
   행별가르기: (행들: unknown[]) => {
-    정상: Array<{ 번호: string; 전화: string; 이름: string; 반: string; 줄: number }>;
+    정상: Array<{ 번호: string; 전화: string; 이름: string; 반: string; 급수?: string; 줄: number }>;
     문제들: Array<{ 줄: number; 번호: string; 사유: string }>;
   };
   반미배정: (행들: unknown[]) => Array<{ 줄: number; 번호: string }>;
@@ -171,10 +172,11 @@ Deno.serve(async (req) => {
       contact: r.전화,
       display_name: r.이름 || null,
       class_id: 반지도.get(r.반) ?? null,
+      level_current: 급수정규화((r as { 급수?: string }).급수),   // 못 읽으면 null = 모름(심문 S7)
       schema_ver: (계약 as { 버전: string }).버전,
     }));
     const 결과 = await sql`
-      insert into engine.learners ${sql(행값들 as unknown as Record<string, never>[], 'student_code', 'contact', 'display_name', 'class_id', 'schema_ver')}
+      insert into engine.learners ${sql(행값들 as unknown as Record<string, never>[], 'student_code', 'contact', 'display_name', 'class_id', 'level_current', 'schema_ver')}
       on conflict (student_code) do nothing
       returning student_code`;
     새로 = (결과 as unknown as Array<{ student_code: string }>).map((r) => r.student_code);
@@ -201,6 +203,39 @@ Deno.serve(async (req) => {
          and l.class_id is distinct from v.class_id
       returning l.student_code`;
     반갱신 = (결과 as unknown as Array<{ student_code: string }>).map((r) => r.student_code);
+  }
+
+  /* ── 급수(심문 S7 · 08-24) — 반갱신과 같은 무늬: 별도 update · `is distinct from` · 못 읽은
+   * 값(null)은 «모름»이라 건너뛴다(시트가 한 칸 비는 날 기존 급수가 지워지지 않는다). 이 배선이
+   * 서기 전 `level_current` 는 운영 기입자 0 = 전원 영구 NULL — 생성 모드가 켜지면 전원
+   * «비대상/미정»이 경보 없이 조용했다(스윕 A:H 창이 급수 칸에 구조상 안 닿았다). 정규화는
+   * `급수정규화`(lib — 적재 쪽 정본) 하나: 정수 1~6 → Lv{n}, 소비 쪽 `/^Lv[1-6]$/` 와 값공간 동일. */
+  let 급수갱신: string[] = [];
+  const 급수짝들 = 정상
+    .filter((r) => !막힌번호.has(정규형(r.번호)))   // 반갱신과 같은 자리 — 동일성 미확인 행에 급수를 적지 않는다
+    .map((r) => ({ code: 학생번호표기(r.번호), lv: 급수정규화(r.급수) }))
+    .filter((p): p is { code: string; lv: string } => p.lv !== null);
+  if (급수짝들.length) {
+    const 결과 = await sql`
+      update engine.learners l set level_current = v.level_current
+        from (select unnest(${급수짝들.map((p) => p.code)}::text[]) as student_code,
+                     unnest(${급수짝들.map((p) => p.lv)}::text[]) as level_current) v
+       where l.student_code = v.student_code
+         and l.level_current is distinct from v.level_current
+      returning l.student_code`;
+    급수갱신 = (결과 as unknown as Array<{ student_code: string }>).map((r) => r.student_code);
+  }
+
+  /* 반비움잔존(관측만 · S7 곁 발견) — 시트에서 반이 «비워진» 학생의 talk 행에 옛 class_id 가
+   * 남아 있는 수. 「빈 반 = 모름」(안전 기본값)의 뒷면이라 자동 해제는 안 한다 — 해제 의미론은
+   * 유호 판정 자리(트랙 등재). 이 수가 0 이 아니면 강사 반 명단·검수 큐가 옛 반으로 그 학생을
+   * 계속 그린다는 뜻이라, 침묵 대신 계수로 낸다(응답 수신자가 알림으로 소리 낸다). */
+  const 반빈코드들 = 정상.filter((r) => (r.반 || '') === '').map((r) => 학생번호표기(r.번호));
+  let 반비움잔존 = 0;
+  if (반빈코드들.length) {
+    const [잔존] = await sql`select count(*)::int as n from engine.learners
+      where student_code in ${sql(반빈코드들)} and class_id is not null`;
+    반비움잔존 = (잔존 as { n: number }).n;
   }
 
   /* ── 조·좌석 (숙제서클 §10-3 · 20260814100000) ──────────────────────────
@@ -310,6 +345,11 @@ Deno.serve(async (req) => {
     반미배정: 반미배정(정상),
     새반,
     반갱신,
+    /* 급수(심문 S7). `급수갱신` = 이번 스윕이 실제로 바꾼 학생 · `반비움잔존` = 시트에서 반이
+     * 비워졌는데 talk 에 옛 class_id 가 남은 수(자동 해제 안 함 — 유호 판정 자리). 급수 열을
+     * 아직 안 쓰는 시트에서는 둘 다 0 이다(옛 스윕 호환 = 무동작). */
+    급수갱신,
+    반비움잔존,
     /* 조·좌석(숙제서클 §10-3) — `조편성` 키가 없던 판에서는 셋 다 0·빈 배열이다. */
     조갱신,
     조해제,

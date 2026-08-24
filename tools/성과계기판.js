@@ -233,7 +233,28 @@ async function 질의실행(기간일, 상한) {
   if (!res.ok) die(`HTTP ${res.status} — ${(await res.text()).slice(0, 500)}`);
   const rows = JSON.parse(await res.text());
   const 값 = (rows && rows[0] && rows[0].값) || [];
-  return { 행들: 값, ref };
+
+  /* ⑥승격 격차(심문 0822 G10 · 08-24) — 엔진도달_설계 §5 가 자인한 「하필 유일하게 끊긴 칸을
+   * 재는 자가 없다」의 그 계수다. 재료는 이미 행에 있다: `promotion_intent=true`(검수자의 훈련
+   * 승격 의사) 수 대 `data_use.granted` 사건 수 — 격차가 곧 ⑥의 빚이고, `data_use.granted` 는
+   * 제어 사건이라 event_type 도달 장부에서는 원리상 영원히 사유 처리다(안 빨개진다). 개원 전
+   * 0 = 0 은 자연이고, 의사가 쌓이는데 사건이 0 인 날부터 이 두 수가 갈라진다. 기간 필터를 안
+   * 거는 이유: 승격은 창이 아니라 «누적 빚»이다 — 옛 의사도 발행 전까지는 빚으로 남는다. */
+  const 승격res = await fetch(`${API}/${ref}/database/query`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${토큰}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: `
+      select jsonb_build_object(
+        '의사', (select count(*) from engine.corrections where promotion_intent = true),
+        '사건', (select count(*) from engine.learning_events where event_type = 'data_use.granted')
+      ) as 값;` }),
+  });
+  if (!승격res.ok) die(`HTTP ${승격res.status}(승격 계수) — ${(await 승격res.text()).slice(0, 300)}`);
+  const 승격rows = JSON.parse(await 승격res.text());
+  const 승 = (승격rows && 승격rows[0] && 승격rows[0].값) || { 의사: 0, 사건: 0 };
+  const 승격 = { 의사: Number(승.의사) || 0, 사건: Number(승.사건) || 0, 격차: (Number(승.의사) || 0) - (Number(승.사건) || 0) };
+
+  return { 행들: 값, 승격, ref };
 }
 
 /* ── 산출 ─────────────────────────────────────────────────────────────────── */
@@ -264,6 +285,10 @@ function 요약찍기(계수, { ref, 잘림 }) {
   if (뺀것.length) console.log('  제외 ' + 뺀것.map(([k, n]) => `${k} ${n}`).join(' · '));
   for (const s of 계수.실패사유) console.log(`    ↳ ${s}`);
   if (잘림) console.log(`  ⚠ 질의가 상한에 걸렸다 — 위 수는 **최근 ${계수.행수}행만** 본 값이다`);
+  /* ⑥승격 — 창이 아니라 «누적 빚»이라 기간 필터 밖이다(질의실행 주석 · G10). */
+  const 승 = 계수.승격;
+  console.log(`  ⑥승격  의사 ${승.의사} · data_use.granted ${승.사건} · 격차 ${승.격차}`
+    + (승.격차 > 0 ? ' 🔴 발행 안 된 승격 의사가 쌓여 있다(생산자 = [자동] 4단 — 아직 0)' : ' (0=0 은 개원 전 자연)'));
 }
 
 /* 🔴 JS 로 그리지 않는다 — 스크립트를 안 돌리는 뷰어(앱 미리보기·메일·PDF)에서 빈 화면이 된다.
@@ -333,6 +358,14 @@ ${규칙.length ? 규칙.map(([판, 칸]) => `<h3 style="font-size:13px;font-wei
 
 ${뺀것.length ? `<h2>세지 않은 개입</h2><table><tbody>${뺀것.map(([k, n]) => `<tr><td>${esc(k)}</td><td class="n">${n}</td></tr>`).join('')}</tbody></table>
 <p class="note">「기준선부족」은 질의 창 시작 부근이라 개입 직전 ${계수.기준선창}일이 통째로 비는 개입입니다 — 세면 「활동이 없던 학생」과 구별이 안 됩니다.</p>` : ''}
+
+<h2>⑥ 훈련 승격 <span class="muted">(누적 — 기간 필터 밖)</span></h2>
+<div class="ext">
+<div class="card"><div class="t">승격 의사 (promotion_intent)</div><div class="n">${계수.승격.의사}</div></div>
+<div class="card"><div class="t">data_use.granted 발행</div><div class="n">${계수.승격.사건}</div></div>
+<div class="card"><div class="t">격차${계수.승격.격차 > 0 ? ' 🔴' : ''}</div><div class="n">${계수.승격.격차}</div></div>
+</div>
+<p class="note">검수자가 「훈련에 써도 된다」고 누른 수 대 실제 승격 사건 수 — 격차가 0보다 크면 발행 안 된 승격 의사가 쌓여 있는 것입니다(생산자 = [자동] 4단 · 아직 0). 0 = 0 은 개원 전 자연입니다.</p>
 </body></html>`;
 }
 
@@ -357,13 +390,14 @@ async function main() {
   if (!Number.isFinite(Date.parse(기준시각))) die(`--기준 을 못 읽었다: ${기준시각}`);
   const 출력 = 출력검사(값('--출력', path.join(os.tmpdir(), 'synk-성과계기판')));
 
-  const { 행들, ref } = await 질의실행(기간일, 상한);
+  const { 행들, 승격, ref } = await 질의실행(기간일, 상한);
   const 잘림 = 행들.length >= 상한;
 
   /* 개입 대상 창 = 질의 창에서 기준선 30일을 뺀 만큼(머리말). 기준시각이 아니라 «지금» 에서
    * 재는 이유: 질의의 `now()` 가 그렇게 잘랐기 때문이다 — 재는 층을 맞춘다. */
   const 개입최소시각 = new Date(Date.now() - (기간일 - 기준선창) * 일).toISOString();
   const 계수 = 계수내기(행들, { 기준시각, 개입최소시각: 기간일 > 기준선창 ? 개입최소시각 : null });
+  계수.승격 = 승격;   // ⑥승격 격차(G10) — 계수내기(사건 행 집계)와 재료가 달라 여기서 싣는다
 
   요약찍기(계수, { ref, 잘림 });
   fs.mkdirSync(출력, { recursive: true });
