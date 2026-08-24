@@ -638,6 +638,50 @@ async function main() {
     s.body.results?.[0]?.error?.code === 'CONTRACT_VIOLATION', s.body.results?.[0]);
   확인('그 행도 저장되지 않았다', (await 저장됐나(어긋남)) === 0);
 
+  /* ── ⑯ 확인 답 하루 1회 — 동시 경쟁 중복의 물리 방벽 (심문 G11 · estimate_daily_once_c13) ──
+   * 두 기기가 같은 카드를 들고 각자 답하면 멱등키가 순수 난수라(제출로그.흐름id) ③의 접기가
+   * 원리상 못 막는다. 방벽은 부분 유일 색인이고, 늦은 쪽은 «그날 행»의 duplicate 로 접혀야
+   * 한다 — SERVER_ERROR/retryable:true 로 새면 앱이 영원히 재시도한다(events catch 의 그 갈래). */
+  console.log('\n⑯ 확인 답 하루 1회(G11)');
+  const 확인답 = () => ({
+    idempotency_key: crypto.randomUUID(),
+    event_type: 'estimate.responded',
+    correlation_id: crypto.randomUUID(),   // 다른 기기 흉내 — 앉음 키도 새것
+    occurred_at: new Date().toISOString(),
+    level_snapshot: null,                  // 이 카드엔 급수가 안 흐른다(성향확인 조립기 그대로)
+    payload: {
+      ver: 1,   // 서버가 모든 payload 에 요구한다 — 이 칸이 빠진 것을 이 왕복이 잡았다(조립기도 같은 커밋에 수리)
+      trait_axis: '리듬', shown_key: '여유제출',
+      shown_text: '요즘 과제를 마감보다 미리 내고 계시던데요 — 미리 계획해 두는 편이에요?',
+      response: '맞다', estimator_version: '학습자상태.v14+성향확인.v1',
+      estimate_as_of: new Date().toISOString(),
+    },
+  });
+  /* 재실행 가능성(위 ① 「그 키만 본다」와 같은 규율): 같은 날 같은 학생으로 다시 돌면 첫 발신부터
+   * 그날 행에 접힌다 — 그건 실패가 아니라 방벽이 일하는 모습이다. 갈래를 갈라 둘 다 정직하게 잰다. */
+  const [그날이미] = await sql(`select event_id from engine.learning_events
+     where learner_id='${learner_id}' and event_type='estimate.responded'
+       and engine.ub_date(ingested_at) = engine.ub_date(now()) limit 1`);
+  const 첫답 = 확인답();
+  r = await 부르기({ events: [첫답] });
+  if (그날이미) {
+    확인('(재실행) 오늘 행이 이미 있어 첫 발신부터 duplicate 로 접힌다',
+      r.body.results?.[0]?.status === 'duplicate' && r.body.results?.[0]?.event_id === 그날이미.event_id,
+      r.body.results?.[0]);
+  } else {
+    확인('첫 답은 stored 다', r.body.results?.[0]?.status === 'stored', r.body.results?.[0]);
+  }
+  const 그날행 = 그날이미?.event_id ?? r.body.results?.[0]?.event_id;
+  const 둘째답 = 확인답();   // 멱등키·앉음키 전부 새것 = 경쟁의 늦은 쪽
+  r = await 부르기({ events: [둘째답] });
+  확인('같은 날 둘째 답은 그날 행의 duplicate 로 접힌다(재시도 유도 금지)',
+    r.body.results?.[0]?.status === 'duplicate' && r.body.results?.[0]?.event_id === 그날행,
+    r.body.results?.[0]);
+  확인('그날 행은 하나뿐이다',
+    (await sql(`select count(*)::int n from engine.learning_events
+                 where learner_id='${learner_id}' and event_type='estimate.responded'
+                   and engine.ub_date(ingested_at) = engine.ub_date(now())`))[0].n === 1);
+
   보고();
 }
 

@@ -1,11 +1,99 @@
+/* 확인 답 하루 1회 — 동시 경쟁 중복의 물리 방벽 (심문 G11 잔여 · 유호 해제 08-24 「G11 잔여도 이어서 진행해」 · 결정.md 그 줄)
+ *
+ * ■ 무엇 — 둘: ①`engine.ub_date(timestamptz)` immutable 래퍼 ②`estimate.responded` 의 부분 유일
+ *   색인 `estimate_daily_once_c13` (learner × 몽골 날짜 · 그날 1행).
+ *
+ * ■ 왜 — 하루 1회 질문 예산(유호 확정 08-22 「하루 1회 · 둘 다 착수」)의 서버 게이트(progress
+ *   오늘답수)는 «순차» 중복만 막는다: 두 기기가 답하기 «전에» 각자 카드를 받으면(경쟁) 둘 다
+ *   제출되고, 멱등키가 순수 난수 UUID 라(lib/제출로그.흐름id) 기존 유일 둘로는 원리상 못 접는다
+ *   (심문 G11 ⓐ — 08-23 연기를 유호가 08-24 다시 열었다). 축은 게이트와 «같은 자»다:
+ *   (learner_id, ub_date(ingested_at)) — occurred_at(기기 시계)로 걸면 게이트와 인덱스가 서로
+ *   다른 날을 가리킨다(심문 G12 그대로). 축·키 무관 «그날 1행» — 게이트의 count(*) 도 축·키를 안 본다.
+ *
+ * ■ ub_date 를 immutable 로 «약속»하는 근거 — `at time zone` 은 엄밀히 STABLE(tzdata 갱신에 답이
+ *   바뀔 수 있다)이라 식 인덱스에 직접 못 앉는다. 몽골은 2017년 DST 폐지 뒤 고정 +08 이고, 혹시
+ *   그 규칙이 바뀌는 날은 이 인덱스를 다시 굽는 날이다(gen_deadline 이 시간대 리터럴을 함수 몸에
+ *   가둔 그 선례 · JS 쌍둥이 = lib/몽골날짜.js — 이름만 들고 규칙은 tzdata 가 진다).
+ *
+ * ■ 지는 쪽의 응답 — supabase/functions/events 가 이 인덱스 이름을 잡아 `duplicate`(그날 행의
+ *   event_id)로 접는다. 일반 catch 로 흘리면 SERVER_ERROR/retryable:true 라 앱이 영원히 재시도한다.
+ *
+ * ■ 기존 행 충돌 — 있으면 create unique index 가 여기서 시끄럽게 죽는다(그게 옳다). 실측
+ *   08-24: 리허설·운영 모두 estimate.responded 0행(왕복 픽스처도 0 — 이 사건의 앱 통로가
+ *   게임로그 접두 표에 빠져 있어 지금까지 생산 자체가 0이었다 · 같은 커밋의 lib 수리).
+ *
+ * ■ 이름 — 태어난 판(_c13)을 달고 그대로 산다. UNIQUE 는 CHECK 접미 통일 대상이 아니다
+ *   (recon2 꼬리 규율 · 「기대:」 줄에도 안 들어간다 — pg_indexes 칸(확인하루유일)이 센다).
+ *
+ * 되돌림: drop index if exists engine.estimate_daily_once_c13; drop function if exists engine.ub_date(timestamptz);
+ *   (되돌리면 동시-중복 방벽이 없던 08-24 이전으로 돌아간다 — 소비층 접기(학습자상태 v14)는 남는다.) */
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260824090000';
+  migration_name constant text := '20260824090000_estimate_once_c13.sql';
+  expected_checksum constant text := 'f094fb26e2e1b9dd5c82524b4784ed6939babb5f2be42a8e762dd43c2a8bbdd9'; -- migration-checksum
+  base_version constant text := '20260824020000';   -- 체인 규약: 직전 조각(recon 2판)
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 합본 위에서만 돈다 — engine.schema_migrations 가 없다(빈 DB 면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      'migration % 는 % 위에서만 돈다 — 체인이 끊겼다',
+      migration_version, base_version;
+  end if;
+
+  /* ── 본문 ① — 몽골 날짜 immutable 래퍼(머리말 근거) ── */
+  create or replace function engine.ub_date(t timestamptz)
+  returns date
+  language sql immutable
+  as $ub$ select (t at time zone 'Asia/Ulaanbaatar')::date $ub$;
+
+  /* ── 본문 ② — 확인 답 하루 1회 부분 유일 색인 ── */
+  create unique index if not exists estimate_daily_once_c13
+    on engine.learning_events (learner_id, engine.ub_date(ingested_at))
+    where event_type = 'estimate.responded';
+
+end
+$migration$;
+
+do $migration2$
+declare
+  expected_checksum constant text := 'f094fb26e2e1b9dd5c82524b4784ed6939babb5f2be42a8e762dd43c2a8bbdd9'; -- migration-checksum
+begin
+  if not exists (select 1 from engine.schema_migrations where version = '20260824090000') then
+    insert into engine.schema_migrations(version, name, checksum)
+    values ('20260824090000', '20260824090000_estimate_once_c13.sql', expected_checksum);
+  end if;
+end
+$migration2$;
+
+commit;
+
 -- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
---
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
 -- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -335,3 +423,39 @@ select case when 테이블수=21 and RLS켜짐=21 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
   from 셈;
+*/
+-- 사후 메모:
+-- ① 이 조각의 몫은 확인 답 하루 1회 방벽 «둘»(engine.ub_date 함수 · estimate_daily_once_c13 부분 유일)이다 — CHECK 를 만들지도 지우지도 않는다.
+-- ② 아래 기대 목록은 generation_c13 가 세운 현행 그대로다(변경 0 — 마지막 조각이 이 줄을 든다).
+--    ⚠ 이 줄은 마지막 조각이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    ⚠ `season_no_overlap_c11`(EXCLUDE) · `…_once_c11`(UNIQUE) · `companion_qa_*_fkey` 는 여기
+--      없다 — CHECK 가 아니라 이 줄의 대상이 아니고, 이름도 c11 그대로 산다(값목록이 없어
+--      판 판별과 무관하다 · 위 기대제약 목록에는 그 이름 그대로 들어 있다).
+--    기대: attempts_gate_values_c13 · attempts_response_present_c13 · attempts_result_gate_c13
+--         · attempts_ver_nonempty_c13 · batch_runs_counts_order_c13 · batch_runs_counts_pair_c13
+--         · batch_runs_enrolled_nonneg_c13 · batch_runs_finished_cols_c13
+--         · batch_runs_level_dist_ok_c13 · batch_runs_partial_pair_c13
+--         · batch_runs_partial_range_c13 · batch_runs_roster_equation_c13
+--         · batch_runs_skipped_range_c13 · batch_runs_ver_nonempty_c13 · broadcast_segment_kind_c13
+--         · classes_key_nonblank_c13 · companion_qa_answer_paired_c13
+--         · companion_qa_question_nonblank_c13 · corrections_promotion_intent_c13
+--         · corrections_supersedes_not_self_c13 · corrections_verdict_c13 · cron_runs_outcome_c13
+--         · jobs_anchor_present_c13 · jobs_claim_cols_c13 · jobs_deciding_pair_c13
+--         · jobs_deciding_result_matches_c13 · jobs_deciding_scope_c13 · jobs_draft_present_c13
+--         · jobs_idle_cols_c13 · jobs_load_failed_cols_c13 · jobs_nontarget_cols_c13
+--         · jobs_nonterminal_cols_c13 · jobs_skill_ids_present_c13 · jobs_status_outcome_pairs_c13
+--         · jobs_terminal_cols_c13 · jobs_ver_nonempty_c13 · jobs_winner_fence_current_c13
+--         · jobs_winner_fence_pair_c13 · jobs_winner_only_success_c13 · jobs_winner_present_c13
+--         · jobs_winner_result_only_success_c13 · jobs_winner_result_pair_c13 · learners_gender_c13
+--         · learners_goal_track_c13 · learners_group_no_c13 · learners_home_aimag_c13
+--         · learners_seat_no_c13 · learners_signup_attempts_nonneg_c13
+--         · learners_temp_password_paired_c13 · learning_events_correction_target_c13
+--         · learning_events_event_type_c13 · learning_events_task_type_c13
+--         · pipeline_jobs_discard_reason_c13 · season_compass_answers_c13 · season_dates_c13
+--         · season_review_decided_c13 · season_review_self_c13 · season_review_verdict_c13
+--         · staff_role_c13 · submissions_due_paired_c13 · submissions_task_format_c13
+--         · submissions_translation_source_c13 · teacher_notes_body_nonblank_c13
+--         · teacher_notes_disposition_c13 · teacher_notes_origin_c13
+

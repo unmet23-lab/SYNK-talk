@@ -181,6 +181,22 @@ test('⑦ 「고칠 곳 없음」(`quiz.answered`)이 이 큐에 든다 — 접�
   assert.ok(항목 && 새것, '담기가 사건을 버렸다(반환값은 성공의 모양이다)');
 });
 
+test('⑫ 확인 답(`estimate.responded`)이 이 큐에 든다 — 접두 표 밖이던 동안 답이 증발했다(08-24 G11)', () => {
+  /* Ⅲ⑥이 카드·조립기·계약·서버를 다 세우고 이 표 한 줄을 빠뜨려, 학생의 「맞다/아니다」가
+   * 기기 로그에도 서버에도 안 닿았다 — quiz.answered 가 밟은 그 병의 재발. 표가 곧 통로다. */
+  const 사건 = {
+    idempotency_key: 'k-est-1', event_type: 'estimate.responded', correlation_id: 'sit-1',
+    payload: { ver: 1, trait_axis: '리듬', shown_key: '여유제출', response: '맞다' },
+  };
+  assert.equal(항목id(사건), 'estimate:sit-1', '확인 답이 큐 소속 밖이다 — 담기가 조용히 버린다');
+  const { 로그, 새것 } = 항목추가([], 사건);
+  assert.equal(새것, true, '담기가 확인 답을 버렸다(반환값은 성공의 모양이다)');
+  /* 같은 앉음의 이중 탭은 한 항목으로 접힌다 — 로컬 접기가 동시-중복(G11)의 첫 방벽이다. */
+  const 다시 = 항목추가(로그, { ...사건, idempotency_key: 'k-est-2' });
+  assert.equal(다시.새것, false, '같은 앉음의 둘째 탭이 새 항목이 됐다 — 같은 답이 두 번 나간다');
+  assert.equal(다시.로그.length, 1);
+});
+
 test('⑦ 같은 턴을 두 번 담으면 접힌다 — 턴 칸이 접기를 깨지 않는다', () => {
   let { 로그, 새것 } = 항목추가([], G2턴사건('g2t01'));
   assert.equal(새것, true);

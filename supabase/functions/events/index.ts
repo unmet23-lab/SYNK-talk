@@ -541,6 +541,21 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
     });
   } catch (e) {
     const 글 = String((e as Error)?.message ?? e);
+    /* G11 동시-중복 — 확인 답(estimate.responded)의 하루 1회 유일 색인(estimate_daily_once_c13).
+     * 두 기기가 같은 카드를 들고 경쟁하면 멱등키가 달라(순수 난수 UUID) on conflict 로는 못 접고
+     * 늦은 쪽이 여기로 온다. 학생 잘못도 서버 잘못도 아니라 **duplicate 로 접는다**(멱등 성공과
+     * 같은 얼굴 — 앱 사건통로가 성공으로 접고 큐를 비운다). 아래 일반 갈래로 흘리면
+     * SERVER_ERROR/retryable:true 라 앱이 영원히 재시도한다(그 줄 주석이 경고한 그 상태).
+     * ⚠ 이 조회는 tx **밖**이다(begin 이 이미 롤백하고 던졌다) — 맨 sql 로 그날 행을 찾는다. */
+    if (/estimate_daily_once/i.test(글)) {
+      const 그날 = await sql`
+        select event_id from engine.learning_events
+         where learner_id = ${learner_id}::uuid
+           and event_type = 'estimate.responded'
+           and engine.ub_date(ingested_at) = engine.ub_date(now())
+         limit 1`;
+      return { idempotency_key: key, status: 'duplicate', event_id: 그날[0]?.event_id ?? null };
+    }
     // DB 가 막은 것은 대개 **계약 위반**이지 서버 잘못이 아니다 — 그걸 5xx 로 주면 앱이 영원히 재시도한다.
     if (/violates check constraint|invalid input|violates foreign key|violates not-null/i.test(글)) {
       return 거절({ code: 'CONTRACT_VIOLATION', message: 글.slice(0, 200), retryable: false });
