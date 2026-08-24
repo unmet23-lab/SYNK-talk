@@ -37,7 +37,7 @@ const { 경로, 활성인가 } = require('../lib/과제생성현행판.js');
 const { 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱말 거절(공용 판정 · F435)
 
 /* 🎯 조준 축은 **없다** — 127.0.0.1 에만 붙는 로컬 서버고 원격·운영 어디에도 안 닿는다. */
-const 아는플래그 = ['--현황', '--파일'];
+const 아는플래그 = ['--현황', '--파일', '--열기'];
 
 const ROOT = path.dirname(__dirname);
 const 화면경로 = path.join(__dirname, '과제채점화면.html');
@@ -179,6 +179,11 @@ const 서버 = http.createServer(async (req, res) => {
   console.log(`과제 채점 — http://localhost:${포트}`);
   console.log(`  ${현황줄(p)} · 파일 ${path.relative(ROOT, 결과경로)}`);
   console.log('  브라우저에서 열어 한 장씩 매긴다(1~8 축 뒤집기 · Enter 저장 · S 나중에). Ctrl+C 로 끝낸다.');
+  /* 바탕화면 바로가기의 문 — .bat 은 코드페이지(CP949/65001)에 따라 한글 경로 파싱이 깨져서
+   * 은퇴했다(08-25 실측 · 두 콘솔 모두). 브라우저 열기는 노드가 직접 진다(인코딩 무관). */
+  if (args.includes('--열기') && process.platform === 'win32') {
+    require('node:child_process').exec(`start "" http://localhost:${포트}`, () => {});
+  }
 });
 
 module.exports = { 재료, 매김처리, 결과경로 };
