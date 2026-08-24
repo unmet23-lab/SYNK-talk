@@ -265,6 +265,15 @@ Deno.serve(async (req: Request) => {
     return 봉투(200, { 평가: true, 실행판, 결과 });
   }
 
+  /* T8(유호 픽 C · 08-24 결정.md) — **조준 모드**: /tasks 가 창 안 «대기» 잡의 학생 하나를
+   * 깨운다. 집기는 `jobs_claim` 의 `_learner` 인자(이미 실물 — 생성왕복이 네 자리에서 재는
+   * 그 슬롯)로 그 학생만 집고, 그 뒤는 순찰 워커와 **같은 코드**다(벤더·검문·착지·예산 전부).
+   * 조준-잡없음(이미 집힘·착지·무잡)은 아래서 **재호출 판정 없이** 조용히 끝낸다. */
+  const 조준 = new URL(req.url).searchParams.get('learner_id');
+  if (조준 && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(조준)) {
+    return 봉투(400, { error: 'learner_id 가 uuid 꼴이 아니다' });
+  }
+
   /* 「오늘」의 원천은 SQL 식 하나(§3-2-a B1 — UTC ::date 로 접으면 워커 시간대가 통째로 전날이다). */
   const 오늘 = (await sql`
     select ((now() at time zone ${시간대})::date)::text as d`)[0].d as string;
@@ -275,11 +284,17 @@ Deno.serve(async (req: Request) => {
 
   const jobs = (await sql`
     select * from engine.jobs_claim(
-      ${오늘}::date, ${owner}, ${워커학생상한}, ${임대_초}, null)`) as unknown as Job[];
+      ${오늘}::date, ${owner}, ${워커학생상한}, ${임대_초}, ${조준 ?? null})`) as unknown as Job[];
   계측.claim_ms = Date.now() - claim전;   // 회수+집기 묶음 1회(호출당) — 학생당으로 나누려면 집음 수가 분모다
 
   /* ── 집을 것 0 — B3 재호출 판정(§3-2-a v5.7 B3 · v5.8 셋째 갈래 · v5.12 · v5.13) ── */
   if (jobs.length === 0) {
+    /* 조준 미스 — 그 학생 잡이 이미 집혔거나(경쟁에서 순찰이 이김) 착지됐거나 애초에 없다.
+     * 셋 다 «할 일 없음»이지 사고가 아니고, B3 재호출 판정은 순찰(무조준)의 몫이다 — 조준
+     * 미스가 오케스트레이터를 깨우면 앱 열기 한 번이 배치 재실행을 부르는 통로가 된다. */
+    if (조준) {
+      return 봉투(200, { 날짜: 오늘, 회수, 집음: 0, 조준: true, 재호출: '불요', 계수, 오류: 오류들, 계측 });
+    }
     const b = (await sql`
       select (select count(*)::int from engine.generation_batch_runs r
                where r.assign_date = ${오늘}::date and r.run_kind = '배치') as 배치수,

@@ -42,13 +42,17 @@ const { 지금유효, 거절몸통 } = 동의모듈 as {
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
 const { 벤더사유 } = 사유모듈 as { 벤더사유: (글: unknown, 상한?: number) => string | null };
 /* 🔴 `시간대` 도 여기서 가져온다 — 리터럴을 다시 적으면 배치와 조회가 갈린다(절단문서 ①-14). */
-const { 몽골날짜, 시간대, 학생판스냅샷, 구제할까, 구앱안내항목 } = 과제모듈 as {
+const { 몽골날짜, 시간대, 학생판스냅샷, 구제할까, 생성중상태들, 창안생성중, 구앱안내항목 } = 과제모듈 as {
   몽골날짜: (때?: Date) => string;
   시간대: string;
   /* 🔴 배정 0인 날을 구제할지의 판정 — **여기 인라인으로 다시 적지 않는다**(B3).
    *   글자로만 검사되는 조건은 하나를 통째로 죽여도 초록이라(F287), 판정은 순수 함수가 지고
    *   회귀는 값을 먹여 행동으로 잰다. */
   구제할까: (상황: { 배정수: number; 막힘: unknown; 날짜: string; 오늘: string }) => boolean;
+  /* T8 재판정(유호 픽 C · 08-24) — 창 안 «생성 진행 중» 판정. 구제할까와 같은 규칙으로
+   *   순수 함수 하나가 정본이고, 「생성중」 상태 집합도 같은 파일 한 곳이다. */
+  생성중상태들: readonly string[];
+  창안생성중: (잡: { 상태: string; 마감뒤: boolean } | null) => boolean;
   /* 🔴 이 응답이 답안지가 되지 않게 거르는 자리(절단문서 ②-20) — 목록도 정본도 저 파일 하나다. */
   학생판스냅샷: (snap: unknown) => unknown;
   /* ⓔ-22 — 활성 뒤 구앱 응답의 `data` 에 싣는 안내 항목. 모양의 정본은 저 파일(`화면과제` 옆)이고
@@ -86,7 +90,30 @@ const 서비스키 = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
  *   「빈 상태는 오류가 아니다」(C0 §4-3)가 이 함수의 계약이다. 구제 시도가 실패했다고 500 을 내면
  *   정상 경로가 오류 경로로 바뀌고, 앱은 고장 화면을 띄운다. 실패는 로그로만 남긴다.
  */
-type 구제결과 = { 결과: '세움' | '설정없음' | '실패'; 사유: string | null };
+type 구제결과 = { 결과: '세움' | '설정없음' | '실패' | '조준생성'; 사유: string | null };
+
+/* T8(유호 픽 C · 08-24 결정.md) — 창 안 «대기» 잡의 조준 생성 깨우기. 발사-망각이다:
+ * /tasks 응답을 벤더 왕복(수십 초)에 안 묶는다. `EdgeRuntime.waitUntil` 로 응답 뒤 생존을
+ * 부탁하고, 그마저 잘리거나 킥이 죽어도 다음 워커 회차(10분 간격)가 그 잡을 집는다 —
+ * 지는 방향이 «조금 늦음»뿐이게 설계한다. 인증은 `지금세우기` 와 같은 서버 열쇠 통로다.
+ * 비용 상한은 안 는다 — `jobs_claim` 유일성이 학생·일 1회(배치와 같은 총량)를 보장한다. */
+function 조준생성킥(learner_id: string): void {
+  if (!서비스키 || !함수기지.startsWith('http')) {
+    console.error('[tasks] 조준 생성을 못 부른다 — SUPABASE_URL·SERVICE_ROLE_KEY 미설정', learner_id);
+    return;
+  }
+  const p = fetch(`${함수기지}/deliver-one?learner_id=${encodeURIComponent(learner_id)}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${서비스키}` },
+  }).then((r) => {
+    if (!r.ok) console.error('[tasks] 조준 생성 킥 응답 이상(다음 워커 회차가 집는다)', learner_id, r.status);
+  }).catch((e) => {
+    console.error('[tasks] 조준 생성 킥 실패(다음 워커 회차가 집는다)', learner_id, String((e as Error)?.message ?? e));
+  });
+  try {
+    (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime?.waitUntil?.(p);
+  } catch { /* 구런타임 — 응답 뒤 잘릴 수 있으나 안전망(워커 회차)은 그대로다 */ }
+}
 
 async function 지금세우기(learner_id: string): Promise<구제결과> {
   if (!서비스키 || !함수기지.startsWith('http')) {
@@ -231,20 +258,53 @@ Deno.serve(async (req: Request) => {
      *   횟수는 이 **구조**가 지고 판정은 저 함수가 진다 — 한쪽에 둘 다 넣으면 갈라진다. */
     /* 🔑 **안 부른 것과 불렀는데 실패한 것을 가른다** — 둘 다 「data 가 비었다」로 끝나므로,
      *   구제 칸이 없으면 빈 응답의 사유가 응답 어디에도 안 남는다(그리고 로그는 하루 뒤 없다). */
+    /* ── 오늘 생성 잡 — **한 번** 읽어 구제 분기(T8)와 `assignment_status` 둘이 같이 쓴다.
+     * 판정 실패는 «못 읽음»으로 들고 간다(심문 T9 status_degraded — «없음»과 «못 쟀다»가 같은
+     * 모양이면 생성중 안내가 조용히 침묵한다). 새 응답 칸은 growth_note 선례(모르는 앱은 무시 ·
+     * null 아님 때만 존재)라 판올림이 아니다. */
+    let 잡: { 상태: string; 마감뒤: boolean } | null = null;
+    let status_degraded = false;   // T9 — 판정 실패 표식(값록 4 는 그대로 · 봉투에만 붙는다)
+    if (!행들.length) {
+      try {
+        const 물리 = await sql`
+          select to_regclass('engine.generation_jobs') is not null as 있음`;
+        if (물리[0]?.있음) {
+          const j = await sql`
+            select g.status, (now() >= engine.gen_deadline(${날짜}::date)) as 마감뒤
+              from engine.generation_jobs g
+             where g.learner_id = ${행.learner_id}::uuid and g.assign_date = ${날짜}::date`;
+          if (j[0]?.status) 잡 = { 상태: String(j[0].status), 마감뒤: Boolean(j[0].마감뒤) };
+        }
+      } catch (e) {
+        status_degraded = true;
+        console.error('[tasks] 생성 잡 판정 실패(없음으로 낸다 · status_degraded)', String((e as Error)?.message ?? e));
+      }
+    }
+
     let 구제: 구제결과 | null = null;
     if (구제할까({ 배정수: 행들.length, 막힘: blocked, 날짜, 오늘: 몽골날짜() })) {
-      구제 = await 지금세우기(행.learner_id as string);
-      if (구제.결과 === '세움') {
-        /* 다시 읽기가 죽어도 **빈 응답으로 돌아간다** — 첫 조회는 이미 성공했으니 여기서 500 을
-         * 내면 「빈 상태는 오류가 아니다」를 구제 시도가 깨뜨리는 꼴이다. */
-        try {
-          행들 = await 배정읽기();
-        } catch (e) {
-          const 말 = String((e as Error)?.message ?? e);
-          console.error('[tasks] 구제 뒤 재조회 실패 — 빈 채로 낸다', 말);
-          /* 구제는 «섰는데» 재조회가 죽은 자리다 — 결과를 덮어써 「세움인데 빈 응답」이라는
-           * 앞뒤 안 맞는 조합이 응답에 안 남게 한다(다음 요청이 다시 읽으면 보인다). */
-          구제 = { 결과: '실패', 사유: `재조회:${벤더사유(말) ?? '(빈 메시지)'}` };
+      if (창안생성중(잡)) {
+        /* T8 재판정(유호 픽 C · 08-24 결정.md) — 창 안 «생성 진행 중»은 구제 대상이 아니다.
+         * 폴백으로 잡아채면 새벽형 학생이 생성이 살아 있어도 매일 강등된다(채택 트레이드의 뒷면).
+         * 「생성중」 카드를 보이고, 아직 아무도 안 집은 잡(대기)이면 그 학생만 조준 생성을 깨운다
+         * (~1분 안 착지 · 킥이 죽어도 다음 워커 회차가 집는다). 마감 뒤·터미널 상태는 이 분기
+         * 밖이라 구제가 종전대로 접는다 — 전멸일·죽은 밤의 안전망은 한 뼘도 안 줄었다. */
+        구제 = { 결과: '조준생성', 사유: null };
+        if (잡!.상태 === '대기') 조준생성킥(행.learner_id as string);
+      } else {
+        구제 = await 지금세우기(행.learner_id as string);
+        if (구제.결과 === '세움') {
+          /* 다시 읽기가 죽어도 **빈 응답으로 돌아간다** — 첫 조회는 이미 성공했으니 여기서 500 을
+           * 내면 「빈 상태는 오류가 아니다」를 구제 시도가 깨뜨리는 꼴이다. */
+          try {
+            행들 = await 배정읽기();
+          } catch (e) {
+            const 말 = String((e as Error)?.message ?? e);
+            console.error('[tasks] 구제 뒤 재조회 실패 — 빈 채로 낸다', 말);
+            /* 구제는 «섰는데» 재조회가 죽은 자리다 — 결과를 덮어써 「세움인데 빈 응답」이라는
+             * 앞뒤 안 맞는 조합이 응답에 안 남게 한다(다음 요청이 다시 읽으면 보인다). */
+            구제 = { 결과: '실패', 사유: `재조회:${벤더사유(말) ?? '(빈 메시지)'}` };
+          }
         }
       }
     }
@@ -312,31 +372,12 @@ Deno.serve(async (req: Request) => {
      *   불문 실리는 값은 하나다) · 마감 «뒤» 잔존은 `오류`(감시 ①과 같은 집합 — 같은 사실).
      * · 신구조 물리가 없는 DB(활성 전 운영)는 표 존재 가드로 현행 이분법(있음/없음) 그대로 —
      *   구앱 규칙(§3-1: 이 칸을 안 읽는 클라이언트는 data 만 본다)과 같은 방향이다. */
+    /* 잡은 위(구제 앞)에서 한 번 읽었다 — 판정은 `창안생성중`(lib 정본) 하나가 진다(T8).
+     * 마감 «뒤» 잔존만 여기서 `오류` 로 가른다(감시 ①과 같은 집합 — 같은 사실). */
     let assignment_status: string = 행들.length ? '있음' : '없음';
-    let status_degraded = false;   // T9 — 판정 실패 표식(값록 4 는 그대로 · 봉투에만 붙는다)
-    if (!행들.length) {
-      try {
-        const 물리 = await sql`
-          select to_regclass('engine.generation_jobs') is not null as 있음`;
-        if (물리[0]?.있음) {
-          const j = await sql`
-            select g.status, (now() >= engine.gen_deadline(${날짜}::date)) as 마감뒤
-              from engine.generation_jobs g
-             where g.learner_id = ${행.learner_id}::uuid and g.assign_date = ${날짜}::date`;
-          const 상태 = j[0]?.status as string | undefined;
-          if (상태 === '대기' || 상태 === 'claimed' || 상태 === '적재실패') {
-            assignment_status = j[0]?.마감뒤 ? '오류' : '생성중';
-          }
-        }
-      } catch (e) {
-        /* 판정 실패는 «없음»으로 낸다(현행 동작) — 조회 부속이 본 응답을 깨지 않는다.
-         * 🔴 단 그 사실을 봉투에 싣는다(심문 T9 — «없음»과 «못 쟀다»가 같은 모양이면 생성중
-         * 안내가 조용히 침묵한다). 새 응답 칸은 growth_note 선례(모르는 앱은 무시 · null 아님
-         * 때만 존재)라 판올림이 아니다 — 지금 소비자는 사람(디버깅)이고, 신앱이 「상태를 못
-         * 읽었어요」 안내를 그리고 싶은 날 이 칸이 그 재료가 된다. */
-        status_degraded = true;
-        console.error('[tasks] assignment_status 판정 실패(없음으로 낸다 · status_degraded)', String((e as Error)?.message ?? e));
-      }
+    if (!행들.length && 잡) {
+      if (창안생성중(잡)) assignment_status = '생성중';
+      else if (잡.마감뒤 && 생성중상태들.includes(잡.상태)) assignment_status = '오류';
     }
 
     /* ⓔ-22 «구앱 간주»의 서버 반쪽(§3-1 v5.13 · C0 §4-3 ① 「창의 수명」) — **활성 시작일 이후**의
