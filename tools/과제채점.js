@@ -175,6 +175,46 @@ const 서버 = http.createServer(async (req, res) => {
   }
 });
 
+/* 🔴 08-25 실사용 실패 — 유호님이 「채점 화면이 안 켜지는데?」. 원인은 여기 «없던» 것이다:
+ *   listen 이 EADDRINUSE 로 던지면 콜백이 안 돌아 브라우저도 안 열리고, 바로가기로 띄운
+ *   콘솔은 그대로 닫힌다 — 화면에는 «아무 일도 안 일어난 것»으로 보인다. 그리고 그 상황의
+ *   실제 뜻은 대개 **「이미 떠 있다」**이지 고장이 아니다(창을 닫아도 서버는 살아 있다).
+ *   ⇒ 그 자리를 열어 준다: 우리 화면이 이미 그 포트에 있으면 브라우저만 띄우고 조용히 끝낸다.
+ *   ⚠ 남의 프로그램이 쓰는 포트에 브라우저를 띄우지 않는다 — 먼저 «우리 페이지인지» 확인한다.
+ *   (실패로 안 세는 이유: 사람이 원한 것은 「화면을 본다」이고 그건 이뤄졌다.) */
+const 브라우저열기 = () => {
+  if (args.includes('--열기') && process.platform === 'win32') {
+    require('node:child_process').exec(`start "" http://localhost:${포트}`, () => {});
+  }
+};
+서버.on('error', (e) => {
+  if (!e || e.code !== 'EADDRINUSE') {
+    console.error(`[과제채점] 서버를 못 세웠다 — ${e && e.message ? e.message : e}`);
+    process.exit(1);
+  }
+  http.get({ host: '127.0.0.1', port: 포트, path: '/', timeout: 2000 }, (res) => {
+    let 글 = '';
+    res.setEncoding('utf8');
+    res.on('data', (c) => { 글 += c; if (글.length > 4000) res.destroy(); });
+    res.on('close', () => {
+      if (글.includes('과제 생성 채점')) {
+        const 연다 = args.includes('--열기') && process.platform === 'win32';
+        console.log(`과제 채점 — 이미 떠 있다${연다 ? '. 브라우저를 연다' : ' — 브라우저에서 열면 된다'}: http://localhost:${포트}`);
+        console.log('  (창을 닫아도 서버는 살아 있다 — 끝내려면 그 콘솔에서 Ctrl+C)');
+        브라우저열기();
+        process.exit(0);
+      }
+      console.error(`[과제채점] 포트 ${포트} 를 «다른 프로그램»이 쓰고 있다 — 채점 화면이 아니다.`);
+      console.error('  그 프로그램을 끄고 다시 열거나, 이 도구의 포트를 바꿔야 한다.');
+      process.exit(1);
+    });
+  }).on('error', () => {
+    console.error(`[과제채점] 포트 ${포트} 가 쓰이고 있는데 응답이 없다 — 죽다 만 프로세스일 수 있다.`);
+    console.error('  작업 관리자에서 node 를 끄고 다시 열어 본다.');
+    process.exit(1);
+  });
+});
+
 서버.listen(포트, '127.0.0.1', () => {
   const p = 채점.진행(읽기(결과경로));
   console.log(`과제 채점 — http://localhost:${포트}`);
@@ -182,9 +222,7 @@ const 서버 = http.createServer(async (req, res) => {
   console.log('  브라우저에서 열어 한 장씩 매긴다(1~8 축 뒤집기 · Enter 저장 · S 나중에). Ctrl+C 로 끝낸다.');
   /* 바탕화면 바로가기의 문 — .bat 은 코드페이지(CP949/65001)에 따라 한글 경로 파싱이 깨져서
    * 은퇴했다(08-25 실측 · 두 콘솔 모두). 브라우저 열기는 노드가 직접 진다(인코딩 무관). */
-  if (args.includes('--열기') && process.platform === 'win32') {
-    require('node:child_process').exec(`start "" http://localhost:${포트}`, () => {});
-  }
+  브라우저열기();
 });
 
 module.exports = { 재료, 매김처리, 결과경로 };
