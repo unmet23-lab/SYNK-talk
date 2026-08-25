@@ -182,10 +182,33 @@ const 서버 = http.createServer(async (req, res) => {
  *   ⇒ 그 자리를 열어 준다: 우리 화면이 이미 그 포트에 있으면 브라우저만 띄우고 조용히 끝낸다.
  *   ⚠ 남의 프로그램이 쓰는 포트에 브라우저를 띄우지 않는다 — 먼저 «우리 페이지인지» 확인한다.
  *   (실패로 안 세는 이유: 사람이 원한 것은 「화면을 본다」이고 그건 이뤄졌다.) */
+/* 🔴 08-25 실측 — `start "" <url>` 도 PowerShell `Start-Process <url>` 도 이 기계에서
+ *   «조용히» 아무것도 안 열었다(오류 0 · stdout 0 · chrome 프로세스 0). 셸의 URL 연결을 못 믿는다.
+ *   그런데 기본 브라우저를 «직접» 부르면 열린다. ⇒ 레지스트리에서 그 실행 명령을 읽어 그대로 쓴다.
+ *   ⚠ 브라우저 이름을 박지 않는다 — 유호님이 기본 브라우저를 바꾸면 그 순간 거짓이 되는 값이다.
+ *   ⚠ 그리고 «조용한 실패»를 다시는 안 만든다: 어느 갈래로 가든 URL 을 한 줄로 크게 찍는다.
+ *     열기는 편의고, 사람이 손으로 열 수 있는 것이 최후의 보증이다. */
 const 브라우저열기 = () => {
-  if (args.includes('--열기') && process.platform === 'win32') {
-    require('node:child_process').exec(`start "" http://localhost:${포트}`, () => {});
-  }
+  const url = `http://localhost:${포트}`;
+  console.log(`
+  ▸ 안 열리면 브라우저 주소창에 이것을 넣는다:  ${url}
+`);
+  if (!args.includes('--열기') || process.platform !== 'win32') return;
+  const { exec } = require('node:child_process');
+  const 레지 = 'reg query "HKCU\SOFTWARE\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice" /v ProgId';
+  exec(레지, (e1, out1) => {
+    const m = /ProgIds+REG_SZs+(S+)/.exec(String(out1 || ''));
+    if (e1 || !m) return exec(`start "" ${url}`, () => {});     // 못 읽으면 옛 방식이라도 던져 본다
+    exec(`reg query "HKCR\${m[1]}\shell\open\command" /ve`, (e2, out2) => {
+      const c = /REG_SZs+(.+)/.exec(String(out2 || ''));
+      const 실행 = c && c[1].trim();
+      const exe = 실행 && /^"([^"]+)"/.exec(실행);
+      if (e2 || !exe) return exec(`start "" ${url}`, () => {});
+      /* %1 자리에 URL 을 넣는다(--single-argument 같은 꼬리 인자를 그대로 살린다). */
+      const 명령 = 실행.includes('%1') ? 실행.replace('%1', url) : `${실행} ${url}`;
+      exec(명령, (e3) => { if (e3) exec(`start "" ${url}`, () => {}); });
+    });
+  });
 };
 서버.on('error', (e) => {
   if (!e || e.code !== 'EADDRINUSE') {
