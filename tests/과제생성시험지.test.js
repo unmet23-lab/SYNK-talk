@@ -76,12 +76,16 @@ test('풀 순서 그대로 · 앵커 id 고정 · 채점표 판·통과선 동�
   assert.deepEqual(시험지.앵커['1점앵커'].map((a) => a.anchor_id), ['A1', 'A2', 'A3']);
   assert.equal(시험지.채점표_판, 평가.채점표판);
   assert.deepEqual(시험지.통과선, 평가.통과선);
+  assert.deepEqual(시험지.절제구간, 평가.절제구간, 'v2 ⑦ 구간도 시험지가 동봉한다 — 채점표 판의 일부라 바뀌면 해시가 갈려야 한다');
   const hex64값 = Object.values(시험지).some((v) => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v));
   assert.equal(hex64값, false, '시험지 해시 «값»은 파일 안에 안 적는다(순환) — 결과 파일 동봉 칸이 든다');
   assert.match(파일해시(시험지경로), /^[0-9a-f]{64}$/);
 });
 
 /* ── 결과 파일 기계 계약의 «탐지력» — 드라이런 뼈대를 변형해 검사가 실제로 잡는지 ───────── */
+/** ⑦ v2 절제 구간을 지키는 «목표를 쓴 사례» 여섯(시험지의 goal 있는 사례 순서대로). */
+const 목표쓴사례 = new Set(시험지.사례.filter((c) => c.goal != null).slice(0, 6).map((c) => c.case_base_id));
+
 function 뼈대() {
   const 행 = [];
   for (const c of 시험지.사례) {
@@ -90,7 +94,10 @@ function 뼈대() {
       const raw = JSON.stringify({ content: [{ type: 'text', text: JSON.stringify({ sentence: `문장 ${c.case_base_id}`, question: `질문 ${r}?` }) }] });
       행.push({
         case_id: 평가.case_id(c.case_base_id, r),
-        axis_scores: Object.fromEntries(평가.축키들.map((k) => [k, (k === 'goal_use' && c.goal == null) ? null : 1])),
+        /* ⑦(v2)은 «절제»가 규격이라 전부 1 이면 오히려 미달(남발)이다 — 목표 있는 사례 20 중
+         * 앞 6개만 «썼다»로 둔다(구간 3~10 안). 나머지 축은 전부 1(유효 뼈대의 뜻). */
+        axis_scores: Object.fromEntries(평가.축키들.map((k) => [k,
+          (k === 평가.구간축) ? (c.goal == null ? null : (목표쓴사례.has(c.case_base_id) ? 1 : 0)) : 1])),
         grader_note: '', sentence: `문장 ${c.case_base_id}`, question: `질문 ${r}?`,
         raw_response: raw, raw_response_hash: 평가.응답해시(raw), input_hash: 평가.input_hash(본문),
       });
@@ -139,4 +146,57 @@ test('E4 실측 — 집계 단위는 «사례»(두 회차 AND) · ⑦ 분모 20
   /* 누락 회차 = 0점(재시도 없음 · 분모에서 안 뺀다). */
   const r2 = 뼈대(); r2.행 = r2.행.slice(1);
   assert.equal(평가.집계(r2, 시험지).축.connect.합, 39);
+});
+
+/* ── 채점표 v2 — ⑦은 «비율»이 아니라 «절제 구간»이다 (유호 확정 2026-08-25) ──────────
+ * v1 은 ⑦을 「활용했나」로 묻고 0.7 을 걸었는데, 프롬프트는 「서너 번에 한 번만」을 명령한다 —
+ * 프롬프트를 지킨 산출이 떨어지는 축이었다(유호 2회전 실측 0.55 · 「제대로 못 매기겠다」).
+ * 이 절이 그 되돌아옴을 막는다: 구간 밖 두 방향이 «각각» 빨개져야 한다. */
+test('v2 ⑦ — 통째로 무시(0건)도 매번 남발(20건)도 미달 · 구간 3~10 안이면 통과', () => {
+  const 목표사례 = 시험지.사례.filter((c) => c.goal != null).map((c) => c.case_base_id);
+  assert.equal(목표사례.length, 20, '시험지 goal 있는 사례가 20이 아니면 아래 구간 수가 뜻을 잃는다');
+
+  const 세운다 = (쓴수) => {
+    const r = 뼈대();
+    const 쓴 = new Set(목표사례.slice(0, 쓴수));
+    for (const 행 of r.행) {
+      const base = 행.case_id.split('#')[0];
+      if (!목표사례.includes(base)) continue;
+      행.axis_scores[평가.구간축] = 쓴.has(base) ? 1 : 0;
+    }
+    return 평가.집계(r, 시험지);
+  };
+
+  assert.equal(세운다(0).축.goal_use.통과, false, '목표를 통째로 무시한 판이 통과하면 v5.4 F2 가 막은 구멍이 다시 열린다');
+  assert.equal(세운다(2).축.goal_use.통과, false, '구간 아래(2 < 3)');
+  assert.equal(세운다(3).축.goal_use.통과, true, '구간 아래끝은 통과');
+  assert.equal(세운다(6).축.goal_use.통과, true);
+  assert.equal(세운다(10).축.goal_use.통과, true, '구간 위끝은 통과');
+  assert.equal(세운다(11).축.goal_use.통과, false, '구간 위(11 > 10) — 매번 쓰면 뻔해진다');
+  assert.equal(세운다(20).축.goal_use.통과, false, '남발도 미달이다 — 이것이 v1 에서는 «만점»이었다');
+  /* 통과선 표기 — ⑦만 수 하나로 못 찍는다(화면·CLI 가 같은 함수를 쓴다). */
+  assert.equal(평가.통과선표기('goal_use'), '3~10건');
+  assert.equal(평가.통과선표기('accuracy'), '0.95');
+  assert.equal(평가.통과선.goal_use, undefined, '⑦은 비율 축이 아니라 통과선 표에 없어야 한다');
+});
+
+test('v2 ⑦ — 사례 이음은 AND 가 아니라 OR · ⑦=0 은 이유를 안 묻는다', () => {
+  const 목표사례 = 시험지.사례.filter((c) => c.goal != null).map((c) => c.case_base_id);
+  const r = 뼈대();
+  /* 한 사례의 «한 회차만» 목표를 썼다 — 그 사례는 「썼다」로 세어야 한다(AND 면 절제가 미사용으로 읽힌다). */
+  const 하나 = 목표사례[0];
+  for (const 행 of r.행) {
+    const base = 행.case_id.split('#')[0];
+    if (!목표사례.includes(base)) continue;
+    행.axis_scores[평가.구간축] = (base === 하나 && 행.case_id.endsWith('#1')) ? 1 : 0;
+  }
+  assert.equal(평가.집계(r, 시험지).축.goal_use.합, 1, '두 회차 중 하나만 써도 그 사례는 「쓴 사례」다(OR)');
+
+  /* ⑦=0 만 있는 행은 이유가 비어도 계약이 선다(v2) — 다른 축의 0 은 그대로 이유 필수. */
+  const r2 = 뼈대();
+  const 목표행 = r2.행.find((행) => 목표사례.includes(행.case_id.split('#')[0]));
+  목표행.axis_scores[평가.구간축] = 0; 목표행.grader_note = '';
+  assert.deepEqual(평가.결과검증(r2, 시험지, 전문), [], '⑦=0 은 흠이 아니라 절제라 이유를 안 묻는다');
+  목표행.axis_scores.fun = 0;
+  assert.match(String(평가.결과검증(r2, 시험지, 전문)[0]), /grader_note 가 비었다/, '다른 축의 0 은 그대로 이유 필수');
 });
