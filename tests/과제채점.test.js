@@ -13,6 +13,13 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const 평가 = require('../lib/과제생성평가.js');
 const { 미채점인가, 고정인가, 진행, 쌍둥이, 매김적용 } = require('../lib/과제채점.js');
+/* ④ 대가 검사가 «실물 판»으로 서야 한다 — 픽스처를 손으로 지으면 계약이 갈린다. */
+const fs = require('fs');
+const path = require('path');
+const { 뼈대 } = require('./lib/과제생성뼈대.js');
+const ROOT = path.resolve(__dirname, '..');
+const 시험지경로 = path.join(ROOT, 'evals', '과제생성_시험지.json');
+const 프롬프트경로 = path.join(ROOT, 'prompts', '과제생성.md');
 
 const 여덟 = (v) => 평가.축키들.map(() => v);
 const 행 = (case_id, 덮을것) => ({
@@ -68,12 +75,42 @@ test('⑦(goal_use)은 목표 없는 사례면 무엇을 보내든 null — «�
   assert.equal(결과.행.find((x) => x.case_id === 'P002#1').axis_scores[평가.null허용축], null);
 });
 
-test('목표 있는 사례의 ⑦은 0/1 필수 — null·딴 값은 거절', () => {
+/* 🔴 규칙이 바뀐 자리(유호 확정 2026-08-25) — 옛 판은 「목표 있는 사례의 ⑦은 0/1 필수」였다.
+ *   ⑦은 «세는 칸»이라 0 이 「흠」이 아니라 「안 썼다」다. 그래서 «안 물었다»를 0 으로 적으면
+ *   「안 썼다」와 구별이 안 된다 — 그 병(초안 O 가 판정으로 읽힘)을 오늘 아침에 잡았고, 이건
+ *   그 거울상이다. ⇒ ⑦에 한해 null = 「안 쟀다」를 받는다. 대신 **대가를 집계가 진다**:
+ *   분모 0 이면 §8-B 는 통과할 수 없다(안 잰 축을 통과로 접으면 F207 이 무너진다).
+ *   이 절이 그 두 짝을 «같이» 잰다 — 하나만 살면 조용한 초록이 된다. */
+test('⑦만 null(안 쟀다)을 받는다 · 딴 축의 null 과 딴 값은 여전히 거절 · 안 재면 통과 못 한다', () => {
   const { 결과, 시험지 } = 판();
-  const 점수들 = 여덟(1); 점수들[평가.축키들.indexOf(평가.null허용축)] = null;
+  const 칠 = 평가.축키들.indexOf(평가.구간축);
+
+  /* ① ⑦ = null → 받는다. 파일에 null 로 남아야 「안 쟀다」가 읽힌다(0 이면 「안 썼다」로 읽힌다). */
+  const 점수들 = 여덟(1); 점수들[칠] = null;
   const r = 매김적용({ 결과, 시험지, case_id: 'P001#1', 점수들, note: '', 채점자: '유호', 지금 });
-  assert.equal(r.ok, false);
-  assert.match(r.오류, /0·1 뿐/);
+  assert.equal(r.ok, true, r.오류);
+  assert.equal(결과.행.find((x) => x.case_id === 'P001#1').axis_scores[평가.구간축], null);
+
+  /* ② 딴 축의 null 은 그대로 거절 — 「안 쟀다」는 ⑦ 하나만 누리는 예외다. */
+  const 딴축 = 여덟(1); 딴축[평가.축키들.indexOf('accuracy')] = null;
+  const r2 = 매김적용({ 결과, 시험지, case_id: 'P002#1', 점수들: 딴축, note: '', 채점자: '유호', 지금 });
+  assert.equal(r2.ok, false); assert.match(r2.오류, /0·1 뿐/);
+
+  /* ③ 0·1·null 아닌 값은 ⑦에서도 거절(관용이 넓어지면 오타가 판정으로 들어온다). */
+  const 딴값 = 여덟(1); 딴값[칠] = 2;
+  const r3 = 매김적용({ 결과, 시험지, case_id: 'P001#1', 점수들: 딴값, note: '', 채점자: '유호', 지금 });
+  assert.equal(r3.ok, false); assert.match(r3.오류, /0·1 뿐/);
+
+  /* ④ 대가 — ⑦을 전 행 안 재면 집계가 «안잼»으로 말하고 통과는 false 다. */
+  const 시험 = JSON.parse(fs.readFileSync(시험지경로, 'utf8'));
+  const 전문 = fs.readFileSync(프롬프트경로, 'utf8');
+  const 뼈 = 뼈대(시험, 전문);
+  for (const 행 of 뼈.행) 행.axis_scores[평가.구간축] = null;
+  const 집 = 평가.집계(뼈, 시험);
+  assert.equal(집.축[평가.구간축].분모, 0);
+  assert.equal(집.축[평가.구간축].안잼, true, '분모 0 은 «미달»이 아니라 «안 쟀다»로 말해야 한다');
+  assert.equal(집.축[평가.구간축].통과, false, '안 잰 축을 통과로 접으면 F207(미실행 ≠ 통과)이 무너진다');
+  assert.equal(집.통과, false);
 });
 
 test('쌍둥이 회차(글자까지 같음)에 같은 점수가 이어진다 — 적용 목록이 둘이다', () => {
