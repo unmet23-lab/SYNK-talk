@@ -369,7 +369,7 @@ function 그리기() {
     const 나중 = 글자(단추, 'button', '나중에', '보조');
     나중.onclick = () => { 대기.push(지금행); 알림(`${지금행.case_id} 는 맨 뒤로 — 나중에 다시 만난다`, false); 다음(); };
   }
-  글자(단추, 'span', '1~8 축 뒤집기 · Enter 저장' + (되돌림 ? ' · Esc 돌아가기' : ' · S 나중에'), '힌트');
+  글자(단추, 'span', '1~8 축 뒤집기 · Enter 저장 · 줄바꿈 Shift+Enter' + (되돌림 ? ' · Esc 돌아가기' : ' · S 나중에'), '힌트');
 
   점수그리기();
 }
@@ -401,7 +401,15 @@ async function 보내기() {
   if (!채점자) { 알림('채점자 이름이 비었다 — 오른쪽 위 칸에 넣는다', true); return; }
   const note = $('이유칸') ? $('이유칸').value : '';
   const 영점 = 재료.축키들.some((k, i) => k !== 재료.구간축 && 점수[i] === 0);   // ⑦=0 은 절제(v2)
-  if (영점 && !note.trim()) { 알림('X 가 있는데 이유가 비었다 — 이유 칸에 한 줄', true); $('이유칸').focus(); return; }
+  if (영점 && !note.trim()) {
+    /* 알림 줄은 카드 «아래»에 있어 저장 버튼에서 300px 넘게 떨어진다 — 긴 카드에서는 화면 밖이라
+     * 「아무 일도 안 일어남」으로 보인다. 그래서 알리는 것으로 안 끝내고 **이유 칸을 화면 한가운데로**
+     * 끌어온다(빨간 「0점 이유(필수)」 라벨이 그 자리에 붙어 있다). */
+    알림('X 가 있는데 이유가 비었다 — 이유 칸에 한 줄', true);
+    const 칸 = $('이유칸');
+    if (칸) { 칸.scrollIntoView({ block: 'center' }); 칸.focus(); }
+    return;
+  }
   보냄 = true;
   try {
     const r = await fetch('/api/score', {
@@ -480,8 +488,14 @@ function 알림(문구, 나쁨, 방금저장) {
 }
 
 document.addEventListener('keydown', (e) => {
+  /* 🔴 08-26 실사용 실패 — 유호님 「중간에 확인이 안 눌려서 껐다」. 진범이 이 네 줄이었다:
+   *   이유 칸(textarea) 안에서는 «맨 Enter 가 아무것도 안 했다». 그런데 바로 아래 화면 안내는
+   *   「Enter 저장」이라고 «약속»하고 있다. 이유를 길게 적는 사람일수록 커서가 그 칸에 있으므로,
+   *   안내대로 눌렀는데 아무 일도 안 일어난다 — 도구가 자기 약속을 어긴 자리다.
+   *   ⇒ 이유 칸에서도 Enter 가 저장한다. 줄바꿈은 Shift+Enter(대화앱 관례 · 여러 줄 메모는 살린다).
+   *   ⚠ 채점자 이름 칸(input)에서도 Enter 로 저장한다 — 거기서 줄바꿈은 뜻이 없다. */
   if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); 보내기(); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); 보내기(); }
     return;
   }
   if (e.key === 'Escape') { if (되돌림) { e.preventDefault(); 되돌림취소(); } else if ($('매긴판').firstChild) { e.preventDefault(); 목록토글(); } return; }
@@ -489,7 +503,11 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); 보내기(); return; }
   if (/^[1-8]$/.test(e.key)) {
     const i = Number(e.key) - 1;
-    if (재료.축키들[i] === 재료.null허용축 && 지금행.목표없음) return;   // 분모에서 뺀 축은 안 뒤집힌다
+    /* 🔴 화면에서 내린 축은 키보드로도 안 뒤집힌다 — 08-25 에 ⑦ 칸을 «안 묻는다»로 내리면서
+     *   이 줄만 옛 조건(목표없음)에 남아, 숫자 7 을 누르면 «안 보이는 채로» ⑦이 0/1 로 켜졌다.
+     *   그러면 「안 쟀다(null)」 기록이 조용히 판정으로 바뀐다 — 오늘 고친 그 병의 재발이다.
+     *   (실측: 유호님 65행에 오염 0 — 안 누르셨다. 남은 15행에서 막는다.) */
+    if (재료.축키들[i] === 재료.구간축) return;
     축값(i, 점수[i] === 1 ? 0 : 1);
     return;
   }
