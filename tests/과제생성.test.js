@@ -9,7 +9,7 @@ const path = require('path');
 
 const {
   생성요청몸통, 생성응답읽기, 입력초과인가, 응답초과인가,
-  응답스키마, 상한_코드포인트, 프롬프트지문, 본문템플릿, 렌더,
+  응답스키마, 상한_코드포인트, 프롬프트지문, 본문템플릿, 렌더, 호출옵션,
 } = require('../lib/과제생성.js');
 
 const 봉투 = (글) => ({ content: [{ type: 'text', text: 글 }], usage: { output_tokens: 1 } });
@@ -50,12 +50,17 @@ test('상한 경계 — 정확히 8000 은 통과, 8001 은 초과(입력·응�
   assert.equal(상한_코드포인트, 8000, '상한이 §11-2 와 갈렸다');
 });
 
-test('요청 몸통 — model 필수(리터럴 0 · 유호님 몫) · thinking 명시 off · 구조화 출력 새 이름', () => {
+test('요청 몸통 — model 필수(리터럴 0 · 유호님 몫) · thinking adaptive · 구조화 출력 새 이름', () => {
   assert.throws(() => 생성요청몸통({ 본문: 'x' }), /model/);
   const b = 생성요청몸통({ 본문: '[학생 맥락] …', model: 'claude-test-1' });
   assert.equal(b.model, 'claude-test-1');
-  assert.deepEqual(b.thinking, { type: 'disabled' },
-    'adaptive thinking 이 조용히 켜지면 생각이 예산을 먹어 응답파손의 얼굴이 된다(08-12 실측)');
+  assert.deepEqual(b.thinking, { type: 'adaptive' },
+    '🔴 유호 픽 08-25 「생각 켜기」 — 08-12 의 off 는 예산 300 이 낳은 처방이었고, 예산을 4000 으로 넓혀 원인을 없앴다. Opus 5 에서 사고 끄기는 API 정본이 권하지 않는 자리다');
+  assert.equal(b.max_tokens, 4000, '생각이 돌 자리 — 상한이지 청구가 아니다(실측 산출은 호출당 125토큰)');
+  /* 몸통과 판 파생이 «같은 옵션 객체»를 읽는가 — 두 벌이면 몸통만 고쳐도 판이 안 올라
+   * 옛 채점이 새 호출에 살아남는다(§4-2 급소 · 08-25 실측으로 한 벌로 합쳤다). */
+  assert.deepEqual({ max_tokens: b.max_tokens, thinking: b.thinking, output_config: b.output_config }, { ...호출옵션 },
+    '요청 몸통이 호출옵션 한 벌에서 나와야 판(prompt_ver)과 안 갈린다');
   assert.equal(b.output_config.format.type, 'json_schema',
     '⓪ 정찰(08-21)의 새 이름 output_config.format 이다 — 전환기 옛 이름에 안 기댄다');
   assert.equal(b.output_config.format.schema, 응답스키마);

@@ -83,29 +83,9 @@ test('풀 순서 그대로 · 앵커 id 고정 · 채점표 판·통과선 동�
 });
 
 /* ── 결과 파일 기계 계약의 «탐지력» — 드라이런 뼈대를 변형해 검사가 실제로 잡는지 ───────── */
-/** ⑦ v2 절제 구간을 지키는 «목표를 쓴 사례» 여섯(시험지의 goal 있는 사례 순서대로). */
-const 목표쓴사례 = new Set(시험지.사례.filter((c) => c.goal != null).slice(0, 6).map((c) => c.case_base_id));
-
-function 뼈대() {
-  const 행 = [];
-  for (const c of 시험지.사례) {
-    const { 본문 } = 평가.사례본문(전문, c);
-    for (const r of [1, 2]) {
-      const raw = JSON.stringify({ content: [{ type: 'text', text: JSON.stringify({ sentence: `문장 ${c.case_base_id}`, question: `질문 ${r}?` }) }] });
-      행.push({
-        case_id: 평가.case_id(c.case_base_id, r),
-        /* ⑦(v2)은 «절제»가 규격이라 전부 1 이면 오히려 미달(남발)이다 — 목표 있는 사례 20 중
-         * 앞 6개만 «썼다»로 둔다(구간 3~10 안). 나머지 축은 전부 1(유효 뼈대의 뜻). */
-        axis_scores: Object.fromEntries(평가.축키들.map((k) => [k,
-          (k === 평가.구간축) ? (c.goal == null ? null : (목표쓴사례.has(c.case_base_id) ? 1 : 0)) : 1])),
-        grader_note: '', sentence: `문장 ${c.case_base_id}`, question: `질문 ${r}?`,
-        raw_response: raw, raw_response_hash: 평가.응답해시(raw), input_hash: 평가.input_hash(본문),
-      });
-    }
-  }
-  const 동봉 = Object.fromEntries([...평가.비교축, ...평가.존재축, ...평가.기록축].map((k) => [k, `v-${k}`]));
-  return { 동봉, 행 };
-}
+/* 뼈대는 tests/lib 한 벌 — 차단기 회귀와 «같은 픽스처»를 써야 둘이 다른 판을 안 본다. */
+const { 뼈대: 뼈대짓기 } = require('./lib/과제생성뼈대.js');
+const 뼈대 = () => 뼈대짓기(시험지, 전문);
 
 test('E2·E9 계약 — 유효 뼈대는 통과하고, 변형 7가지는 각각 «파일 전체 무효»', () => {
   const 기준 = 뼈대();

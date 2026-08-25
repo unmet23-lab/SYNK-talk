@@ -23,6 +23,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const 평가 = require('../lib/과제생성평가.js');
 const { 경로, 활성인가, 현행판 } = require('../lib/과제생성현행판.js');
+const { 뼈대 } = require('./lib/과제생성뼈대.js');
 /* 읽기 경로는 리터럴로(소스검사통로 래칫) · 한 원천은 첫 검사가 `경로` 와 대조한다. */
 const 프롬프트경로 = path.join(ROOT, 'prompts', '과제생성.md');
 const 시험지경로 = path.join(ROOT, 'evals', '과제생성_시험지.json');
@@ -110,11 +111,18 @@ test('결과한벌 — 비교축 하나만 달라도 한벌 false(옛 실행판 
   if (!활성인가() || !정본있음) return;
   const 시험지 = JSON.parse(fs.readFileSync(시험지경로, 'utf8'));
   const 전문 = fs.readFileSync(프롬프트경로, 'utf8');
-  const 변이 = JSON.parse(JSON.stringify(결과정본));
-  for (const r of 변이.행) if (r.grader_note === '미채점') { r.grader_note = '픽스처 매김'; r.axis_scores = Object.fromEntries(평가.축키들.map((k) => [k, r.axis_scores[k] === null ? null : 1])); }
+  /* 🔴 픽스처는 «지금 판»으로 그 자리에서 짓는다 — 실물 결과 파일을 쓰면 그 파일의 input_hash 가
+   * «그때의 프롬프트» 것이라, 프롬프트를 고치는 날 이 회귀가 «비교축»과 상관없는 계약 사유로
+   * 빨개진다(08-25 v5 판올림에서 실제로 그랬다). 무관한 적색은 곧 「원래 빨간 것」이 된다. */
+  const 변이 = 뼈대(시험지, 전문);
   변이.동봉.estimator_version = '학습자상태.v0';
   const 판 = 평가.결과한벌({ 결과: 변이, 시험지, 전문, 현행: { ...현행판(), estimator_version: '학습자상태.v999' }, 비교제외: 평가.비교축.filter((k) => k !== 'estimator_version') });
   assert.equal(판.한벌, false);
   assert.deepEqual(판.다름, ['estimator_version']);
   assert.match(String(판.사유), /옛 실행판/);
+  /* 같은 뼈대가 «비교축을 안 건드리면» 초록이어야 한다 — 위 false 가 estimator_version 때문임을
+   * 이 대조가 증명한다(사유가 계약 쪽으로 새면 위 단언이 우연히 맞을 수 있다). */
+  const 성한판 = 평가.결과한벌({ 결과: 뼈대(시험지, 전문), 시험지, 전문, 현행: 현행판(), 비교제외: 평가.비교축 });
+  assert.deepEqual(성한판.무효사유, [], `뼈대가 계약을 못 지나면 이 회귀는 자기 주제를 못 잰다: ${성한판.무효사유.slice(0, 3).join(' / ')}`);
+  assert.equal(성한판.한벌, true);
 });
