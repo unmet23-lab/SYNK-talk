@@ -11,7 +11,7 @@
   · X 면 = 눌림 Coral 3 #AE322A(면 전용) · 완주 표시 = 성장 Meadow Soft #D3E8BE(면 없이 글자).
   기본 버튼 = Paper 면 + Ink Deep 글자(코랄 면 + 흰 글자는 이 킷에서 대비 미달 — 테마.js 원문).
   순백·순검정 0 · 이모지 0 · 한글 keyframes 없음(애니메이션 자체가 없다 — 전환만, 300ms 상한).
-  초안 = 축 여덟 전부 O 로 미리 눌러 둔다(문항검수 선례 「사람 손은 확정 하나」) — 유호님은
+  초안 = 축 «일곱» O 로 미리 눌러 둔다(문항검수 선례 「사람 손은 확정 하나」) — 유호님은
   흠 있는 축만 X 로 뒤집고 저장한다. CLI 의 「11111111」 습관과 같은 무게다.
 -->
 <style>
@@ -112,6 +112,8 @@
   }
   .토글 button[aria-pressed="true"].O { background: rgba(251,247,240,.14); color: var(--paper); border-color: rgba(251,247,240,.35); }
   .토글 button[aria-pressed="true"].X { background: var(--pressed); color: var(--paper); border-color: var(--pressed); }
+  /* 미정 = 아직 안 누른 축(⑦뿐) — 둘 다 흐리고 테두리를 점선으로 둬 「초안 O」와 눈으로 갈린다. */
+  .토글 button.미정 { opacity: .5; border-style: dashed; }
   .축.뺌 { opacity: .55; }
   .축.뺌 .뺌표 { color: var(--meta); font-size: 13px; }
   .앵커 { border: 0; margin: -2px 0 6px; padding: 0 12px; }
@@ -213,7 +215,12 @@ function 분모그리기(p) {
 function 다음() {
   되돌림 = null;
   지금행 = 대기.shift() || null;
-  점수 = 재료.축키들.map(() => 1);   // 초안 = 전부 O — 사람 손은 흠 있는 축 뒤집기 + 저장
+  /* 🔴 ⑦(구간축)만 초안 O 를 «안» 준다 — 08-25 실측: 2회전 80행에서 ⑦=1 이 31행이었는데
+   *   그 문장들은 목표와 아무 상관이 없었다(「K-POP 가사 이해」 목표에 할머니 전화·아침 커피).
+   *   유호님 말 「목표 채점은 제대로 못 했다」의 정체가 이것이다 — **초안 O 가 그대로 남은 것**이고,
+   *   그러면 「보고 O 준 축」과 「안 본 축」이 파일에서 구별되지 않는다(좋은 0과 「안 재봤다」의 그 가름).
+   *   ⑦은 v2 에서 «사실» 질문(썼나/안 썼나)이 됐으니 한 번 누르는 데 드는 손이 거의 없다. */
+  점수 = 재료.축키들.map((k) => (k === 재료.구간축 && !지금행?.목표없음 ? null : 1));
   그리기();
 }
 
@@ -249,7 +256,10 @@ function 다시열기(case_id) {
   /* 지금 보던 카드를 잃지 않는다 — 저장·취소하면 그 자리로 돌아간다. */
   되돌림 = { 이전: 지금행, 이전점수: 점수.slice() };
   지금행 = 행;
-  점수 = 재료.축키들.map((k) => (행.axis_scores[k] === 0 ? 0 : 1));   // null(⑦ 뺌)은 화면에서 안 쓰인다
+  /* 다시 매길 때는 저장된 값을 그대로 되살린다 — ⑦은 «안 매긴 것»과 「O 로 매긴 것」이 갈려야 하므로
+   * 옛 판에서 온 행(초안 O 가 남았을 수 있다)도 사람이 한 번 더 누르게 null 로 연다. */
+  점수 = 재료.축키들.map((k) => (k === 재료.구간축 && !행.목표없음 ? null
+    : (행.axis_scores[k] === 0 ? 0 : 1)));
   그리기();
   const 칸 = $('이유칸');
   if (칸) 칸.value = 행.grader_note || '';
@@ -350,6 +360,8 @@ function 점수그리기() {
     const i = Number(b.dataset.축);
     const 눌림 = b.className.includes('O') ? 점수[i] === 1 : 점수[i] === 0;
     b.setAttribute('aria-pressed', String(눌림));
+    /* 미정(null)은 «둘 다 안 눌린» 모양 — 초안 O 와 눈으로 갈린다. */
+    b.classList.toggle('미정', 점수[i] === null);
   });
   const 영점 = 재료.축키들.some((k, i) => k !== 재료.구간축 && 점수[i] === 0);   // ⑦=0 은 절제(v2)
   const 라벨 = $('이유라벨');
@@ -366,6 +378,8 @@ async function 보내기() {
   const note = $('이유칸') ? $('이유칸').value : '';
   const 영점 = 재료.축키들.some((k, i) => k !== 재료.구간축 && 점수[i] === 0);   // ⑦=0 은 절제(v2)
   if (영점 && !note.trim()) { 알림('X 가 있는데 이유가 비었다 — 이유 칸에 한 줄', true); $('이유칸').focus(); return; }
+  const 칠 = 재료.축키들.indexOf(재료.구간축);
+  if (칠 >= 0 && 점수[칠] === null) { 알림('⑦목표 소재를 아직 안 눌렀다 — 이 문장이 목표를 소재로 썼나(예 O · 아니오 X)', true); return; }
   보냄 = true;
   try {
     const r = await fetch('/api/score', {

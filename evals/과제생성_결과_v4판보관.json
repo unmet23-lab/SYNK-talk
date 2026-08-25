@@ -1,0 +1,1537 @@
+{
+ "판": "§8-B 결과 — 실물 응답. 채점은 --채점 이 채운다(미채점 행은 집계 0 → 차단기 빨강: 실행과 채점은 한 벌이다)",
+ "동봉": {
+  "model": "claude-opus-5",
+  "prompt_ver": "과제생성.v4+70b33933e442",
+  "skill_taxonomy_ver": "skills.v1",
+  "estimator_version": "학습자상태.v13",
+  "시험지_해시": "371d4225db97ace18f7685251e9ceb68d6a5dc6d1d7e10db5e4ebd8985adf72b",
+  "채점표_판": "채점표.v1",
+  "quality_ver": "fc032b131ff7",
+  "policy_ver": "오늘과제.v3+58e3e4eeae8e",
+  "채점자": "유호",
+  "시각": "2026-08-25T09:30:27.647Z"
+ },
+ "행": [
+  {
+   "case_id": "P001#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 0,
+    "fun": 0,
+    "accuracy": 0,
+    "goal_use": 0,
+    "state_use": 0
+   },
+   "grader_note": "오늘의 문장 어휘가 좀 어색해. 내가 고쳐보자면\n할머니께서는 보통 저녁을 드시고 나서 산책을 하세요. 저는 저녁 식사 후에 설거지를 빨리 마치고 할머니랑 같이 산책하는 걸 좋아해요. \n\n답하기는 그나마 괜찮아.",
+   "sentence": "할머니께서는 저녁을 드시고 나서 꼭 산책을 하세요. 저는 산책 전에 설거지를 끝내고 같이 나가요.",
+   "question": "저녁을 먹은 다음에는 보통 뭘 하면서 시간을 보내요? 그 시간이 마음에 들어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKd4vxvuczXQhRKEdMFa\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"할머니께서는 저녁을 드시고 나서 꼭 산책을 하세요. 저는 산책 전에 설거지를 끝내고 같이 나가요.\\\", \\\"question\\\": \\\"저녁을 먹은 다음에는 보통 뭘 하면서 시간을 보내요? 그 시간이 마음에 들어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3146,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":121,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "5ac87f8d3ac874668ae5365587aa6dc48d329281a72375653af01f7e7a308d05",
+   "input_hash": "8f5694fa07fc77106720bb6e993ca0f60a9e14f3aba15027d5c0a6ffc4c75384"
+  },
+  {
+   "case_id": "P001#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "듣기 따라말하기 어휘가 어색해. \n\n할머니꼐서는 요즘 감기에 걸리셨다고 하셨어요가 아니라. 할머니께서는 감기에 걸리셨다고 말씀하셨어요. 라고 하면 훨씬 자연스러워>\n\n답하기는 최고야 마음에 들어",
+   "sentence": "저녁을 먹고 나서 할머니께 전화를 드렸어요. 할머니께서는 요즘 감기에 걸리셨다고 하셨어요. 그래서 주말에 찾아뵈려고 해요.",
+   "question": "가족 중에 목소리만 들어도 마음이 편해지는 사람이 있어요? 마지막으로 연락한 게 언제예요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKd5Ge7kYqQyV1RhADLD\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저녁을 먹고 나서 할머니께 전화를 드렸어요. 할머니께서는 요즘 감기에 걸리셨다고 하셨어요. 그래서 주말에 찾아뵈려고 해요.\\\", \\\"question\\\": \\\"가족 중에 목소리만 들어도 마음이 편해지는 사람이 있어요? 마지막으로 연락한 게 언제예요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3146,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":143,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "611ea3c896be79c1c94de4d9bd38a9c7e9c716d6790483edef3ba853a0932042",
+   "input_hash": "8f5694fa07fc77106720bb6e993ca0f60a9e14f3aba15027d5c0a6ffc4c75384"
+  },
+  {
+   "case_id": "P002#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "듣기 따라말하기 어휘가 어색해. \n저는 시장에 갈 때 보통 버스를 타고 가는데 오늘은 날씨가 좋아서 자전거를 타고 갔어요. 그리고 시장에서 과일을 조금 샀어요\n이렇게 해야 훨씬 자연스러워. \n\n그래도 답하기는 마음에 들어",
+   "sentence": "저는 시장에 갈 때 보통 버스로 가요. 오늘은 날씨가 좋아서 자전거를 타고 갔어요. 시장에서 과일을 조금 샀어요.",
+   "question": "집 근처에 자주 가는 가게가 있어요? 거기서 뭘 자주 사요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKd5fmARE9wFHRdE6WbQ\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 시장에 갈 때 보통 버스로 가요. 오늘은 날씨가 좋아서 자전거를 타고 갔어요. 시장에서 과일을 조금 샀어요.\\\", \\\"question\\\": \\\"집 근처에 자주 가는 가게가 있어요? 거기서 뭘 자주 사요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3187,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":119,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "1cd449df29fb3fcb4b07ae877e4eca0b9717e7d5ec98621b0f42e8fef56be91c",
+   "input_hash": "0d541597991d48f2490e0329ac29acb002181cdfb3e921e85c5af2e2c02a5bf4"
+  },
+  {
+   "case_id": "P002#2",
+   "axis_scores": {
+    "connect": 0,
+    "answerable": 0,
+    "level_fit": 0,
+    "fresh": 0,
+    "fun": 0,
+    "accuracy": 0,
+    "goal_use": 0,
+    "state_use": 0
+   },
+   "grader_note": "듣기 따라말하기 어휘가 말이 안돼\n날씨가 좋아서 자전거를 탔는데, 돌아올때는 왜 무거운 짐을 들고 걷는거야? 자전거는 어디두고? 말이 연결성이 제로야.\n \n\n그리고 답하기도 어색해.  아예 너무 어색해 너무 애매하게 이상해, 이런식으로 쓰지마",
+   "sentence": "저는 시장에 갈 때 보통 버스로 가요. 오늘은 날씨가 좋아서 자전거를 타고 갔어요. 돌아올 때는 무거운 짐을 들고 걸었어요.",
+   "question": "집에서 자주 가는 곳까지 어떻게 다녀요? 그 길에서 기분이 좋아지는 순간이 있어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKd5zmumGFq93mij5Dqs\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 시장에 갈 때 보통 버스로 가요. 오늘은 날씨가 좋아서 자전거를 타고 갔어요. 돌아올 때는 무거운 짐을 들고 걸었어요.\\\", \\\"question\\\": \\\"집에서 자주 가는 곳까지 어떻게 다녀요? 그 길에서 기분이 좋아지는 순간이 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3187,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":142,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "dcc1a28721a311f6a342b9cd5da1e9d2ff214290e4cc80cb0d284301271e98d7",
+   "input_hash": "0d541597991d48f2490e0329ac29acb002181cdfb3e921e85c5af2e2c02a5bf4"
+  },
+  {
+   "case_id": "P003#1",
+   "axis_scores": {
+    "connect": 0,
+    "answerable": 1,
+    "level_fit": 0,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": 0,
+    "state_use": 0
+   },
+   "grader_note": "듣기 따라말하기 어휘가 말이 안돼\n그냥 아예 말이 안돼, 내가 고칠수도없어.  시장에 다시 가려고 했지만 지갑을 집에 두고 왔어요. / 비가 너무 많이 왔어요. 그래서 우산을 사러 편의점에 들렀어요. \n이렇게 따로 하나씩 해야 이해가 되지, 지금 저거 이어서 다 쓴건 아예 맥락 구조가 말이 안돼.\n \n\n그래도 답하기는 이해가 돼. 답을 할 수 있어.",
+   "sentence": "지갑을 집에 두고 와서 시장에 다시 가려고 했지만, 비가 너무 많이 왔어요. 그래서 우산을 사러 편의점에 들렀어요.",
+   "question": "밖에 나갔다가 뭔가를 두고 온 걸 알았을 때, 보통 어떻게 해요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKd6UYFwgxiNyZv22HqX\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"지갑을 집에 두고 와서 시장에 다시 가려고 했지만, 비가 너무 많이 왔어요. 그래서 우산을 사러 편의점에 들렀어요.\\\", \\\"question\\\": \\\"밖에 나갔다가 뭔가를 두고 온 걸 알았을 때, 보통 어떻게 해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3151,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":124,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "b53796056b50372666eb5ddf1a9af0718c8d56cb3ece3577dd264098dd906094",
+   "input_hash": "d01ae5e344c05ed8e3bd4da48b61867ce4823d1fa652fe0943b716455735731b"
+  },
+  {
+   "case_id": "P003#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "지금까지 본 숙제중 최고,  문법도 좋고 의미도 최상급. \n이런 숙제만 내주면  너무 좋을것같아",
+   "sentence": "저는 요리를 잘 못하지만 오늘은 친구한테 만두를 만들어 주려고 시장에 갔어요. 재료를 사서 오는 길이 좀 무거웠지만 기분은 좋았어요.",
+   "question": "누군가를 위해서 직접 뭔가를 만들어 본 적이 있어요? 그때 그 사람 반응은 어땠어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKd6wEs2J6NgczhGpGis\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 요리를 잘 못하지만 오늘은 친구한테 만두를 만들어 주려고 시장에 갔어요. 재료를 사서 오는 길이 좀 무거웠지만 기분은 좋았어요.\\\", \\\"question\\\": \\\"누군가를 위해서 직접 뭔가를 만들어 본 적이 있어요? 그때 그 사람 반응은 어땠어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3151,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":145,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "0ae4dc370e470185778437f01bedc768477629267bdbcdf0e679420dcbc33766",
+   "input_hash": "d01ae5e344c05ed8e3bd4da48b61867ce4823d1fa652fe0943b716455735731b"
+  },
+  {
+   "case_id": "P004#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "너무 훌륭해. 이런 숙제는 재밌고 퀄리티도 높아. 최고야",
+   "sentence": "지금 시장에서 과일을 고르고 있어요. 사과가 싸면 두 개쯤 사서 친구랑 나눠 먹으려고요.",
+   "question": "장 볼 때 꼭 사게 되는 게 있어요? 언제부터 그걸 좋아했어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKd7H9voxMvi9nNpy7AT\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"지금 시장에서 과일을 고르고 있어요. 사과가 싸면 두 개쯤 사서 친구랑 나눠 먹으려고요.\\\", \\\"question\\\": \\\"장 볼 때 꼭 사게 되는 게 있어요? 언제부터 그걸 좋아했어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3153,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":110,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "92b97ae8bb00cb2836f607dd27892e49cd2542536312923bce7c18da5d0e3aa0",
+   "input_hash": "3bfa946ee97e416a32eea6cb01e8b71596207d3ded428087444bad0abda6b9b8"
+  },
+  {
+   "case_id": "P004#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "전체적으로 좋아.  굿",
+   "sentence": "지금 시장에서 과일을 고르고 있어요. 딸기가 싸면 두 봉지 살 거예요.",
+   "question": "장을 볼 때 제일 먼저 담는 게 뭐예요? 그걸 왜 좋아해요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKd7b1iYetrbc6tm6ev7\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"지금 시장에서 과일을 고르고 있어요. 딸기가 싸면 두 봉지 살 거예요.\\\", \\\"question\\\": \\\"장을 볼 때 제일 먼저 담는 게 뭐예요? 그걸 왜 좋아해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3153,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":97,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "ca20554e7f5adc55f3166f5422b5f01e375c427d26998392c99672611e063e2b",
+   "input_hash": "3bfa946ee97e416a32eea6cb01e8b71596207d3ded428087444bad0abda6b9b8"
+  },
+  {
+   "case_id": "P005#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "굿. 이 숙제도 마음에 들어.",
+   "sentence": "어제 시장에서 귤을 샀는데 두 개밖에 안 남았어요. 하나는 동생에게 주고, 하나는 할머니께 드렸어요.",
+   "question": "먹을 게 조금 남았을 때 누구 생각이 제일 먼저 나요? 그 사람은 어떤 사람이에요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKd7t8N5TayHzqiyztpJ\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 귤을 샀는데 두 개밖에 안 남았어요. 하나는 동생에게 주고, 하나는 할머니께 드렸어요.\\\", \\\"question\\\": \\\"먹을 게 조금 남았을 때 누구 생각이 제일 먼저 나요? 그 사람은 어떤 사람이에요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3120,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":124,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "acf38b19142822a485cc06283c24fed9bb9188457082d8e5e9a4a6ad04a180f8",
+   "input_hash": "10aebc541c60bc21e095347e50ccaa310fbef994fb934fcf4f724ffc5538a8c3"
+  },
+  {
+   "case_id": "P005#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "좋아 이 숙제도 매우 훌륭해 잘 만들었어",
+   "sentence": "저는 고민이 생기면 언니한테만 이야기해요. 부모님께는 걱정하실까 봐 말씀을 안 드려요. 친구들도 잘 모를 거예요.",
+   "question": "마음이 복잡할 때 제일 먼저 떠오르는 사람이 누구예요? 그 사람은 보통 뭐라고 해 줘요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKd8HtMsJmP5soLNFF5a\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 고민이 생기면 언니한테만 이야기해요. 부모님께는 걱정하실까 봐 말씀을 안 드려요. 친구들도 잘 모를 거예요.\\\", \\\"question\\\": \\\"마음이 복잡할 때 제일 먼저 떠오르는 사람이 누구예요? 그 사람은 보통 뭐라고 해 줘요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3120,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":137,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "f442ff09f47f129fcb31b8d1745e74689f97d172da2df21ccb1e7b9139b2d021",
+   "input_hash": "10aebc541c60bc21e095347e50ccaa310fbef994fb934fcf4f724ffc5538a8c3"
+  },
+  {
+   "case_id": "P021#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "굿 훌륭해. 전부 다 이해가 가.",
+   "sentence": "저는 아침에 커피하고 빵을 먹어요. 그런데 오늘은 시간이 없어서 아침을 못 먹었어요. 배가 고파서 공부가 잘 안 돼요.",
+   "question": "아침에 꼭 챙겨 먹는 편이에요? 요즘 아침에 제일 먼저 하는 일은 뭐예요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKd8jeemfbbdxACtFkVc\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 아침에 커피하고 빵을 먹어요. 그런데 오늘은 시간이 없어서 아침을 못 먹었어요. 배가 고파서 공부가 잘 안 돼요.\\\", \\\"question\\\": \\\"아침에 꼭 챙겨 먹는 편이에요? 요즘 아침에 제일 먼저 하는 일은 뭐예요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3231,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":137,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "eac3c3a42b6a607de2f5b564a5f946a45037b97d1b927d2193285de4017752c5",
+   "input_hash": "1e0f963330a3d49169ffadfc83336cbd762b02501a0a5e8f4d95087e4b57acba"
+  },
+  {
+   "case_id": "P021#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "듣기 따라말하기 문장이 좀 어색해.\n친구가 나에게 말하는 상황인데 왜 존댓말을 쓰지?\n친구들이 식당에서 김치찌개는 시키지 마세요 하고 놀려요 가 아니라 친구들이 식당에서 김치찌개는 시키지 말라고 놀려요 라고 해야지. \n답변은 자연스러워",
+   "sentence": "저는 매운 음식하고 신 음식을 잘 못 먹어요. 그래서 친구들이 식당에서 김치찌개는 시키지 마세요 하고 놀려요. 그래도 저는 창피하지 않아요.",
+   "question": "어릴 때부터 지금까지 계속 못 먹는 음식이 있어요? 언제부터 그렇게 됐어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKd96fx8Egmfkt15DDfB\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 매운 음식하고 신 음식을 잘 못 먹어요. 그래서 친구들이 식당에서 김치찌개는 시키지 마세요 하고 놀려요. 그래도 저는 창피하지 않아요.\\\", \\\"question\\\": \\\"어릴 때부터 지금까지 계속 못 먹는 음식이 있어요? 언제부터 그렇게 됐어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3231,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":143,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "4d786f83593b1590e08dba565f0cecb23432958de3e97a97cdd812af82c104f7",
+   "input_hash": "1e0f963330a3d49169ffadfc83336cbd762b02501a0a5e8f4d95087e4b57acba"
+  },
+  {
+   "case_id": "P022#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "굿 굿 훌륭해. 학생을 파악하기도 좋고 자기성찰도 되네. 좋은 과제야.",
+   "sentence": "저는 월요일부터 금요일까지 도서관에서 공부해요. 주말에는 집에서 쉬거나 시장에 가요. 시장에 갈 때마다 과일을 꼭 사요.",
+   "question": "요즘 자주 가는 곳이 어디예요? 거기에 가면 기분이 어때요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKd9UUsQu8cjo8PgKJxU\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 월요일부터 금요일까지 도서관에서 공부해요. 주말에는 집에서 쉬거나 시장에 가요. 시장에 갈 때마다 과일을 꼭 사요.\\\", \\\"question\\\": \\\"요즘 자주 가는 곳이 어디예요? 거기에 가면 기분이 어때요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3251,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":122,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "a1ac379a78ec33a0855e056d7ddafabbbf605f8606d927c59d4d14de79264c5d",
+   "input_hash": "7a393b36138869864474d31b70f284717a6f4d7194c4dee79ca12a74cd158b98"
+  },
+  {
+   "case_id": "P022#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "나쁘진 않은데 약간 어휘가 한국인스럽지않아. 너무 뚝뚝 끊기지만 말이 안되는수준은 아니야. 이해는 되는데 노력이 필요한느낌?",
+   "sentence": "저는 월요일부터 금요일까지 집에서 도시락을 싸요. 아침마다 부엌에 서서 김밥을 만들어요. 점심시간에 교실에서 친구들과 같이 먹어요.",
+   "question": "요즘 아침에 꼭 하는 일이 하나 있어요? 그거 언제부터 하게 됐어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKd9mwqtdezbq4yAhDUN\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 월요일부터 금요일까지 집에서 도시락을 싸요. 아침마다 부엌에 서서 김밥을 만들어요. 점심시간에 교실에서 친구들과 같이 먹어요.\\\", \\\"question\\\": \\\"요즘 아침에 꼭 하는 일이 하나 있어요? 그거 언제부터 하게 됐어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3251,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":134,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "fca6923b09ce0033d676baf7673d6c182d325f745e33569d62203e30b39d2913",
+   "input_hash": "7a393b36138869864474d31b70f284717a6f4d7194c4dee79ca12a74cd158b98"
+  },
+  {
+   "case_id": "P023#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "훌륭해. 전체적으로 이해도 잘 되고 의도도 좋아. 재미있어.",
+   "sentence": "지난주에 시장에서 산 신발이 좀 컸어요. 그래서 내일 다시 가서 바꿀 거예요.",
+   "question": "물건을 사고 나서 마음에 안 든 적 있어요? 그때 어떻게 했어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdA6TaWvZFX8QNjoPBZ\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"지난주에 시장에서 산 신발이 좀 컸어요. 그래서 내일 다시 가서 바꿀 거예요.\\\", \\\"question\\\": \\\"물건을 사고 나서 마음에 안 든 적 있어요? 그때 어떻게 했어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3279,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":99,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "a30fd56b9ef0ade38ada796a1816418083dfe00e193be474bc5b0f4eb22b9d98",
+   "input_hash": "c893e72d9f42f3fd51bce935a00999ad7c38b6de84e84b174aa7a9fabff7742b"
+  },
+  {
+   "case_id": "P023#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "좋아좋아. 이 질문도 훌륭해. 전체적으로 재밌는 숙제야 좋았어.",
+   "sentence": "어제 시장에서 사과를 너무 많이 샀어요. 혼자 다 먹기 힘들어서 옆집에 조금 나눠 줄 거예요.",
+   "question": "누구한테 뭔가를 나눠 준 적이 있어요? 그때 그 사람 표정이 어땠어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdAUPSHJ4fCh4GdcFVF\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 사과를 너무 많이 샀어요. 혼자 다 먹기 힘들어서 옆집에 조금 나눠 줄 거예요.\\\", \\\"question\\\": \\\"누구한테 뭔가를 나눠 준 적이 있어요? 그때 그 사람 표정이 어땠어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3279,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":117,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "139cc1031ca1691a4eb93a75de0a003d1a49c2952df02dc5da4debf8c44de10f",
+   "input_hash": "c893e72d9f42f3fd51bce935a00999ad7c38b6de84e84b174aa7a9fabff7742b"
+  },
+  {
+   "case_id": "P024#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "말하기가 약간 어색하네. 집에와서 씻고 냉장고에 넣었다는걸 집에와서 냉장고에 넣었다고하는게 더 자연스러울것같은데? 왜냐면 앞에 서사가 있잖아. 사과를 많이샀다는 얘기를 해줘서 굳이 뒤에 저렇게 안해도 이해가 충분히 가.\n그리고 답변은 약간 부자연스럽다. 왜 그게 자꾸 손에 잡혀요가 아니라 왜 그걸 사게 되나요? 라고 해야지. \n손에 잡혀요는 너무 한정적인 답변을 유도하게되는데? 막상 내가 답변하려고해도 할 말이 없어. 손에 잡히다. 이게 좀 이 맥락에서는 어울리지 않아.",
+   "sentence": "어제 시장에 갔는데 사과가 싸서 많이 샀어요. 집에 와서 씻고 나서 냉장고에 넣어 뒀어요. 아침마다 하나씩 먹으려고요.",
+   "question": "장을 볼 때 꼭 사게 되는 게 있어요? 왜 그게 자꾸 손에 잡혀요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdAsVVeo42uwPg3acdc\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에 갔는데 사과가 싸서 많이 샀어요. 집에 와서 씻고 나서 냉장고에 넣어 뒀어요. 아침마다 하나씩 먹으려고요.\\\", \\\"question\\\": \\\"장을 볼 때 꼭 사게 되는 게 있어요? 왜 그게 자꾸 손에 잡혀요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3320,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":136,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "1531a2aed022041c25dfb09e7f6b7d587b95d1fef3a5f0c5f2e22485e05bf548",
+   "input_hash": "d0490e0b10c756b6ec05fe1d54194622488df0b43dbf5d0526de62cfed987b27"
+  },
+  {
+   "case_id": "P024#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "좋아 나쁘지않은데 베스트는 아니야. 그래도 낫베드",
+   "sentence": "어제 시장에서 과일을 사고 나서 버스를 놓쳤어요. 다음 버스가 안 와서 그냥 걸어왔어요. 집에 도착하니까 발이 너무 아팠어요.",
+   "question": "걷는 걸 좋아하는 편이에요? 걸으면서 무슨 생각을 자주 해요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdBEgThFRjCdJzYyDkY\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 과일을 사고 나서 버스를 놓쳤어요. 다음 버스가 안 와서 그냥 걸어왔어요. 집에 도착하니까 발이 너무 아팠어요.\\\", \\\"question\\\": \\\"걷는 걸 좋아하는 편이에요? 걸으면서 무슨 생각을 자주 해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3320,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":131,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "5815993a7bff61e5981ae38a59b7b2221813c16ee305d9205063358561f6a94c",
+   "input_hash": "d0490e0b10c756b6ec05fe1d54194622488df0b43dbf5d0526de62cfed987b27"
+  },
+  {
+   "case_id": "P025#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "너무좋아. 자아성찰도되고 깔끔하고 이해도 쉬워 . 잘했어.",
+   "sentence": "제 방은 좀 지저분해요. 오늘은 시간이 있어서 청소를 할 거예요. 창문도 활짝 열 거예요.",
+   "question": "집에서 정리가 제일 안 되는 곳은 어디예요? 언제 치우고 싶어져요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdBaVpr8N3zeHUVN8Eo\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"제 방은 좀 지저분해요. 오늘은 시간이 있어서 청소를 할 거예요. 창문도 활짝 열 거예요.\\\", \\\"question\\\": \\\"집에서 정리가 제일 안 되는 곳은 어디예요? 언제 치우고 싶어져요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3207,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":107,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "a3bfb01646cc985dee686b92bc5f8c7deaae58480de88717e51b0057cafe9395",
+   "input_hash": "a1fe46ccd4987ed8316fcba648fc511698a26f6c16beefd9a47654d78e6c734d"
+  },
+  {
+   "case_id": "P025#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "굿 이것도 좋아. 자아성찰도되고 덩달아 내 방 점검도하는 시간이 될것같아. 훌륭해",
+   "sentence": "제 방은 지금 좀 지저분해요. 그래서 오늘 저녁에 청소를 할 거예요. 책상 위부터 치울 거예요.",
+   "question": "방에서 제일 먼저 치우고 싶은 곳은 어디예요? 왜 거기가 제일 신경 쓰여요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdBupfcmGDZvtV82ihW\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"제 방은 지금 좀 지저분해요. 그래서 오늘 저녁에 청소를 할 거예요. 책상 위부터 치울 거예요.\\\", \\\"question\\\": \\\"방에서 제일 먼저 치우고 싶은 곳은 어디예요? 왜 거기가 제일 신경 쓰여요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3207,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":119,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "f82af7514661c974a1c7ff1317bb59d95017d650a0a8349ba2bd9b840a2ec419",
+   "input_hash": "a1fe46ccd4987ed8316fcba648fc511698a26f6c16beefd9a47654d78e6c734d"
+  },
+  {
+   "case_id": "P041#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "듣기 따라말하기 문장은 약간 부자연스러운데 이해는가.\n마음은 바쁘다는게 조금 부자연스럽네.  정당성을 부여해주면 자연스러울것같아. 예를들어 버스 안은 조용하지만 지각할까봐 제 마음은 불안해요. \n이렇게 하는게 자여스럽지않을까? 정당성이 있잖아. \n\n답하기는 괜찮아. 자아성찰을 할수있는 좋은 답변이야.",
+   "sentence": "저는 월요일부터 금요일까지 아침마다 버스를 타요. 버스 안은 조용하지만 제 마음은 바빠요.",
+   "question": "아침에 집을 나서기 전에 꼭 하는 일이 있어요? 그거 안 하면 기분이 어때요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdCVsHzDGLQ1AHRafRV\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 월요일부터 금요일까지 아침마다 버스를 타요. 버스 안은 조용하지만 제 마음은 바빠요.\\\", \\\"question\\\": \\\"아침에 집을 나서기 전에 꼭 하는 일이 있어요? 그거 안 하면 기분이 어때요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3139,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":111,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "2dfcf89caba44bb7fdccf91510bc0bc31cde87106d223a4b2abaaec611a32b94",
+   "input_hash": "0b83eafb1fbef25d30c647ad862c038172ba3e468e62d2095d4e1c643a497583"
+  },
+  {
+   "case_id": "P041#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "듣기 따라말하기 문장은 약간 부자연스러운데 이해는가.\n그래도 저는 서서 가는 게 편해요가 아니라 그런데 저는 서서 가는 게 편해요가 훨씬 자연스러워. 전체적인 맥락을 봤을떄.\n\n답하기는 좋아. 자아성찰을 할수있는 좋은 답변이야.",
+   "sentence": "저는 월요일부터 금요일까지 아침마다 버스를 타요. 창가 자리는 인기가 많아서 늘 사람이 앉아 있어요. 그래도 저는 서서 가는 게 편해요.",
+   "question": "버스나 지하철에서 보통 뭘 하면서 시간을 보내요? 그때 무슨 생각이 많이 들어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdCokpkdQde8EaFe8jt\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 월요일부터 금요일까지 아침마다 버스를 타요. 창가 자리는 인기가 많아서 늘 사람이 앉아 있어요. 그래도 저는 서서 가는 게 편해요.\\\", \\\"question\\\": \\\"버스나 지하철에서 보통 뭘 하면서 시간을 보내요? 그때 무슨 생각이 많이 들어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3139,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":141,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "71a83f7aa7d6b4efd2a5172e29f6559201c4bf5c20220fc4bea0e605907fcba4",
+   "input_hash": "0b83eafb1fbef25d30c647ad862c038172ba3e468e62d2095d4e1c643a497583"
+  },
+  {
+   "case_id": "P042#1",
+   "axis_scores": {
+    "connect": 0,
+    "answerable": 1,
+    "level_fit": 0,
+    "fresh": 0,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": 0,
+    "state_use": 0
+   },
+   "grader_note": "답변은 괜찮은데 말하기 문장이 아예 말이 안돼 아예 말이 전혀 안돼는 느낌이야. 교정 할 수준도 안돼 아예 문맥이 이상해.",
+   "sentence": "지갑을 집에 두고 와서 시장까지 걸어갔어요. 다리는 아팠지만 과일을 사려고 끝까지 갔어요.",
+   "question": "뭔가를 깜빡 잊고 나와서 당황한 적이 있어요? 그때 어떻게 했어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdDBH897q4rSm19fNgW\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"지갑을 집에 두고 와서 시장까지 걸어갔어요. 다리는 아팠지만 과일을 사려고 끝까지 갔어요.\\\", \\\"question\\\": \\\"뭔가를 깜빡 잊고 나와서 당황한 적이 있어요? 그때 어떻게 했어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3200,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":114,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "6b784494aa39c4aa585b6959dbf0eca4bb3e0e79fdb9e55fb7531ce7eee47a91",
+   "input_hash": "c56b69ddba86ec67b9e2f7476ca042792439072d3bd89e0ecba58433b8b2d2d8"
+  },
+  {
+   "case_id": "P042#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "좋아 좋아 훌륭한 과제야. 그런데 답하기 부분에서  그 음식을 어디에서 처음 먹어 봤어요? 가 아니라 그 음식을 어디서 처음 알게되었어요? 라고하는게 답변하기 훨씬 수월하지. 안먹어봤을수도있잖아.",
+   "sentence": "저는 요리를 잘 못하지만 오늘은 김치찌개를 만들어 보려고 해요. 재료를 사러 시장에 다녀왔어요.",
+   "question": "직접 만들어 보고 싶은 음식이 있어요? 그 음식을 어디에서 처음 먹어 봤어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdDYHvkY1Wx2cUBXi8Q\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 요리를 잘 못하지만 오늘은 김치찌개를 만들어 보려고 해요. 재료를 사러 시장에 다녀왔어요.\\\", \\\"question\\\": \\\"직접 만들어 보고 싶은 음식이 있어요? 그 음식을 어디에서 처음 먹어 봤어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3200,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":119,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "5f2601cb453bd92e4205499ffc1b3070045f2e608618b270393194a776636b3b",
+   "input_hash": "c56b69ddba86ec67b9e2f7476ca042792439072d3bd89e0ecba58433b8b2d2d8"
+  },
+  {
+   "case_id": "P043#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 0,
+    "fun": 0,
+    "accuracy": 0,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "말이 안돼 따라말하기 문맥 자체가 이상해. 사람이 많은거랑 사과 사는거랑 연관이 없지않아? 차라리 사과를 사러 시장에 가고있어요. 시장에 도착했는데 사람이 엄청 많아요. 이렇게 해야 훨씬 자연스럽지",
+   "sentence": "지금 시장에 가고 있는데 사람이 정말 많아요. 사과가 싸면 좀 넉넉히 사려고요.",
+   "question": "장을 볼 때 꼭 확인하는 게 있어요? 그렇게 하게 된 이유가 있어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdDrypjkdFq9NdAovPB\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"지금 시장에 가고 있는데 사람이 정말 많아요. 사과가 싸면 좀 넉넉히 사려고요.\\\", \\\"question\\\": \\\"장을 볼 때 꼭 확인하는 게 있어요? 그렇게 하게 된 이유가 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3129,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":105,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "f5547c7f657d271f1fa660656fe229cb90b28cfcbb149ae6d4daaa2f1e2939f0",
+   "input_hash": "7d642bc4ed47969311fedd632cf7a4cac8d8dbd4ce8587dc6511dc457239a884"
+  },
+  {
+   "case_id": "P043#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "너무 좋은 과제이고 현실적으로 잘 구성했어. 최고",
+   "sentence": "지금 지하철을 기다리고 있는데 사람이 정말 많아요. 다음 열차도 이렇게 붐비면 그냥 버스를 타려고 해요.",
+   "question": "길에서 시간을 오래 보낼 때 보통 뭘 하면서 버텨요? 그 시간이 좋을 때도 있어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdEFjYmAgWhohShmdQv\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"지금 지하철을 기다리고 있는데 사람이 정말 많아요. 다음 열차도 이렇게 붐비면 그냥 버스를 타려고 해요.\\\", \\\"question\\\": \\\"길에서 시간을 오래 보낼 때 보통 뭘 하면서 버텨요? 그 시간이 좋을 때도 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3129,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":127,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "f4b1f7aec5a99d703013c69988c40ddff85f32b7d6d997016a10a4315c6365e9",
+   "input_hash": "7d642bc4ed47969311fedd632cf7a4cac8d8dbd4ce8587dc6511dc457239a884"
+  },
+  {
+   "case_id": "P044#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "오늘은 사과를 조금 사서 가방에 넣었어요. 이것보다 오늘은 사과를 조금 샀어요. 학교에서 친구랑 먹으려고요. 이게 더 서사가 있고 재밌어. 지금은 가방에 넣은 이유가 없어서 약간 황당한 느낌이랄까. 말이 안되진않는데 자연스럽지않아.",
+   "sentence": "저는 시장에서 과일을 사는 걸 좋아해요. 오늘은 사과를 조금 사서 가방에 넣었어요.",
+   "question": "장을 볼 때 꼭 사게 되는 게 있어요? 왜 그게 자꾸 손에 잡혀요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdEcm5oiCxSVRux41Lv\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 시장에서 과일을 사는 걸 좋아해요. 오늘은 사과를 조금 사서 가방에 넣었어요.\\\", \\\"question\\\": \\\"장을 볼 때 꼭 사게 되는 게 있어요? 왜 그게 자꾸 손에 잡혀요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3167,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":110,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "88ab56ab2d5bd000555d834a6834bd744418f7eadb624312291e8960bc50fc69",
+   "input_hash": "96b840e8a6727a850356bd5006d7e919930aba253999c7220a49d0224d8b38f7"
+  },
+  {
+   "case_id": "P044#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "굿굿 자연스럽고 훌륭해.",
+   "sentence": "어제 시장에서 사과를 조금 샀어요. 오늘 아침에 그 사과를 가방에 넣어서 학교에 가져왔어요.",
+   "question": "요즘 자주 사 먹는 간식이 있어요? 그걸 언제 제일 먹고 싶어져요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdEvKmcQFmvmVX41i21\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 사과를 조금 샀어요. 오늘 아침에 그 사과를 가방에 넣어서 학교에 가져왔어요.\\\", \\\"question\\\": \\\"요즘 자주 사 먹는 간식이 있어요? 그걸 언제 제일 먹고 싶어져요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3167,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":112,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "8d4f455f17b47c117c8d60a8363f6d6525c3f77f853ca19e7729abe860149926",
+   "input_hash": "96b840e8a6727a850356bd5006d7e919930aba253999c7220a49d0224d8b38f7"
+  },
+  {
+   "case_id": "P045#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "너무너무 훌륭한 숙제야. 좋아. 이렇게 간접적으로 긍정적인 효과를 줄 수 있는 과제가 많았으면 하네.",
+   "sentence": "어제 시장에서 사과하고 감자를 샀어요. 반은 옆집 할머니께 드리고, 나머지는 친구한테 나눠 줬어요.",
+   "question": "뭔가를 나눠 주고 기분이 좋았던 적이 있어요? 그때 상대방은 어떤 반응이었어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdFEQhevjpnJop6EZ75\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 사과하고 감자를 샀어요. 반은 옆집 할머니께 드리고, 나머지는 친구한테 나눠 줬어요.\\\", \\\"question\\\": \\\"뭔가를 나눠 주고 기분이 좋았던 적이 있어요? 그때 상대방은 어떤 반응이었어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3135,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":123,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "9d9799968c657167cd2a72e5786471e790c7c00ca209654fe5cbcf7430c46296",
+   "input_hash": "959bce3f2139916383e94db2dc749ee5c33b610b9070bf865bd7e1e7bf73ea26"
+  },
+  {
+   "case_id": "P045#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "이것도 훌륭해 ! 학생에게 긍정적인 영향을 주는 과제야. 굿굿",
+   "sentence": "어제 시장에서 사과하고 배를 샀어요. 사과는 동생에게 주고, 배는 할머니께 보내 드렸어요.",
+   "question": "요즘 뭔가를 사면 제일 먼저 누구 얼굴이 떠올라요? 왜 그 사람이 생각날까요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdFasWbd1PYJf3oCQVU\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 사과하고 배를 샀어요. 사과는 동생에게 주고, 배는 할머니께 보내 드렸어요.\\\", \\\"question\\\": \\\"요즘 뭔가를 사면 제일 먼저 누구 얼굴이 떠올라요? 왜 그 사람이 생각날까요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3135,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":118,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "5ca658802038055848b40b8e19e274e5db9128f617b15f0389bcf63c1eeca3c6",
+   "input_hash": "959bce3f2139916383e94db2dc749ee5c33b610b9070bf865bd7e1e7bf73ea26"
+  },
+  {
+   "case_id": "P061#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "이것도 너무 좋아. 자연스럽고 이해도 쉽고 자가성찰도 돼. 나이스 !",
+   "sentence": "지갑에 천 원밖에 없어서 시장에서 사과 두 개만 샀어요. 집까지는 버스로 가려다가 그냥 걸어왔어요.",
+   "question": "돈이 부족해서 사고 싶은 걸 못 산 적 있어요? 그때 기분이 어땠어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdFyqdeC2mqKUz93GZo\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"지갑에 천 원밖에 없어서 시장에서 사과 두 개만 샀어요. 집까지는 버스로 가려다가 그냥 걸어왔어요.\\\", \\\"question\\\": \\\"돈이 부족해서 사고 싶은 걸 못 산 적 있어요? 그때 기분이 어땠어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3186,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":119,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "1b5db58bfcf8d36108beed2b215ad07492e0663223ea213ef303ad9d83654a66",
+   "input_hash": "15fc1ad17e7c1774696a9d1e358edb59bb24f51f8cf7a9b4eafa39d67b9dc50a"
+  },
+  {
+   "case_id": "P061#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "나쁘진않은데  듣기 따라말하기 문장은 이해가 잘 돼거든?\n근데 말하기부분에서 이해가 안가네 갑자기 돈이 필요한데 좀 부족한 상황일때. 보통 어떻게 하는 편이에요?  이렇게 하는게 훨씬 자연스럽고 학생 성향 파악하기도 쉽지않을까 ?",
+   "sentence": "지갑에 천 원밖에 없어서 시장에서 귤만 조금 샀어요. 집까지는 버스로 갔어요.",
+   "question": "돈이 조금밖에 없을 때 뭘 제일 먼저 사요? 그때 기분이 어때요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdGK5GYH9G6hx6HveDP\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"지갑에 천 원밖에 없어서 시장에서 귤만 조금 샀어요. 집까지는 버스로 갔어요.\\\", \\\"question\\\": \\\"돈이 조금밖에 없을 때 뭘 제일 먼저 사요? 그때 기분이 어때요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3186,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":104,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "63eec9f838e7104cca8196ef96312690b1bbe9053b04e523bdd12e7c6cec665e",
+   "input_hash": "15fc1ad17e7c1774696a9d1e358edb59bb24f51f8cf7a9b4eafa39d67b9dc50a"
+  },
+  {
+   "case_id": "P062#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "듣기 따라말하기 문장이 어색해.\n내가 교정해줄게.\n\n할머니와 함께 시장에서 장을 봤어요. 저는 짐이 무거우니까 혼자 들지 마시라고 말씀드렸더니 할머니는 괜찮다고 안 힘들다고 하셨어요.\n이렇게 하는게 훨씬 자연스러워",
+   "sentence": "할머니께서 시장에 같이 가시자고 하셨어요. 저는 짐이 무거우니까 혼자 들지 마시라고 말씀드렸어요. 그런데 할머니는 안 힘들다고 하셨어요.",
+   "question": "요즘 누구랑 같이 장을 보러 가요? 그 사람이랑 있으면 어떤 기분이 들어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdGdscYLMkP3FjYaCCM\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"할머니께서 시장에 같이 가시자고 하셨어요. 저는 짐이 무거우니까 혼자 들지 마시라고 말씀드렸어요. 그런데 할머니는 안 힘들다고 하셨어요.\\\", \\\"question\\\": \\\"요즘 누구랑 같이 장을 보러 가요? 그 사람이랑 있으면 어떤 기분이 들어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3272,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":144,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "ee87f84cb148e28c320030cbf35a7704d6bdbe0c77a7916c9e9c77834acfc0cd",
+   "input_hash": "29d5c980be524aef0e06cf6da596406cdca8005d295fefaa87bb6322551d16fd"
+  },
+  {
+   "case_id": "P062#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "듣기 따라말하기 문장이 어색해.\n내가 교정해줄게.\n\n할머니와 함께 시장에서 장을 봤어요. 저는 짐이 무거워서 못 들어드렸어요. 그런데 할머니는 괜찮다고 미안해하지말라고 하셨어요.\n이렇게 하는게 훨씬 자연스러워\n\n답변은 자연스럽고 좋아.",
+   "sentence": "할머니께서 시장에 같이 가시자고 하셨어요. 그런데 저는 짐이 무거워서 못 들어 드렸어요. 할머니는 괜찮다고, 미안해하지 말라고 하셨어요.",
+   "question": "어른한테 도움을 받고 마음이 좀 미안했던 적 있어요? 그때 뭐라고 말했어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdH54SLY7spsezyFbau\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"할머니께서 시장에 같이 가시자고 하셨어요. 그런데 저는 짐이 무거워서 못 들어 드렸어요. 할머니는 괜찮다고, 미안해하지 말라고 하셨어요.\\\", \\\"question\\\": \\\"어른한테 도움을 받고 마음이 좀 미안했던 적 있어요? 그때 뭐라고 말했어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3272,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":142,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "16a8c1e46ec8b1c6e570a97ffdceb53e138f25f90762bc5b7adebf886f592a72",
+   "input_hash": "29d5c980be524aef0e06cf6da596406cdca8005d295fefaa87bb6322551d16fd"
+  },
+  {
+   "case_id": "P063#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "듣기 따라말하기 문장이 어색해.  그러니까를 그래서로 바꿔야 훨씬 자연스럽지. 그러니까는 어휘가 이상해. 말이 안이어져\n어제 시장에 갔는데 사과가 싸서 한 봉지 샀어요. 집에 와서 씻어 놓고 나서 냉장고에 넣었어요. 그래서 오늘 아침에 바로 꺼내 먹을 수 있었어요.\n\n답변은 낫베드인데 좋지도않은느낌",
+   "sentence": "어제 시장에 갔는데 사과가 싸서 한 봉지 샀어요. 집에 와서 씻어 놓고 나서 냉장고에 넣었어요. 그러니까 오늘 아침에 바로 꺼내 먹을 수 있었어요.",
+   "question": "장을 볼 때 꼭 사게 되는 게 있어요? 왜 그게 자꾸 손에 잡혀요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdHVwQMzu49tu1o7tfR\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에 갔는데 사과가 싸서 한 봉지 샀어요. 집에 와서 씻어 놓고 나서 냉장고에 넣었어요. 그러니까 오늘 아침에 바로 꺼내 먹을 수 있었어요.\\\", \\\"question\\\": \\\"장을 볼 때 꼭 사게 되는 게 있어요? 왜 그게 자꾸 손에 잡혀요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3304,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":154,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "85680601f195737f8264f416daaac624bb4ad07f850ac398cca67f507c822891",
+   "input_hash": "8ae21ed88ab9e7542f5e5c6a6c1572edcb17dc96bb4c57a5e4093a9c73268c17"
+  },
+  {
+   "case_id": "P063#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "훌륭해. 전부 다 이해되고 자연스러워 특히 답변 부분이 전에 쓰던 손에 잡혀요 ? 이것보다 지금 버전이 더 좋은것같기도해. 타당성,정당성이 있잖아.",
+   "sentence": "어제 시장에 갔는데 사람이 너무 많아서 금방 지쳤어요. 그래서 과일만 사고 나서 바로 집에 왔어요. 다음에는 문 열기 전에 일찍 가 볼까 해요.",
+   "question": "장을 볼 때 꼭 빠뜨리지 않고 사는 게 있어요? 그건 왜 그렇게 자주 사게 돼요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdJ1JzBYJToA1qTx1FH\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에 갔는데 사람이 너무 많아서 금방 지쳤어요. 그래서 과일만 사고 나서 바로 집에 왔어요. 다음에는 문 열기 전에 일찍 가 볼까 해요.\\\", \\\"question\\\": \\\"장을 볼 때 꼭 빠뜨리지 않고 사는 게 있어요? 그건 왜 그렇게 자주 사게 돼요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3304,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":155,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "620608be1288ed02cb825fe86c1e3382b7954aaf2adad31436609197f86c87fd",
+   "input_hash": "8ae21ed88ab9e7542f5e5c6a6c1572edcb17dc96bb4c57a5e4093a9c73268c17"
+  },
+  {
+   "case_id": "P064#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "듣기 따라말하기 문장에서 부자연스러운 부분이 있어.\n생각보다 너무 달아서 금방 다 먹었어요는 부자연스럽지. 내가 교정해줄게\n생각보다 너무 맛있어서 금방 다 먹었어요. 되게 달아서 맛있었어요. 저는 단걸 좋아하거든요. 다음에는 두봉지 살거에요. 이렇게 해야지\n답변은 너무 훌륭해 최고야. 자가성찰되고 학생의 생각도 알게되는거니까.",
+   "sentence": "어제 시장에서 사과를 한 봉지 샀어요. 생각보다 너무 달아서 금방 다 먹었어요. 다음에는 두 봉지 살 거예요.",
+   "question": "장을 볼 때 꼭 한 번씩 사게 되는 게 있어요? 언제부터 그렇게 됐어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdJP2ha6KB55YAmAmFi\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 사과를 한 봉지 샀어요. 생각보다 너무 달아서 금방 다 먹었어요. 다음에는 두 봉지 살 거예요.\\\", \\\"question\\\": \\\"장을 볼 때 꼭 한 번씩 사게 되는 게 있어요? 언제부터 그렇게 됐어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3328,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":126,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "48d71ffbc8add922f141d637ab9418d748624b24fea8d2b4cee1c35197162138",
+   "input_hash": "5b33d4c142bfc4cb5d6863ed8fa3d2483f8b2eaa6d93f4048c116249858af9c8"
+  },
+  {
+   "case_id": "P064#2",
+   "axis_scores": {
+    "connect": 0,
+    "answerable": 0,
+    "level_fit": 0,
+    "fresh": 0,
+    "fun": 0,
+    "accuracy": 0,
+    "goal_use": null,
+    "state_use": 0
+   },
+   "grader_note": "이건 그냥 말이 안돼. 전체적으로 이상해 답변이든 말하기든 전부 별로야. 교정 가치가없어 기각.",
+   "sentence": "어제 시장에서 사과를 한 봉지 샀는데 생각보다 너무 달았어요. 그래서 내일 또 사러 갈 거예요.",
+   "question": "장을 볼 때 꼭 챙기게 되는 게 있어요? 왜 그게 손이 가요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdJk7DVhBDbxHUMPMWt\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 사과를 한 봉지 샀는데 생각보다 너무 달았어요. 그래서 내일 또 사러 갈 거예요.\\\", \\\"question\\\": \\\"장을 볼 때 꼭 챙기게 되는 게 있어요? 왜 그게 손이 가요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3328,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":110,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "69a69fe2c086b75e91d1ca07d8a75dbc00460c8b17bfc0c75df7264ce0c15ba7",
+   "input_hash": "5b33d4c142bfc4cb5d6863ed8fa3d2483f8b2eaa6d93f4048c116249858af9c8"
+  },
+  {
+   "case_id": "P065#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "전체적으로 괜찮거든? 근데 답변부분에 좀 아쉬운게 있어.\n밖에 나갈때 조건 자체를 뺴야 혼자있는 시간에대한 부각이 더 잘 되잖아.\n혼자 있는 시간에는 보통 뭘 하면서 보내요? 그 시간이 마음에 들어요? >> 답변이 이렇게 되었으면 100점이었을것같아.",
+   "sentence": "저는 버스를 타면 항상 창가 자리에 앉아요. 자리가 없으면 서서 가지만 그것도 나쁘지 않아요. 밖을 보면 시간이 빨리 가거든요.",
+   "question": "밖에 나갈 때 혼자 있는 시간에는 보통 뭘 하면서 보내요? 그 시간이 마음에 들어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdK55yoc1zK2YoBCY3K\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 버스를 타면 항상 창가 자리에 앉아요. 자리가 없으면 서서 가지만 그것도 나쁘지 않아요. 밖을 보면 시간이 빨리 가거든요.\\\", \\\"question\\\": \\\"밖에 나갈 때 혼자 있는 시간에는 보통 뭘 하면서 보내요? 그 시간이 마음에 들어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3200,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":143,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "796553bc92b0e157247de3f78b8fc103d58b6a5a7fdfd2aa9fc3f2f7c63d50c1",
+   "input_hash": "20ecf3d97af48883fd128ff57791c318cc6c28087aff030b01b3febbb49834cb"
+  },
+  {
+   "case_id": "P065#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "매우 매우 훌륭한 숙제야. 자가성찰도되고 문맥도 자연스러워",
+   "sentence": "버스가 늦게 오면 저는 그냥 걸어가요. 조금 힘들지만 걷는 동안 생각이 정리돼서 좋아요.",
+   "question": "혼자 있을 때 생각이 제일 잘 정리되는 곳은 어디예요? 거기서 보통 무슨 생각을 해요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdKUxvJBZQ66hyqgtEd\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"버스가 늦게 오면 저는 그냥 걸어가요. 조금 힘들지만 걷는 동안 생각이 정리돼서 좋아요.\\\", \\\"question\\\": \\\"혼자 있을 때 생각이 제일 잘 정리되는 곳은 어디예요? 거기서 보통 무슨 생각을 해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3200,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":123,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "870f5046cea0ff58fab656a0fcd8505e1eee0c1b99a29c84e9ef6a7f42010113",
+   "input_hash": "20ecf3d97af48883fd128ff57791c318cc6c28087aff030b01b3febbb49834cb"
+  },
+  {
+   "case_id": "P081#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": 0,
+    "state_use": 1
+   },
+   "grader_note": "너무 달았다는게 문맥이 어색해. 너무 달면 보통 안먹게되거든? 화자가 단걸 좋아한다면 이해가 되는데 그런 서사가 없으니 어색하고 이해가 좀 안되는 느낌이야. 답변은  좋아. 자연스러워",
+   "sentence": "어제 시장에서 귤을 한 봉지 샀는데 너무 달았어요. 지금도 책상에 앉아서 하나씩 까먹고 있어요.",
+   "question": "요즘 자꾸 손이 가는 간식이 있어요? 언제 제일 많이 먹게 돼요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdKsiPtrJoAVqtiyKCw\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 귤을 한 봉지 샀는데 너무 달았어요. 지금도 책상에 앉아서 하나씩 까먹고 있어요.\\\", \\\"question\\\": \\\"요즘 자꾸 손이 가는 간식이 있어요? 언제 제일 많이 먹게 돼요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3132,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":115,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "89ff47e2049851c8ef77bd534d5cc7b5c4451309e137850fbf31aeaa603febd9",
+   "input_hash": "1e2b819879a34e49ff5e17e2e4e934687f780b12c8430f93853381ae6b344b03"
+  },
+  {
+   "case_id": "P081#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "좋아. 너무 이해가 잘되고 직관적이야. 이건 전체적으로 자연스러워 굿",
+   "sentence": "어제 시장에서 귤을 한 봉지 샀는데, 너무 셔서 반은 그대로 남았어요. 지금 냉장고 안에서 굴러다니고 있어요.",
+   "question": "요즘 자주 사 먹는 과일이나 간식이 있어요? 그거 언제 처음 먹어 봤어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdLGUN3p6jbfmdiw8E5\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 귤을 한 봉지 샀는데, 너무 셔서 반은 그대로 남았어요. 지금 냉장고 안에서 굴러다니고 있어요.\\\", \\\"question\\\": \\\"요즘 자주 사 먹는 과일이나 간식이 있어요? 그거 언제 처음 먹어 봤어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3132,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":127,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "48378c6e2fe6497507cd12943e44efc8e149d338e702ac224a1dc7942a6f7cca",
+   "input_hash": "1e2b819879a34e49ff5e17e2e4e934687f780b12c8430f93853381ae6b344b03"
+  },
+  {
+   "case_id": "P082#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "좋아 ! 전체적으로 괜찮아. 문맥도 자연스럽고",
+   "sentence": "어제 시장에서 귤을 샀는데 두 개밖에 안 남았어요. 하나는 동생한테 주고, 하나는 할머니께 드렸어요.",
+   "question": "맛있는 걸 조금만 남겨 두었을 때 누구 얼굴이 먼저 떠올라요? 왜 그 사람이에요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdLdTRGqgTwkLxyrmwN\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 귤을 샀는데 두 개밖에 안 남았어요. 하나는 동생한테 주고, 하나는 할머니께 드렸어요.\\\", \\\"question\\\": \\\"맛있는 걸 조금만 남겨 두었을 때 누구 얼굴이 먼저 떠올라요? 왜 그 사람이에요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3171,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":128,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "6e6a89f387bb1cf996fc9ce96860ed2b0cd006fefc8cf7d30a0f4924f17264b2",
+   "input_hash": "b283e52c53b1bf52476a4d6d2e92c08c8f4a13d32a69dda615a12e7e3f2f4348"
+  },
+  {
+   "case_id": "P082#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "이것도 자연스러워. 나쁘지않아.",
+   "sentence": "어제 시장에서 귤을 샀는데 두 개밖에 안 남았어요. 하나는 동생한테 주고, 하나는 할머니께 드렸어요.",
+   "question": "맛있는 걸 조금만 남겨 두면 보통 누구 생각이 나요? 그 사람이랑 언제 마지막으로 같이 먹었어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdLx2dJs1k9gk2FAWNs\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 귤을 샀는데 두 개밖에 안 남았어요. 하나는 동생한테 주고, 하나는 할머니께 드렸어요.\\\", \\\"question\\\": \\\"맛있는 걸 조금만 남겨 두면 보통 누구 생각이 나요? 그 사람이랑 언제 마지막으로 같이 먹었어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3171,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":134,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "123b2f640f69510bd13ccadd74166ebbc4e6f15207263db3291907008c1597a4",
+   "input_hash": "b283e52c53b1bf52476a4d6d2e92c08c8f4a13d32a69dda615a12e7e3f2f4348"
+  },
+  {
+   "case_id": "P083#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "굿굿. 뻔하지않고 매우 신선해. 너무 좋아 훌륭해",
+   "sentence": "어제 시장에 반찬을 사러 갔는데 사람이 너무 많아서 그냥 돌아왔어요. 오늘은 문 여는 시간에 맞춰 일찍 가려고 해요.",
+   "question": "장을 볼 때 주로 어디에 가요? 거기를 고른 이유가 있어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdMPquHt8FS61YqKcSe\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에 반찬을 사러 갔는데 사람이 너무 많아서 그냥 돌아왔어요. 오늘은 문 여는 시간에 맞춰 일찍 가려고 해요.\\\", \\\"question\\\": \\\"장을 볼 때 주로 어디에 가요? 거기를 고른 이유가 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3148,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":123,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "7dfba5d2e542928b5a716325b203d337876338e55826dc82f14663d1d621dffe",
+   "input_hash": "c36334fe990c6ffe615f1ed8d39d1efd71621d97a9b79608106f049baaa74bba"
+  },
+  {
+   "case_id": "P083#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "굿 전체적으로 좋은 과제야.",
+   "sentence": "어제 시장에 감자를 사러 갔는데, 상인 아주머니가 덤을 많이 주셔서 기분이 좋았어요. 그래서 오늘도 또 가고 싶어요.",
+   "question": "장을 볼 때 꼭 사게 되는 게 있어요? 그걸로 주로 뭘 만들어 먹어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdMvJy4BAFf2rWUw4kh\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에 감자를 사러 갔는데, 상인 아주머니가 덤을 많이 주셔서 기분이 좋았어요. 그래서 오늘도 또 가고 싶어요.\\\", \\\"question\\\": \\\"장을 볼 때 꼭 사게 되는 게 있어요? 그걸로 주로 뭘 만들어 먹어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3148,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":132,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "bcd7ceecce070c32f5613638ce9333912790d28c3a1844f0352634ce526a1695",
+   "input_hash": "c36334fe990c6ffe615f1ed8d39d1efd71621d97a9b79608106f049baaa74bba"
+  },
+  {
+   "case_id": "P084#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "너무 훌륭한 과제야. 굿굿 !! 너무 좋아",
+   "sentence": "저는 월요일부터 금요일까지 아침마다 버스를 타요. 버스는 늘 붐비지만 창밖 구경이 재미있어요.",
+   "question": "요즘 밖에 나가면 어떤 풍경이 제일 눈에 들어와요? 그걸 보면 무슨 생각이 들어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdNKJ5katFimiA4pqNh\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 월요일부터 금요일까지 아침마다 버스를 타요. 버스는 늘 붐비지만 창밖 구경이 재미있어요.\\\", \\\"question\\\": \\\"요즘 밖에 나가면 어떤 풍경이 제일 눈에 들어와요? 그걸 보면 무슨 생각이 들어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3177,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":123,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "91050f3fb37b9c0508863c68afe3c43b88b2ab6680fb0a8d2d0e8a985d98f80f",
+   "input_hash": "abceb03725ec457ded671b58942c9c9c7f14c4f9e6e2604c9a57dc2ee554e479"
+  },
+  {
+   "case_id": "P084#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "이것도 너무 좋아. 훌륭한 과제야 !",
+   "sentence": "저는 월요일부터 금요일까지 아침마다 버스를 타요. 버스는 늘 사람이 많지만 창밖 풍경이 참 좋아요.",
+   "question": "길에서 자주 보게 되는 풍경 중에 마음에 드는 게 있어요? 그때 무슨 생각이 들어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdNe7fY5o5eb5j2gPvt\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 월요일부터 금요일까지 아침마다 버스를 타요. 버스는 늘 사람이 많지만 창밖 풍경이 참 좋아요.\\\", \\\"question\\\": \\\"길에서 자주 보게 되는 풍경 중에 마음에 드는 게 있어요? 그때 무슨 생각이 들어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3177,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":123,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "ed29b8f0ad523e013a258ff05bdf65d98d99a1edc64bd6bf41199720fd06b94e",
+   "input_hash": "abceb03725ec457ded671b58942c9c9c7f14c4f9e6e2604c9a57dc2ee554e479"
+  },
+  {
+   "case_id": "P085#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "무슨 일이 있었어요? 이것보다 어떤 기분을 느꼈어요? 라고 하는게 훨씬 자연스럽고 학생에게 도움이 될것같아.  무슨 일이 있었어요?는 약간 부자연스럽다랄까. 하지만 전체적으로 괜찮아.",
+   "sentence": "할머니께서 시장에 다녀오신 후에 국수를 만들어 주셨어요. 저는 손을 씻고 나서 얼른 식탁에 앉았어요.",
+   "question": "누가 해 준 음식이 제일 기억에 남아요? 그날 무슨 일이 있었어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdNyMJa3tGayDZ3G25w\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"할머니께서 시장에 다녀오신 후에 국수를 만들어 주셨어요. 저는 손을 씻고 나서 얼른 식탁에 앉았어요.\\\", \\\"question\\\": \\\"누가 해 준 음식이 제일 기억에 남아요? 그날 무슨 일이 있었어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3132,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":115,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "a008075b201852891629e1b4de50cedce3fdebbc8f8f7e41c84b8809da55c23c",
+   "input_hash": "026dc9b027f289d021ac088cd4fd6a9fac83fb5a4e3ee30a063b86a731a120b6"
+  },
+  {
+   "case_id": "P085#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "최고야. 굿굿 좋은 과제야.",
+   "sentence": "할머니께서 시장에 다녀오신 후에 만두를 만드셨어요. 저는 손을 씻고 나서 옆에서 도와드렸어요.",
+   "question": "누구랑 같이 음식을 만들어 본 적 있어요? 그때 기분이 어땠어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdPJobPzWUSsW6kigEg\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"할머니께서 시장에 다녀오신 후에 만두를 만드셨어요. 저는 손을 씻고 나서 옆에서 도와드렸어요.\\\", \\\"question\\\": \\\"누구랑 같이 음식을 만들어 본 적 있어요? 그때 기분이 어땠어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3132,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":110,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "d607c12bfb502172a63590a16fa3b363a1953c972800f016f2eff93888e42604",
+   "input_hash": "026dc9b027f289d021ac088cd4fd6a9fac83fb5a4e3ee30a063b86a731a120b6"
+  },
+  {
+   "case_id": "P101#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": 0,
+    "state_use": 1
+   },
+   "grader_note": "나쁘지않은데 듣기 따라말하기가 너무 길어지게되네. 왜냐하면 지금 문장이 성립하려면 친구는 매운걸 좋아해야하는데 그런 말이 없잖아. 그런 말이 들어가있으면 정당성이있어서 자연스러운데 지금은 그게 없으니 약간 부자연스럽네. \n그래도 답변은 자연스럽고 좋아.",
+   "sentence": "저는 매운 음식을 잘 못 먹어요. 그래서 친구하고 밥을 먹을 때는 국물하고 밥을 먼저 시켜요. 친구는 저한테 억지로 먹지 말라고 했어요.",
+   "question": "같이 밥을 먹을 때 메뉴는 보통 누가 정해요? 그때 기분이 어때요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdPm4evSgr1GkLwNFGa\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 매운 음식을 잘 못 먹어요. 그래서 친구하고 밥을 먹을 때는 국물하고 밥을 먼저 시켜요. 친구는 저한테 억지로 먹지 말라고 했어요.\\\", \\\"question\\\": \\\"같이 밥을 먹을 때 메뉴는 보통 누가 정해요? 그때 기분이 어때요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3244,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":140,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "534d0e997b7a16f5df0a1d252b6e74f0dbc4634d1649fd5d7914e668193089e6",
+   "input_hash": "83fb02d243ad0fa2e40ef26758aed10350f9e0dc9c1ffa6f5a1ad383e520ab0b"
+  },
+  {
+   "case_id": "P101#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "듣기 따라말하기가 약간 어색하지만 그래도 전체적으로 괜찮아. 답하기도 자연스럽고 이해 돼.",
+   "sentence": "저는 매운 음식하고 신 음식을 잘 못 먹어요. 그래서 친구들이 식당에서 김치찌개는 시키지 말라고 해요. 사실 저도 별로 먹고 싶지 않아요.",
+   "question": "입에 잘 안 맞는 음식이 있어요? 그런 음식이 나오면 보통 어떻게 해요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdQBAz6Z2uTLoSh4ti7\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 매운 음식하고 신 음식을 잘 못 먹어요. 그래서 친구들이 식당에서 김치찌개는 시키지 말라고 해요. 사실 저도 별로 먹고 싶지 않아요.\\\", \\\"question\\\": \\\"입에 잘 안 맞는 음식이 있어요? 그런 음식이 나오면 보통 어떻게 해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3244,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":140,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "c39b2b1a9094d6163f91e2fe3cd148fc1e05a26deeda72ae31be3bc3507f8d4c",
+   "input_hash": "83fb02d243ad0fa2e40ef26758aed10350f9e0dc9c1ffa6f5a1ad383e520ab0b"
+  },
+  {
+   "case_id": "P102#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "굿굿 매우 훌륭한 과제야. 뻔하지도않고 신선해.",
+   "sentence": "오늘은 버스로 시장에 갔어요. 딸기를 한 상자 샀는데 생각보다 싸서 기분이 좋았어요.",
+   "question": "값이 싸서 계획에 없던 걸 산 적 있어요? 그때 뭘 샀어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdQaJ2cTwYWBbi1QUfN\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"오늘은 버스로 시장에 갔어요. 딸기를 한 상자 샀는데 생각보다 싸서 기분이 좋았어요.\\\", \\\"question\\\": \\\"값이 싸서 계획에 없던 걸 산 적 있어요? 그때 뭘 샀어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3248,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":106,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "05796a449ccee6ac3484e7765c5f31c1b2597771d6f3d26cc2a568a38174f40e",
+   "input_hash": "79230b660e6bacb4bad6aeea2a2eb3752547e4b082139695f455eb2252870941"
+  },
+  {
+   "case_id": "P102#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": 0,
+    "state_use": 1
+   },
+   "grader_note": "듣기 따라말하기 문장이 너무 부자연스럽고 어색해\n시장에서 산 사과를 상자로 하나 샀어요가 말이 안돼; \n교정하자면 어제 시장에서 사과를 박스로 하나 샀어요. 너무 많아서 옆집 아주머니께 나눠 드렸어요. 이렇게 해야 자연스럽지. \n\n답변은 자연스러고 좋아.",
+   "sentence": "어제 시장에서 산 사과를 상자로 하나 샀어요. 너무 많아서 옆집 아주머니께 몇 개를 나눠 드렸어요.",
+   "question": "누군가에게 뭔가를 나눠 준 적이 있어요? 그때 상대방이 뭐라고 했어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdR1Y5YNgFT1C6w5arq\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 산 사과를 상자로 하나 샀어요. 너무 많아서 옆집 아주머니께 몇 개를 나눠 드렸어요.\\\", \\\"question\\\": \\\"누군가에게 뭔가를 나눠 준 적이 있어요? 그때 상대방이 뭐라고 했어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3248,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":119,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "ec4be8cbca4349d0e5a3259a6544fd96f18a1987b390cbf82d95d72cbf6f926c",
+   "input_hash": "79230b660e6bacb4bad6aeea2a2eb3752547e4b082139695f455eb2252870941"
+  },
+  {
+   "case_id": "P103#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "전체적으로 나쁘지는 않지만 좋지도 않아.  만약에 장을 안보거나 하면 답변할수없어서 아쉽네",
+   "sentence": "시장에 가면 늘 과일부터 구경해요. 오늘은 딸기가 비싸지만 그냥 한 상자 샀어요.",
+   "question": "장을 볼 때 꼭 먼저 담게 되는 게 있어요? 언제부터 그렇게 됐어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdRRxkx66tq1j62qqpL\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"시장에 가면 늘 과일부터 구경해요. 오늘은 딸기가 비싸지만 그냥 한 상자 샀어요.\\\", \\\"question\\\": \\\"장을 볼 때 꼭 먼저 담게 되는 게 있어요? 언제부터 그렇게 됐어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3257,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":110,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "0d67e36125b3ad9d545c26e55b8ba81725f9b9a43b26eb95351c07228d2ab529",
+   "input_hash": "52a13c3103d8ac2d3541ce6cdb0f655d6b75fdcbeaddf849b7b49f4bcf0af45b"
+  },
+  {
+   "case_id": "P103#2",
+   "axis_scores": {
+    "connect": 0,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "듣기 따라말하기 문장이 너무 부자연스럽고 어색해\n저는 버스를 타면 항상 창가 자리에 앉아요. 사람이 많으면 서서 가지만 그래도 밖을 보는 게 좋아요.\n이게 아니라 내가 교정해보자면\n저는 버스를 타면 항상 창가 자리에 앉아요. 만약 사람이 많으면 서서 가지만 창 밖을 보면 기분이 좋아요. \n이렇게 해야 훨씬 자연스럽지. \n\n그리고 답변은 \n듣기랑 연결이 아예 안돼. 내가 교정해보자면\n버스를 탈때 보통 앉아서 가나요 서서 가나요? 어떤 걸 더 선호해요? \n\n이렇게 해야 훨씬 자연스럽지.",
+   "sentence": "저는 버스를 타면 항상 창가 자리에 앉아요. 사람이 많으면 서서 가지만 그래도 밖을 보는 게 좋아요.",
+   "question": "밖에 나갈 때 꼭 지키는 자기만의 습관이 있어요? 언제부터 그렇게 했어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdRpzbToZ9uUSRKAWyh\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 버스를 타면 항상 창가 자리에 앉아요. 사람이 많으면 서서 가지만 그래도 밖을 보는 게 좋아요.\\\", \\\"question\\\": \\\"밖에 나갈 때 꼭 지키는 자기만의 습관이 있어요? 언제부터 그렇게 했어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3257,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":120,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "597375db415ade97181b9d1e46930f704786c77670aaa1ac3407d3f5e4fe4c5e",
+   "input_hash": "52a13c3103d8ac2d3541ce6cdb0f655d6b75fdcbeaddf849b7b49f4bcf0af45b"
+  },
+  {
+   "case_id": "P104#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "전체적으로 약간 부자연스러워. \n내가 교정해보자면\n우리 집 앞 시장은 주말에 사람이 정말 많아요. 그래서 저는 보통 아침 일찍 시장에 가서 과일을 사오는 편이에요.\n이렇게 해야 훨씬 자연스럽지. \n\n그리고 답변은 \n왜 손이가요? 이게 문맥이 이상해. 장을 볼 때 꼭 사게 되는게 있어요? 물었으면 그걸 왜 사요? 또는 주로 어떤 걸 사는편이에요? 이렇게 해야 훨씬 자연스럽지",
+   "sentence": "우리 집 앞 시장은 주말에 사람이 정말 많아요. 그래서 저는 아침 일찍 가서 과일을 사 올 거예요.",
+   "question": "장을 볼 때 꼭 사게 되는 게 있어요? 그게 왜 손이 가요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdS8GRAafw1tfHeQuTG\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"우리 집 앞 시장은 주말에 사람이 정말 많아요. 그래서 저는 아침 일찍 가서 과일을 사 올 거예요.\\\", \\\"question\\\": \\\"장을 볼 때 꼭 사게 되는 게 있어요? 그게 왜 손이 가요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3307,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":109,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "2e9fc6bcca93f82417661a8d58c736bd50a50e2252897141758f183b75b44eff",
+   "input_hash": "a56e09eb011ab229f8e4551be980cc97ac6f878a9f55283113f70071aba7a00f"
+  },
+  {
+   "case_id": "P104#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "전체적으로 나쁘진 않아. 그렇다고 좋지도 않네",
+   "sentence": "제 방은 지금 정말 지저분해요. 책상 위에 컵이 세 개나 있어요. 오늘 저녁에는 다 치울 거예요.",
+   "question": "방이 어질러지면 어디부터 손을 대는 편이에요? 반대로 늘 미루게 되는 건 뭐예요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdSXJ1Z7cHsSX1S8JYE\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"제 방은 지금 정말 지저분해요. 책상 위에 컵이 세 개나 있어요. 오늘 저녁에는 다 치울 거예요.\\\", \\\"question\\\": \\\"방이 어질러지면 어디부터 손을 대는 편이에요? 반대로 늘 미루게 되는 건 뭐예요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3307,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":120,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "914b55f1a139ff73da343f08957bca4b614c58bc023711f0334bdeb0fbb65ce7",
+   "input_hash": "a56e09eb011ab229f8e4551be980cc97ac6f878a9f55283113f70071aba7a00f"
+  },
+  {
+   "case_id": "P105#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "듣기 따라말하기가 부자연스러워 \n말이 안되는게 보통 평일 월요일부터 금요일까지 학교를 갈텐데 아침 아홉시에 도서관을 간다는게 말이 안되잖아. 어색하고 부자연스러워.\n하지만 답변은 매우 훌륭해. 자가성찰도 되고 좋은데 ?",
+   "sentence": "저는 월요일부터 금요일까지 도서관에 가요. 아침 아홉 시에 도착해서 자리마다 앉아 보다가 창가 자리를 골라요.",
+   "question": "혼자 조용히 있고 싶을 때 주로 어디로 가요? 거기 가면 기분이 어때요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdSwcVCSgTrMBBK2VSJ\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 월요일부터 금요일까지 도서관에 가요. 아침 아홉 시에 도착해서 자리마다 앉아 보다가 창가 자리를 골라요.\\\", \\\"question\\\": \\\"혼자 조용히 있고 싶을 때 주로 어디로 가요? 거기 가면 기분이 어때요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3207,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":120,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "6b46b0c5c70eb0d4c2be2aab7d78ea8356840f209c9f21cb1c5c060056dfd343",
+   "input_hash": "3b057aaded1f74d0062536950d1ac0c9868eb2c0361df03ccb10c1e513858712"
+  },
+  {
+   "case_id": "P105#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "듣기 따라말하기가 부자연스러워 \n내가 교정해줄게\n저는 월요일부터 금요일까지 도서관에서 공부해요. 그리고 주말에는 집 근처 공원에서 산책을 해요. 거기에서 사진도 자주 찍어요\n이렇게 해야 훨씬 자연스럽지.\n\n답하기는 매우 휼륭해",
+   "sentence": "저는 월요일부터 금요일까지 도서관에서 공부해요. 주말마다 집 근처 공원에 가서 산책을 해요. 거기에서 사진도 자주 찍어요.",
+   "question": "혼자 조용히 있고 싶을 때 어디로 가요? 거기가 왜 편해요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdTKTthYiUczMqwp7Ro\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 월요일부터 금요일까지 도서관에서 공부해요. 주말마다 집 근처 공원에 가서 산책을 해요. 거기에서 사진도 자주 찍어요.\\\", \\\"question\\\": \\\"혼자 조용히 있고 싶을 때 어디로 가요? 거기가 왜 편해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3207,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":120,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "96b819a358a5632da786f4a1f66d3e4ab6cb5d1469adfa23433f1741db7880fe",
+   "input_hash": "3b057aaded1f74d0062536950d1ac0c9868eb2c0361df03ccb10c1e513858712"
+  },
+  {
+   "case_id": "P121#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "듣기 따라말하기가 약간 부자연스러워 \n내가 교정해줄게\n붕어빵만 두 개 샀어요 보다 붕어빵을 두 개 샀어요가 자연스럽지. 왜냐하면 앞에 정당성을 이미 부여했잖아. 지갑에 천원밖에 없다고. \n\n그리고 답하기는 매우 부자연스러워. 돈이 조금밖에 없으면 뭘 사고싶지않지 ;; 안그래? 답하기는 매우 부자연스럽고 별로야",
+   "sentence": "지갑에 천 원밖에 없어서 시장에서 붕어빵만 두 개 샀어요. 집까지는 걸어서 갔는데, 손이 시려서 붕어빵으로 손을 녹였어요.",
+   "question": "돈이 조금밖에 없을 때 무엇을 먼저 사고 싶어요? 그때 기분은 어땠어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdTmPcC8RmbJyfghNxd\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"지갑에 천 원밖에 없어서 시장에서 붕어빵만 두 개 샀어요. 집까지는 걸어서 갔는데, 손이 시려서 붕어빵으로 손을 녹였어요.\\\", \\\"question\\\": \\\"돈이 조금밖에 없을 때 무엇을 먼저 사고 싶어요? 그때 기분은 어땠어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3154,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":139,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "39fc30c59e0105969b3dcf459e697eb602f0c0f9c53d945189d7b2dd08423d93",
+   "input_hash": "e9e36c82c690acc05a07d2c4d387bef91ee86cbaabfc5e333cd217745996d69c"
+  },
+  {
+   "case_id": "P121#2",
+   "axis_scores": {
+    "connect": 0,
+    "answerable": 0,
+    "level_fit": 0,
+    "fresh": 0,
+    "fun": 0,
+    "accuracy": 0,
+    "goal_use": 0,
+    "state_use": 0
+   },
+   "grader_note": "전체적으로 어휘나 문맥이 부자연스럽고 답변도 매우 부자연스러워 별로야.",
+   "sentence": "지갑에 동전밖에 없어서 버스로 집까지 왔어요. 걸어갈까 생각했지만 다리가 너무 아팠어요.",
+   "question": "돈이 얼마 없을 때 뭘 제일 먼저 포기하는 편이에요? 그때 기분은 어때요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdU9jH8BdaXcs9jJA9p\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"지갑에 동전밖에 없어서 버스로 집까지 왔어요. 걸어갈까 생각했지만 다리가 너무 아팠어요.\\\", \\\"question\\\": \\\"돈이 얼마 없을 때 뭘 제일 먼저 포기하는 편이에요? 그때 기분은 어때요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3154,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":116,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "60d52a9cccf9c1270bee654a30576ee552dea8d7684330fa476cfcb062ef058a",
+   "input_hash": "e9e36c82c690acc05a07d2c4d387bef91ee86cbaabfc5e333cd217745996d69c"
+  },
+  {
+   "case_id": "P122#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "좋아. 전체적으로 좋은 과제야. 굿굿",
+   "sentence": "어제 시장에서 어머니하고 같이 과일을 샀어요. 사과와 귤이 아주 싸서 많이 담았어요. 오늘은 옆집 할머니께 조금 나눠 드리려고 해요.",
+   "question": "뭔가를 나눠 주고 싶어지는 사람이 있어요? 그 사람은 어떤 사람이에요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdUWFooJLNgGo7vVPzz\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 어머니하고 같이 과일을 샀어요. 사과와 귤이 아주 싸서 많이 담았어요. 오늘은 옆집 할머니께 조금 나눠 드리려고 해요.\\\", \\\"question\\\": \\\"뭔가를 나눠 주고 싶어지는 사람이 있어요? 그 사람은 어떤 사람이에요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3189,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":139,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "10fe5249a8d0d891ee3be3009d5c866cbd50526d979291abaf7b70a8f193b9bf",
+   "input_hash": "d6caa5697da66312d37904c5504a13d033ab7646735e0497cb85653016f4fd9f"
+  },
+  {
+   "case_id": "P122#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "좋아. 전체적으로 자연스럽고 자가성찰도 될만한 과제야.",
+   "sentence": "어제 시장에서 사과하고 배를 샀어요. 절반은 옆집 할머니께 드리고, 나머지는 동생한테 줬어요.",
+   "question": "누군가에게 뭘 나눠 주고 기분이 좋았던 적이 있어요? 그때 상대방은 어떤 반응이었어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdUqe8MP2kJ2pdGJfC7\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 사과하고 배를 샀어요. 절반은 옆집 할머니께 드리고, 나머지는 동생한테 줬어요.\\\", \\\"question\\\": \\\"누군가에게 뭘 나눠 주고 기분이 좋았던 적이 있어요? 그때 상대방은 어떤 반응이었어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3189,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":123,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "a2efa42cddc484855cc8ab06fde6b0dabeebf005e7fe8b0a4935655fb33338d0",
+   "input_hash": "d6caa5697da66312d37904c5504a13d033ab7646735e0497cb85653016f4fd9f"
+  },
+  {
+   "case_id": "P123#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "약간 이해하기 어렵지만 전체적으로 재밌고 신선해. 신선해서 좋아 굿굿 부자연스럽지도않고 !",
+   "sentence": "저는 월요일부터 금요일까지 시장 앞을 지나가요. 특히 아침마다 그 냄새가 좋아서 발걸음이 느려져요. 오늘은 결국 호떡을 하나 사 먹었어요.",
+   "question": "길을 걷다가 갑자기 뭔가 사 먹고 싶어진 적 있어요? 그때 뭘 골랐어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdV9rk9mP2CSW4TXyFa\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 월요일부터 금요일까지 시장 앞을 지나가요. 특히 아침마다 그 냄새가 좋아서 발걸음이 느려져요. 오늘은 결국 호떡을 하나 사 먹었어요.\\\", \\\"question\\\": \\\"길을 걷다가 갑자기 뭔가 사 먹고 싶어진 적 있어요? 그때 뭘 골랐어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3130,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":148,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "74278f046dde41dd52f9d48acd67d999e1cf641a758ca536c9e3ee9df6be0fa0",
+   "input_hash": "7e46111f69811fc906bacc4f61a457243596b4aa2cdb77a7c3c3347e4a000193"
+  },
+  {
+   "case_id": "P123#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "매우 좋은 과제야. 뭔가 나도 기분이 좋아지는 답변인걸? 앞으로도 이런식으로 간접적으로 기분 좋아지는 과제로 구성되었으면 좋겠네.",
+   "sentence": "저는 월요일부터 금요일까지 아침마다 버스를 타요. 지하철은 빠르지만 버스가 더 편해서 좋아요.",
+   "question": "요즘 밖에 나갈 때 기분이 제일 좋아지는 순간은 언제예요? 그때 뭘 하고 있어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdVhVkuGEMgEtgQo8Sd\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 월요일부터 금요일까지 아침마다 버스를 타요. 지하철은 빠르지만 버스가 더 편해서 좋아요.\\\", \\\"question\\\": \\\"요즘 밖에 나갈 때 기분이 제일 좋아지는 순간은 언제예요? 그때 뭘 하고 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3130,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":120,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "47cb25a10335fb5e30a73a84ea4f9349b1a9353c04c15c7285dc1cfdb8417de6",
+   "input_hash": "7e46111f69811fc906bacc4f61a457243596b4aa2cdb77a7c3c3347e4a000193"
+  },
+  {
+   "case_id": "P124#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "듣기 따라말하기가 약간 부자연스러워 \n왜냐하면 그래서 오늘 아침에 하나를 깎아 먹었어요. 이 부분에 정당성이없어.\n사과가 생각보다 많아서 깎아먹는거잖아. 말에 정당성을 부여해야 자연스럽지. \n내가 교정해줄게\n어제 시장에서 사과를 한 봉지 샀어요. 집에 와서 세어 보니까 열 개나 들어 있었어요. \n그래서 밥을 먹고나서 배불렀지만 바로 사과를 또 깍아먹었어요. \n\n이렇게 해야 훨씬 자연스럽지.\n\n답변은 매우 자연스럽고 좋아.",
+   "sentence": "어제 시장에서 사과를 한 봉지 샀어요. 집에 와서 세어 보니까 열 개나 들어 있었어요. 그래서 오늘 아침에 하나를 깎아 먹었어요.",
+   "question": "장을 볼 때 생각보다 많이 사서 놀란 적 있어요? 그때 뭘 샀어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdW25ThfFs39sui4Pex\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 사과를 한 봉지 샀어요. 집에 와서 세어 보니까 열 개나 들어 있었어요. 그래서 오늘 아침에 하나를 깎아 먹었어요.\\\", \\\"question\\\": \\\"장을 볼 때 생각보다 많이 사서 놀란 적 있어요? 그때 뭘 샀어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3143,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":134,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "f3c11b57041cbceed21befc5836a765d76bff4fd94bca8bedbaf476bcdf973b3",
+   "input_hash": "a70cde561ebe49f86fb6ecca750647e4009350c89849117a184055b050867264"
+  },
+  {
+   "case_id": "P124#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "전체적으로 부자연스럽지도않고 자연스럽지도않아. 보통의 느낌이야.",
+   "sentence": "어제 시장에서 사과를 한 봉지 샀어요. 집에 와서 냉장고에 넣어 두었는데, 벌써 반이나 없어졌어요.",
+   "question": "집에 있으면 자꾸 손이 가는 음식이 뭐예요? 언제부터 그걸 좋아하게 됐어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdWNNbTF8N7RsnZmWbk\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 사과를 한 봉지 샀어요. 집에 와서 냉장고에 넣어 두었는데, 벌써 반이나 없어졌어요.\\\", \\\"question\\\": \\\"집에 있으면 자꾸 손이 가는 음식이 뭐예요? 언제부터 그걸 좋아하게 됐어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3143,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":125,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "a46663990fbabbb3f7f584f45dc2cce330263bf0efadf257c7a217682bd71c99",
+   "input_hash": "a70cde561ebe49f86fb6ecca750647e4009350c89849117a184055b050867264"
+  },
+  {
+   "case_id": "P125#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "낫베드. 자연스러운데 그렇다고 엄청 좋지도 않네",
+   "sentence": "할머니께서는 아침 운동을 하고 나서 꼭 차를 한 잔 드세요. 저는 그 옆에서 신문을 읽어 드려요. 차를 다 드신 후에 같이 시장에 가요.",
+   "question": "요즘 아침에 일어나서 제일 먼저 하는 일이 뭐예요? 그 일을 언제부터 했어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdWgq77BXB87BZ5k2F4\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"할머니께서는 아침 운동을 하고 나서 꼭 차를 한 잔 드세요. 저는 그 옆에서 신문을 읽어 드려요. 차를 다 드신 후에 같이 시장에 가요.\\\", \\\"question\\\": \\\"요즘 아침에 일어나서 제일 먼저 하는 일이 뭐예요? 그 일을 언제부터 했어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3135,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":143,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "eea0b04c9e26ad916348e9ea7ec848635bf29cd8244c7834562e3826ff705fab",
+   "input_hash": "b07283f2dad9d5ab425d34e67f8bc9d245bd6d09d804d757adc0581c45a42db6"
+  },
+  {
+   "case_id": "P125#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "나쁘진않은데 약간 직관적이지 못해서 아쉬운느낌? 그래도 괜찮아. 이정도면 이해하기 엄청 어렵거나 그렇진않은데 초보자들에게는 이해하기 좀 어려울것같아.",
+   "sentence": "저녁을 차려 드리고 나서 할머니께 여쭤봤어요. 할머니는 국을 다 드신 후에 옛날 이야기를 들려주셨어요.",
+   "question": "누구랑 밥을 먹을 때 이야기가 제일 길어져요? 주로 무슨 이야기를 해요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdX6kmZisMLB73Pg6ga\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저녁을 차려 드리고 나서 할머니께 여쭤봤어요. 할머니는 국을 다 드신 후에 옛날 이야기를 들려주셨어요.\\\", \\\"question\\\": \\\"누구랑 밥을 먹을 때 이야기가 제일 길어져요? 주로 무슨 이야기를 해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3135,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":122,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "5ce7e5a48926a79a02ae0848e9dc28e16d9a392e6584c492ea8bf8646021f121",
+   "input_hash": "b07283f2dad9d5ab425d34e67f8bc9d245bd6d09d804d757adc0581c45a42db6"
+  },
+  {
+   "case_id": "P141#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 0,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "듣기 따라말하기가 약간 부자연스러워 \n날씨가 갑자기 추워져서 지금도 그 양말을 신고있어요 이걸 내가 교정해줄게\n날씨가 갑자기 추워져서 어제 산 양말을 잘 산것같아요. 지금도 신고있는데 발이 따뜻해요.\n\n이렇게 해야 훨씬 자연스럽지.\n\n답변은 자연스럽고 맘에 들어",
+   "sentence": "어제 시장에서 두꺼운 양말을 샀어요. 날씨가 갑자기 추워져서 지금도 그 양말을 신고 있어요.",
+   "question": "요즘 추워지면서 새로 산 물건이 있어요? 어디에서 샀어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdXXTKhayY1kbSwzzbJ\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 두꺼운 양말을 샀어요. 날씨가 갑자기 추워져서 지금도 그 양말을 신고 있어요.\\\", \\\"question\\\": \\\"요즘 추워지면서 새로 산 물건이 있어요? 어디에서 샀어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3202,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":105,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "4c8aa40bcb62c594df4f2f11aa56bab97e93831294290dd99e150c1d481c4b92",
+   "input_hash": "57b380fd5ec4866fa0e71c6d8dd4dbcd93072f97aa9ab949957dac20ce249c9b"
+  },
+  {
+   "case_id": "P141#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "굿 좀 어려운데 전체적으로 구성이 매우 훌륭해. 좋아.",
+   "sentence": "어제 시장에서 산 귤이 너무 시었어요. 그래서 지금 냉장고에 넣어 두고 단맛이 들기를 기다리고 있어요.",
+   "question": "시장이나 마트에서 사고 나서 후회한 물건이 있어요? 그때 그걸 어떻게 했어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdXrDwEFD23iDJGyiTH\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 산 귤이 너무 시었어요. 그래서 지금 냉장고에 넣어 두고 단맛이 들기를 기다리고 있어요.\\\", \\\"question\\\": \\\"시장이나 마트에서 사고 나서 후회한 물건이 있어요? 그때 그걸 어떻게 했어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3202,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":121,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "98c4ec766c82ab8141104b5e6552e5eefd10b4a72953f8690c1ea99e2d1715af",
+   "input_hash": "57b380fd5ec4866fa0e71c6d8dd4dbcd93072f97aa9ab949957dac20ce249c9b"
+  },
+  {
+   "case_id": "P142#1",
+   "axis_scores": {
+    "connect": 0,
+    "answerable": 0,
+    "level_fit": 0,
+    "fresh": 0,
+    "fun": 0,
+    "accuracy": 0,
+    "goal_use": 0,
+    "state_use": 0
+   },
+   "grader_note": "듣기 따라말하기가 매우매우 부자연스럽고 말이 안돼. \n지갑을 집에 두고왔는데 갑자기 시장에 가려고 버스를 타는거 자체가 말이 전혀안돼. \n그런데 갑자기 또 저녁거리를 사왔다는게 무슨 말인지 도통 모르겠어.\n\n답변은 자연스럽고 신선하고 재밌어.",
+   "sentence": "지갑을 집에 두고 와서 시장에 다시 가려고 버스를 탔어요. 좀 귀찮았지만 덕분에 저녁거리도 같이 사 왔어요.",
+   "question": "뭘 깜빡하고 안 가져와서 당황한 적 있어요? 그때 어떻게 했어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdYCTbUAQc2k6LwjrJf\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"지갑을 집에 두고 와서 시장에 다시 가려고 버스를 탔어요. 좀 귀찮았지만 덕분에 저녁거리도 같이 사 왔어요.\\\", \\\"question\\\": \\\"뭘 깜빡하고 안 가져와서 당황한 적 있어요? 그때 어떻게 했어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3253,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":124,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "18daf3f949984a99c7dda857e06e3039d98db69027f40007d21c2ea8197eeee0",
+   "input_hash": "44b81d4304d1d4764320ba8fec0b8c024c74a7d6e5794beb4bf28466503033bc"
+  },
+  {
+   "case_id": "P142#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": 1,
+    "state_use": 1
+   },
+   "grader_note": "정당성도있고 매우 훌륭해 . 이해도 쉽고 구성도 잘했어. 나이스",
+   "sentence": "지갑을 집에 두고 와서 버스를 못 탔지만, 걸어서 갔더니 오히려 기분이 좋았어요. 다음부터는 일부러 한 정거장 먼저 내려서 걸으려고 해요.",
+   "question": "요즘 걷다가 마음이 편해지는 길이 있어요? 그 길에서 보통 무슨 생각을 해요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdYayBnNQkdywr2297g\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"지갑을 집에 두고 와서 버스를 못 탔지만, 걸어서 갔더니 오히려 기분이 좋았어요. 다음부터는 일부러 한 정거장 먼저 내려서 걸으려고 해요.\\\", \\\"question\\\": \\\"요즘 걷다가 마음이 편해지는 길이 있어요? 그 길에서 보통 무슨 생각을 해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3253,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":145,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "c4045c875203e2382753100bb3626d94f597ceaeab7c7ac3194be0d5a81bd5da",
+   "input_hash": "44b81d4304d1d4764320ba8fec0b8c024c74a7d6e5794beb4bf28466503033bc"
+  },
+  {
+   "case_id": "P143#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "전체적으로 훌륭해. 이 과제 잘 만들었어. 맥락이나 어휘도 좋고 학생 자가성찰도 되네",
+   "sentence": "제 방은 좀 어수선해요. 책상 위에 물건이 너무 많아서 오늘 저녁에는 정리를 할 거예요.",
+   "question": "방에서 제일 정리가 안 되는 곳은 어디예요? 그걸 볼 때 기분이 어때요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdYxSm3idPrEihLpr72\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"제 방은 좀 어수선해요. 책상 위에 물건이 너무 많아서 오늘 저녁에는 정리를 할 거예요.\\\", \\\"question\\\": \\\"방에서 제일 정리가 안 되는 곳은 어디예요? 그걸 볼 때 기분이 어때요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3286,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":110,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "bb1941bd4739b11066cef058b0fb1784ff35a9ed14c076d0498b129e703b2f81",
+   "input_hash": "914dd1e2b0a816316cfb660dce62bb7c466ba68acbcc1c90fe5f73386cb4ccf8"
+  },
+  {
+   "case_id": "P143#2",
+   "axis_scores": {
+    "connect": 0,
+    "answerable": 0,
+    "level_fit": 0,
+    "fresh": 0,
+    "fun": 0,
+    "accuracy": 0,
+    "goal_use": null,
+    "state_use": 0
+   },
+   "grader_note": "재미도없고 전체적으로 맥락이나 어휘가 말이 안돼 저녁에 시끄러운거랑 과일을 사는거랑 정당성이없어 그냥 막 ai가 지어낸 말같은 느낌이야.",
+   "sentence": "우리 집 앞 시장은 저녁에 더 시끄러워요. 오늘은 거기에서 과일을 조금 살 거예요.",
+   "question": "장 보러 갈 때 꼭 사게 되는 게 있어요? 왜 자꾸 손이 가요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdZNdoXpvdkvoQ5KBaR\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"우리 집 앞 시장은 저녁에 더 시끄러워요. 오늘은 거기에서 과일을 조금 살 거예요.\\\", \\\"question\\\": \\\"장 보러 갈 때 꼭 사게 되는 게 있어요? 왜 자꾸 손이 가요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3286,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":106,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "00851503598b3e0e52884475155a37e87f68a6020bb6ddf132ec8c0e88021935",
+   "input_hash": "914dd1e2b0a816316cfb660dce62bb7c466ba68acbcc1c90fe5f73386cb4ccf8"
+  },
+  {
+   "case_id": "P144#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "굿굿. 매우 자연스럽고 이해되고 타당성있어.",
+   "sentence": "저는 시장에 가면 과일하고 채소를 꼭 사요. 그런데 오늘은 지갑을 안 가지고 나와서 아무것도 못 샀어요. 다음부터는 이렇게 급하게 나가지 마세요.",
+   "question": "물건을 사러 나갔다가 그냥 돌아온 적이 있어요? 그때 기분이 어땠어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdZiQCAvzcZAAx4W4vL\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 시장에 가면 과일하고 채소를 꼭 사요. 그런데 오늘은 지갑을 안 가지고 나와서 아무것도 못 샀어요. 다음부터는 이렇게 급하게 나가지 마세요.\\\", \\\"question\\\": \\\"물건을 사러 나갔다가 그냥 돌아온 적이 있어요? 그때 기분이 어땠어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3325,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":145,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "2c7d5cf77b9bbc1b3e7ed23806d72341fe1a60a2f632818c9bcebdb217d16e06",
+   "input_hash": "a19b8deb211ba45989dbc3761264bc7bd23100bebd1ab416da152ba7a0b960e0"
+  },
+  {
+   "case_id": "P144#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "전체적으로 훌륭한데 딱 한군데만 고치면 될것같아. 친구들이 나에게 말해주는데 존댓말을 쓰지 않잖아. 내가 교정해줄게\n그래서 친구들이 식당에서 저한테 김치찌개는 시키지 말라고 놀려요.  이렇게 하는게 훨씬 자연스럽지. \n그리고 답변은 괜찮아 낫베드인데 좀 뻔한느낌이랄까? 답변이 한정적이야. 붎배아파서 몸이 불편해지면 물을 마시던지 화장실만 가던지. 좀 뻔하다. 그래도 전체적으로 말이 안되진않아. 자연스러운데 신선함이랑 재미가 약간 부족한 느낌",
+   "sentence": "저는 매운 음식하고 신 음식을 잘 못 먹어요. 그래서 친구들이 식당에서 저한테 김치찌개는 시키지 마세요 하고 놀려요. 사실 맛이 싫지 않은데 배가 아파서요.",
+   "question": "먹고 나면 몸이 불편해지는 음식이 있어요? 그럴 때는 어떻게 해요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKda5m5K3Z5RqMWEsKRD\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 매운 음식하고 신 음식을 잘 못 먹어요. 그래서 친구들이 식당에서 저한테 김치찌개는 시키지 마세요 하고 놀려요. 사실 맛이 싫지 않은데 배가 아파서요.\\\", \\\"question\\\": \\\"먹고 나면 몸이 불편해지는 음식이 있어요? 그럴 때는 어떻게 해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3325,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":149,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "100f2a4566749f859cbc5f485f587a558e4a4efae14541849e080783de063095",
+   "input_hash": "a19b8deb211ba45989dbc3761264bc7bd23100bebd1ab416da152ba7a0b960e0"
+  },
+  {
+   "case_id": "P145#1",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "매우 훌륭한 숙제 구성이야. 전체적으로 자연스럽고 자가성찰도 되고. 나이쓰",
+   "sentence": "어제는 시장에 사람이 너무 많아서 조금 힘들었어요. 그래도 장을 보고 나서 국수를 한 그릇 먹으니까 기분이 다 풀렸어요.",
+   "question": "기분이 안 좋을 때 나만의 방법이 있어요? 그게 언제부터 생겼어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdaTntbebQgBXzDtH2x\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제는 시장에 사람이 너무 많아서 조금 힘들었어요. 그래도 장을 보고 나서 국수를 한 그릇 먹으니까 기분이 다 풀렸어요.\\\", \\\"question\\\": \\\"기분이 안 좋을 때 나만의 방법이 있어요? 그게 언제부터 생겼어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3188,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":126,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "89179f239d8ea29e95f008b400ec56161dd1a5da49b4dec2353e3004ee20715b",
+   "input_hash": "a556941bc51e082167852fa727a27b6549cf2a483ad15a9e14b596178ed75ee2"
+  },
+  {
+   "case_id": "P145#2",
+   "axis_scores": {
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
+   },
+   "grader_note": "전체적으로 이해는 가. 자연스럽기도 해. 낫베드",
+   "sentence": "어제 시장에 갔다가 사과가 너무 싸서 한 봉지나 샀어요. 집에 와서 씻고 나서 바로 하나 먹어 봤는데 생각보다 시더라고요. 그래도 값이 싸니까 기분은 좋았어요.",
+   "question": "시장이나 마트에서 예상과 다른 물건을 산 적 있어요? 그때 어떻게 했어요?",
+   "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CeKdapvPD2vXWiXrZGxiy\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에 갔다가 사과가 너무 싸서 한 봉지나 샀어요. 집에 와서 씻고 나서 바로 하나 먹어 봤는데 생각보다 시더라고요. 그래도 값이 싸니까 기분은 좋았어요.\\\", \\\"question\\\": \\\"시장이나 마트에서 예상과 다른 물건을 산 적 있어요? 그때 어떻게 했어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":3188,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":155,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
+   "raw_response_hash": "cb9b983f11d9838d6223881f63e2385d3e1856295344189da89350a5945776be",
+   "input_hash": "a556941bc51e082167852fa727a27b6549cf2a483ad15a9e14b596178ed75ee2"
+  }
+ ]
+}
