@@ -1,11 +1,78 @@
+/* 확인 꼬리 이관 — 마지막 조각이 «확인 쿼리 블록»을 들게 한다 (20260825000000 후속 · 검사 층)
+ *
+ * ■ 무엇 — 스키마 변경 0. 이 조각의 몫은 꼬리에 확인 쿼리 블록을 다는 것 하나다.
+ *   블록 내용은 20260824090000(estimate_once)의 것을 기계로 떼어 온 그대로이고,
+ *   갈아끼운 것은 체인 끝 두 줄(현재이력 version·checksum)뿐이다.
+ *
+ * ■ 왜 — 조각 38개 중 37개가 이 블록을 들었는데 20260825000000 하나만 안 들었다.
+ *   그러면 tools/마이그레이션_합본.js 의 syncCheckFile() 이 합본 «전체»에서
+ *   lastIndexOf('with 기대열') 로 찾다가 «앞 조각» 것을 조용히 집는다 — 에러도 안 난다.
+ *   그래서 supabase/확인_적용후상태.sql 이 한 세대 뒤(20260824090000)에 머물렀고,
+ *   CI 의 「빈 DB 적용: 사후 판정=❌」이 08-25 이후 43커밋 내내 빨갰다.
+ *   실측: 칸 37개는 «전부 통과»했다 — 깨진 것은 현재이력 두 줄뿐이었다.
+ *
+ * ■ 왜 20260825000000 을 안 고치고 새 조각을 붙이나 — supabase/DB착지판.json 이
+ *   「리허설·운영 양쪽 최신 조각이 20260825000000」이라 기록한다. 이미 부어진 조각의
+ *   파일을 고치면 checksum 이 갈려 «운영 이력 소급»이 된다. 그 길은 막혀 있다.
+ *
+ * 되돌림: 이 조각을 지우고 합본을 다시 구우면 전 판으로 돌아간다(스키마 무변경이라 DB 는 그대로다). */
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260826000000';
+  migration_name constant text := '20260826000000_check_tail_c13.sql';
+  expected_checksum constant text := '301e4d5a1c9a47784a07de8d98b5348366c463c0f5518a6e3e5fed963cbc8318'; -- migration-checksum
+  base_version constant text := '20260825000000';   -- 체인 규약: 직전 조각(cron_ledger_wait)
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 합본 위에서만 돈다 — engine.schema_migrations 가 없다(빈 DB 면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      'migration % 는 % 위에서만 돈다 — 체인이 끊겼다',
+      migration_version, base_version;
+  end if;
+
+  /* 스키마 변경 0 — 이 조각의 몫은 아래 꼬리(확인 쿼리 블록)를 드는 것뿐이다. */
+end
+$migration$;
+
+do $migration2$
+declare
+  expected_checksum constant text := '301e4d5a1c9a47784a07de8d98b5348366c463c0f5518a6e3e5fed963cbc8318'; -- migration-checksum
+begin
+  if not exists (select 1 from engine.schema_migrations where version = '20260826000000') then
+    insert into engine.schema_migrations(version, name, checksum)
+    values ('20260826000000', '20260826000000_check_tail_c13.sql', expected_checksum);
+  end if;
+end
+$migration2$;
+
+commit;
+
 -- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
---
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
 -- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -335,3 +402,38 @@ select case when 테이블수=21 and RLS켜짐=21 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
   from 셈;
+*/
+-- 사후 메모:
+-- ① 이 조각의 몫은 «꼬리를 드는 것» 하나다 — 스키마 변경 0, CHECK 를 만들지도 지우지도 않는다.
+-- ② 아래 기대 목록은 generation_c13 가 세운 현행 그대로다(변경 0 — 마지막 조각이 이 줄을 든다).
+--    ⚠ 이 줄은 마지막 조각이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    ⚠ `season_no_overlap_c11`(EXCLUDE) · `…_once_c11`(UNIQUE) · `companion_qa_*_fkey` 는 여기
+--      없다 — CHECK 가 아니라 이 줄의 대상이 아니고, 이름도 c11 그대로 산다(값목록이 없어
+--      판 판별과 무관하다 · 위 기대제약 목록에는 그 이름 그대로 들어 있다).
+--    기대: attempts_gate_values_c13 · attempts_response_present_c13 · attempts_result_gate_c13
+--         · attempts_ver_nonempty_c13 · batch_runs_counts_order_c13 · batch_runs_counts_pair_c13
+--         · batch_runs_enrolled_nonneg_c13 · batch_runs_finished_cols_c13
+--         · batch_runs_level_dist_ok_c13 · batch_runs_partial_pair_c13
+--         · batch_runs_partial_range_c13 · batch_runs_roster_equation_c13
+--         · batch_runs_skipped_range_c13 · batch_runs_ver_nonempty_c13 · broadcast_segment_kind_c13
+--         · classes_key_nonblank_c13 · companion_qa_answer_paired_c13
+--         · companion_qa_question_nonblank_c13 · corrections_promotion_intent_c13
+--         · corrections_supersedes_not_self_c13 · corrections_verdict_c13 · cron_runs_outcome_c13
+--         · jobs_anchor_present_c13 · jobs_claim_cols_c13 · jobs_deciding_pair_c13
+--         · jobs_deciding_result_matches_c13 · jobs_deciding_scope_c13 · jobs_draft_present_c13
+--         · jobs_idle_cols_c13 · jobs_load_failed_cols_c13 · jobs_nontarget_cols_c13
+--         · jobs_nonterminal_cols_c13 · jobs_skill_ids_present_c13 · jobs_status_outcome_pairs_c13
+--         · jobs_terminal_cols_c13 · jobs_ver_nonempty_c13 · jobs_winner_fence_current_c13
+--         · jobs_winner_fence_pair_c13 · jobs_winner_only_success_c13 · jobs_winner_present_c13
+--         · jobs_winner_result_only_success_c13 · jobs_winner_result_pair_c13 · learners_gender_c13
+--         · learners_goal_track_c13 · learners_group_no_c13 · learners_home_aimag_c13
+--         · learners_seat_no_c13 · learners_signup_attempts_nonneg_c13
+--         · learners_temp_password_paired_c13 · learning_events_correction_target_c13
+--         · learning_events_event_type_c13 · learning_events_task_type_c13
+--         · pipeline_jobs_discard_reason_c13 · season_compass_answers_c13 · season_dates_c13
+--         · season_review_decided_c13 · season_review_self_c13 · season_review_verdict_c13
+--         · staff_role_c13 · submissions_due_paired_c13 · submissions_task_format_c13
+--         · submissions_translation_source_c13 · teacher_notes_body_nonblank_c13
+--         · teacher_notes_disposition_c13 · teacher_notes_origin_c13
