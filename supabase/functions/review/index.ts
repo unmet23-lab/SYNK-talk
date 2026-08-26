@@ -54,6 +54,10 @@ import 커서모듈 from './검수커서.mjs';
 import 경로모듈 from './업로드경로.mjs';
 import 확정모듈 from './검수확정.mjs';
 import 계약판모듈 from './계약판.mjs';
+/* 저작 신뢰 — 철학 Ⅱ-9 의 엔진 쪽 문(정본 = `docs/저작신뢰_설계_v1.md`). 판정은 순수하고
+   재료는 행에 남아, 여기서 재든 나중에 승격 통로가 재든 **같은 답**이 나온다. */
+import 저작모듈 from './저작신뢰.mjs';
+import 작성과정모듈 from './작성과정.mjs';
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
 const { 버킷, 저장소헤더, 저장소키흠 } = 경로모듈 as {
@@ -93,6 +97,15 @@ const { 판정, 청취문턱, 폐기어휘, 승인요청, 폐기요청 } = 확�
   승인요청: (본문: unknown) => 요청검증;
   폐기요청: (본문: unknown) => 요청검증;
 };
+
+const { 저작판정, 승격보류인가, 보류문구 } = 저작모듈 as {
+  저작판정: (재료: { compose_meta: unknown; 본문길이: number }) => { 등급: string; 덩어리비율: number | null };
+  승격보류인가: (판정: unknown) => boolean;
+  보류문구: string;
+};
+/* 길이는 **코드포인트**로 센다 — `String.length` 는 이모지를 둘로 세서 비율이 조용히 낮아진다
+   (`lib/작성과정.js` 가 같은 이유로 쓰는 그 함수를 그대로 빌린다 · 두 곳이 다르게 세면 안 된다). */
+const { 글자수 } = 작성과정모듈 as { 글자수: (s: unknown) => number };
 
 const { 판번호, 행들에서판, 앞선판인가 } = 계약판모듈 as {
   판번호: (판: unknown) => number | null;
@@ -550,6 +563,14 @@ async function 승인(본문: unknown, staff_id: string, ver: string) {
 
     const [재료] = await tx`
       select s.stt_segments,
+             /* 🔴 저작 신뢰의 재료(철학 Ⅱ-9 · lib/저작신뢰.js). 새 열을 안 만들었다 —
+              *   compose_meta 는 그 제출을 낳은 사건의 payload 에 이미 있고(lib/작성과정.js),
+              *   body_original 은 이 표의 열이다. 판정은 **읽는 자리**에서 한다.
+              *   ⚠ 이 주석은 템플릿 리터럴 «안»이다 — 백틱을 쓰면 SQL 이 거기서 끊긴다
+              *     (아래 청취 게이트 주석이 같은 이유로 백틱을 안 쓴다 · 08-26 에 여기서 재발). */
+             s.body_original,
+             (select le.payload->'compose_meta' from engine.learning_events le
+               where le.event_id = s.event_id) as compose_meta,
              exists (select 1 from engine.review_queue v
                       where v.submission_id = s.submission_id) as 큐안,
              (select c.corrected_text from engine.corrections c
@@ -702,11 +723,27 @@ async function 승인(본문: unknown, staff_id: string, ver: string) {
       insert into engine.staff_access_log (staff_id, action, target_ids)
       values (${staff_id}::uuid, 'review.approve', array[${q.submission_id}::uuid])`;
 
+    /* 저작 신뢰(철학 Ⅱ-9) — **행을 안 고친다.** `promotion_intent` 에는 사람이 누른 것이 그대로
+     *   들어간다(위 insert). 기계가 그것을 false 로 덮으면 「사람이 누르려 했다」가 증발하고,
+     *   그건 이 함수 머리말이 이미 금지한 형태다(§5 원자성 — 의사는 잃지 않는다).
+     * 🔑 덮지 않아도 방어가 서는 이유 = **판정이 순수하고 재료가 행에 남아 소급 재현된다.**
+     *   훈련 승격(Core §6 경로 B)이 서는 날 그 통로가 같은 함수로 다시 재고 «덩어리» 행을
+     *   분모에서 뺀다(규격 = `docs/저작신뢰_설계_v1.md` §4 · 회귀가 그 게이트를 잠근다).
+     *   그때까지 이 응답이 검수자에게 **그 자리에서** 알린다 — 재검수 통로가 살아 있어
+     *   사람이 되돌릴 수 있다. */
+    const 저작 = 저작판정({
+      compose_meta: 재료.compose_meta,
+      본문길이: 글자수(재료.body_original as string | null),
+    });
     return {
       correction_id: 행.correction_id as string,
       verdict,
       promotion_intent: q.promote,
       listen_gate: { required_ms: 문턱.ms, measured: 문턱.재료 },
+      authorship: { grade: 저작.등급, burst_ratio: 저작.덩어리비율 },
+      /* 사람이 승격을 눌렀는데 «덩어리»인 그 조합에서만 말한다 — 아닌 날 띄우면 소음이고,
+       * 소음이 되면 정작 그날 안 읽힌다(감시 늑대소년 · 심문 T12 와 같은 축). */
+      ...(q.promote && 승격보류인가(저작) ? { promotion_notice: 보류문구 } : {}),
     };
   });
 
