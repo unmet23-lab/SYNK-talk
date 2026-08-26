@@ -103,12 +103,29 @@ function assertByteIdentical(actual, expected, label = '합본') {
  * 자리는 다음번에 빠뜨리는 자리라, 합본을 만드는 그 자리에서 함께 파생시킨다.
  * `tests/L0스키마.test.js` 의 대조는 그대로 둔다 — 파생이 죽어도 검사가 남아야 한다. */
 function syncCheckFile(bundle) {
-  const 꼬리 = bundle.toString('utf8');
-  const 시작 = 꼬리.lastIndexOf('with 기대열');
-  const 끝 = 꼬리.indexOf('*/', 시작);
-  if (시작 === -1 || 끝 === -1) throw new Error('마지막 조각에서 확인 쿼리 블록을 못 찾았다');
+  /* 🔴 **「마지막 조각에서」라고 말하면서 합본 «전체»를 뒤지고 있었다**(08-26 실측 · 다섯 번째 재발).
+   *   `bundle.lastIndexOf('with 기대열')` 은 마지막 조각에 그 블록이 «없으면» 조용히 **앞 조각의
+   *   블록**으로 후퇴한다 — 그러면 `확인_적용후상태.sql` 의 체인 끝이 낡은 채로 파생되고,
+   *   증상은 「정상 DB 가 ❌ 로 보고」다(08-25 이후 talk CI 가 43커밋 내내 빨갰던 그 자리).
+   *   위 머리말이 「손으로 옮기는 자리는 다음번에 빠뜨리는 자리」라 적어 두고, 그 파생 자체가
+   *   같은 병에 걸려 있었다.
+   * 🔑 그래서 **마지막 «조각 파일»에서 찾고, 없으면 죽는다.** 후퇴가 없으면 다음 사람은 조각에
+   *   블록을 안 단 그 순간 알게 된다(조용한 오답 → 시끄러운 실패). */
+  const 조각들 = migrationFiles();
+  const 마지막 = 조각들[조각들.length - 1];
+  const 조각원문 = fs.readFileSync(마지막, 'utf8');
+  const 시작 = 조각원문.lastIndexOf('with 기대열');
+  const 끝 = 조각원문.indexOf('*/', 시작);
+  if (시작 === -1 || 끝 === -1) {
+    const 안내 = [
+      `마지막 조각에 확인 쿼리 블록이 없다: ${path.relative(ROOT, 마지막)}`,
+      '  → 그 조각 꼬리에 `with 기대열 … */` 확인 블록을 단다(앞 조각 것을 베끼지 말고 그 판의 값으로).',
+      '  ⚠ 예전엔 여기서 조용히 «앞 조각»으로 후퇴해 낡은 체인 끝이 파생됐다 — 그래서 이제 죽는다.',
+    ];
+    throw new Error(안내.join(String.fromCharCode(10)));
+  }
   const 머리 = fs.readFileSync(CHECK_FILE, 'utf8').split('with 기대열')[0];
-  const 새것 = 머리 + 꼬리.slice(시작, 끝);
+  const 새것 = 머리 + 조각원문.slice(시작, 끝);
   fs.writeFileSync(CHECK_FILE, 새것);
   return 새것;
 }
