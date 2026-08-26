@@ -45,14 +45,34 @@ def 잘라앉히기(원본):
     return 판
 
 
+def 몸찾기(굽기폴더, 이름):
+    """굽기 산출에서 «몸 패스»를 찾는다 — 이름이 두 갈래라서 이 함수가 하나로 모은다.
+
+    🔴 2026-08-27 에 이 자리가 실제로 어긋나 있었다. 굽기가 내는 이름은 «그림자 받이가 있나»로 갈린다
+    (appsscript `요소굽기.py` 끝단):
+      · 받이가 있으면  → `<이름>_몸.png` + `<이름>_접지.png` (두 패스)
+      · 받이가 0 이면  → `<이름>.png` **한 장** (08-26 에 못 박은 규약 — 빈 접지 한 장을 위해
+        씬을 한 번 더 도는 낭비를 걷었다)
+    NPC 배지는 밤천 받침을 걷고 굽는 갈래라(`--더 "받침=0,투명=1"`) **한 장**으로 온다.
+    이 함수가 없으면 변환기가 `_몸` 만 찾다 「굽기가 덜 끝났다」로 죽는다 — 굽기는 멀쩡한데.
+    """
+    for 후보 in (f'{이름}.png', f'{이름}_몸.png'):
+        p = os.path.join(굽기폴더, 후보)
+        if os.path.exists(p):
+            return p
+    raise SystemExit(
+        f'🔴 {이름} 의 몸 패스가 없다 — {이름}.png 도 {이름}_몸.png 도 못 찾았다.\n'
+        f'   찾은 곳: {os.path.abspath(굽기폴더)}\n'
+        '   → appsscript 에서 먼저 굽는다: node tools/NPC굽기.js --더 "받침=0,투명=1"')
+
+
 def 변환(굽기폴더):
     os.makedirs(DST, exist_ok=True)
     낱장 = {}
     for 역 in 역들:
         for 상태 in 상태들:
             이름 = f'{역}-{상태}'
-            원경로 = os.path.join(굽기폴더, f'{이름}_몸.png')
-            assert os.path.exists(원경로), f'{이름}_몸.png 이 없다 — 굽기가 덜 끝났다'
+            원경로 = 몸찾기(굽기폴더, 이름)
             판 = 잘라앉히기(Image.open(원경로).convert('RGBA'))
             나갈길 = os.path.join(DST, f'{이름}.webp')
             판.save(나갈길, 'WEBP', quality=92, method=6)
