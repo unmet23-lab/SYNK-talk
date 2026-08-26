@@ -111,6 +111,42 @@ const 없을때안내 = `
 그다음 이 도구가 그대로 돈다:  node tools/오류조회.js
 `;
 
+/**
+ * 🔑 **0 건일 때 「좋은 0」과 「죽은 배선」을 가른다** — 이 도구의 진짜 값이 여기 있다.
+ *
+ * 2026-08-26 실측이 이 함수를 낳았다: 이슈 0 건을 보고 「감시가 안 닿는다」로 읽을 뻔했는데,
+ * 프로젝트 판을 열어 보니 `hasSessions=true` 였다 — **세션은 도착하고 있었다.** 즉 앱→Sentry
+ * 통신은 살아 있고 오류가 실제로 안 난 것이었다(08-16 Maestro 3/3 통과 = 크래시 0 과 일관).
+ * 그 둘은 이슈 목록만 봐서는 원리상 구별이 안 된다 — 둘 다 「0」이다(F207 · 분모 없는 초록).
+ *
+ * @returns {Promise<string>} 사람이 읽는 판정 한 문단
+ */
+async function 영판정(org, project, 토큰) {
+  const url = `https://sentry.io/api/0/projects/${org}/${project}/`;
+  let p;
+  try {
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${토큰}` } });
+    if (!r.ok) return `   ⚠ 배선 판정을 못 냈다 — 프로젝트 조회가 ${r.status}. 「0의 뜻」은 미상이다.`;
+    p = await r.json();
+  } catch (e) {
+    return `   ⚠ 배선 판정을 못 냈다 — ${e.message}. 「0의 뜻」은 미상이다.`;
+  }
+  const 첫이벤트 = p.firstEvent || null;
+  const 세션 = Boolean(p.hasSessions);
+  if (첫이벤트) {
+    return `   ↳ 배선 ✅ — 첫 이벤트가 ${첫이벤트} 에 도착한 적이 있다. 지금 0 은 「다 해결됐다」는 뜻이다.`;
+  }
+  if (세션) {
+    return '   ↳ 배선 ✅ — 오류는 한 번도 없었지만(firstEvent 없음) **세션은 도착하고 있다**(hasSessions).\n'
+      + '     앱→Sentry 통신이 살아 있다는 뜻이라, 이 0 은 「좋은 0」이다.\n'
+      + '     ⚠ 남은 미검증 한 칸 = 「일부러 낸 오류가 실제로 가는가」 — 세션과 오류는 같은 통로를 타지만\n'
+      + '       오류에만 beforeSend 체가 걸린다(src/관측.js). 그 칸은 기기·에뮬레이터라야 닫는다.';
+  }
+  return '   🔴 배선 미상 — 오류도 세션도 도착한 적이 없다(firstEvent 없음 · hasSessions 아님).\n'
+    + '     「오류가 안 났다」와 「아무것도 안 닿는다」가 구별되지 않는 자리다. DSN·초기화부터 본다\n'
+    + '     (기기에서: 설정 → 배포 도착 확인 → 「관측(Sentry)」).';
+}
+
 async function 본체() {
   const 옵션 = 인자판정(process.argv.slice(2));
   const env = { ...env읽기(), ...process.env };
@@ -145,6 +181,7 @@ async function 본체() {
   if (!이슈들.length) {
     console.log(`✅ ${org}/${project} — ${옵션.전체 ? '이슈' : '미해결 이슈'}가 0건이다.`);
     console.log('   (0 = 「없다」이지 「안 재봤다」가 아니다 — 조회는 실제로 돌았다)');
+    console.log(await 영판정(org, project, 토큰));
     return;
   }
 
