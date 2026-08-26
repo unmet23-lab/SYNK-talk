@@ -36,7 +36,7 @@
  */
 import { useCallback, useMemo, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { 색, 폰트, 모노트래킹 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어폰트 } from './테마';
 import { 열기, 저장하기 } from './나침반API.js';
 import { use등장 } from '../lib/모션.js';
 
@@ -169,7 +169,12 @@ export default function 나침반화면({ 토큰, 돌아가기 }) {
       {세션 && 문항들.map((q) => (
         <View key={q.키} style={s.카드}>
           {/* 몽골어가 검수되면 서버만 채우면 된다 — 비면 한국어를 그린다(지어 넣지 않는다). */}
-          <Text style={s.칸이름}>{q.라벨_mn || q.라벨}</Text>
+          /* 🔴 폰트가 글자를 따라간다 — 몽골어(키릴)는 킷 한글 폰트에 글리프가 없어 두부(□□□)가
+             된다. `라벨_mn` 이 아직 전부 null 이라 증상이 없을 뿐, 검수가 끝나 차는 날 이 자리만
+             깨졌을 것이다(08-27 실측 · `막힘카드`·`생성카드` 와 같은 계열). */
+          <Text style={[s.칸이름, q.라벨_mn && { fontFamily: 몽골어폰트.강조 }]}>
+            {q.라벨_mn || q.라벨}
+          </Text>
 
           {시즌회차 && q.키 === 'self_in_5y' ? (
             <View style={s.칸}>

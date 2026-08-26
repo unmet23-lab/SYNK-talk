@@ -35,7 +35,7 @@
  */
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { 색, 폰트, 모노트래킹 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어폰트 } from './테마';
 import { 열기, 자기판정하기, 판정하기 } from './회고API.js';
 
 /** 굳힌 축 한 층에서 「축 이름 → 칸 → 값」을 뽑는다. **축 이름·칸 이름을 여기 안 적는다** —
@@ -133,10 +133,22 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
   );
   /* 「갈렸나」가 이 그릇의 가장 값진 신호다(설계 §7) — 확정하는 그 자리에서 보여 준다. */
   const 갈림 = 확정 && 확정.자기판정 != null && 확정.자기판정 !== 확정.판정;
-  const 문구 = (코드, 학생용) => {
+  /**
+   * 판정 갈래 하나를 글로. **부르는 자리가 한국어 문장 «안»이라** 그냥 문자열을 돌려주면
+   * 그 조각만 몽골어여도 부모 Text 의 킷 한글 폰트로 그려진다 — 키릴은 글리프가 없어
+   * 두부(□□□)가 되고, 그 줄은 「글자가 안 온 것」과 구별이 안 된다(`테마.몽골어` 머리말).
+   * 🔑 Text 하나에 폰트는 하나뿐이라 **자리를 나눈다** — 중첩 Text 는 부모 스타일을 물려받고
+   *   폰트만 덮는다. 그래서 부르는 자리는 한 글자도 안 바뀐다.
+   * ⚠ 지금 `라벨_mn` 은 전부 null 이라 문자열이 그대로 나간다(오늘 화면은 어제와 같다).
+   *   차는 날 이 함수가 알아서 감싼다.
+   */
+  const 문구 = (코드, 학생용, 굵기 = 몽골어폰트.본문) => {
     const o = 갈래.find((x) => x.코드 === 코드);
     if (!o) return 코드;
-    return 학생용 ? (o.라벨_mn_학생 || o.라벨_학생) : (o.라벨_mn || o.라벨);
+    const mn = 학생용 ? o.라벨_mn_학생 : o.라벨_mn;
+    if (!mn) return 학생용 ? o.라벨_학생 : o.라벨;
+    /* 굵기는 **부모 줄을 따라간다** — 캡션(400) 줄에 500 을 얹으면 그 조각만 굵어 보인다. */
+    return <Text style={{ fontFamily: 굵기 }}>{mn}</Text>;
   };
 
   return (
@@ -194,7 +206,9 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
           <Text style={s.칸이름}>이번 시즌에 스스로 말한 것</Text>
           {(나침반.questions ?? []).map((q) => (
             <View key={q.키} style={s.칸}>
-              <Text style={s.메타}>{q.라벨_mn || q.라벨}</Text>
+              <Text style={[s.메타, q.라벨_mn && { fontFamily: 몽골어폰트.캡션 }]}>
+                {q.라벨_mn || q.라벨}
+              </Text>
               <Text style={s.문장}>{(나침반.answers || {})[q.키] || '—'}</Text>
             </View>
           ))}
@@ -257,7 +271,12 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
                   (자기저장됨 != null || 건너뜀) && s.칩잠김, pressed && s.눌림,
                 ]}
               >
-                <Text style={[s.판정칩글, 자기고름 === o.코드 && s.판정칩글_고름]}>
+                {/* 🔴 폰트가 글자를 따라간다 — 키릴은 킷 한글 폰트에 글리프가 없어 두부가 된다.
+                    지금은 `라벨_mn_학생` 이 전부 null 이라 증상이 없을 뿐이다(08-27 실측). */}
+                <Text style={[
+                  s.판정칩글, 자기고름 === o.코드 && s.판정칩글_고름,
+                  o.라벨_mn_학생 && { fontFamily: 자기고름 === o.코드 ? 몽골어폰트.강조 : 몽골어폰트.본문 },
+                ]}>
                   {o.라벨_mn_학생 || o.라벨_학생}
                 </Text>
               </Pressable>
@@ -279,7 +298,7 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
               </Pressable>
             </>
           )}
-          {자기저장됨 != null && <Text style={s.안내글}>학생 답이 적혔어요 — {문구(자기저장됨, true)}</Text>}
+          {자기저장됨 != null && <Text style={s.안내글}>학생 답이 적혔어요 — {문구(자기저장됨, true, 몽골어폰트.캡션)}</Text>}
           {건너뜀 && 자기저장됨 == null && (
             <Text style={s.안내글}>학생 칸을 비워 둡니다 — 「안 눌렀다」로 남아요.</Text>
           )}
@@ -297,7 +316,10 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
                 onPress={() => set강사고름(o.코드)}
                 style={({ pressed }) => [s.판정칩, 강사고름 === o.코드 && s.판정칩_고름, pressed && s.눌림]}
               >
-                <Text style={[s.판정칩글, 강사고름 === o.코드 && s.판정칩글_고름]}>
+                <Text style={[
+                  s.판정칩글, 강사고름 === o.코드 && s.판정칩글_고름,
+                  o.라벨_mn && { fontFamily: 강사고름 === o.코드 ? 몽골어폰트.강조 : 몽골어폰트.본문 },
+                ]}>
                   {o.라벨_mn || o.라벨}
                 </Text>
               </Pressable>

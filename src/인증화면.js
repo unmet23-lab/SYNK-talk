@@ -3,7 +3,7 @@ import {
   ActivityIndicator, Animated, KeyboardAvoidingView, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
-import { 색, 폰트, 모노트래킹 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어폰트 } from './테마';
 import { use등장 } from '../lib/모션.js';
 import { 학생번호맞나 } from '../lib/학생계정.js';
 import { 문항, 답검사 } from '../lib/가입문항.js';
@@ -163,7 +163,7 @@ export default function 인증화면({ 로그인성공, 시작단계 = 단계.�
             (L0 §704 「뒤에 붙이면 재적 전원에게 다시 물어야 한다」). 값은 학생에게 다시
             보여주지 않는다 — 수집 축이지 프로필이 아니다(발주_수집파이프라인 [CHK-4]). */}
         {지금 === 단계.첫등록 && 문항.map((q) => (
-          <고르기 key={q.필드} 라벨={q.라벨} 보기={q.보기} 값={가입답[q.필드]}
+          <고르기 key={q.필드} 라벨={q.라벨} 라벨_mn={q.라벨_mn} 보기={q.보기} 값={가입답[q.필드]}
             고르기={(v) => set가입답((앞) => ({ ...앞, [q.필드]: v }))} />
         ))}
 
@@ -255,20 +255,31 @@ function 칸({ id, 라벨, 값, 바꾸기, 자리표시, 비밀, 숫자, 이메�
 /* 보기에서 하나를 고른다 — 자유 입력이 아닌 이유는 `lib/가입문항.js` 머리말에 있다(표기가
    갈리면 그 칸의 존재 이유가 죽는다). 세 문항이 한 컴포넌트를 쓴다: 갈라 두면 고른 표시가
    문항마다 달라 보이고, 그 차이는 학생에게 「뭔가 다른 질문」으로 읽힌다. */
-function 고르기({ 라벨, 보기, 값, 고르기: 눌렀다 }) {
+/* 🔴 **폰트는 글자를 따라간다** — 몽골어(키릴)를 킷 한글 폰트로 그리면 글리프가 없어
+ *   두부(□□□)가 되고, 그 화면은 「글자가 안 온 것」과 구별이 안 된다(`테마.몽골어` 머리말).
+ *   그래서 `라벨_mn` 이 있는 줄에만 `몽골어폰트` 를 얹는다. 지금은 전부 `null` 이라 킷 폰트가
+ *   그대로 서고, 감수가 끝나 그 칸이 차는 순간 **화면 코드 없이** 폰트까지 함께 바뀐다. */
+function 고르기({ 라벨, 라벨_mn, 보기, 값, 고르기: 눌렀다 }) {
   return (
     <View style={s.칸}>
-      <View style={s.칸머리}><Text style={s.칸라벨}>{라벨}</Text></View>
+      <View style={s.칸머리}>
+        <Text style={[s.칸라벨, 라벨_mn && { fontFamily: 몽골어폰트.본문 }]}>{라벨_mn || 라벨}</Text>
+      </View>
       <View style={s.보기줄}>
         {보기.map((b) => {
           const 골랐나 = 값 === b.값;
+          const 몽골어줄 = Boolean(b.라벨_mn);
           return (
             <Pressable
               key={b.값}
               onPress={() => 눌렀다(b.값)}
               style={({ pressed }) => [s.보기, 골랐나 && s.보기_고름, pressed && { opacity: 0.7 }]}
             >
-              <Text style={[s.보기글, 골랐나 && s.보기글_고름]}>{b.라벨}</Text>
+              <Text style={[
+                s.보기글,
+                골랐나 && s.보기글_고름,
+                몽골어줄 && { fontFamily: 골랐나 ? 몽골어폰트.강조 : 몽골어폰트.본문 },
+              ]}>{b.라벨_mn || b.라벨}</Text>
             </Pressable>
           );
         })}
