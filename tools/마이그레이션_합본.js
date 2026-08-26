@@ -114,7 +114,13 @@ function syncCheckFile(bundle) {
   const 조각들 = migrationFiles();
   const 마지막 = 조각들[조각들.length - 1];
   const 조각원문 = fs.readFileSync(마지막, 'utf8');
-  const 시작 = 조각원문.lastIndexOf('with 기대열');
+  /* 🔴 **닻에 여는 괄호를 붙인다** — 이게 「설명이 자기 검사를 깨뜨리는」 자리를 구조로 없앤다.
+   *   [08-26 · 80 세션 지적] 조각 머리말이 이 코드를 인용하면(`lastIndexOf('with 기대열') 로 …`)
+   *   그 인용이 «두 번째 후보»가 된다. 지금은 `lastIndexOf` 라 뒤엣것(진짜 블록)을 집어 옳게 돌지만,
+   *   누군가 `indexOf` 로 바꾸는 순간 **머리말 인용을 집어 조용히 깨진다**.
+   * 🔑 `with 기대열(` 로 찾으면 산문 인용은 `'` 가 뒤따라 원리상 안 맞는다 — 그래서 앞뒤 어느
+   *   쪽으로 찾아도 같은 답이 나온다. 프로즈로 「lastIndexOf 여야 한다」고 못 박는 대신 닻을 고쳤다. */
+  const 시작 = 조각원문.indexOf('with 기대열(');
   const 끝 = 조각원문.indexOf('*/', 시작);
   if (시작 === -1 || 끝 === -1) {
     const 안내 = [
@@ -124,7 +130,7 @@ function syncCheckFile(bundle) {
     ];
     throw new Error(안내.join(String.fromCharCode(10)));
   }
-  const 머리 = fs.readFileSync(CHECK_FILE, 'utf8').split('with 기대열')[0];
+  const 머리 = fs.readFileSync(CHECK_FILE, 'utf8').split('with 기대열(')[0];   // 닻은 위와 같은 것 하나다
   const 새것 = 머리 + 조각원문.slice(시작, 끝);
   fs.writeFileSync(CHECK_FILE, 새것);
   return 새것;
