@@ -28,7 +28,7 @@ const { 경로, 파일해시, 활성인가, 현행판 } = require('../lib/과제
 
 const { 검문 } = require('../lib/과제검문.js');
 const { 생성응답읽기 } = require('../lib/과제생성.js');
-const { 워커예산_MS, 생성타임아웃_MS } = require('../lib/생성상수.js');
+const { 워커예산_MS, 생성타임아웃_MS, 폴백여유_MS, 크론표 } = require('../lib/생성상수.js');
 
 const ROOT = path.resolve(__dirname, '..');
 /* 배포판 게이트 스코프 — 이 도구가 부르는 Edge Fn 은 deliver-one 하나(tests/왕복골격.test.js 가 「소스가 부르는
@@ -147,8 +147,17 @@ if (argv.includes('--원격')) {
       sentence: 값 ? 값.sentence : '', question: 값 ? 값.question : '',
       raw_response: raw, raw_response_hash: 평가.응답해시(raw), input_hash: 평가.input_hash(x.본문),
     });
+    /* 🔴 지연 실측(08-26 신설) — `생성상수.js` 가 스스로 「초기값은 측정 «전» 안전선이지 최적값이
+     * 아니다 · 첫 리허설 실측이 서면 갱신하고 판을 올린다」고 적어 둔 그 측정이다. 지금 그 자리는
+     * 비어 있고(학생 0명이라 운영 배치가 한 번도 안 돌았다), 그래서 「한 명당 몇 초」를 아무도 모른다.
+     * 그 한 숫자가 셋을 동시에 답한다: ①모델을 바꿀 수 있나 ②하룻밤에 몇 명까지 되나
+     * ③`워커학생상한` 의 보수값 3 을 얼마로 올릴 수 있나.
+     * ⚠ 행에 싣지 않는다 — `행키들` 은 여덟으로 얼어 있고(E2) 늘리면 기계 계약이 깨진다.
+     *   딴 파일로 낸다. 그래서 이 계측은 4회전 결과의 판을 «안 올린다»(비교축 무접촉). */
+    const 지연 = [];
     for (let i = 0; i < 일감.length; i += 묶음크기) {
       const 조각 = 일감.slice(i, i + 묶음크기);
+      const 잰시작 = Date.now();
       const r = await fetch(주소, {
         method: 'POST',
         headers: { apikey: service_role, Authorization: `Bearer ${service_role}`, 'Content-Type': 'application/json' },
@@ -156,8 +165,12 @@ if (argv.includes('--원격')) {
         /* 서버 최악(묶음 전체가 타임아웃까지)보다 길게 — 짧으면 서버가 답을 만드는데 먼저 끊어 벤더 비용이 증발한다. */
         signal: AbortSignal.timeout(생성타임아웃_MS * 묶음크기 + 30_000),
       });
+      const 잰밀리 = Date.now() - 잰시작;
       if (!r.ok) { console.error(`[과제생성평가] 평가 통로 HTTP ${r.status} — ${(await r.text()).slice(0, 300)}`); 저장(); process.exit(1); }
       const 본 = await r.json();
+      /* 묶음 하나가 서버에서 «차례로» 돈다(deliver-one 평가 통로의 for 문) — 사례당 시간은 나눈 값이다.
+       * HTTP 왕복 몫이 섞여 있으므로 **위쪽으로 치우친 값**이다(안전한 방향: 실제는 이보다 빠르다). */
+      지연.push({ 묶음: 조각.length, 밀리: 잰밀리, 사례당밀리: Math.round(잰밀리 / 조각.length) });
       if (!서버실행판) {
         서버실행판 = 본.실행판 || null;
         /* 이중 자물쇠 — 배포된 동봉의 판이 로컬 파일 판과 다르면 이 실행 전체가 무효다. */
@@ -185,6 +198,54 @@ if (argv.includes('--원격')) {
       저장();
       console.log(`  … ${Math.min(i + 묶음크기, 일감.length)}/${일감.length}`);
     }
+    /* ── 지연 실측 보고 + 용량 산수 ─────────────────────────────────────────
+     * 「한 명당 몇 초」 하나에서 「하룻밤 몇 명」이 나온다. 산수의 재료는 전부 생성상수(손 숫자 0). */
+    if (지연.length) {
+      const 사례당들 = 지연.map((x) => x.사례당밀리).sort((a, b) => a - b);
+      const 중앙 = 사례당들[Math.floor(사례당들.length / 2)];
+      const 최대 = 사례당들[사례당들.length - 1];
+      /* generate-worker 크론에서 하룻밤 발화 수(「매 N분 · H1~H2시」 꼴).
+       * ⚠ 모양이 다르면 **못 읽었다고 말한다** — 0 으로 접으면 「용량 0」이 조용히 사실처럼 찍힌다. */
+      const c = String(크론표['generate-worker'] || '');
+      const m = c.match(/^\*\/(\d+)\s+(\d+)-(\d+)\s/);
+      const 발화 = m ? Math.floor(((Number(m[3]) - Number(m[2]) + 1) * 60) / Number(m[1])) : null;
+      const 한번에 = (밀리) => Math.max(1, Math.min(
+        Math.floor((150000 - 폴백여유_MS) / 밀리),
+        Math.floor(워커예산_MS / 밀리),
+      ));
+
+      const 보고 = {
+        잰날: new Date().toISOString(),
+        model: 현.model, prompt_ver: 현.prompt_ver,
+        묶음수: 지연.length, 묶음크기,
+        사례당밀리: { 중앙, 최대, 최소: 사례당들[0] },
+        주의: '묶음 HTTP 왕복 몫이 섞여 있어 «위로 치우친» 값이다 — 실제 벤더 시간은 이보다 짧다',
+        지금상수: { 생성타임아웃_MS, 워커예산_MS, 폴백여유_MS, 워커학생상한: require('../lib/생성상수.js').워커학생상한 },
+        산출: {
+          한번에_중앙: 한번에(중앙), 한번에_최대: 한번에(최대),
+          밤발화수: 발화,
+          하룻밤_중앙: 발화 ? 한번에(중앙) * 발화 : null,
+          하룻밤_최대기준: 발화 ? 한번에(최대) * 발화 : null,
+        },
+        묶음별: 지연,
+      };
+      const 지연경로 = path.join(ROOT, 'evals', '생성지연_실측.json');
+      fs.writeFileSync(지연경로, JSON.stringify(보고, null, 1) + '\n');
+
+      console.log(`\n[지연 실측] 사례당 중앙 ${(중앙 / 1000).toFixed(1)}초 · 최대 ${(최대 / 1000).toFixed(1)}초`
+        + `  (묶음 ${지연.length}벌 · 위로 치우친 값)`);
+      console.log(`  타임아웃 ${생성타임아웃_MS / 1000}초 대비 — ${최대 > 생성타임아웃_MS ? '🔴 최대가 벽을 넘었다' : '✅ 최대도 벽 안'}`);
+      if (발화) {
+        console.log(`  용량 산수: 한 번에 ${한번에(중앙)}명(최대 기준 ${한번에(최대)}명) × 밤 ${발화}회`
+          + ` = 하룻밤 **${한번에(중앙) * 발화}명**(보수 ${한번에(최대) * 발화}명)`);
+        console.log(`  ⚠ 지금 「워커학생상한」은 ${require('../lib/생성상수.js').워커학생상한} 으로 «측정 전 보수값»이다`
+          + ` — 이 실측이 그 줄을 걷는 근거다(생성상수.js:33 이 그렇게 적어 뒀다). 고치면 policy_ver 가 오른다.`);
+      } else {
+        console.log(`  ⚠ 하룻밤 발화 수를 «못 읽었다» — 크론 「${c}」 이 「*/N H1-H2 * * *」 모양이 아니다(0 으로 접지 않는다).`);
+      }
+      console.log(`  → ${path.relative(ROOT, 지연경로)}`);
+    }
+
     const 사유 = 평가.결과검증(읽기(출력), 시험지, 전문);
     console.log(`[과제생성평가] 저장 → ${path.relative(ROOT, 출력)} · 기계 계약 ${사유.length ? '❌ ' + 사유.slice(0, 3).join(' / ') : '✅'} · 다음 = --채점 ${path.relative(ROOT, 출력)} --채점자 <이름>`);
   })().catch((e) => { console.error('[과제생성평가] 원격 실패:', e && e.message ? e.message : e); process.exit(1); });
