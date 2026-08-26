@@ -63,7 +63,7 @@ async function main() {
 
   /* ── 판 깔기 — 사람 셋 ─────────────────────────────────────────────
    * 🔑 직원은 만들고 지우지 않는다 — 재사용한다(FK 가 on delete restrict 다). */
-  console.log('\n■ 판 깔기 — 감수자(l10n_reviewer) · 검수자(inspector) · 비직원');
+  console.log('\n■ 판 깔기 — 감수자(l10n_reviewer) · 검수자(inspector) · 강사(teacher) · 비직원');
   const 사람세우기 = async (라벨, 로컬, 비번, 역할) => {
     const 메일 = `${로컬}${도메인}`;
     let uid = (await sql(`select id from auth.users where email=${따옴(메일)}`))[0]?.id;
@@ -131,8 +131,16 @@ async function main() {
   /* 🔴 이 저장소가 이 통로를 «따로» 낸 이유가 여기서 실물로 갈린다.
    *   inspector 는 학생 발화 검수자다 — 문구 감수 문에는 **일부러 안 넣었다**. */
   const 검수자가 = await 부르기('l10n/queue?limit=1', 검수자.토큰);
-  확인('🔴 검수자(inspector)는 문구 감수 문에 못 들어온다 — 역할을 겸하지 않는다',
+  확인('🔴 검수자(inspector)는 문구 감수 문에 못 들어온다 — 안 안전해서가 아니라 그렇게 정한 적이 없어서다',
     검수자가.status === 403, 검수자가);
+
+  /* 🔑 강사는 **들어온다**(유호 확정 08-27) — 몽골 강사가 몽골어 원어민이다.
+   *   안전이 넓어진 게 아니다: 강사는 이미 `teach` 문으로 학생 발화를 본다. 여기 더한다고
+   *   새로 열리는 자원이 없고, **반대 방향**(감수자→학생)은 바로 아래 검사가 그대로 지킨다. */
+  const 강사 = await 사람세우기('리허설 강사', 'probe-teacher', 'Teacher-Rehearsal-1', 'teacher');
+  const 강사가 = await 부르기('l10n/queue?limit=1', 강사.토큰);
+  확인('🔑 강사(teacher)는 문구 감수 문에 들어온다 — 몽골어 원어민이 곧 감수자다',
+    강사가.status === 200, 강사가);
 
   /* 🔴 그리고 그 반대 방향 — 이쪽이 «자원 격리»의 실물 증거다.
    *   소스 검사는 「우리가 학생 표를 안 썼다」까지만 말한다. 그 사람이 실제로 학생 큐에
