@@ -29,6 +29,7 @@ import { 연출대본 } from '../lib/마스코트생명.js';
 import { 배치, 목소리판정 } from '../lib/몽글목소리.js';
 import { 효과음 } from './소리.js';
 import 어제의나 from './어제의나';
+import 반짝임 from './반짝임.js';
 import 마스코트 from './마스코트';
 
 /* 서버 응답 모양 그대로 — 정본(`견줌`)이 화면이 읽는 꼴로 접는다.
@@ -187,6 +188,28 @@ export default function 검수문({ 돌아가기 }) {
               />
             )}
             {!연기 && <Text style={s.빈무대}>위에서 대본을 고르면 여기서 연기합니다</Text>}
+          </View>
+        </View>
+
+        {/* ── ⑤ 반짝임 — «기쁨 한 박자» (유호 확정 08-27 ③ · 아직 쓰이는 자리가 없다) ──
+            🔴 이 칸은 «어디에 쓸까»를 유호님이 정하시라고 있는 자리다.
+            앱의 축하는 지금 전부 몽글이가 진다(표정·소리·연기). 그리고 「어제의 나」는
+            머리말에 「신호(코랄)가 없다 · 위계는 밀도로 준다」가 박혀 있고, 포인트·스토어·
+            리그도 유호님이 빼신 상태다 — 그래서 이 반짝임을 **아무 데도 자동으로 안 걸었다.**
+            걸 자리를 고르시면 그때 화면 하나에 `보임` 한 줄로 붙는다. */}
+        <View style={s.칸}>
+          <View style={s.칸머리}>
+            <Text style={s.칸이름}>⑤ 반짝임 — 기쁨 한 박자 (아직 «쓰는 자리» 없음)</Text>
+            <Pressable onPress={다시} style={({ pressed }) => [s.버튼, pressed && s.눌림]}>
+              <Text style={s.버튼글}>다시 재생</Text>
+            </Pressable>
+          </View>
+          <Text style={s.눈금}>
+            1.30초 · 60fps · 별 셋이 0 → 10 → 20프레임에 차례로 뜬다 ·
+            색은 킷의 「기쁨」 자리(Butter · Butter Soft) — 코랄은 «녹음 중»이라 안 쓴다
+          </Text>
+          <View style={[s.무대, { alignItems: 'center', justifyContent: 'center', paddingVertical: 18 }]}>
+            <반짝임 key={`반짝-${회차}`} 보임 크기={120} />
           </View>
         </View>
 

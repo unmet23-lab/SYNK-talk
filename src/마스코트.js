@@ -33,6 +33,7 @@ import { 색, 폰트 } from './테마.js';
    그 한 곳에 산다). 옛 규칙 「마스코트는 소리를 안 낸다」는 유호 지시 08-25(탭 반응음)로
    바뀌었다 — 지금 금지는 「expo-audio 를 직접 잡는 것」이다(배선 회귀가 그걸 지킨다). */
 import { 지금녹음중, 효과음 } from './소리.js';
+import 마스코트몸, { 쓸수있나 as 몸쓸수있나 } from './마스코트몸.js';
 import { 표정컷, 혼잣말 } from '../lib/마스코트생명.js';
 import { 목소리판정 } from '../lib/몽글목소리.js';
 
@@ -81,6 +82,11 @@ export default function 마스코트({ 사건 = null, 자리 = null, 말건네�
   const [말, set말] = useState(null);
   const [줄임, set줄임] = useState(false);
   const [연출중, set연출중] = useState(false);
+  /* 탭 순간 하나 — Skia 몸이 눌림 곡선을 세는 재료다(그 값은 네이티브 드라이버라 못 읽는다). */
+  const [탭시각, set탭시각] = useState(0);
+  /* Skia 가 이 기기에 있나 — 없으면(Expo Go·웹) 아래 <Animated.Image> 가 그대로 선다.
+     판정은 한 번만 하면 되는 상수다(모듈 로드 시점에 정해진다). */
+  const 몸된다 = 몸쓸수있나().된다;
 
   const 부유 = useRef(new Animated.Value(0)).current; // 0→1 사인 반주기
   const 튐 = useRef(new Animated.Value(0)).current; // px (음수 = 위)
@@ -186,6 +192,7 @@ export default function 마스코트({ 사건 = null, 자리 = null, 말건네�
    * 닿은 순간의 반동처럼 짧게, 복원은 스프링이 살짝 넘치며(overshoot = 젤리) 돌아온다.
    * 가로가 늘고 세로가 줄어드는 squash — 몸이 뜨는 점프와 달리 «눌렸다»가 읽히는 몸짓이다. */
   const 쫀득하기 = () => {
+    set탭시각(Date.now());   // 몸(Skia)이 있으면 이 숫자로 «발치부터» 눌린다
     Animated.sequence([
       Animated.timing(쫀득, { toValue: 1, duration: 90, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web' }),
       Animated.spring(쫀득, { toValue: 0, friction: 3.6, tension: 160, useNativeDriver: Platform.OS !== 'web' }),
@@ -333,17 +340,31 @@ export default function 마스코트({ 사건 = null, 자리 = null, 말건네�
       }]}
     >
       <Pressable onPress={탭} hitSlop={10} accessibilityLabel="마스코트">
-        <Animated.Image
-          source={컷그림[그릴컷]}
-          style={[s.몸, {
-            /* 쫀득은 몸에만 건다 — 말풍선까지 눌리면 라벨이 종이가 아니라 고무가 된다. */
-            transform: [
-              { scaleX: 쫀득.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] }) },
-              { scaleY: 쫀득.interpolate({ inputRange: [0, 1], outputRange: [1, 0.88] }) },
-            ],
-          }]}
-          resizeMode="contain"
-        />
+        {몸된다 ? (
+          /* Skia 가 있는 기기 — 같은 그림 한 장이 «격자»로 산다(숨은 발치부터 · 눌림도 발치부터).
+             바깥 어휘(부유·기울기·크기)는 위 Animated.View 에 그대로 얹혀 있다 —
+             이 층은 «몸의 결»만 맡고 위치·회전은 안 넘본다. */
+          <마스코트몸
+            그림={컷그림[그릴컷]}
+            너비={s.몸.width}
+            높이={s.몸.height}
+            멈춤={멈춤()}
+            졸림={졸림}
+            탭시각={탭시각}
+          />
+        ) : (
+          <Animated.Image
+            source={컷그림[그릴컷]}
+            style={[s.몸, {
+              /* 쫀득은 몸에만 건다 — 말풍선까지 눌리면 라벨이 종이가 아니라 고무가 된다. */
+              transform: [
+                { scaleX: 쫀득.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] }) },
+                { scaleY: 쫀득.interpolate({ inputRange: [0, 1], outputRange: [1, 0.88] }) },
+              ],
+            }]}
+            resizeMode="contain"
+          />
+        )}
       </Pressable>
       {/* 🔑 key={말} — 문구가 바뀌면 라벨을 새로 세워 등장 박자가 매번 돈다(재사용하면 첫 말만 박자). */}
       {말 ? <말풍선 key={말} 글={말} 줄임={줄임} /> : null}
