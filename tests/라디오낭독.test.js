@@ -174,6 +174,23 @@ test('🔴 이탈 봉투에도 판이 실린다 — 한쪽만 표식하면 완�
   assert.equal(사건.submission.task_schema_ver, 'radio-pack.v1');
 });
 
+/* 🔴 **급소 ③은 문이 «둘»이었다**(08-26 실측·수리). 위 절들은 `제출사건`(서버로 나가는 문)만
+ *   재고 있었는데, 그 앞에 `제출로그.항목추가`(로그에 들어가는 문)가 하나 더 있었다. 낭독 걸음이
+ *   그 문지기 목록에 없어 **08-14 이래 낭독 제출이 전건 던지고 있었다** — 화면에는 오류 한 줄도
+ *   안 뜨고 「보내기」를 눌러도 아무 일이 안 일어나는 모양이다(제출이 async 라 조용히 거절된다).
+ *   👉 「이 검사가 지킨다」고 적힌 자리가 그 자리를 원리상 못 보고 있었다. 그래서 여기서 잰다. */
+test('🔴 낭독 걸음이 제출 로그 문지기를 지난다 — 막히면 녹음이 로그에도 못 들어간다', () => {
+  const { 항목추가 } = require('../lib/제출로그.js');
+  const { 항목: 남긴것 } = 항목추가([], {
+    date: '2026-08-14', step: 낭독.낭독걸음, status: 'submitted', duration_ms: 900,
+    hesitation_ms: 0, spoke: true, threshold_db: -40, text: null, audio: null,
+    prompt_id: 'c1', created_at: '2026-08-14T10:00:00.000Z', task_meta: null,
+    capture_app: null, correlation_id: '11111111-1111-4111-8111-111111111111', replayed_at: null,
+  });
+  assert.equal(남긴것.step, '라디오낭독');
+  assert.equal(남긴것.id, '2026-08-14-라디오낭독-1');
+});
+
 test('모르는 걸음은 여전히 막힌다 — 가드를 넓혔지 열어 둔 것이 아니다', () => {
   const r = 낭독.오늘의낭독({ 기준시각: '2026-08-14T10:00:00Z' });
   assert.equal(제출사건(항목(r.task_meta, { step: '없는걸음' }), null), null);

@@ -27,5 +27,7 @@
   "작성과정.mjs": "lib/작성과정.js",
   "기술선택.mjs": "lib/기술선택.js",
   "계약판.mjs": "lib/계약판.js",
-  "과제생성프롬프트.mjs": "prompts/과제생성.md"
+  "과제생성프롬프트.mjs": "prompts/과제생성.md",
+  "걸음.mjs": "lib/걸음.js",
+  "문장끊기.mjs": "lib/문장끊기.js"
 }

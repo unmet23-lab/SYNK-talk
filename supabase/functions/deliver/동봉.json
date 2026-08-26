@@ -32,5 +32,7 @@
   "과제요약.mjs": "lib/과제요약.js",
   "시즌맥락.mjs": "lib/시즌맥락.js",
   "착지봉투.mjs": "lib/착지봉투.js",
-  "과제생성프롬프트.mjs": "prompts/과제생성.md"
+  "과제생성프롬프트.mjs": "prompts/과제생성.md",
+  "걸음.mjs": "lib/걸음.js",
+  "문장끊기.mjs": "lib/문장끊기.js"
 }

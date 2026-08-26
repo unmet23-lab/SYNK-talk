@@ -15,5 +15,7 @@
   "계약판.mjs": "lib/계약판.js",
   "갈래판정.mjs": "lib/갈래판정.js",
   "문구_생성.mjs": "contents/문구_생성.js",
-  "문구_동의.mjs": "contents/문구_동의.js"
+  "문구_동의.mjs": "contents/문구_동의.js",
+  "걸음.mjs": "lib/걸음.js",
+  "문장끊기.mjs": "lib/문장끊기.js"
 }
