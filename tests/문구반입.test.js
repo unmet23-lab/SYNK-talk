@@ -149,3 +149,25 @@ test('⑫ 🔴 내보내기 도구가 보내는 SQL 전량이 «읽기»다 — 
   /* 탐지력 — 게이트가 살아 있나. 죽으면 위 반복은 영원히 초록이다. */
   assert.throws(() => 자격증명.질의전용('update engine.l10n_strings set status = %s', '문구내보내기'));
 });
+
+test('⑬ 🔴 `--찍기` 의 stdout 에는 SQL 밖에 없다 — 사람글이 한 글자만 섞여도 그 .sql 은 못 돈다', () => {
+  /* `node tools/문구반입.js --찍기 > x.sql` 이 그 통로다(`tools/원격SQL.js` 가 먹는 파일).
+     08-27 검토 실측: 그전엔 목록 요약·대상 줄이 그대로 stdout 에 섞여 파일이 통째로 깨졌다.
+     같은 규율이 이 저장소의 `--json` 통로에도 서 있다 — 그쪽은 회귀가 이미 물고 있었고
+     이 도구만 빠져 있었다. */
+  const src = 코드만(파일소스(path.join(__dirname, '..', 'tools', '문구반입.js')));
+  const stdout자리 = [...src.matchAll(/console\.log\(/g)];
+  assert.equal(stdout자리.length, 1,
+    `stdout 에 쓰는 자리가 ${stdout자리.length}곳이다 — SQL 한 줄만 남아야 한다`);
+  /* 그 한 곳이 «찍기 갈래»인지까지 본다: 개수만 세면 엉뚱한 줄이 살아남아도 통과한다. */
+  assert.match(src, /if \(찍기\) \{ if \(sql\) console\.log/,
+    '남은 stdout 한 곳이 SQL 출력 자리가 아니다');
+  assert.match(src, /if \(찍기\) 사람통로 = console\.error/,
+    '찍기 모드에서 사람글을 stderr 로 돌리는 줄이 사라졌다');
+});
+
+test('⑭ 사람글은 통로 하나(`말하기`)를 지난다 — 새 줄이 stdout 으로 새는 것을 막는다', () => {
+  const src = 코드만(파일소스(path.join(__dirname, '..', 'tools', '문구반입.js')));
+  assert.ok((src.match(/말하기\(/g) || []).length >= 8,
+    '사람글이 통로를 안 지나는 자리가 생겼다 — 그 줄은 찍기 모드에서 SQL 에 섞인다');
+});

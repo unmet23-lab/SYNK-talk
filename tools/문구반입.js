@@ -36,19 +36,30 @@ const 아는플래그 = [...공용플래그, '--적용', '--원문갱신', '--�
 class 중단 extends Error {}
 const die = (m) => { console.error('[문구반입] ' + m); process.exitCode = 1; throw new 중단(m); };
 
+/**
+ * 사람에게 하는 말은 **전부 여기를 지난다**.
+ *
+ * 🔴 `--찍기` 는 stdout 을 SQL «만» 쓰라고 비워 둔다 — `node tools/문구반입.js --찍기 > x.sql` 이
+ *   그 통로다. 사람글이 한 글자라도 섞이면 그 .sql 은 못 돈다(`tools/원격SQL.js` 가 먹는 파일이다).
+ *   같은 규율이 이 저장소의 `--json` 통로에도 서 있다(형제 도구 회귀가 그것을 문다).
+ *   ⚠ 숨기는 게 아니라 **통로를 가르는 것**이다 — 화면에는 그대로 보인다(stderr 도 터미널이다).
+ */
+let 사람통로 = console.log;
+const 말하기 = (줄) => 사람통로(줄);
+
 /** 갈래 하나를 사람이 읽게 찍는다. 분모 없이 숫자만 내면 「좋은 0」과 「안 재봤다」가 같아진다. */
 function 갈래찍기(제목, 줄들, 상세) {
-  console.log(`  ${제목}  ${줄들.length}건`);
+  말하기(`  ${제목}  ${줄들.length}건`);
   if (!상세 || !줄들.length) return;
   for (const v of 줄들.slice(0, 상세)) {
     const 글 = String(v.source_ko ?? '').replace(/\n/g, ' ⏎ ');
-    console.log(`      ${v.string_id.padEnd(30)} ${글.slice(0, 46)}`);
+    말하기(`      ${v.string_id.padEnd(30)} ${글.slice(0, 46)}`);
     if (v.옛원문 !== undefined) {
-      console.log(`      ${' '.repeat(30)} 🔴 옛 원문: ${String(v.옛원문).replace(/\n/g, ' ⏎ ').slice(0, 46)}`
+      말하기(`      ${' '.repeat(30)} 🔴 옛 원문: ${String(v.옛원문).replace(/\n/g, ' ⏎ ').slice(0, 46)}`
         + `  (지금 상태: ${v.옛상태 ?? '?'})`);
     }
   }
-  if (줄들.length > 상세) console.log(`      … 외 ${줄들.length - 상세}건`);
+  if (줄들.length > 상세) 말하기(`      … 외 ${줄들.length - 상세}건`);
 }
 
 async function main() {
@@ -59,6 +70,8 @@ async function main() {
   const 적용 = args.includes('--적용');
   const 원문갱신 = args.includes('--원문갱신');
   const 찍기 = args.includes('--찍기');
+  /* stdout 은 SQL 의 자리다 — 사람글을 stderr 로 옮긴다(위 `말하기` 머리말). */
+  if (찍기) 사람통로 = console.error;
 
   /* ── ① 목록을 먼저 검사한다 — 네트워크보다 앞이다 ─────────────────────────
    * 🔑 DB 가 거절할 것을 여기서 먼저 거절한다. 안 그러면 절반이 들어간 뒤 죽고, 그 상태는
@@ -69,7 +82,7 @@ async function main() {
     die(`반입칸이 갈라졌다 — 목록(${반입칸.join()}) ≠ 규칙(${규칙.칸.join()}). 둘 중 하나가 낡았다.`);
   }
 
-  console.log(`[문구반입] 목록 ${문구_1차.length}줄 (contents/문구_1차.js)`);
+  말하기(`[문구반입] 목록 ${문구_1차.length}줄 (contents/문구_1차.js)`);
 
   /* ── ② 과녁 ────────────────────────────────────────────────────────────
    * 🔴 `--적용` 이 없으면 **읽기**다 — 그 사실을 과녁 게이트에 그대로 넘긴다(사본 금지). */
@@ -89,7 +102,7 @@ async function main() {
   /* 🔴 대상부터 소리 내어 읽는다 — 리허설과 운영을 가르는 유일한 값이 .env 한 줄이다. */
   const pr = await fetch(`${API}/${ref}`, { headers: M });
   const 이름 = pr.ok ? (JSON.parse(await pr.text()).name || '(모름)') : '(이름을 못 읽었다)';
-  console.log(`[문구반입] 대상 ▸ ${이름}  (${ref})${적용 ? '  ⚠ 쓰기(--적용)' : '  읽기(미리보기)'}\n`);
+  말하기(`[문구반입] 대상 ▸ ${이름}  (${ref})${적용 ? '  ⚠ 쓰기(--적용)' : '  읽기(미리보기)'}\n`);
 
   /* ── ③ 지금 DB 상태 ────────────────────────────────────────────────── */
   const 표있나 = (await 질의("select to_regclass('engine.l10n_strings') is not null as 있다"))[0];
@@ -100,7 +113,7 @@ async function main() {
   const 현재 = await 질의('select string_id, source_ko, draft_mn, context, max_len, status from engine.l10n_strings');
 
   const 판 = 규칙.대조(문구_1차, 현재);
-  console.log(`  DB 에 지금 ${현재.length}줄`);
+  말하기(`  DB 에 지금 ${현재.length}줄`);
   갈래찍기('① 새것        ', 판.새것, 3);
   갈래찍기('② 그대로      ', 판.그대로, 0);
   갈래찍기('③ 곁가지바뀜  ', 판.곁가지바뀜, 5);
@@ -111,8 +124,8 @@ async function main() {
   const 목록id = new Set(문구_1차.map((x) => x.string_id));
   const 사라진것 = 현재.filter((r) => !목록id.has(r.string_id));
   if (사라진것.length) {
-    console.log(`  ⚠ DB 에만 있고 목록엔 없는 줄 ${사라진것.length}건 — **안 지운다**(감수 이력이 붙어 있을 수 있다)`);
-    console.log(`      ${사라진것.slice(0, 8).map((r) => r.string_id).join(' · ')}`);
+    말하기(`  ⚠ DB 에만 있고 목록엔 없는 줄 ${사라진것.length}건 — **안 지운다**(감수 이력이 붙어 있을 수 있다)`);
+    말하기(`      ${사라진것.slice(0, 8).map((r) => r.string_id).join(' · ')}`);
   }
 
   const sql = 규칙.SQL(판, 원문갱신);
@@ -122,18 +135,18 @@ async function main() {
   if (막힘) die(막힘);
 
   const 할일 = 규칙.할일수(판, 원문갱신);
-  if (!할일) { console.log('\n[문구반입] 할 일 0건 — DB 가 목록과 같다.'); return; }
+  if (!할일) { 말하기('\n[문구반입] 할 일 0건 — DB 가 목록과 같다.'); return; }
 
   if (!적용) {
-    console.log(`\n[문구반입] 미리보기다 — 아무것도 안 바꿨다. 붓기: node tools/문구반입.js --적용`
+    말하기(`\n[문구반입] 미리보기다 — 아무것도 안 바꿨다. 붓기: node tools/문구반입.js --적용`
       + (원문갱신 ? ' --원문갱신' : ''));
     return;
   }
 
   await 질의(sql);
-  console.log(`\n[문구반입] ✅ ${할일}건 반영했다`
+  말하기(`\n[문구반입] ✅ ${할일}건 반영했다`
     + (원문갱신 && 판.원문바뀜.length ? ` (그중 ${판.원문바뀜.length}건은 원문이 바뀌어 상태가 pending 으로 돌아갔다)` : ''));
-  console.log(`   ↳ 감수 대기 확인: select count(*) from engine.l10n_queue;`);
+  말하기(`   ↳ 감수 대기 확인: select count(*) from engine.l10n_queue;`);
 }
 
 module.exports = { 갈래찍기 };

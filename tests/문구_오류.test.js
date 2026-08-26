@@ -74,13 +74,13 @@ test('⑦ 🔴 서버 message 와 표의 ko 가 갈라지지 않는다 — 두 �
   /* 서버는 앱 아닌 호출자에게도 답해야 해서 자기 문장을 계속 든다. 앱은 번역을 붙이려고
      자기 표를 든다. 그래서 사본 둘이 «정당하게» 존재한다 — 갈라지는 것만 막으면 된다. */
   const fn = 소스('supabase/functions/auth/index.ts');
+  /* 🔑 **서버에 남은 다섯을 전부** 센다 — 셋만 재던 것을 08-27 검토에서 넓혔다.
+     분모를 좁히면 안 잰 둘이 「맞다」와 구별이 안 된다. */
   const 대조 = [
-    ['SIGNUP_GATE_FAILED', 'err.signup_gate_failed'],
-    ['AUTH_REQUIRED', 'err.auth_required'],
-    ['PASSWORD_TOO_LONG', 'err.password_too_long'],
+    'err.signup_gate_failed', 'err.auth_required', 'err.id_format', 'err.password_too_long',
   ];
   let 잰것 = 0;
-  for (const [, id] of 대조) {
+  for (const id of 대조) {
     assert.ok(fn.includes(문구[id].ko), `서버에 없는 문장을 표가 들고 있다: ${id}\n`
       + `  표: ${문구[id].ko}\n  → 서버가 문장을 고쳤다면 표도 같이 고친다(감수 목록도 함께).`);
     잰것 += 1;
