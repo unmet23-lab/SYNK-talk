@@ -1,11 +1,157 @@
+/* 몽골어 문구 감수 — 외부 감수자가 «우리 카피»를 고치는 자리 (검수_내부계약 §1 의 ⏳ 를 닫는 조각)
+ *
+ * ■ 무엇 — 표 둘(`l10n_strings`·`l10n_reviews`) · 뷰 하나(`l10n_queue`) · staff 역할 하나(`l10n_reviewer`).
+ *
+ * ■ 🔴 왜 검수 큐에 얹지 않고 «따로» 서나 — 문을 나누는 것이 이 조각의 절반이다
+ *   `review` Fn 은 `['inspector','director']` 로 문 하나를 지킨다(functions/review/index.ts:120).
+ *   몽골어 감수자에게 `inspector` 를 주면 **학생 발화 큐에도 그대로 통과한다** — 그 사람은
+ *   외부 계약자다. 경로별로 역할을 갈라 막을 수도 있지만, 그것은 계약 §0 이 「새는 방향이 언제나
+ *   통과」라며 기각한 바로 그 구조다(새 경로가 하나 늘 때마다 사람이 기억해야 하는 자리가 는다).
+ *   👉 그래서 **자원부터 가른다**: 이 표들엔 학생 식별자가 한 칸도 없다(learner_id·event_id·
+ *      submission_id 무참조). 감수자는 학생 데이터에 **원리상** 못 닿는다 — 권한 설정이 아니라
+ *      스키마가 그것을 보장한다.
+ *
+ * ■ 🔑 `string_id` 는 ASCII 로 못 박는다 (2026-08-26 실측이 낳은 제약)
+ *   같은 날 Sentry 태그 키가 한글이라 **이벤트는 200 으로 통과하고 태그만 조용히 사라지는**
+ *   버그를 열하루 만에 찾았다(talk `7d6c9db`). 이 id 는 앱·문서·내보내기 파일을 오가는
+ *   «바깥으로 나가는 키»라 같은 병에 걸릴 자리다. 값(한국어·몽골어)은 그대로 한글이어도 된다 —
+ *   막히는 것은 언제나 키다(memory `workflow-schema-ascii-keys`).
+ *
+ * ■ verdict 세 값 — 「원문을 고쳐야 한다」가 있는 까닭
+ *   ①`초벌이 맞다` ②`고쳤다` ③`원문을 고쳐야 한다`. ③이 없으면 감수자는 «번역이 안 되는
+ *   한국어»를 만났을 때 억지로 옮기거나 건너뛴다. 그 신호는 몽골어가 아니라 **우리 카피의 결함**
+ *   이고, 받을 자리가 없으면 영영 안 온다. ③일 때 `final_mn` 은 null 이어야 한다(제약이 강제) —
+ *   「고칠 수 없다」고 말하면서 번역을 내는 것은 두 말을 한 번에 하는 것이다.
+ *
+ * ■ append-only — 고치면 새 행(`supersedes`)
+ *   `corrections` 와 같은 수다. 감수는 되돌아오는 일이라(문구가 바뀌면 다시 본다) 마지막 판정만
+ *   남기면 «왜 그렇게 정했나»가 사라진다.
+ *
+ * ■ RLS 는 켜되 정책은 0
+ *   engine 의 규약 그대로 — 표 수 == RLS 켜진 수. 접근은 service_role(Edge Fn)만이고 그 문은
+ *   `l10n` Fn 이 진다. 정책을 만들면 문이 둘이 된다.
+ *
+ * 되돌림: `drop view engine.l10n_queue; drop table engine.l10n_reviews, engine.l10n_strings;`
+ *   + staff 역할 제약을 셋으로 되돌린다. 학생 데이터에 안 닿으므로 되돌림이 다른 표를 안 건드린다. */
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260826130000';
+  migration_name constant text := '20260826130000_l10n_c13.sql';
+  expected_checksum constant text := 'c80631b25ad14e4c998ed5b4cb74ee9c11e5197aa282a485555bde87ed3d78ba'; -- migration-checksum
+  base_version constant text := '20260826000000';   -- 체인 규약: 직전 조각(check_tail)
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 합본 위에서만 돈다 — engine.schema_migrations 가 없다(빈 DB 면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      'migration % 는 % 위에서만 돈다 — 체인이 끊겼다', migration_version, base_version;
+  end if;
+
+  if to_regclass('engine.staff') is null then
+    raise exception
+      'engine.staff 가 없다 — 감수자는 직원 위에 선다(20260806234000_staff_c7 이 먼저 서야 한다)';
+  end if;
+
+  -- ① 감수 대상 문장 — «우리 카피» 하나에 한 행. 학생 발화가 아니다.
+  --    `max_len` 은 규모 못이 아니라 판단 재료다: 버튼 안에 들어가야 하는 문구인지 감수자가
+  --    알아야 «짧게 고칠지»를 정한다. null 이 정상(길이 제약이 없는 자리).
+  create table if not exists engine.l10n_strings (
+    string_id  text primary key
+               constraint l10n_strings_id_ascii_c13
+               check (string_id ~ '^[a-z0-9]+([._-][a-z0-9]+)+$'),
+    source_ko  text not null
+               constraint l10n_strings_ko_nonblank_c13 check (btrim(source_ko) <> ''),
+    draft_mn   text,
+    context    text,
+    max_len    smallint
+               constraint l10n_strings_max_len_c13
+               check (max_len is null or max_len between 1 and 4000),
+    status     text not null default 'pending'
+               constraint l10n_strings_status_c13
+               check (status in ('pending', 'verified', 'discarded')),
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+  );
+
+  comment on table engine.l10n_strings is
+    '몽골어 감수 대상 문장(우리 카피). 학생 식별자를 한 칸도 안 든다 — 외부 감수자가 보는 자리라 스키마가 격리를 진다. 소비자 = l10n Fn.';
+
+  -- ② 감수 결과 — append-only. 고치면 새 행이 `supersedes` 로 앞 행을 가리킨다.
+  create table if not exists engine.l10n_reviews (
+    review_id  uuid primary key default gen_random_uuid(),
+    string_id  text not null references engine.l10n_strings(string_id) on delete restrict,
+    reviewer   uuid not null references engine.staff(staff_id) on delete restrict,
+    verdict    text not null
+               constraint l10n_reviews_verdict_c13
+               check (verdict in ('초벌이 맞다', '고쳤다', '원문을 고쳐야 한다')),
+    final_mn   text,
+    note       text,
+    supersedes uuid references engine.l10n_reviews(review_id) on delete restrict,
+    created_at timestamptz not null default now(),
+    -- 🔴 「원문을 고쳐야 한다」면 번역을 내지 않는다 — 두 말을 한 번에 하는 것을 막는다.
+    constraint l10n_reviews_final_paired_c13 check (
+      (verdict = '원문을 고쳐야 한다' and final_mn is null)
+      or (verdict <> '원문을 고쳐야 한다' and btrim(coalesce(final_mn, '')) <> '')
+    ),
+    constraint l10n_reviews_supersedes_not_self_c13 check (supersedes is distinct from review_id)
+  );
+
+  comment on table engine.l10n_reviews is
+    '몽골어 감수 판정(append-only · 고치면 supersedes 로 새 행). verdict 셋 = 초벌이 맞다 / 고쳤다 / 원문을 고쳐야 한다 — 셋째가 우리 카피의 결함을 받는 유일한 통로다.';
+
+  create index l10n_reviews_string_idx on engine.l10n_reviews (string_id, created_at desc);
+
+  -- ③ 큐 판 — 판은 «무엇을 보여줄지»만 정한다(정렬은 읽는 쪽 몫 · 20260809050000 과 같은 축).
+  create view engine.l10n_queue as
+    select s.string_id, s.source_ko, s.draft_mn, s.context, s.max_len, s.created_at
+      from engine.l10n_strings s
+     where s.status = 'pending';
+
+  comment on view engine.l10n_queue is
+    '몽골어 감수 큐(검수_내부계약 §1 외부 검수자 갈래). 학생 정체·발화·오디오가 원리상 없다 — 기본 검수 큐와 자원 자체가 다르다.';
+
+  -- ④ RLS — 정책 0. 접근은 service_role(l10n Fn) 하나이고 그 문이 역할을 본다.
+  alter table engine.l10n_strings enable row level security;
+  alter table engine.l10n_reviews enable row level security;
+
+  -- ⑤ 역할 하나를 연다. 🔴 이름은 그대로 두고 값목록만 넓힌다 — 확인 꼬리의 기대제약이 이름으로 센다.
+  alter table engine.staff drop constraint staff_role_c13;
+  alter table engine.staff
+    add constraint staff_role_c13
+    check (role in ('teacher', 'inspector', 'director', 'l10n_reviewer'));
+
+  insert into engine.schema_migrations(version, name, checksum)
+  values (migration_version, migration_name, expected_checksum);
+end
+$migration$;
+
+commit;
+
 -- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
---
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
 -- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -348,3 +494,42 @@ select case when 테이블수=23 and RLS켜짐=23 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
   from 셈;
+*/
+-- 사후 메모:
+-- ① 이 조각의 몫은 «꼬리를 드는 것» 하나다 — 스키마 변경 0, CHECK 를 만들지도 지우지도 않는다.
+-- ② 아래 기대 목록은 generation_c13 가 세운 현행 그대로다(변경 0 — 마지막 조각이 이 줄을 든다).
+--    ⚠ 이 줄은 마지막 조각이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    ⚠ `season_no_overlap_c11`(EXCLUDE) · `…_once_c11`(UNIQUE) · `companion_qa_*_fkey` 는 여기
+--      없다 — CHECK 가 아니라 이 줄의 대상이 아니고, 이름도 c11 그대로 산다(값목록이 없어
+--      판 판별과 무관하다 · 위 기대제약 목록에는 그 이름 그대로 들어 있다).
+--    기대: attempts_gate_values_c13 · attempts_response_present_c13 · attempts_result_gate_c13
+--         · attempts_ver_nonempty_c13 · batch_runs_counts_order_c13 · batch_runs_counts_pair_c13
+--         · batch_runs_enrolled_nonneg_c13 · batch_runs_finished_cols_c13
+--         · batch_runs_level_dist_ok_c13 · batch_runs_partial_pair_c13
+--         · batch_runs_partial_range_c13 · batch_runs_roster_equation_c13
+--         · batch_runs_skipped_range_c13 · batch_runs_ver_nonempty_c13 · broadcast_segment_kind_c13
+--         · classes_key_nonblank_c13 · companion_qa_answer_paired_c13
+--         · companion_qa_question_nonblank_c13 · corrections_promotion_intent_c13
+--         · corrections_supersedes_not_self_c13 · corrections_verdict_c13 · cron_runs_outcome_c13
+--         · jobs_anchor_present_c13 · jobs_claim_cols_c13 · jobs_deciding_pair_c13
+--         · jobs_deciding_result_matches_c13 · jobs_deciding_scope_c13 · jobs_draft_present_c13
+--         · jobs_idle_cols_c13 · jobs_load_failed_cols_c13 · jobs_nontarget_cols_c13
+--         · jobs_nonterminal_cols_c13 · jobs_skill_ids_present_c13 · jobs_status_outcome_pairs_c13
+--         · jobs_terminal_cols_c13 · jobs_ver_nonempty_c13 · jobs_winner_fence_current_c13
+--         · jobs_winner_fence_pair_c13 · jobs_winner_only_success_c13 · jobs_winner_present_c13
+--         · jobs_winner_result_only_success_c13 · jobs_winner_result_pair_c13
+--         · l10n_reviews_final_paired_c13 · l10n_reviews_supersedes_not_self_c13
+--         · l10n_reviews_verdict_c13 · l10n_strings_id_ascii_c13
+--         · l10n_strings_ko_nonblank_c13 · l10n_strings_max_len_c13
+--         · l10n_strings_status_c13 · learners_gender_c13
+--         · learners_goal_track_c13 · learners_group_no_c13 · learners_home_aimag_c13
+--         · learners_seat_no_c13 · learners_signup_attempts_nonneg_c13
+--         · learners_temp_password_paired_c13 · learning_events_correction_target_c13
+--         · learning_events_event_type_c13 · learning_events_task_type_c13
+--         · pipeline_jobs_discard_reason_c13 · season_compass_answers_c13 · season_dates_c13
+--         · season_review_decided_c13 · season_review_self_c13 · season_review_verdict_c13
+--         · staff_role_c13 · submissions_due_paired_c13 · submissions_task_format_c13
+--         · submissions_translation_source_c13 · teacher_notes_body_nonblank_c13
+--         · teacher_notes_disposition_c13 · teacher_notes_origin_c13

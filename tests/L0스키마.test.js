@@ -50,8 +50,14 @@ const 마지막정의 = new Map();
 for (const m of SQL.matchAll(CHECK정의)) 마지막정의.set(m[1], m.index);
 const 죽은제약 = new Set(
   [...마지막드롭].filter(([n, i]) => (마지막정의.get(n) ?? -1) < i).map(([n]) => n));
+/* 🔑 **이름의 집합이지 정의의 목록이 아니다** — 같은 이름을 «다시» 정의하는 조각이 있다
+ *   (값목록만 넓힐 때 `drop constraint X` → `add constraint X` 로 이름을 지킨다 · 2026-08-26
+ *   l10n 조각이 `staff_role_c13` 에 역할 하나를 더하며 그 길을 처음 썼다). 그때 이 함수가
+ *   같은 이름을 두 번 내면, 이것을 쓰는 「기대: 줄과 같은가」 검사가 **영원히 빨개진다** —
+ *   비교 상대는 `new Set` 으로 중복을 접기 때문이다. 살아 있는 «이름»이 판정 대상이므로
+ *   여기서 접는 것이 맞다(중복 정의 자체는 SQL 로서 정상이다 — 마지막 정의가 이긴다). */
 const 살아있는CHECK = (원천 = SQL) =>
-  [...원천.matchAll(CHECK정의)].map((m) => m[1]).filter((n) => !죽은제약.has(n));
+  [...new Set([...원천.matchAll(CHECK정의)].map((m) => m[1]))].filter((n) => !죽은제약.has(n));
 const 꼬리시작 = 원문.lastIndexOf('확인 (한 번에)');
 const 최종꼬리 = 꼬리시작 === -1 ? '' : 원문.slice(꼬리시작);
 
