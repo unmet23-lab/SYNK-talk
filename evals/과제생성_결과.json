@@ -10,7 +10,7 @@
   "quality_ver": "9d96c02fd9b5",
   "policy_ver": "오늘과제.v3+907562cf1cc9",
   "채점자": "유호",
-  "시각": "2026-08-25T14:28:03.732Z"
+  "시각": "2026-08-25T16:43:40.464Z"
  },
  "행": [
   {
@@ -548,16 +548,16 @@
   {
    "case_id": "P045#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "굿 좋아. 자연스러워 ! 하지만 답변이 아까 말했듯이 패턴이 너무 반복되어서 좀 신선함이랑 재미가 떨어져. \n10대 후반 고등학생이 타겟이니 연얘 얘기나 친구얘기도 추가해서 재미있게 풀어가줬으면 좋겠어. \n예를들어 이성 친구에게 음식을 나눠 준 적이 있나요? 그때 그 사람이 뭐라고 했나요? 이런식으로 풀어갈수있잖아 !",
    "sentence": "어제 언니하고 시장에 가서 귤을 한 상자 샀어요. 너무 많아서 옆집 할머니께 조금 나눠 드렸어요.",
    "question": "누군가에게 음식을 나눠 준 적이 있어요? 그때 그 사람이 뭐라고 했어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePLuPcvneH5kYnsuhzRo\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 언니하고 시장에 가서 귤을 한 상자 샀어요. 너무 많아서 옆집 할머니께 조금 나눠 드렸어요.\\\", \\\"question\\\": \\\"누군가에게 음식을 나눠 준 적이 있어요? 그때 그 사람이 뭐라고 했어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4317,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":118,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -814,16 +814,16 @@
   {
    "case_id": "P082#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "굿 좋아. 자연스러워 ! 하지만 답변이 아까 말했듯이 패턴이 너무 반복되어서 좀 신선함이랑 재미가 떨어져. \n10대 후반 고등학생이 타겟이니 연얘 얘기나 친구얘기도 추가해서 재미있게 풀어가줬으면 좋겠어.",
    "sentence": "어제 이사를 도와준 친구에게 커피를 사 줬어요. 그날 온 사람이 그 친구밖에 없었거든요. 다음에는 밥도 사려고요.",
    "question": "요즘 고맙다는 말을 꼭 하고 싶은 사람이 있어요? 무슨 일이 있었어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePM3ppU79xMTjXsR8umm\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 이사를 도와준 친구에게 커피를 사 줬어요. 그날 온 사람이 그 친구밖에 없었거든요. 다음에는 밥도 사려고요.\\\", \\\"question\\\": \\\"요즘 고맙다는 말을 꼭 하고 싶은 사람이 있어요? 무슨 일이 있었어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4353,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":127,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -871,16 +871,16 @@
   {
    "case_id": "P083#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "좋아 자연스럽고 마음에 들어 굿굿",
    "sentence": "친구 생일 선물을 사려고 어제 시장에 갔어요. 그런데 마음에 드는 게 없어서 그냥 편지만 썼어요.",
    "question": "선물보다 마음이 더 잘 전해진 적이 있어요? 그때 어떤 걸 주고받았어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePM54R4Etxr6cThTJYTE\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"친구 생일 선물을 사려고 어제 시장에 갔어요. 그런데 마음에 드는 게 없어서 그냥 편지만 썼어요.\\\", \\\"question\\\": \\\"선물보다 마음이 더 잘 전해진 적이 있어요? 그때 어떤 걸 주고받았어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4330,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":116,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -890,16 +890,16 @@
   {
    "case_id": "P084#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "듣기 따라말하기 어휘가 부자연스럽다. \n아예 말이 안되진않는데 한국인인 내가봐도 오해할만큼 이해하기 좀 어려운편이야\n교정해보자면 저는 매일 아침마다 시장에 들러요. 왜냐하면 아침에 채소가 제일 싱싱하거든요. \n이렇게 하면 이해가 가지. \n\n그리고 답하긱는 너무 부자연스러워. 내가 교정해보자면\n요즘 아침에 일어나자마자 하는 일이 있어요? 여자친구에게 연락하기라던지 비밀인가요?\n\n이런식으로 재밌게 풀어나가줘. 꼭 기억해줘",
    "sentence": "저는 월요일부터 목요일까지 아침마다 시장에 들러요. 그날 먹을 채소가 제일 싱싱하거든요.",
    "question": "요즘 아침에 꼭 하는 일이 하나 있어요? 그게 어떻게 시작됐는지 기억나요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePM5S256bRwC1gFJzL53\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 월요일부터 목요일까지 아침마다 시장에 들러요. 그날 먹을 채소가 제일 싱싱하거든요.\\\", \\\"question\\\": \\\"요즘 아침에 꼭 하는 일이 하나 있어요? 그게 어떻게 시작됐는지 기억나요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4359,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":114,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -909,16 +909,16 @@
   {
    "case_id": "P084#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "나쁘진않은데 맥락이 좀 어색해. 자연스럽지는 못해.이해가 안갈수준까지는 아니야.",
    "sentence": "저는 월요일부터 목요일까지 아침마다 버스를 타요. 금요일은 수업이 늦게 시작해서 걸어가요.",
    "question": "하루 중에 혼자 있는 시간이 언제예요? 그때 보통 무슨 생각을 해요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePM5oSgKCPrVaP8SEx8i\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 월요일부터 목요일까지 아침마다 버스를 타요. 금요일은 수업이 늦게 시작해서 걸어가요.\\\", \\\"question\\\": \\\"하루 중에 혼자 있는 시간이 언제예요? 그때 보통 무슨 생각을 해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4359,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":108,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -928,16 +928,16 @@
   {
    "case_id": "P085#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "듣기 따라말하기는 좋은데 답변이 말이 안되네\n하루중에 몸을 움직이는시간은 항상 있지않아? 왜 이런 어이없는 질문을 하는거지 ?",
    "sentence": "할머니께서 저녁을 드시고 나서 꼭 동네를 한 바퀴 걸으세요. 그렇게 걸으면 잠이 잘 온다고 하셔서 저도 요즘 따라 나가요.",
    "question": "하루 중에 몸을 움직이는 시간이 있어요? 그 시간에 기분이 어때요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePM68tDp9nq18DRsawqa\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"할머니께서 저녁을 드시고 나서 꼭 동네를 한 바퀴 걸으세요. 그렇게 걸으면 잠이 잘 온다고 하셔서 저도 요즘 따라 나가요.\\\", \\\"question\\\": \\\"하루 중에 몸을 움직이는 시간이 있어요? 그 시간에 기분이 어때요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4314,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":134,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -947,16 +947,16 @@
   {
    "case_id": "P085#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
     "fresh": 0,
     "fun": 0,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "맥락이 안맞아. 무릎이 아픈데 걷는다고만 말하면 말이 안돼. 그리고 답하기도 조금 재미가 떨어져.",
    "sentence": "할머니께서 저녁을 드시고 나서 산책을 나가셨어요. 요즘 무릎이 아파서 밥 먹은 후에 조금씩 걷는 게 좋다고 하셨어요.",
    "question": "가족 중에 누구랑 같이 있을 때 마음이 제일 편해요? 왜 그런 것 같아요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePM6YBgcAGmYVhpV6Rgm\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"할머니께서 저녁을 드시고 나서 산책을 나가셨어요. 요즘 무릎이 아파서 밥 먹은 후에 조금씩 걷는 게 좋다고 하셨어요.\\\", \\\"question\\\": \\\"가족 중에 누구랑 같이 있을 때 마음이 제일 편해요? 왜 그런 것 같아요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4314,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":134,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -966,16 +966,16 @@
   {
    "case_id": "P101#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
     "fun": 0,
     "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "goal_use": null,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "답변이 좀 어색해. 그리고 재미가 없어. 학생들이 10대 후반인만큼 연얘얘기 친구얘기를 좀 더 재밌게 풀어나가는 답하기라면 너무 좋겠어. 마치 비밀친구랑 대화하는것처럼 말이야.",
    "sentence": "저는 매운 음식을 잘 못 먹어요. 그래서 친구들과 밖에서 먹을 때는 떡볶이하고 김치찌개는 시키지 않아요.",
    "question": "친구들과 밖에서 먹을 때 메뉴는 보통 누가 정해요? 그때 기분은 어때요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePM6zUEKLVPVpUqXpVAz\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 매운 음식을 잘 못 먹어요. 그래서 친구들과 밖에서 먹을 때는 떡볶이하고 김치찌개는 시키지 않아요.\\\", \\\"question\\\": \\\"친구들과 밖에서 먹을 때 메뉴는 보통 누가 정해요? 그때 기분은 어때요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4426,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":125,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -985,16 +985,16 @@
   {
    "case_id": "P101#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "굿  이번꺼는 그래도 재밌고 문맥도 자연스럽고 좋아.",
    "sentence": "저는 친구하고 노래방에 가면 빠른 노래는 잘 못 불러요. 가사를 다 못 외워서 자꾸 놓쳐요. 그래도 후렴은 안 틀리니까 그것만 크게 불러요.",
    "question": "노래방이나 혼자 있을 때 자주 부르는 노래가 있어요? 언제부터 그 노래가 좋아졌어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePM7LRnDiyvUrz8Jbfr7\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 친구하고 노래방에 가면 빠른 노래는 잘 못 불러요. 가사를 다 못 외워서 자꾸 놓쳐요. 그래도 후렴은 안 틀리니까 그것만 크게 불러요.\\\", \\\"question\\\": \\\"노래방이나 혼자 있을 때 자주 부르는 노래가 있어요? 언제부터 그 노래가 좋아졌어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4426,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":153,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1004,16 +1004,16 @@
   {
    "case_id": "P102#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
     "fresh": 0,
     "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
+    "accuracy": 1,
+    "goal_use": null,
     "state_use": 0
    },
-   "grader_note": "미채점",
+   "grader_note": "이건 가족이 돈이 없다고 보이기도 해서 이건 별로야. 학생이 용돈 떨어지는건 좋은데 가족이 돈이 없어보이는건 별로야. 이사하면 가족돈이잖아. 거지도아니고 가구살돈이없다고하면 안되지.",
    "sentence": "지난주에 이사를 해서 짐을 정리했어요. 큰 상자를 책상으로 쓰고 있어요. 아직 가구를 살 돈이 없어서요.",
    "question": "집에서 원래 용도랑 다르게 쓰는 물건이 있어요? 언제부터 그렇게 쓰게 됐어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePM7nFJQTScmsrWyiav6\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"지난주에 이사를 해서 짐을 정리했어요. 큰 상자를 책상으로 쓰고 있어요. 아직 가구를 살 돈이 없어서요.\\\", \\\"question\\\": \\\"집에서 원래 용도랑 다르게 쓰는 물건이 있어요? 언제부터 그렇게 쓰게 됐어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4430,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":129,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1023,16 +1023,16 @@
   {
    "case_id": "P102#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "goal_use": null,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "답하기가 매우 부자연스러워 뭔가 강제하는 느낌이야. 시간이 잘 가려고 뭔갈 하는 편이에요? 이렇게 물어봐야지 ;;",
    "sentence": "요즘 지하철에서 노래를 들으면서 가사를 따라 불러요. 그러면 지루한 시간을 즐겁게 보낼 수 있어서 좋아요.",
    "question": "이동할 때 시간이 잘 가게 하려고 뭘 해요? 그게 언제부터 습관이 됐어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePM8DsAP8gQxQRZZqhn9\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"요즘 지하철에서 노래를 들으면서 가사를 따라 불러요. 그러면 지루한 시간을 즐겁게 보낼 수 있어서 좋아요.\\\", \\\"question\\\": \\\"이동할 때 시간이 잘 가게 하려고 뭘 해요? 그게 언제부터 습관이 됐어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4430,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":125,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1042,16 +1042,16 @@
   {
    "case_id": "P103#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "굿 이해가 잘 된다.",
    "sentence": "저는 버스에 사람이 많으면 서서 가지만 그게 더 편해요. 앉으면 금방 졸려서 내릴 곳을 놓칠 때가 있거든요.",
    "question": "이동하는 동안 보통 뭘 하면서 시간을 보내요? 그 시간이 좋아요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePM8cr2jkK9hkQVAwv8H\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 버스에 사람이 많으면 서서 가지만 그게 더 편해요. 앉으면 금방 졸려서 내릴 곳을 놓칠 때가 있거든요.\\\", \\\"question\\\": \\\"이동하는 동안 보통 뭘 하면서 시간을 보내요? 그 시간이 좋아요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4439,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":121,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1061,16 +1061,16 @@
   {
    "case_id": "P103#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
     "fun": 0,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "재미도 없고 매우 부자연스러워. 답하기 문맥이 나도 이해가 잘 안될정도로 부자연스럽다",
    "sentence": "저는 방이 좀 지저분하지만 그냥 놔둬요. 그런데 친구가 온다고 하면 급하게 청소를 시작해요.",
    "question": "무슨 일이 생기기 전에 갑자기 부지런해질 때가 있어요? 그때 제일 먼저 뭘 해요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePM9465DZWwX8uPQknPj\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 방이 좀 지저분하지만 그냥 놔둬요. 그런데 친구가 온다고 하면 급하게 청소를 시작해요.\\\", \\\"question\\\": \\\"무슨 일이 생기기 전에 갑자기 부지런해질 때가 있어요? 그때 제일 먼저 뭘 해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4439,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":121,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1080,16 +1080,16 @@
   {
    "case_id": "P104#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "나쁘진않은데 퀄리티는 전체적으로 약간 떨어져.",
    "sentence": "제 방은 지금 좀 어수선해요. 그래서 오늘 저녁에는 책상부터 정리할 거예요.",
    "question": "정리하고 나면 기분이 어떻게 달라져요? 미루다가 결국 몰아서 한 적도 있어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePM9TEcALLViwJcMgVRJ\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"제 방은 지금 좀 어수선해요. 그래서 오늘 저녁에는 책상부터 정리할 거예요.\\\", \\\"question\\\": \\\"정리하고 나면 기분이 어떻게 달라져요? 미루다가 결국 몰아서 한 적도 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4489,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":106,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1099,16 +1099,16 @@
   {
    "case_id": "P104#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
     "fun": 0,
-    "accuracy": 0,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "방 청소하는 과제중에는 제일 낫다. 다만 재미가 좀 떨어져. 미루다가 후회한적이 없어요? 보다 혹시 책상에 이성친구 사진이 있나요? ㅋㅋ 이런식으로 친근하게 다가가도 좋을것같아.",
    "sentence": "제 방은 지금 좀 어질러져 있어요. 오늘은 시간이 있으니까 저녁에 청소를 할 거예요.",
    "question": "방이 어지러울 때 제일 먼저 치우는 건 뭐예요? 미루다가 후회한 적도 있어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePM9nbScU1CLWeipBh1U\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"제 방은 지금 좀 어질러져 있어요. 오늘은 시간이 있으니까 저녁에 청소를 할 거예요.\\\", \\\"question\\\": \\\"방이 어지러울 때 제일 먼저 치우는 건 뭐예요? 미루다가 후회한 적도 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4489,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":112,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1118,16 +1118,16 @@
   {
    "case_id": "P105#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
     "fun": 0,
-    "accuracy": 0,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "나쁘진 않은데 조금 재미가 떨어져.",
    "sentence": "요즘 아침마다 집에서 공원까지 천천히 걸어가요. 공원에 벤치가 많아서 잠깐 앉아 쉬다가 와요.",
    "question": "아침에 눈을 뜨고 제일 먼저 하는 일이 뭐예요? 그게 어떻게 시작됐어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMA7soZjcpFQ49kcaFN\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"CAISjQgKjgEIERgCKkCtUUX3jc2HllaYXpDpiv3pU7JM1U1vfvrv4w2Ujx1HvMZaVBJv1PdUYWZemIZHY2sqJvTWDDeTp+YTZyUmdmJvMg1jbGF1ZGUtb3B1cy01OAFCCHRoaW5raW5nWiRmNmRkYzFiZS01MTFmLTQ0MjYtYTU5NS05NmJjOTU2ZmZhMDSoAdXqtdQGEgw6ww6ep/xxDw79ezAaDBAWRugC2FT/Jr2LGyIw7mHwhX3DIGsw/Aismcce9pdprNHB1q4as8SfskYuc615QRBHevCV4g8Tjo/X356MKqsGuDNh2ALrFMcAR2HKlvJ6lIN0gzjhH7BgJvas4ubDyxim50RrsdWRuAEtdx5oU3DryIva3Yor2f/PPbpOvOwI5BhaJEMNmFK7J9x2nLCq3qn7oEL/lT5F88XanC+yQJuMxxzX5GqO0cnoDINl4L0tOXZz9aeqatWcMRfT/dLbkbXQxj82V0WIY2Tb5/aYmr2JyPTKNTk2HYbnc6R3I1ykdR1dsHxWEyBtlDZiCXZwOylbRxpfpXyeyapbzk6h5rupu0pX85lN92dNSlkGKyevF1nR3O21AJw3jWookSdDAf8WbqDf3sJbCG4AElcmDngbjfPQz+974qRJG+4WCx8KfIRRfxL8NgQV+GavoETbWi/5Mv7UE6PNge562JQngH3WEHtXA9yjytfydnn9XV8pfXjukK5iejfCMQGv/zoq29om7Zg8W32AEqQADKzHKolBJUnMN3MVOAawyoWn6KoLkU4OTEO1+vfOmjiHroGi70gUB3q3ZkYfjz/1VSHSFPiQ+hVaWxgY0Nt/iZduVHRVJ3Rd1DOanyF3kulvA8YUWfPyofSW/qiC7C1RHqKPBX195O9ZabzDykdAvqjkIIP1ESe3TTIgaHElxELIhqXVD9HXL/rlJQVXHbv4i7ZW2TG1V1Ewp9v0sW+zm4xrECZIwmxfPgt64G22rKh3pJc93AETA+ePqv4cQx+j2YlhlpxQtqn6vnk+SGo/MN8H8Njx1aGkHJQJ1nLy+jaFzTzpa4N4QHyfIypiw3ym84ryPD+OdMOuaWAm/fKziAg0+M0AZrzsQeZymhrRsNQEGpQSWcX/aWPKp1eDXkMs20gPir8nZch/A1n/dfEOdWVpUqfpWNiNfAAP+Q/o34bn8Z7HSxppBCe+v37fhgEuEfEnil7Sya1yIEb88046AaqKzQ7ALbdhyi0MJIJsl3ZDdApP4kSJVzNYuSpF5aRntlKnr/lCr1pU+KqoeMbtkT0a4CVD5xETlcO73SseaYlwj0ywBZFQ54y6GMXEgfw+86oPlxaNlEPno+C15PxNvZrDqNAz/zXA5tFmkndrsnXevIkssP/qhdPziyOfOiswsxgB\"},{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"요즘 아침마다 집에서 공원까지 천천히 걸어가요. 공원에 벤치가 많아서 잠깐 앉아 쉬다가 와요.\\\", \\\"question\\\": \\\"아침에 눈을 뜨고 제일 먼저 하는 일이 뭐예요? 그게 어떻게 시작됐어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4389,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":475,\"output_tokens_details\":{\"thinking_tokens\":351},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1137,16 +1137,16 @@
   {
    "case_id": "P105#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "답변에서 기분이 어때요? 이것보다 혹시 좋아하는 사람 생각하나요? 이런식으로 재밌게 하면 좋겠는데",
    "sentence": "저는 월요일부터 금요일까지 학교 앞 카페에서 아르바이트를 해요. 주말에는 집에서 푹 쉬고 싶어서 일을 안 넣었어요.",
    "question": "요즘 쉬는 날에는 주로 뭘 하면서 시간을 보내요? 그렇게 하고 나면 기분이 어때요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMAj7s93cVVUJVtTDDL\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 월요일부터 금요일까지 학교 앞 카페에서 아르바이트를 해요. 주말에는 집에서 푹 쉬고 싶어서 일을 안 넣었어요.\\\", \\\"question\\\": \\\"요즘 쉬는 날에는 주로 뭘 하면서 시간을 보내요? 그렇게 하고 나면 기분이 어때요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4389,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":138,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1156,16 +1156,16 @@
   {
    "case_id": "P121#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "나쁘지않아",
    "sentence": "오늘은 지갑에 천 원밖에 없어서 시장에서 사과만 두 개 샀어요. 집까지 버스로 오고 싶었는데 차비가 없어서 그냥 걸어왔어요.",
    "question": "요즘 갖고 싶은데 계속 참고 있는 물건이 있어요? 언제쯤 살 생각이에요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMBBdoYhA9RoFCUpF36\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"CAIS5AgKjgEIERgCKkCldHxzlYiENLJhmWP9fPhENnvWfNjVK1v2HHQFkKK80ayg6R3qDZkJpwoU9o3OA4XXSQwIJfBHL9uwiClqdELnMg1jbGF1ZGUtb3B1cy01OAFCCHRoaW5raW5nWiRmNmRkYzFiZS01MTFmLTQ0MjYtYTU5NS05NmJjOTU2ZmZhMDSoAeXqtdQGEgweEIrct0JL4+HyQX8aDIYslIBVwxDb7f5rEiIwOTu10WP5StiCnljq46C5FXrv53WiVeZZAT1QDrrOIppYPAtPUAEkcxr1QUQXbinrKoIHKlGJda7REzn9i7E9R2pKV8UJqHfbMtVq7Wiqwa7EHx2d6kcnmHPg2q0PQF1qFn91WY5qLBP3NClIEkvM7s5EOlDQvet9edmDbruAMR6BMekpOheG9k2vK5XSdJy+MYf6i85AV+nmYDJPuVvDum3Pb5cfYfoGSvjChP3XsN4eq//ehhSpD3ODbxeFm4/Zamfso13+ryNpz7YmZgBfNPaDABnodFlyOqTqaGOZp+R6iaDdJ1sxPkAnBYguMSye4am84KoQEAehrooAeISYGxkF/+PPJE852erpxHcCy1cjCw/ugjI+KWxpRwXGAxXS1TZ0QEZUJ+tmOWZATPCZsuowSl3rSxbU98EdRhyZYFXcWvi3f+ePKuq2OAxsrfnC057BN2Xj/hq3HnAN/BpIVoPwyTbTOeDuEniACEUJEwrdww6PcaK5B6Tc2cTb6oeCa09EmrO1jE/G/5GKx1QKWjEW3GC/nnETZbB4DVCEnroDASobFoaCYvp+wyQzjxkzhkNr3e1BztksaH04TF/btge8+siiD9tZpH+8OJ+eqHW+uu6xSk0o+bElKMpC8CQqPxVCEvaVGrI9b6fQpKyIGE8lJZP+Jnhwhc2KTExl5RN5mqc71KmhrpvHeS/FSdGvCBz/G1MLlDT9ZNdrZtbVODi9Ew66HxnnFeC1m2gj8z5Y9w9wqbEQUaebDomI3J63A/18PistCynaOZS8ICdAv2/GcknPpWkhFFJtd8R3RSapJX23CAXMmHNru4XvEqrC5qFuRFJryJ9uDhV0ZMV7ePlSsNAFjVT80KX4ttqlfuqALn6+8tyvifvpt0NL8aNMPmlnP+MTcNj35LT1+feI8vNtvv9eS9Vv4GlqkQmVgHSG9NWKWai9DSzOqwFvG+Ig7DZjIwT6vPIqSnDiue+a91+Gl8yzneYjHZfEpG2+K1tSlqA/WdcPvktBg6CDLLE0vZDT86qjoGbSItXuCh8pW2bh/efrzStN5yX3+QJINrmYhFwBUSBPr+jf/SboAu3AO/BPhXzBKdOwYWnhtAG9Ne4fmwyS6axytE9caOfUaEJ7SdsbXqdCMSdzvy6Nev/5kLDDCoWZ7FClkDC+7bqwuiFLnnwF+gR1247OX5dr/kgSBxmu5ioGqUgRNJ+7oxaQPB0MYj3/hotHbWPf2J6LjyvvmdrT7uJIlmzggjPfhFobSOF5fhgB\"},{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"오늘은 지갑에 천 원밖에 없어서 시장에서 사과만 두 개 샀어요. 집까지 버스로 오고 싶었는데 차비가 없어서 그냥 걸어왔어요.\\\", \\\"question\\\": \\\"요즘 갖고 싶은데 계속 참고 있는 물건이 있어요? 언제쯤 살 생각이에요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4336,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":544,\"output_tokens_details\":{\"thinking_tokens\":406},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1175,16 +1175,16 @@
   {
    "case_id": "P121#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "굿굿 훌륭한데 재미를 조금 더 추가했으면 어떨가 싶어.",
    "sentence": "요즘 바빠서 점심으로 김밥만 먹어요. 쉬는 시간이 십 분밖에 없어서 빨리 먹을 수 있는 걸로 고르게 돼요.",
    "question": "하루 중에 제일 여유로운 시간은 언제예요? 그때는 보통 뭘 하면서 보내요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMBvaTz31d7b4RQmxpu\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"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\"},{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"요즘 바빠서 점심으로 김밥만 먹어요. 쉬는 시간이 십 분밖에 없어서 빨리 먹을 수 있는 걸로 고르게 돼요.\\\", \\\"question\\\": \\\"하루 중에 제일 여유로운 시간은 언제예요? 그때는 보통 뭘 하면서 보내요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4336,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":697,\"output_tokens_details\":{\"thinking_tokens\":568},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1194,16 +1194,16 @@
   {
    "case_id": "P122#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "굿 !! 훌륭해",
    "sentence": "어제 언니하고 시장에 가서 귤과 딸기를 샀어요. 주말에 할머니께 가져다드리려고요.",
    "question": "뭔가 맛있는 걸 보면 제일 먼저 떠오르는 사람이 있어요? 왜 그 사람이 떠올라요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMCwckGJERjwVVzbWgJ\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"CAISxgkKjgEIERgCKkD7quzSmXjXi0Z7MEr2P6mWD/M9QfJWcxPiAHTH8JvETMPV6Ry63QBC/huxik4txqZ/V162J6YIa53zA6zySDeNMg1jbGF1ZGUtb3B1cy01OAFCCHRoaW5raW5nWiRmNmRkYzFiZS01MTFmLTQ0MjYtYTU5NS05NmJjOTU2ZmZhMDSoAf3qtdQGEgzbQtHDU3eNnUc/SfAaDI+MdBT+zpt8+A66+yIwODE1dofxGqtixkxUyMIt24R/fAgn6kxc4coqwC6yDFZWyXbFt7aqyzAa2CQxDd5NKuQHvUYiPsJCDnkaw/Rpx+KlzRCBFlv/+P7BE34gbLWAdKjjbHTKOKnyBnYhNR56IEtKg8MkjcH6/geORMcAFCG8xuGpef9OdFtkd+BbBST2n4/kjmi3BBD+Qez+ymtNmdImJ7BKUaVvZWViineUi6vGRmsUcFnDeoYR2knI5XpA9/lMQHaAJn8hOWPMEKYmABGHrd6kcG8gLZBtrt8V75xmGCmX+tSZZSBCdSBmRTwyzDM1NBRQxBZfYWVdkd6aPNL2Z6+sqpt9Msj7QxecXSie3qVYhvl2YKcHPTRI65K8pQ1NSkR6oLoTosgZPZv4M92hz4RmamWMtjjR1jtE0Dr4xtyBlZw2RPQ4n0kvbSwr/0VYs0DdS+ZcoHfzrcHJ+DJ36bbhcPb37bEMZYu/lmo6G8q0pArpNYpa5o7MNEZuk1+KtIU6JvmVMeM0Nxzytmy5FipbzzmWyVNDEqW62g2Tu/3nT7tFcLgYFM4kB52x5/YKm6Nwu4dJohvQMIZtiFuiW/GL566G8IXUeUZn0MYk3BiyBWjGmkpUG0D1WBwnooRLPAHphTV3m8kyDnD12kwJMnyvkYLLqhtJsikVd3J1rJp5GXGFIyZb4FwBNYx7x3hUQ/5sqE1vLZ5/E6gasK/ujkmIeDLvwOA3wKpaPgdQ4lqlNM5w6I5PLBffUmWTcKIiUIxZtzlsjiJdMW5zhQyks94DOanjAOlsXN26eJtAw5xSztAV9bppuVNiPdqJ9jDXyXQRXHofmU69VNYIVfMdS8CbRYK0bZy12lPmXcOgpIw9qKic7931rhnO9zlc3AY5+bedUOmPVoZhVH10vjLhm9P6Jt6nrYnF7jaWG5867cRH5sMDyakxVsLWncslQOpqRDZIKZyok4MKnltvMtLYLveJYkydBWHcgFx9yEHHaQdseMjW6bhhoeRB4K0rnYLpuJanBu6dDGLyDwf1mTdSyuz8N91mjawUeQ56Z6PeIWk7mES/sWzZJ4tdyz8bBfFYBGSz0hUBY6111oTULxCvUdFGYNUd0Tts9BbTXQIm/L5hI0RG9FT2qQ1UsU7vZvRoLSThIypGjU93PD1OaIAEal3p6IWfLr5Msl/VuD8/ndIOogwY8uijtLfQbh2yvygRNJbL8Imyd5cnohOAUFzHo/HYrIceTOqKhORAavC69wHuhNlcuGfn2sJQ+PpvCRe+Plho/qdcGIlU/5r+N6SbvGjahPkm8qPKs8sbXas1WmnAoxhmuYV3ATon7UzMCVNC9HzTTvdeLDlQ74uskLLEq11Am9xuzsaQzyEi9I2tIfHSksYCPbXg5mqO1BhtW1xnmGbfGAE=\"},{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 언니하고 시장에 가서 귤과 딸기를 샀어요. 주말에 할머니께 가져다드리려고요.\\\", \\\"question\\\": \\\"뭔가 맛있는 걸 보면 제일 먼저 떠오르는 사람이 있어요? 왜 그 사람이 떠올라요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4371,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":528,\"output_tokens_details\":{\"thinking_tokens\":411},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1213,16 +1213,16 @@
   {
    "case_id": "P122#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "나쁘지않아. 굿굿",
    "sentence": "어제 시장에서 귤하고 사과를 샀어요. 반은 할머니께 드리고 반은 친구한테 나눠 줬어요. 혼자 먹기에는 너무 많았거든요.",
    "question": "맛있는 걸 보면 제일 먼저 떠오르는 사람이 누구예요? 왜 그 사람이 떠올라요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMDgesCxTWyyVJpbSiN\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"CAIStQYKjgEIERgCKkAhM4V+2dIZe14pXV5haneKAp16UVKb0xNIiavgppbfIJl8hb3pHptKcaYXV+bZQUoJZh7YsLqWD3LKhUgRvsM1Mg1jbGF1ZGUtb3B1cy01OAFCCHRoaW5raW5nWiRmNmRkYzFiZS01MTFmLTQ0MjYtYTU5NS05NmJjOTU2ZmZhMDSoAYXrtdQGEgya9Kcl/bzGLNHkp0oaDG+YrKyqVtPVIKIRQyIwdGwjkboSugxoWVHDjV764+SIHLyGpjiMrHMhEAKujouRnTB/2cK7MeASQEk46ncKKtMEO2LcMdHEyC+oYD4o0H970eF9N23/yPU/RVZ003F5/OlCbnveNi0txmAKsc6JIwMOkIvRB+KsuQjHhHnEAKd0GbZyjNjsIlCh2cS+9Gmp7av2SH4UIARa+Rh5jeYCY8+M+0V71itcSCfeO8suhDjYQp+p5Umje/ingO0r78gCHnJ80gmLgHvs/g2HQDuwR9ZkeLtSiMRAyK4YtnrnDyg2ys9gmtIkSnP28urYJ7HDIDXhZo+NEk5Cqwg9gRLf4X9ePPd/fRhtbxP9MeIVo5PMIMC77bEOJM7U3GKagYIPzVbWM4ZqyKMtC8UsfN3QK102E4POlOMS+8lBjq71YxsQiSz25WgAihZ+PSWmsQFihVJD58k4gOy8tOEcQXX8ehgvsfxurij8P0DOEy3ToR6QxW6l358GvaUKv/dCHoAevoAfgExXwPv9jtkv6iKmzePJ3fmGspIi3JTfoPSJImrNpHu+D3SVLCF0pEYTndElM1qYSKTCigOweh20LOU/p/zD5nha7devTUCQJ59JyvN9zHFZ/1n+4JJmIKYKbS92D2L3rx3f5p5JEvje+oWawMOuKxaDctAV+V7GflSnpkXxLR6YS4Z1X17k3VwTxeoUicpvPXFTUuik3DaMQpyULUDiJiVmLCUDl2on97qX2ofmn9pYo7bwV9LuvubgXbAQcZEmVrg7VLetPEMLoh53aZEkhaZG1fPdSSi2EfQUlpmAHkZNh1KMucNevl2CJSjYrFZbBxEyiLJxjLRSTovkk6pW/px36Zt87wUJu/qipmhy8Sp3qxgB\"},{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 시장에서 귤하고 사과를 샀어요. 반은 할머니께 드리고 반은 친구한테 나눠 줬어요. 혼자 먹기에는 너무 많았거든요.\\\", \\\"question\\\": \\\"맛있는 걸 보면 제일 먼저 떠오르는 사람이 누구예요? 왜 그 사람이 떠올라요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4371,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":393,\"output_tokens_details\":{\"thinking_tokens\":256},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1232,16 +1232,16 @@
   {
    "case_id": "P123#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "굿 !! 훌륭한 과제야.",
    "sentence": "저는 월요일부터 목요일까지 아르바이트를 해요. 그래서 금요일 저녁이 제일 좋아요. 그날은 밤마다 하던 걱정이 없거든요.",
    "question": "일주일 중에서 마음이 제일 편해지는 순간은 언제예요? 그때 보통 뭘 하면서 쉬어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMEKiZeLJa4KAsQjDBN\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 월요일부터 목요일까지 아르바이트를 해요. 그래서 금요일 저녁이 제일 좋아요. 그날은 밤마다 하던 걱정이 없거든요.\\\", \\\"question\\\": \\\"일주일 중에서 마음이 제일 편해지는 순간은 언제예요? 그때 보통 뭘 하면서 쉬어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4312,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":136,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1251,16 +1251,16 @@
   {
    "case_id": "P123#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "goal_use": null,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "듣기 따라말하기 문장이 좀 어색해 \n 그래서 금요일 저녁마다 친구들과 만나서 수다를 떨어요. 이걸 내가 교정해줄게\n 그래서 금요일 저녁에는 친구들과 만나서 수다를 떨어요. 이게 훨씬 자연스러워.\n여기서 더 재미를 챙기려면 연얘 얘기를 답하기에 넣으면 자연스럽고 최고일텐데 약간 아쉽네.",
    "sentence": "저는 월요일부터 목요일까지 아르바이트를 해요. 그래서 금요일 저녁마다 친구들과 만나서 수다를 떨어요.",
    "question": "일주일 중에서 가장 기다려지는 시간이 언제예요? 그때 보통 뭘 하면서 보내요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMEpE43kGnwcMDUgAaa\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 월요일부터 목요일까지 아르바이트를 해요. 그래서 금요일 저녁마다 친구들과 만나서 수다를 떨어요.\\\", \\\"question\\\": \\\"일주일 중에서 가장 기다려지는 시간이 언제예요? 그때 보통 뭘 하면서 보내요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4312,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":119,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1270,16 +1270,16 @@
   {
    "case_id": "P124#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "매우 훌륭한 구성이야 . 나이스. 굿굿",
    "sentence": "저는 시끄러운 곳에서는 집중이 잘 안 돼요. 그래서 시험 기간에는 도서관에 가서 공부를 해요.",
    "question": "집중이 제일 잘되는 장소가 어디예요? 왜 거기가 편해요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMFBTW3bpzvvcDrPj57\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 시끄러운 곳에서는 집중이 잘 안 돼요. 그래서 시험 기간에는 도서관에 가서 공부를 해요.\\\", \\\"question\\\": \\\"집중이 제일 잘되는 장소가 어디예요? 왜 거기가 편해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4325,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":105,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1289,16 +1289,16 @@
   {
    "case_id": "P124#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "보통 침대에 눕게 되거든요가 훨씬 자연스러울것같아.",
    "sentence": "저는 도서관에서 공부하는 걸 좋아해요. 집에서는 자꾸 침대를 보게 되거든요.",
    "question": "혼자 집중이 잘 되는 장소가 따로 있어요? 거기서는 보통 뭘 해요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMFbfHYKD3vND7uhp8f\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 도서관에서 공부하는 걸 좋아해요. 집에서는 자꾸 침대를 보게 되거든요.\\\", \\\"question\\\": \\\"혼자 집중이 잘 되는 장소가 따로 있어요? 거기서는 보통 뭘 해요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4325,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":103,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1308,16 +1308,16 @@
   {
    "case_id": "P125#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "자연스러워 낫베드 !",
    "sentence": "오늘 아침에 할머니께서 산책을 하고 나서 죽을 드셨어요. 요즘 소화가 잘 안 되셔서 가벼운 음식만 찾으세요.",
    "question": "아침에 일어나서 제일 먼저 하는 일이 뭐예요? 그건 언제부터 하게 됐어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMG1F7UXoBNTtcLwrJ4\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"CAISggkKjgEIERgCKkBKqbIQX1FhfgYbuS3lQc6KJQn5Fwq2bI5rnXIYmDBO6K43mTdsxEj/iyIBghqe1YSBW7/Sy0QSrvEEvd2/2JJlMg1jbGF1ZGUtb3B1cy01OAFCCHRoaW5raW5nWiRmNmRkYzFiZS01MTFmLTQ0MjYtYTU5NS05NmJjOTU2ZmZhMDSoAavrtdQGEgy/h14YtxTqYZCFJpQaDCpKwO9NwSDat/OMtCIw7IjW++LHAqK7b3p309vv0voLwZMfc5BnBW3UNpYbX3QVlopR+ALtrEl6dQNYysl0KqAHjyVglXPKFd0MoKKgTRBpwZfbfcX7fg535fP3UyW0aG4LfMgCUWcrtCDYuElcyr7+K9Wm4UC3UAXjv3vWr4A8BbTWjxSPErv8CgsWzWYoLIg/dTbSWiwEt/pN0Fv7H9kqI0oih2q+ttzjlrOuFMmWru8ueA1sDqNla1wCQ9N4AKtUsOPb5NGCSr9nOvNwGm2+pWJ4vvbaAs8UsE2W3nt4P+BPxgdZqOvdaKJ7bD/bfGMt6dpi9Iodedns2AG28++dwIAh53LqWBYVWHbXCxOufnzh8ltgJ5k6Y9Tr4VElEA1ASOk8YCo4UqzMpKXonoveVETeOH+KesQJv3Zb+NPytHdCoENgI3mn67FmtJfd89OV00ZUlPeIhwBL/3KARwxwRq5vprWdcamwqU4cICcjVlnq+6oSupBiu8RlNV+4oMO9wpqEl4AV+Zc2zEi+Zs5mpMNSjfe2b3MEipiBhi6UkKj0J4/zi+Py2tXOwdLFVs2VLTqEJ2uuLVPnfG+hQXIrr710JvVF8x5HLNIwzrWrE9jQHfZqXmchZ6ILpCrfKZ3XsoCup0I2kseklAdACEJ6csCJkc2XhOZCokVHZBavtC5uucgm/XunDVcYqqfgP0u/ozqyQQURykyA6tuV8pE0vQpK1gm6ERiBGcFMq5JOGfxYtPHnHRa0IIT8DUnH1FElgggiszT6rz4Gz6YNp9sf/Wf2VYYIBk0TVRtuQ1PJLttILOPoUsgRcVd0XSfxQNitW6ac8t6SVF+rd42jEpGxRV2TuOhMcJWFVWxhBRGmUTTjahDTEKRQ0bphyXvmcfwKKZ3AR3Bp+sx4vQVouOShrFKWQ5wy2+qP+Y+hPYTRReA0dEjI673FJEMbo1SSS2yYiiKGKnlSnpFsg0oxzrhmXX4l1J9Hiy6FJGOyRTqdeoJYDwSTD4U6I0ze7Yo65H27KVJ0pRuhodzeDF5gc5EbF6xP4ymVo8JBl6SNYuPTTYa6bBIuKA7ZUvoDmb3h6CIr9EtoNyTnlLUVPpKCklslGhaRjqJnYvBTxnwOX5unDAynJFefHoB2SvGHRBlwP3PmZ2E8YQIuO8EzjaoqHekpSRHaI7vz3Tt1J0y3FbpIA55TDaWR7s3acnYdPS9wAtZBoOm9PwaLXNNYvbTVEQt376mnyJovB5NregVPaVi4Moc1kUO099gOcF0/7f2/EVpxY02DltXeze15PGNzhRr3KLMLHyLI1Rw2rrkdI2XmrBgB\"},{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"오늘 아침에 할머니께서 산책을 하고 나서 죽을 드셨어요. 요즘 소화가 잘 안 되셔서 가벼운 음식만 찾으세요.\\\", \\\"question\\\": \\\"아침에 일어나서 제일 먼저 하는 일이 뭐예요? 그건 언제부터 하게 됐어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4317,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":549,\"output_tokens_details\":{\"thinking_tokens\":420},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1327,16 +1327,16 @@
   {
    "case_id": "P125#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "자연스럽고 나쁘지않은데?",
    "sentence": "할머니께서는 저녁을 드시고 나서 꼭 동네를 한 바퀴 걸으세요. 그렇게 걸으셔야 밤에 잠이 잘 온다고 하세요.",
    "question": "밥을 먹은 다음에 꼭 하는 일이 있어요? 그걸 안 하면 어떤 기분이 들어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMH28iwyJKYRqhbTSNK\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"할머니께서는 저녁을 드시고 나서 꼭 동네를 한 바퀴 걸으세요. 그렇게 걸으셔야 밤에 잠이 잘 온다고 하세요.\\\", \\\"question\\\": \\\"밥을 먹은 다음에 꼭 하는 일이 있어요? 그걸 안 하면 어떤 기분이 들어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4317,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":136,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1346,16 +1346,16 @@
   {
    "case_id": "P141#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "굿 이건 자연스럽고 재밌다.",
    "sentence": "어제 친구가 만들어 준 떡볶이가 생각보다 훨씬 매웠어요. 그래서 아침부터 물을 계속 마시고 있어요.",
    "question": "매운 음식을 먹으면 기분이 풀리는 편이에요, 아니면 되도록 피하는 편이에요? 언제부터 그랬어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMHWjvQcoz45Yqns72K\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"CAISlAsKjgEIERgCKkBv78vBYQY8U92KVDx4yZejIuKz5vxgAfXaCDKZsU7kJ1HgaQMOh6p7qWNHQW3OWX7lFKwzi5LVQibtFqkmLR7rMg1jbGF1ZGUtb3B1cy01OAFCCHRoaW5raW5nWiRmNmRkYzFiZS01MTFmLTQ0MjYtYTU5NS05NmJjOTU2ZmZhMDSoAbzrtdQGEgwOF6gWMJ6ZqI3o4q4aDLEE631F+pScc83TGSIwtUzbcYO7jYzaB3AtnTpfWgtdVHAckQQcwFFRriBTA+ami/hlMhjNu27tcuzqb+/FKrIJn8xaMtDQV728qU2RiR55uzqESxwQlrcedkiGxjlVtNf0O4jgqEwc/JHSbrCXoGdvFfUikN8K+Aet/gjG6e2wNasDd28FaHfjbV1OoUxjG84XN4IxehCVHVEcIjYU5tz3Fhnc89Fkbk0pt5BZDdit1Cxq6JUHt4Ta/hg4wUyJh9FLaQSxAyUHFkK6o9+sDwf8P2CpRZjh8W+4Hy1W120qNrjxow1WbkpE+DKp7xN9RyPJ9zymrF/4p1VYz6omLPmQ6UiGCYHOmQ6UC1ViLsg2+pprwiolgVSaLjrjN1sJVmDOovJgmZuD5guRZ0qdm19z0oSe+gW3mbEr+V11K++68518i/Suh3Ea/bYVnKU18/OmoiS45+qzhm1+X5a7P4/S6lqLnAOCdCpum4zrXDxK3Ak5aXa5mXYfQVnRBqe0Kd9vWb6/282JMbou3d32eEvBQ/c2Dt3dCAHgfOoBqD9Ibc/OaQ+hnwTrVOTeVwL1fvfGXzD4qxPrQ/3Mxb9r7W8NCVbXresQ9N8/8fV36SjbP9YLIZpSiPo3/88U9a/NBTXhX8f9b0IFyN1m4cpxygBnp3psPKuJEjWtJwSzHVpH6Qvw5YrWFez/JxLY04Rfmz75ik7DUr+Rh/RQpre2nHWB0Z9/ZhkbmUTkTE8CwU/r+hulSpCau8K8QK7JuT+i3Rdknl1z/a97k7/9IadAkt9Snm6naLcq3bbzedbQ+YG3YhPGIJs7uI7FU4KbQ4QnOzyKP+Ov5AVkMPwbk7lKmCNT0Bh2LRqlMiuTDYN/x2uUzoL1FvV/jrrXmkgakeIdEAUQjqTEbPB1t/8CeJXhqhEyQtbezv/AIqaC322Q2KHtBhEAMoCYqVuui+7m4moZhK4CYChNFnsdTgZhECy575kfvMcc9+SAMHm/Axjg9g1Mv5vWi/EOmHSq/omOIyyRmTn+q+ItTM3hTOB6EJzpKsawpS+o8TjikUvEVcmlfu4G9DDAMYDiVtS8jzMs7ASc23N9RKUi7c0m5oU6xW1pU+nc61hMfT/wx4T7PL4ayNw0IWwefSttIv64uF3GG7++ryX46CZa962ijBZj7SYY7WI9vYhjuiLYE69adsXYWG52piPiwMwEZOaL1W6gbEo1xf7rYoz9V+CCmolRkN93M3HJK0uvWj132uI1YZz/m4oTuSRCLC1F4qJ9R7XEQOBxGdlsacsXn9ZBsayKV75hwQX7/35B7VLKSQAA9zQcQoLcvwiOSGIPLaocOII4RtB+MTu4pdDU+deKw2pQQlJIYAgaG072xIvVHBfXbV42E7UyjTfqXLEcjJF5vXCeZEfL+psRQLjrSi4xqQv5Z8XwsvzPi4CYvYjMZzkjkWzZrFfB2O+fBx/8v0+00dhYJLKv8tHVViQ5H896jSKiWC4fbwR+rTO2PupyLJOLBO3R9duwejDzPyDyw8ptvdipe/877zZtTuLNFmez4w++HASIsRm/I1tqyurRQ0r2CUnZLU5WD77UcEaSWSNXMHR8tZ83UJujzsQc9coxoHG4oY09fVnBDrp6cRxeCwBVOte8lbXHPy0KYrRIAzEwJj09+tkPQd1KAobLcEkCqqIyzvnXEb3VxisYAQ==\"},{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 친구가 만들어 준 떡볶이가 생각보다 훨씬 매웠어요. 그래서 아침부터 물을 계속 마시고 있어요.\\\", \\\"question\\\": \\\"매운 음식을 먹으면 기분이 풀리는 편이에요, 아니면 되도록 피하는 편이에요? 언제부터 그랬어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4384,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":646,\"output_tokens_details\":{\"thinking_tokens\":514},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1365,16 +1365,16 @@
   {
    "case_id": "P141#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "goal_use": null,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "누구한테서 처음 들었어요? 이게 좀 그래. 만약 노래를 듣는편이라고하면 누구한테 들었어요라는게 성립이 안되잖아. 이게 좀 어색해.",
    "sentence": "어제 학교에서 집까지 걸어오면서 노래를 들었는데 가사가 마음에 콕 박혔어요. 그래서 오늘도 그 노래만 계속 듣고 있어요.",
    "question": "속상할 때 힘이 되는 노래나 말이 있어요? 그건 누구한테서 처음 들었어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMJMjiaEZU1FtVbMRYt\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"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\"},{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제 학교에서 집까지 걸어오면서 노래를 들었는데 가사가 마음에 콕 박혔어요. 그래서 오늘도 그 노래만 계속 듣고 있어요.\\\", \\\"question\\\": \\\"속상할 때 힘이 되는 노래나 말이 있어요? 그건 누구한테서 처음 들었어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4384,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":899,\"output_tokens_details\":{\"thinking_tokens\":769},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1384,16 +1384,16 @@
   {
    "case_id": "P142#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "나쁘지않은데 답변이 조금 더 재미있었으면 해. 그렇게하면 기분이 풀려요? 이게 네 아니오밖에 안되니까 좀 별로야",
    "sentence": "저는 노래는 잘 못하지만 노래방을 좋아해요. 그래서 오늘도 친구랑 스트레스를 풀러 노래방에 갈 거예요.",
    "question": "기분이 안 좋을 때 나만의 방법이 있어요? 그렇게 하면 정말 풀려요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMKb7QXAXCjrUcL7o99\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 노래는 잘 못하지만 노래방을 좋아해요. 그래서 오늘도 친구랑 스트레스를 풀러 노래방에 갈 거예요.\\\", \\\"question\\\": \\\"기분이 안 좋을 때 나만의 방법이 있어요? 그렇게 하면 정말 풀려요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4435,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":120,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1403,16 +1403,16 @@
   {
    "case_id": "P142#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
-    "goal_use": 0,
-    "state_use": 0
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
+    "goal_use": null,
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "굿 전체적으로 깔끔해",
    "sentence": "오늘은 좀 피곤하지만 시장에 가려고 일찍 나왔어요. 저녁에 친구가 오는데 같이 만두를 만들어 먹고 싶어서요.",
    "question": "누군가에게 직접 만들어 준 음식이 있어요? 그때 상대방 반응은 어땠어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMKxtqUnCfY5p79pSwk\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"오늘은 좀 피곤하지만 시장에 가려고 일찍 나왔어요. 저녁에 친구가 오는데 같이 만두를 만들어 먹고 싶어서요.\\\", \\\"question\\\": \\\"누군가에게 직접 만들어 준 음식이 있어요? 그때 상대방 반응은 어땠어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4435,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":125,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1422,16 +1422,16 @@
   {
    "case_id": "P143#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "굿 이것도 깔끔하고 자아성찰도 돼  굿굿 훌륭해",
    "sentence": "제 방은 짐이 많아서 좀 답답해요. 그래서 이번 주에는 안 쓰는 물건을 정리할 거예요.",
    "question": "방에서 제일 버리기 아까운 물건이 뭐예요? 그걸 왜 못 버리고 있어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMLPGnx9vPqdaqNQSGj\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"제 방은 짐이 많아서 좀 답답해요. 그래서 이번 주에는 안 쓰는 물건을 정리할 거예요.\\\", \\\"question\\\": \\\"방에서 제일 버리기 아까운 물건이 뭐예요? 그걸 왜 못 버리고 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4468,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":111,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1441,16 +1441,16 @@
   {
    "case_id": "P143#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "답변이 좀 어색하다. 뭔가 시비거는듯한 느낌이야 ;;",
    "sentence": "저는 버스보다 지하철이 더 편해요. 지하철은 길이 막히지 않으니까요. 그래서 내일 약속에도 지하철을 타고 갈 거예요.",
    "question": "길에서 시간을 보낼 때 보통 뭘 하면서 버텨요? 그게 도움이 돼요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMLp6nbzCM9M8uoTAyN\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 버스보다 지하철이 더 편해요. 지하철은 길이 막히지 않으니까요. 그래서 내일 약속에도 지하철을 타고 갈 거예요.\\\", \\\"question\\\": \\\"길에서 시간을 보낼 때 보통 뭘 하면서 버텨요? 그게 도움이 돼요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4468,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":124,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1460,16 +1460,16 @@
   {
    "case_id": "P144#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "다음 날 아침에 못일어나서요가 아니라 늦게 일어나서요가 아닐까?",
    "sentence": "저는 커피하고 초콜릿을 아주 좋아하는데 밤에는 안 먹어요. 잠이 오지 않아서 다음 날 아침에 못 일어나거든요.",
    "question": "잠들기 전에 꼭 하는 습관이 하나 있어요? 언제부터 그렇게 됐어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMMAuRm7KiLGqp3tHAt\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"CAIShQgKjgEIERgCKkC4MydUfXxyK4xudZP1I71Uor+idPzqT1Velndq3MZv9yZBTV8RfrvGisRD0pgrlNnrFWLt3AiKT0fVjkQDb+FxMg1jbGF1ZGUtb3B1cy01OAFCCHRoaW5raW5nWiRmNmRkYzFiZS01MTFmLTQ0MjYtYTU5NS05NmJjOTU2ZmZhMDSoAezrtdQGEgxAO0OYR5RRlN9HyaoaDIXNVgoFbCcr6sgpUCIwqKdRNlg2RyieTAttUxbWUdZDJoo43NnCRvxTnnc0cuIIRvt7fJSLE2b8YaaajAXuKqMGqhkp6P614/Bqe6j9tDfQomxR7cD24f4jNZTKxqmuNHj0pzBIwDUAIB+0TCUaIWBqlJrS991QsKLRYoxHN0i0SQM/5cFamBpVOyI1ZOXReTxEHRHMf8qN3dtBNFJ+EmWNhnIs77rGK6tEgcm8LURczH07TxBj+X5rFamWkXBLJROC2oNjp/5brBTRi/3Gvkpmk1ehXLbjOgzf3yg9gGeIMPA+YYvRFBAugiGXTSURUURf1XSU/TwIE9ayiOlFP5ptQEFfoQI87JGRmUK7sqO+QNFaEYqhMRAnwIW9ogwfAyUBmgAyQPQU0Qa76BqoNOiz+CJzeb3hye9NJGEIRWYXITjV1JlKSbjzxCIs5IrkoheObpTUjXaYcavGMd0l54SCgzHcOu3skMbWRshbqTqgixMVIPxQ6MUz53wjCXAWP0S72mtpExSVbeqslHlrAQEwsSGF2EsI6dFNkYce7c8yBfV/ghZIVcqrJw8xXejKXs262wC8C0UjUzywfY6nrsCubLV0v/5EbJy+jE0NjbZyAprzqNASDQRRpjgGiqwlIA6g5TuODJTe2hZUiS3orY3Iq9e6Zf2A1wXqmnJVA+gcV1TuvWXxt6TxTY9oPWEt9Y9Z0CdZH8hTnY4ymGkVfFhH16UhDbWDRc81UecBd3wV55UyctsK+ZhXPwCdF5IlV5kuWL4yPQmr1pTFELfRUFsCR44BT8iFfABk/+2difWO54Is95KeZF3mY6ayOYPbhxt+x9dEHgMTqEd/VXAlXAlqQhGIvi3u5SsAF5E50OH0ZkWahmGN7Cp7vucIfFzN5ltsXoksOy+bXsnTHuBf185NDFEMb8Vtvay6OmOLc3Xn4HeCiu1PZCYFLqhYU0/I2tlCsy3O/ZjF9EF90n5IrWal1K9Upn0tDUnsTPai62fQxh6JZVTOc0RXJ/SM5LsQ+wJcvmyAo8JvS474iab/KkolWYHtHMKJsLPIeuNm/hXyylwXg4rS5mPC2nPDoSBZTDhsuV9FMUXdo2GgV0FE4JG+FQJdM/EMfZmwOIEPwBNApAbB8ysRBHDBBnxek9o84q+t8hEYAQ==\"},{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 커피하고 초콜릿을 아주 좋아하는데 밤에는 안 먹어요. 잠이 오지 않아서 다음 날 아침에 못 일어나거든요.\\\", \\\"question\\\": \\\"잠들기 전에 꼭 하는 습관이 하나 있어요? 언제부터 그렇게 됐어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4507,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":472,\"output_tokens_details\":{\"thinking_tokens\":347},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1479,16 +1479,16 @@
   {
    "case_id": "P144#2",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "나쁘지않은데 재미가 좀 없게 느껴지네",
    "sentence": "저는 커피하고 초콜릿을 정말 좋아해요. 그런데 밤에는 안 먹어요. 먹으면 잠이 잘 오지 않거든요.",
    "question": "밤에 잠들기 전에 꼭 하는 일이 있어요? 언제부터 그렇게 했어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMMsFKWHDoC4h4a7vyJ\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"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\"},{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 커피하고 초콜릿을 정말 좋아해요. 그런데 밤에는 안 먹어요. 먹으면 잠이 잘 오지 않거든요.\\\", \\\"question\\\": \\\"밤에 잠들기 전에 꼭 하는 일이 있어요? 언제부터 그렇게 했어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4507,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":681,\"output_tokens_details\":{\"thinking_tokens\":562},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1498,16 +1498,16 @@
   {
    "case_id": "P145#1",
    "axis_scores": {
-    "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
-    "fresh": 0,
-    "fun": 0,
-    "accuracy": 0,
+    "connect": 1,
+    "answerable": 1,
+    "level_fit": 1,
+    "fresh": 1,
+    "fun": 1,
+    "accuracy": 1,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "굿 ! 나쁘지않아",
    "sentence": "저는 자기 전에 방을 조금 치워요. 아침에 일어나서 방이 깨끗하니까 기분이 좋거든요. 그래서 정리를 하고 나서 불을 꺼요.",
    "question": "하루 중에 마음이 제일 편해지는 순간은 언제예요? 그때 보통 뭘 하고 있어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMNmBEAdxxr6ykv7UYy\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"저는 자기 전에 방을 조금 치워요. 아침에 일어나서 방이 깨끗하니까 기분이 좋거든요. 그래서 정리를 하고 나서 불을 꺼요.\\\", \\\"question\\\": \\\"하루 중에 마음이 제일 편해지는 순간은 언제예요? 그때 보통 뭘 하고 있어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4370,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":134,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
@@ -1518,15 +1518,15 @@
    "case_id": "P145#2",
    "axis_scores": {
     "connect": 0,
-    "answerable": 0,
-    "level_fit": 0,
+    "answerable": 1,
+    "level_fit": 1,
     "fresh": 0,
     "fun": 0,
     "accuracy": 0,
     "goal_use": null,
-    "state_use": 0
+    "state_use": 1
    },
-   "grader_note": "미채점",
+   "grader_note": "미뤘는데 어떤 기분이 드냐는건 좀 말이 이상하지않아? 미뤘으면 당연히 찝찝하겠지; 재미도 없고 부자연스러워",
    "sentence": "어제는 방이 너무 어질러져 있어서 청소부터 했어요. 청소를 하고 나서 창문을 열어 두니까 공기가 시원해져서 기분이 좋았어요.",
    "question": "집안일 중에서 제일 하기 싫은 건 뭐예요? 그걸 미루면 어떤 기분이 들어요?",
    "raw_response": "{\"model\":\"claude-opus-5\",\"id\":\"msg_011CePMP7sRbg8TVcmjXJNPb\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"sentence\\\": \\\"어제는 방이 너무 어질러져 있어서 청소부터 했어요. 청소를 하고 나서 창문을 열어 두니까 공기가 시원해져서 기분이 좋았어요.\\\", \\\"question\\\": \\\"집안일 중에서 제일 하기 싫은 건 뭐예요? 그걸 미루면 어떤 기분이 들어요?\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":4370,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":133,\"output_tokens_details\":{\"thinking_tokens\":0},\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}",
