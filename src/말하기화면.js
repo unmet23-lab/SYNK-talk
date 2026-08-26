@@ -24,6 +24,7 @@ import {
 import { useAudioStream } from 'expo-audio/build/AudioStream';
 import * as Speech from 'expo-speech';
 import { 색, 폰트, 모노트래킹 } from './테마';
+import { 상단밀림 } from './인셋';
 import { 머뭇거림추적, 발화문턱_DB, 데시벨, 다음호흡 } from '../lib/세호흡.js';
 import { wav조립 } from '../lib/wav조립.js';
 import { 정본 as 음성정본 } from '../lib/음성헤더.js';
@@ -1502,7 +1503,8 @@ const 코랄지름 = 84;
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: 색.바탕 },
-  inner: { padding: 24, paddingTop: 68, paddingBottom: 48, gap: 20 },
+  // paddingTop + 상단밀림: 겉테 줄이 컷아웃 기기에서 내려오는 만큼 본문도 같이 (인셋.js)
+  inner: { padding: 24, paddingTop: 68 + 상단밀림, paddingBottom: 48, gap: 20 },
 
   머리: { gap: 6 },
   브랜드: { fontFamily: 폰트.모노, fontSize: 11, letterSpacing: 모노트래킹.라벨, color: 색.잉크_태그 },

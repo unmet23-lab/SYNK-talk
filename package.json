@@ -10,7 +10,7 @@
     "ios": "node tools/앱시작.js start --ios",
     "web": "node tools/앱시작.js start --web",
     "test": "node --test",
-    "postinstall": "node tools/BGM빌드.js",
+    "postinstall": "node tools/스키아패치.js && node tools/BGM빌드.js",
     "eval": "node tools/eval-score.js evals/출력_v1.json",
     "setup": "node tools/install-hooks.js",
     "guard": "node tools/precommit.js"

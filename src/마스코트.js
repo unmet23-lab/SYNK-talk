@@ -29,6 +29,7 @@ import {
   AccessibilityInfo, Animated, Easing, Platform, Pressable, StyleSheet, Text,
 } from 'react-native';
 import { 색, 폰트 } from './테마.js';
+import { 상단밀림 } from './인셋.js';
 /* 효과음은 src/소리.js 어댑터를 지나서만 낸다(단일 게이트 — 녹음 중 무음·킷 화이트리스트가
    그 한 곳에 산다). 옛 규칙 「마스코트는 소리를 안 낸다」는 유호 지시 08-25(탭 반응음)로
    바뀌었다 — 지금 금지는 「expo-audio 를 직접 잡는 것」이다(배선 회귀가 그걸 지킨다). */
@@ -406,7 +407,9 @@ function 말풍선({ 글, 줄임 }) {
 
 const s = StyleSheet.create({
   /* 기본 자리 = 오른쪽 위(답장 화면 겉테) — 화면이 `자리` 로 덮어쓴다. 신호색 0 · 면 0. */
-  자리: { position: 'absolute', top: 52, right: 20, alignItems: 'flex-end' },
+  // + 상단밀림: 겉테 링크 줄과 한 몸으로 내려간다 — 따로 두면 내려온 링크를 몸이 덮어
+  //   탭을 가로챈다(08-23 실사고 · 전말 = 인셋.js).
+  자리: { position: 'absolute', top: 52 + 상단밀림, right: 20, alignItems: 'flex-end' },
   몸: { width: 84, height: 84 },
   /* 천 라벨 — 얼굴 옆(왼쪽)에 단다. right = 몸 84 + 틈 10. 점선 = 실땀 자수 한 땀. */
   말풍선: {

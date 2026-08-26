@@ -25,6 +25,7 @@ import { 교정목록받기 } from './src/교정API';
 import { 배치미달받기 } from './src/과제API';
 import { 세션읽기, 세션쓰기, 세션지우기 } from './src/저장';
 import { 색, 폰트, 모노트래킹 } from './src/테마';
+import { 상단밀림 } from './src/인셋';
 import 기호 from './src/기호';
 
 /**
@@ -168,10 +169,30 @@ export default function App() {
   // 🔴 로그인 전에는 다른 화면을 그리지 않는다 — 쓰기 통로가 전부 토큰을 요구하므로,
   //    안 그러면 학생이 말하기를 하고 나서야 「저장이 안 됐다」를 만난다.
   if (!세션) {
+    /* 🔑 검수문만 예외다(개발 빌드 한정) — 검수문의 존재 이유가 «서버 데이터 없이 움직임을
+       본다»(그 파일 머리말 08-24)인데 문이 로그인 «뒤»에만 있으면 새 에뮬레이터는 원리상
+       못 들어간다(08-25 검수가 막힌 두 벽 중 하나). 값은 전부 가짜라 토큰이 필요 없다.
+       ⚠ 입구를 화면 «아래»에 두는 것도 진단이다 — 상단 y34 줄은 08-25 에 adb 탭이 안 먹던
+       자리라(원인 미확정 · memory `emulator-review-blocked`), 같은 줄에 두면 이 문도 같이
+       막히고, 아래가 되는데 위가 안 되면 그 줄의 결함이 실측으로 갈린다(SYSTEM·어제의 나도
+       그 줄에 있다). */
+    if (__DEV__ && 화면 === '검수문') {
+      return (
+        <View style={s.wrap}>
+          <StatusBar style="light" />
+          <검수문 돌아가기={() => set화면('말하기')} />
+        </View>
+      );
+    }
     return (
       <View style={s.wrap}>
         <StatusBar style="light" />
         <인증화면 로그인성공={세션세움} />
+        {__DEV__ && (
+          <Pressable onPress={() => set화면('검수문')} style={s.검수문링크_문앞} hitSlop={8}>
+            <Text style={s.검수문글}>검수문</Text>
+          </Pressable>
+        )}
       </View>
     );
   }
@@ -308,15 +329,19 @@ const s = StyleSheet.create({
   로딩가운데: { alignItems: 'center', justifyContent: 'center' },
   /* 겉테 두 링크는 같은 띠에 마주 놓는다 — 말하기 화면 본문은 paddingTop 68 아래에서 시작해
      이 띠와 겹치지 않는다. 🚫 코랄로 칠하지 않는다: 그 화면의 신호 1점은 녹음 버튼이다. */
-  겉테줄: { position: 'absolute', top: 34, left: 24, flexDirection: 'row', gap: 18 },
+  /* + 상단밀림: 컷아웃 기기에서 이 줄이 상태바 창 밑에 깔려 탭을 시스템이 먹는다(08-25 미제 ·
+     전말 = src/인셋.js). 마스코트·본문 시작선도 같은 밀림으로 한 몸으로 내려간다. */
+  겉테줄: { position: 'absolute', top: 34 + 상단밀림, left: 24, flexDirection: 'row', gap: 18 },
   겉테글: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_서브 },
   // 같은 줄의 링크(잉크_서브)보다 한 층 위 — 색을 안 바꾸고 밝기만으로 먼저 읽히게 한다.
   미달글: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크 },
-  시스템링크: { position: 'absolute', top: 34, right: 24, opacity: 0.8 },
+  시스템링크: { position: 'absolute', top: 34 + 상단밀림, right: 24, opacity: 0.8 },
   /* 검수문 링크 — SYSTEM 과 **같은 줄, 그 왼쪽**(개발 빌드 전용).
      🔴 이 줄(y34~50)은 겉테가 쓰고 마스코트는 top 64 부터다 — 여기 y 를 내리면 몽글 몸이
      링크를 덮어 탭을 가로챈다(08-23 시연 실측에서 이미 한 번 났다). */
-  검수문링크: { position: 'absolute', top: 34, right: 84, opacity: 0.8 },
+  검수문링크: { position: 'absolute', top: 34 + 상단밀림, right: 84, opacity: 0.8 },
+  // 로그인 화면의 문앞 입구 — 아래에 두는 까닭은 위 `if (!세션)` 주석(상단 줄 진단).
+  검수문링크_문앞: { position: 'absolute', bottom: 34, right: 24, opacity: 0.8 },
   검수문글: {
     fontFamily: 폰트.모노,
     fontSize: 10,
