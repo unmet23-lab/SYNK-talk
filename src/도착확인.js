@@ -146,6 +146,13 @@ export default function 도착확인({ 돌아가기, 가기 }) {
             style={({ pressed }) => [s.줄버튼, pressed && { opacity: 0.65 }]}>
             <Text style={s.줄버튼글}>시즌 회고 (원장·강사)</Text>
           </Pressable>
+          {/* 🔴 위 넷과 **다른 문**이다 — 여기 닿는 표에는 학생이 한 칸도 없다(몽골어 문구만).
+              그래서 외부 계약자에게 이 줄만 열어 줄 수 있다. 이 줄이 없으면 화면이 서 있어도
+              아무도 못 열고, 그러면 몽골어 감수 처리량은 원리상 0이다(강사 줄과 같은 이유). */}
+          <Pressable onPress={() => 가기('문구감수')} hitSlop={6}
+            style={({ pressed }) => [s.줄버튼, pressed && { opacity: 0.65 }]}>
+            <Text style={s.줄버튼글}>몽골어 문구 감수 (원장·감수자)</Text>
+          </Pressable>
           {/* 🔴 이 통로가 없으면 한 기기는 **영원히 한 계정**이다 — 공용·형제 기기에서 다음
               학생의 발화가 앞 학생 행으로 저장되고, append-only 라 되돌릴 방법이 없다. */}
           <Pressable onPress={물어보기} hitSlop={6}
