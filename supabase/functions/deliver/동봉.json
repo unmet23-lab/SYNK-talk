@@ -34,5 +34,7 @@
   "착지봉투.mjs": "lib/착지봉투.js",
   "과제생성프롬프트.mjs": "prompts/과제생성.md",
   "걸음.mjs": "lib/걸음.js",
-  "문장끊기.mjs": "lib/문장끊기.js"
+  "문장끊기.mjs": "lib/문장끊기.js",
+  "예비과제.mjs": "lib/예비과제.js",
+  "예비과제풀.mjs": "contents/예비과제풀.js"
 }

@@ -18,5 +18,7 @@
   "문구_동의.mjs": "contents/문구_동의.js",
   "걸음.mjs": "lib/걸음.js",
   "문장끊기.mjs": "lib/문장끊기.js",
-  "작성과정.mjs": "lib/작성과정.js"
+  "작성과정.mjs": "lib/작성과정.js",
+  "예비과제.mjs": "lib/예비과제.js",
+  "예비과제풀.mjs": "contents/예비과제풀.js"
 }
