@@ -104,6 +104,21 @@ async function main() {
   const 오늘 = 몽골날짜();
   const 표 = `t${Date.now().toString(36)}`;   // 이번 회차의 학생을 가르는 표식 — 회차마다 새 학생
   const 판 = (await sql(`select name from engine.schema_migrations order by version desc limit 1`))[0].name.match(/_(c\d+)\.sql$/)[1];
+  /* [08-27 · «장부 ↔ 실물» 한 칸] 착지판(DB착지판.json)이 방금 읽은 DB 실물과 같은가 —
+   * 저장소 안 검사(tests/계약.test.js)는 DB 실물을 **원리상 못 본다**(부어진 조각도 「대기 중」으로 읽어
+   * 초록 — 그 틈으로 장부가 c11 에 멈춘 채 여드레를 산 것이 08-25 실사고다). 이 시험은 어차피
+   * 원격 DB 에 접속해 있으니(추가 왕복 0) 여기서 그 대조를 «항상» 낸다. 갈리면 이 회차는 빨갛다 —
+   * 장부가 거짓인 채의 초록 왕복은 왕복이 아니라 분장이다.
+   * [사각] 이 칸이 «안» 보는 것: 조준 판(리허설/운영) 반대쪽 DB · 이미 행에 박힌 옛 판 값(소급 불가). */
+  {
+    const 착지 = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'supabase', 'DB착지판.json'), 'utf8'));
+    const 장부판 = String(착지.판 ?? 착지.version ?? 착지.contract_ver ?? '').trim();
+    if (!장부판) throw new Error('착지판 장부에서 판을 못 읽었다(DB착지판.json 키 확인) — 「못 쟀다」는 「같다」가 아니라 이 회차를 세운다');
+    if (장부판 !== 판) {
+      throw new Error(`착지판 장부(${장부판})와 DB 실물(${판})이 갈렸다 — 부었으면 장부도 같은 커밋에서 올린다(supabase/DB착지판.json · 08-25 여드레 실사고의 그 자리)`);
+    }
+    console.log(`  ✅ 착지판 장부 = DB 실물 = ${판}`);
+  }
   const D1 = 날전(오늘, 1), D2 = 날전(오늘, 2), D3 = 날전(오늘, 3);
 
   /* ── V1~V5 장부 — 확인(초록/빨강)과 별개로 «어느 검증점의 것인가»를 든다.

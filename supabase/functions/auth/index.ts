@@ -86,17 +86,24 @@ const 최대비번바이트 = 72;
 
 type 오류 = { code: string; message: string; retryable: boolean; field?: string };
 
-function 봉투(status: number, body: Record<string, unknown>, ver: string) {
+/* [08-27 판정 ⓒ] `contract_ver` 는 `string | null` — **null = 「계약층에 닿기 전」또는 「판을 못 읽음」**.
+ *   구판은 그 자리들이 `''` 를 실어 «판이 없는 응답»과 «판을 못 읽은 응답»이 같은 모양이었다
+ *   (`lib/계약판.js` 머리말이 적어 둔 그 병 — 조각 쪽은 이미 null 로 고쳤는데 이 함수의 초기값과
+ *   `판 ?? ''` 가 그것을 되살리고 있었다). ⓑ(판 읽기를 앞으로)를 안 고른 까닭: `계약판읽기` 는 캐시가
+ *   없어 **봇의 404 마다 DB 왕복**이 하나씩 늘고, 이른 거절 다섯은 계약층 «앞»의 거절이라 판이 없는 게
+ *   사실이다 — 사실을 '' 로 분장하지 말고 null 로 말한다. 오늘 이 칸을 오류 응답에서 읽는 소비자는
+ *   0(트랙 실측 — 과제API·교정API 는 성공 응답에서만 쓴다)이라 소급 파손도 0이다. */
+function 봉투(status: number, body: Record<string, unknown>, ver: string | null) {
   return new Response(JSON.stringify({ contract_ver: ver, ...body }), {
     status,
     headers: { 'Content-Type': 'application/json', ...CORS모듈.머리() },
   });
 }
-const 실패 = (status: number, e: 오류, ver: string) => 봉투(status, { ok: false, error: e }, ver);
+const 실패 = (status: number, e: 오류, ver: string | null) => 봉투(status, { ok: false, error: e }, ver);
 
 /* 🔴 게이트 실패는 **어느 칸이 틀렸는지 알려주지 않는다**(§4-1-1 ③). 호출부가 실수로
  *   구분되는 메시지를 만들지 못하게, 문구를 여기 한 곳에 둔다. */
-const 게이트실패 = (ver: string) =>
+const 게이트실패 = (ver: string | null) =>
   실패(401, {
     code: 'SIGNUP_GATE_FAILED',
     message: '학생번호 또는 전화번호 뒤 4자리가 맞지 않습니다. 계속 안 되면 학원에 문의해 주세요.',
@@ -156,14 +163,14 @@ function 토큰주장(req: Request): { sub: string; iat: number } | null {
   }
 }
 
-/* 여기서만 `''` 로 접는다 — 이 함수의 값은 **봉투 표기**이지 게이트가 아니라(위 ■), 못 읽었다고
- * 로그인을 막으면 막으려던 것보다 큰 사고가 된다. 대신 «못 읽었다»를 로그로는 말한다 —
- * 안 그러면 「판이 없는 응답」과 「판을 못 읽은 응답」이 밖에서 같은 모양이다. */
-async function 계약판읽기() {
+/* [08-27 판정 ⓒ] 못 읽으면 **null 그대로** 내보낸다 — 이 값은 봉투 표기이지 게이트가 아니라(위 ■)
+ * 못 읽었다고 로그인을 막으면 막으려던 것보다 큰 사고가 된다. 구판의 `판 ?? ''` 는 조각 쪽이 null 로
+ * 고친 것을 여기서 도로 '' 로 되살리던 자리다 — 로그는 그대로 말한다. */
+async function 계약판읽기(): Promise<string | null> {
   const 판행 = await sql`select name from engine.schema_migrations order by version desc limit 1`;
   const 판 = 행들에서판(판행);
   if (!판) console.error('[auth] DB 계약판을 못 읽었다', 판행.length ? 판행[0].name : '(이력 0행)');
-  return 판 ?? '';
+  return 판;
 }
 
 /** 임시번호가 사는 시간 (L0 §4-2-2). 이 값이 참이 되려면 우리 코드가 로그인 길목에 있어야 한다. */
@@ -320,7 +327,7 @@ async function 임시로그인(본문: Record<string, unknown>) {
 }
 
 /** 비밀번호 규격 — 통과하면 null. 게이트와 **별개로** 알려준다(본인이 방금 정한 값이다). */
-function 비번규격(비밀번호: string, ver: string) {
+function 비번규격(비밀번호: string, ver: string | null) {
   if (비밀번호.length < 최소비번) {
     return 실패(400, {
       code: 'PASSWORD_TOO_SHORT', field: 'password', retryable: false,
@@ -344,7 +351,8 @@ Deno.serve(async (req: Request) => {
    걸려 죽는다(08-27 실측: 그 400 은 게이트웨이가 아니라 우리 코드가 냈다 · `lib/CORS.js`). */
   const 예비 = 예비응답(req);
   if (예비) return 예비;
-  let ver = '';
+  // [08-27 판정 ⓒ] 계약층에 닿기 전의 거절 다섯(405·404·JSON아님·금지필드·가입답)은 contract_ver: null 을 싣는다.
+  let ver: string | null = null;
   try {
     if (req.method !== 'POST') {
       return 실패(405, { code: 'CONTRACT_VIOLATION', message: 'POST 만 받는다', retryable: false }, ver);
