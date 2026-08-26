@@ -22,7 +22,7 @@
  *   이 화면의 신호 1점은 **녹음 버튼**이다 — 여기엔 코랄을 쓰지 않는다. 위계는 밀도로 준다.
  */
 import { StyleSheet, Text, View } from 'react-native';
-import { 색, 폰트, 모노트래킹 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어폰트 } from './테마';
 import { 막힘안내 } from '../contents/문구_동의.js';
 
 /**
@@ -64,8 +64,11 @@ const s = StyleSheet.create({
   본문: { fontFamily: 폰트.본문, fontSize: 16, lineHeight: 26, color: 색.잉크_서브 },
   /* 몽골어 병기 줄 — 한 단계 내린다(같은 뜻의 두 번째 목소리다). 지금은 `mn` 이 비어 있어
      이 자리가 안 그려진다. 번역·폰트가 오는 날 `문구_동의.js` 의 `mn` 만 채우면 선다. */
-  제목_병기: { fontFamily: 폰트.강조, fontSize: 17, lineHeight: 26, color: 색.잉크_서브 },
-  본문_병기: { fontFamily: 폰트.캡션, fontSize: 15, lineHeight: 24, color: 색.잉크_메타 },
+  /* 🔴 **몽골어 줄이다** — 킷 한글 폰트(SUIT)를 박으면 키릴 자형이 없어 두부(□□□)가 된다.
+     08-27 까지 여기가 `폰트.강조`·`폰트.캡션` 이었다: 몽골어가 아직 안 와서 증상이 없었을 뿐,
+     오는 날 이 화면만 깨졌을 자리다(`테마.몽골어` 머리말이 예고한 바로 그 새는 자리). */
+  제목_병기: { fontFamily: 몽골어폰트.강조, fontSize: 17, lineHeight: 26, color: 색.잉크_서브 },
+  본문_병기: { fontFamily: 몽골어폰트.캡션, fontSize: 15, lineHeight: 24, color: 색.잉크_메타 },
 
   번호칸: { alignItems: 'center', gap: 6, paddingVertical: 12 },
   번호라벨: { fontFamily: 폰트.모노, fontSize: 11, letterSpacing: 모노트래킹.라벨, color: 색.잉크_태그 },

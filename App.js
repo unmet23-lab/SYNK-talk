@@ -49,6 +49,13 @@ export default function App() {
     'SUIT-SemiBold': require('./assets/fonts/SUIT-SemiBold.ttf'),
     'SUIT-ExtraBold': require('./assets/fonts/SUIT-ExtraBold.ttf'),
     'DMMono-Medium': require('./assets/fonts/DMMono-Medium.ttf'),
+    /* 🔴 몽골어(키릴) — SUIT 4종·DM Mono 에는 이 문자가 **한 자도 없다**(실측 08-27: Inter Tight
+       네 굵기는 몽골 키릴 70/70). 여기서 빠뜨리면 안드로이드는 그 자리에서 죽고 웹은 조용히
+       시스템 폰트로 떨어진다 — **후자가 더 나쁘다**(브랜드 밖 글자인데 아무도 모른다).
+       🔑 무엇을 실을지는 `src/테마.js` 의 `몽골어폰트` 가 정하고, 회귀가 둘을 대조한다. */
+    'InterTight-Regular': require('./assets/fonts/InterTight-Regular.ttf'),
+    'InterTight-Medium': require('./assets/fonts/InterTight-Medium.ttf'),
+    'InterTight-SemiBold': require('./assets/fonts/InterTight-SemiBold.ttf'),
   });
 
   /* 시작하자마자 저장된 세션으로 갱신을 시도한다. 성공하면 학생은 로그인 화면을 아예 안 본다. */

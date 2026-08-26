@@ -10,7 +10,7 @@
  * ■ 디자인 — 막힘카드와 같은 밀도·같은 위계(신호 1점 = 녹음 버튼 · 여기엔 코랄 0). `테마.js` R1.
  */
 import { StyleSheet, Text, View } from 'react-native';
-import { 색, 폰트, 모노트래킹 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어폰트 } from './테마';
 import { 생성안내 } from '../contents/문구_생성.js';
 
 /**
@@ -50,8 +50,11 @@ const s = StyleSheet.create({
   카드: { backgroundColor: 색.바탕띄움, borderRadius: 20, padding: 22, gap: 14 },
   제목: { fontFamily: 폰트.헤드, fontSize: 21, lineHeight: 31, color: 색.잉크 },
   본문: { fontFamily: 폰트.본문, fontSize: 16, lineHeight: 26, color: 색.잉크_서브 },
-  제목_병기: { fontFamily: 폰트.강조, fontSize: 17, lineHeight: 26, color: 색.잉크_서브 },
-  본문_병기: { fontFamily: 폰트.캡션, fontSize: 15, lineHeight: 24, color: 색.잉크_메타 },
+  /* 🔴 **몽골어 줄이다** — 킷 한글 폰트(SUIT)를 박으면 키릴 자형이 없어 두부(□□□)가 된다.
+     08-27 까지 여기가 `폰트.강조`·`폰트.캡션` 이었다: 몽골어가 아직 안 와서 증상이 없었을 뿐,
+     오는 날 이 화면만 깨졌을 자리다(`테마.몽골어` 머리말이 예고한 바로 그 새는 자리). */
+  제목_병기: { fontFamily: 몽골어폰트.강조, fontSize: 17, lineHeight: 26, color: 색.잉크_서브 },
+  본문_병기: { fontFamily: 몽골어폰트.캡션, fontSize: 15, lineHeight: 24, color: 색.잉크_메타 },
   번호칸: { alignItems: 'center', gap: 6, paddingVertical: 12 },
   번호라벨: { fontFamily: 폰트.모노, fontSize: 12, letterSpacing: 모노트래킹, color: 색.잉크_메타 },
   번호: { fontFamily: 폰트.모노, fontSize: 28, letterSpacing: 모노트래킹, color: 색.잉크 },
