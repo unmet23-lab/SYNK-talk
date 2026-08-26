@@ -49,11 +49,14 @@ const { 발급시각, 살아있는직원 } = 토큰모듈 as {
 };
 
 type 요청검증 = { 값: Record<string, never> | null; 이유: string | null; 칸: string | null };
-const { 쪽크기, 커서, 확정요청, 상태전이 } = 감수모듈 as {
+const { 쪽크기, 커서, 확정요청, 상태전이, 내보내기질의 } = 감수모듈 as {
   쪽크기: (raw: string | null) => { 값: number | null; 이유: string | null };
   커서: (raw: string | null) => { 값: string | null; 이유: string | null };
   확정요청: (본문: unknown) => 요청검증;
   상태전이: (verdict: string) => string;
+  /* 내보내기 질의는 이 함수와 `tools/문구내보내기.js` 가 **같은 문자열**을 돌린다 —
+     문은 둘이되(세션 있는 화면 · 세션 없는 CLI) 질의는 하나다. */
+  내보내기질의: string;
 };
 
 /* 🔑 **허용 목록**이다(차단 목록이 아니다 — 못 적은 역할이 새는 방향은 언제나 「통과」다).
@@ -263,18 +266,8 @@ async function 확정(본문: unknown, staff_id: string, ver: string) {
  * 🔑 「원문을 고쳐야 한다」로 끝난 것도 싣는다 — 그것을 빼면 내보내기 파일만 보는 사람에게는
  *   그 문장이 **아직 감수 전인 것처럼** 보인다. 대신 verdict 를 실어 갈래를 알린다. */
 async function 확정본(ver: string) {
-  const 행들 = await sql`
-    select s.string_id, s.source_ko, s.status,
-           r.verdict, r.final_mn, r.note, r.created_at as reviewed_at
-      from engine.l10n_strings s
-      join lateral (
-        select verdict, final_mn, note, created_at
-          from engine.l10n_reviews r2
-         where r2.string_id = s.string_id
-         order by r2.created_at desc, r2.review_id desc
-         limit 1
-      ) r on true
-     where s.status <> 'pending'
-     order by s.string_id`;
+  /* 🔑 질의는 `lib/문구감수.js` 가 쥔다 — `tools/문구내보내기.js` 가 **같은 문자열**을 돌린다.
+   *   여기 리터럴로 되돌리면 두 벌이 되고, 갈라진 쪽은 조용하다(회귀 ⑪ 이 그것을 막는다). */
+  const 행들 = await sql.unsafe(내보내기질의);
   return 봉투(200, { ok: true, data: 행들, count: 행들.length }, ver);
 }

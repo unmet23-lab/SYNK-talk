@@ -61,7 +61,37 @@ const SECRET_CONTENT = [
   },
 ];
 
+/**
+ * 크기 상한. 겨누는 것은 **셋**이다 — ①실수로 딸려 들어온 미디어·덤프 ②git 이력을 영구히
+ * 무겁게 만드는 이진물 ③리뷰가 원리상 불가능한 덩어리. 「1MB」 자체에 성스러운 근거는 없다.
+ * ⚠ 그래서 상한을 **통째로 올리는 것은 답이 아니다** — 셋 다 같이 느슨해진다.
+ *   한 파일이 정당하게 넘으면 아래 `큰파일예외` 에 **이름으로** 적는다.
+ */
 const MAX_BYTES = 1024 * 1024; // 1MB
+
+/**
+ * 크기 규칙을 이름으로 비켜 가는 자리 — **여기 적힌 것만**, 다른 무엇도 예외가 없다.
+ *
+ * 🔑 왜 상한을 올리지 않고 이름으로 뚫나
+ *   상한을 2MB 로 올리면 「새로 생기는 대용량」까지 같이 통과한다 — 가드가 겨눈 셋이 전부
+ *   느슨해진다. 이름으로 뚫으면 **이 파일만** 지나가고 나머지는 어제와 똑같이 막힌다.
+ * 🔑 왜 매번 `SYNK_SKIP_GUARD=1` 로 넘기지 않나
+ *   그 우회는 **가드 전체**를 끄므로, 그날 같은 커밋에 자격증명이 섞여도 조용히 나간다.
+ *   게다가 08-26 에 두 번 썼다 — 예외가 습관이 되면 진짜 사고를 못 막는다.
+ * ⚠ 여기 줄을 더할 때 물을 것: 「이건 **사람이 만든 파일**인가, 기계가 이은 산출물인가?」
+ *   사람이 만든 것이 1MB 를 넘으면 그건 예외가 아니라 **쪼갤 신호**다.
+ */
+const 큰파일예외 = [
+  {
+    re: /^supabase\/L0_스키마\.sql$/,
+    why: '마이그레이션 조각들을 tools/마이그레이션_합본.js 가 이어 만든 산출물이다. '
+      + '조각이 붙을 때마다 선형으로 커지고, 빈 DB 에 한 번에 붓는 것이 존재 이유라 쪼갤 수 없다 '
+      + '(테스트 6·lib 2·supabase/DB착지판.json 이 이 파일 하나를 본다).',
+  },
+];
+
+/** 크기 예외인가 — 경로가 **정확히** 맞아야 한다(접두사 일치는 사본까지 뚫어 준다). */
+const 크기예외인가 = (p) => 큰파일예외.some((x) => x.re.test(p));
 
 /** `.env.example` 처럼 「예시」임이 파일명에 드러나면 이름 규칙에서 뺀다. */
 function isExample(p) {
@@ -85,11 +115,12 @@ function inspect(files) {
       }
     }
 
-    if (typeof f.bytes === 'number' && f.bytes > MAX_BYTES) {
+    if (typeof f.bytes === 'number' && f.bytes > MAX_BYTES && !크기예외인가(p)) {
       out.push({
         path: p,
         rule: '대용량 파일',
-        why: `${(f.bytes / 1024 / 1024).toFixed(1)}MB — 1MB 넘는 파일은 git에 넣지 않는다`,
+        why: `${(f.bytes / 1024 / 1024).toFixed(1)}MB — 1MB 넘는 파일은 git에 넣지 않는다`
+          + '(정당한 산출물이면 tools/guard.js 의 큰파일예외에 이름으로 적는다 — SKIP_GUARD 로 넘기지 않는다)',
       });
     }
 
@@ -105,4 +136,4 @@ function inspect(files) {
   return out;
 }
 
-module.exports = { inspect, SECRET_NAMES, SECRET_CONTENT, MAX_BYTES, isExample };
+module.exports = { inspect, SECRET_NAMES, SECRET_CONTENT, MAX_BYTES, isExample, 큰파일예외 };

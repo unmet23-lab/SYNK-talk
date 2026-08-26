@@ -126,3 +126,51 @@ test('한 파일에 위반 2개면 2건 보고', () => {
   const v = inspect([{ path: '.env', text: 'K=sk-ant-' + A(24), bytes: 10 }]);
   assert.ok(v.length >= 2, `합산 보고 실패: ${JSON.stringify(v)}`);
 });
+
+/* ── 크기 예외 ────────────────────────────────────────────────
+ * 🔑 상한을 올리는 대신 **이름으로** 뚫은 결정(08-26 · 유호 위임 「최적의 방향으로」)을 여기서 못박는다.
+ *   위험한 것은 예외의 존재가 아니라 예외가 **넓어지는 것**이라, 아래 셋이 그 폭을 잰다.
+ */
+const { 큰파일예외 } = require('../tools/guard.js');
+const 예외경로 = 'supabase/L0_스키마.sql';
+
+test('통과: 이름이 적힌 산출물은 1MB 를 넘어도 지나간다', () => {
+  const v = inspect([{ path: 예외경로, bytes: 3 * 1024 * 1024 }]);
+  assert.deepStrictEqual(v, [], `예외가 안 먹었다: ${JSON.stringify(v)}`);
+});
+
+test('차단: 닮은 이름은 못 지나간다 — 접두사 일치였다면 사본까지 뚫린다', () => {
+  for (const 닮은것 of [
+    'supabase/L0_스키마_사본.sql',
+    'supabase/L0_스키마.sql.bak',
+    'docs/supabase/L0_스키마.sql',
+    'supabase/migrations/L0_스키마.sql',
+  ]) {
+    const v = inspect([{ path: 닮은것, bytes: 3 * 1024 * 1024 }]);
+    assert.ok(v.length > 0, `${닮은것} 이 예외로 통과했다 — 앵커(^…$)가 풀렸다`);
+  }
+});
+
+test('🔴 크기 예외는 **크기에만** 듣는다 — 자격증명은 그 파일에서도 걸린다', () => {
+  /* 이 검사가 없으면 예외가 「이 경로는 가드를 안 본다」로 조용히 넓어진다. 그때 증상은 없다
+     (커밋이 잘 된다) — 그리고 그것이 SYNK_SKIP_GUARD 를 안 쓰기로 한 이유 그 자체다. */
+  const v = inspect([{
+    path: 예외경로,
+    bytes: 3 * 1024 * 1024,
+    text: 'insert into x values (\'' + 'sk-ant-' + A(24) + '\');',
+  }]);
+  assert.ok(v.some((x) => x.rule === '내용에 박힌 비밀'),
+    `예외 경로에서 비밀 검사가 꺼졌다: ${JSON.stringify(v)}`);
+  assert.ok(!v.some((x) => x.rule === '대용량 파일'), '크기는 여전히 예외여야 한다');
+});
+
+test('예외 줄에는 반드시 까닭이 붙는다 — 이름만 적고 지나가지 못하게', () => {
+  assert.ok(큰파일예외.length > 0);
+  for (const x of 큰파일예외) {
+    assert.ok(x.re instanceof RegExp, '예외는 정규식이어야 한다');
+    assert.ok(x.re.source.startsWith('^') && x.re.source.endsWith('$'),
+      `${x.re} 가 앵커되지 않았다 — 부분 일치는 닮은 파일까지 뚫는다`);
+    assert.ok(typeof x.why === 'string' && x.why.length >= 40,
+      `${x.re} 에 까닭이 없다(또는 너무 짧다) — 다음 사람이 왜 뚫렸는지 못 읽는다`);
+  }
+});
