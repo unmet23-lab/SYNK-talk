@@ -1,7 +1,7 @@
 {
- "판": "스냅샷풀.v1",
+ "판": "스냅샷풀.v2",
  "만든날": "2026-08-22",
- "규칙": "불변 · 추가만(§8-B E4-1) — 옛 줄을 고치면 옛 시험지 해시가 소급으로 거짓이 된다. 전부 합성(실학생 0명 · §10). 축 모양 = lib/학습자상태.js 반환 키 · 쓸축수 = 표본적음 1~2 / 표본풍부 3~6(lib/과제요약.js 가 센다).",
+ "규칙": "불변 · 추가만(§8-B E4-1) — 옛 줄을 고치면 옛 시험지 해시가 소급으로 거짓이 된다. 🔴 v2(2026-08-26)에서 이 규칙을 «한 번» 깼다: goal_candidate 10종을 전부 갈았다. 까닭 = 유호 지적 08-25 「kpop 가사 이해라는 걸 왜 그대로 두느냐」 — 학생이 실제로 받는 질문은 나침반 「이번 교재에서 하고 싶은 것 한 가지는?」이고 정본은 그 답을 「학생이 제 말로 적은」이라 부르는데(lib/시즌맥락.js), 옛 값 10종이 전부 «명사형 이름표»라 운영에서 안 올 모양으로 시험하고 있었다. 판을 v1→v2 로 올려 조용한 표류가 아님을 못박는다 — 옛 회전의 시험지는 그 회전 커밋에서 재현한다(해시는 각 _vN판보관.json 의 동봉이 쥔다). P003 계열 4사례의 목표는 키릴이다(Солонгос хэлний шалгалтад тэнцэх = 한국어 시험에 합격하기) — 「맥락의 언어는 출력 언어를 바꾸지 않는다」 규칙이 과제생성에서 한 번도 시험된 적이 없어 그 자리를 연다. 이 몽골어 줄은 지어낸 것이 아니라 evals/맥락표본.json C02 가 08-20 부터 같은 목적으로 쓰던 그 줄이다(몽골어 사람 감수는 아직 전). 전부 합성(실학생 0명 · §10). 축 모양 = lib/학습자상태.js 반환 키 · 쓸축수 = 표본적음 1~2 / 표본풍부 3~6(lib/과제요약.js 가 센다).",
  "칸당": 20,
  "사례": [
   {
@@ -9,7 +9,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "db3fe71a-0b6f-4f6e-ac04-da6aebd24e49",
-   "goal_candidate": "K-POP 가사 이해",
+   "goal_candidate": "좋아하는 노래 가사를 알아듣고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -39,7 +39,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "4c9039e3-bff1-42e9-a10c-5f108b96db80",
-   "goal_candidate": "한국 드라마를 자막 없이 보기",
+   "goal_candidate": "드라마를 자막 없이 보고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -76,7 +76,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "927df313-7df5-499a-a394-660dac835e5d",
-   "goal_candidate": "TOPIK 4급",
+   "goal_candidate": "Солонгос хэлний шалгалтад тэнцэх",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -112,7 +112,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "3bdfa238-a4f6-4597-a112-a6f3860f7653",
-   "goal_candidate": "한국어로 일기 쓰기",
+   "goal_candidate": "한국어로 일기를 써 보고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -146,7 +146,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "b1ce8350-3736-4be5-a0fc-39f4a05fb72d",
-   "goal_candidate": "한국 여행에서 혼자 다니기",
+   "goal_candidate": "한국에 가서 혼자 다녀 보고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -177,7 +177,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "4fcb75a2-4bf6-4043-a9bb-4cbb5ca3e383",
-   "goal_candidate": "한국 회사 취업",
+   "goal_candidate": "한국 회사에서 일하고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -214,7 +214,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "1aad4566-0355-499b-a6ce-0ce5138e5e93",
-   "goal_candidate": "한국 요리 배우기",
+   "goal_candidate": "한국 음식을 만들어 보고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -245,7 +245,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "b9f05152-dce3-4a7e-afdf-70691081ed88",
-   "goal_candidate": "유학 준비",
+   "goal_candidate": "한국에서 공부하고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -279,7 +279,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "9c8e931e-cb79-434f-a73c-2b333ad2c08d",
-   "goal_candidate": "한국 친구와 편하게 대화",
+   "goal_candidate": "한국 친구랑 편하게 이야기하고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -312,7 +312,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "595adbc8-07ca-490b-a952-61981b1977fe",
-   "goal_candidate": "대학 진학",
+   "goal_candidate": "한국 대학에 가고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -350,7 +350,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "e842ac93-91fb-4e66-aa83-0280d017a0f8",
-   "goal_candidate": "K-POP 가사 이해",
+   "goal_candidate": "좋아하는 노래 가사를 알아듣고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -379,7 +379,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "6cc51d80-0ccc-45db-ae21-8420b176f3af",
-   "goal_candidate": "한국 드라마를 자막 없이 보기",
+   "goal_candidate": "드라마를 자막 없이 보고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -416,7 +416,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "523f5179-4491-41ba-a008-274c23ff9828",
-   "goal_candidate": "TOPIK 4급",
+   "goal_candidate": "Солонгос хэлний шалгалтад тэнцэх",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -445,7 +445,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "e55600bb-cb5b-4100-a1e0-0ec13538cd23",
-   "goal_candidate": "한국어로 일기 쓰기",
+   "goal_candidate": "한국어로 일기를 써 보고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -486,7 +486,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "caca4f40-e6a1-4b64-a5b2-7a2c54167baf",
-   "goal_candidate": "한국 여행에서 혼자 다니기",
+   "goal_candidate": "한국에 가서 혼자 다녀 보고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -518,7 +518,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "49176ab3-cde8-4b8c-a132-cd18a4b09435",
-   "goal_candidate": "한국 회사 취업",
+   "goal_candidate": "한국 회사에서 일하고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -554,7 +554,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "634600b8-907e-4296-a674-441f005f9faa",
-   "goal_candidate": "한국 요리 배우기",
+   "goal_candidate": "한국 음식을 만들어 보고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -589,7 +589,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "516d7a30-07de-49b1-a786-b2f36340344d",
-   "goal_candidate": "유학 준비",
+   "goal_candidate": "한국에서 공부하고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -625,7 +625,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "c0cbf3a9-62f3-4b6e-a446-b4f956a79eef",
-   "goal_candidate": "한국 친구와 편하게 대화",
+   "goal_candidate": "한국 친구랑 편하게 이야기하고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -655,7 +655,7 @@
    "level": "Lv3",
    "상태갈래": "표본적음",
    "learner_id": "ede6c0c9-a06c-48d9-ad93-5e274a0fb3d0",
-   "goal_candidate": "대학 진학",
+   "goal_candidate": "한국 대학에 가고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -691,7 +691,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "64ab21c4-86fb-4284-a459-455a8e129d93",
-   "goal_candidate": "K-POP 가사 이해",
+   "goal_candidate": "좋아하는 노래 가사를 알아듣고 싶어요",
    "estimator_confidence": 0.44,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -741,7 +741,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "8e53e10b-66dd-4946-a3cb-ded9ff72845f",
-   "goal_candidate": "한국 드라마를 자막 없이 보기",
+   "goal_candidate": "드라마를 자막 없이 보고 싶어요",
    "estimator_confidence": 0.47,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -796,7 +796,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "d7936746-d791-486d-afd7-44898147be5c",
-   "goal_candidate": "TOPIK 4급",
+   "goal_candidate": "Солонгос хэлний шалгалтад тэнцэх",
    "estimator_confidence": 0.5,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -854,7 +854,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "fbc71a62-7a0f-43e9-a953-e05ffae81dff",
-   "goal_candidate": "한국어로 일기 쓰기",
+   "goal_candidate": "한국어로 일기를 써 보고 싶어요",
    "estimator_confidence": 0.52,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -920,7 +920,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "8aaad2aa-3c0c-453e-a509-9287edbecbee",
-   "goal_candidate": "한국 여행에서 혼자 다니기",
+   "goal_candidate": "한국에 가서 혼자 다녀 보고 싶어요",
    "estimator_confidence": 0.55,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -973,7 +973,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "e4510e64-6f87-47dd-a369-a6c82eba8d74",
-   "goal_candidate": "한국 회사 취업",
+   "goal_candidate": "한국 회사에서 일하고 싶어요",
    "estimator_confidence": 0.57,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -1028,7 +1028,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "aa4eb7dd-13fb-4a7e-a257-aff5d767b52e",
-   "goal_candidate": "한국 요리 배우기",
+   "goal_candidate": "한국 음식을 만들어 보고 싶어요",
    "estimator_confidence": 0.58,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -1088,7 +1088,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "5780d898-0443-454e-abf4-9844e0321eb7",
-   "goal_candidate": "유학 준비",
+   "goal_candidate": "한국에서 공부하고 싶어요",
    "estimator_confidence": 0.6,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -1161,7 +1161,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "fc68bd0f-fa70-4c0a-a20c-30fc3e83513d",
-   "goal_candidate": "한국 친구와 편하게 대화",
+   "goal_candidate": "한국 친구랑 편하게 이야기하고 싶어요",
    "estimator_confidence": 0.62,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -1214,7 +1214,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "1037450c-8972-4209-ad15-620cf963f508",
-   "goal_candidate": "대학 진학",
+   "goal_candidate": "한국 대학에 가고 싶어요",
    "estimator_confidence": 0.63,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -1273,7 +1273,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "2242d415-6371-4ab4-a777-1d6f270f622f",
-   "goal_candidate": "K-POP 가사 이해",
+   "goal_candidate": "좋아하는 노래 가사를 알아듣고 싶어요",
    "estimator_confidence": 0.64,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -1343,7 +1343,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "b11aa095-839c-41d6-af92-592d05304af0",
-   "goal_candidate": "한국 드라마를 자막 없이 보기",
+   "goal_candidate": "드라마를 자막 없이 보고 싶어요",
    "estimator_confidence": 0.66,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -1418,7 +1418,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "698a124d-c55f-47b6-a6e4-9e6f00515a6f",
-   "goal_candidate": "TOPIK 4급",
+   "goal_candidate": "Солонгос хэлний шалгалтад тэнцэх",
    "estimator_confidence": 0.44,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -1462,7 +1462,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "218d4a31-2c24-414b-a00c-a94b1a304287",
-   "goal_candidate": "한국어로 일기 쓰기",
+   "goal_candidate": "한국어로 일기를 써 보고 싶어요",
    "estimator_confidence": 0.47,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -1514,7 +1514,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "6ab127f4-4db1-4dd4-a91c-23b2609fa805",
-   "goal_candidate": "한국 여행에서 혼자 다니기",
+   "goal_candidate": "한국에 가서 혼자 다녀 보고 싶어요",
    "estimator_confidence": 0.5,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -1577,7 +1577,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "30a68e6c-2df3-4b9a-a0f9-355025186174",
-   "goal_candidate": "한국 회사 취업",
+   "goal_candidate": "한국 회사에서 일하고 싶어요",
    "estimator_confidence": 0.52,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -1644,7 +1644,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "f4c8e8e1-5c6d-4d88-a7f5-3a026f0f0c6c",
-   "goal_candidate": "한국 요리 배우기",
+   "goal_candidate": "한국 음식을 만들어 보고 싶어요",
    "estimator_confidence": 0.55,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -1695,7 +1695,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "b4f2e7e3-19fd-45f9-a350-1040c50c91ee",
-   "goal_candidate": "유학 준비",
+   "goal_candidate": "한국에서 공부하고 싶어요",
    "estimator_confidence": 0.57,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -1755,7 +1755,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "a0dd43cd-1ed1-4570-a648-eea38bca7d73",
-   "goal_candidate": "한국 친구와 편하게 대화",
+   "goal_candidate": "한국 친구랑 편하게 이야기하고 싶어요",
    "estimator_confidence": 0.58,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -1820,7 +1820,7 @@
    "level": "Lv3",
    "상태갈래": "표본풍부",
    "learner_id": "a18d7ff3-3d27-455f-ae2c-cfd9f8bf1947",
-   "goal_candidate": "대학 진학",
+   "goal_candidate": "한국 대학에 가고 싶어요",
    "estimator_confidence": 0.6,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -1890,7 +1890,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "ea802616-7fdb-42f8-a441-8c967d7ffe5d",
-   "goal_candidate": "K-POP 가사 이해",
+   "goal_candidate": "좋아하는 노래 가사를 알아듣고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -1919,7 +1919,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "ac2285d0-02cc-4b91-a556-743c4f1f15c3",
-   "goal_candidate": "한국 드라마를 자막 없이 보기",
+   "goal_candidate": "드라마를 자막 없이 보고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -1960,7 +1960,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "623e4aaa-cd58-4151-ad17-3f3eaf6674fb",
-   "goal_candidate": "TOPIK 4급",
+   "goal_candidate": "Солонгос хэлний шалгалтад тэнцэх",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -1992,7 +1992,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "56ff3edd-6f22-467c-ae30-7ec55f1b48e5",
-   "goal_candidate": "한국어로 일기 쓰기",
+   "goal_candidate": "한국어로 일기를 써 보고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2028,7 +2028,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "80d27f7c-9e3d-45b8-a436-9103ba6ab96d",
-   "goal_candidate": "한국 여행에서 혼자 다니기",
+   "goal_candidate": "한국에 가서 혼자 다녀 보고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2063,7 +2063,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "9313db96-d6ca-4289-abfb-988dcecc331c",
-   "goal_candidate": "한국 회사 취업",
+   "goal_candidate": "한국 회사에서 일하고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2099,7 +2099,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "e3432fb6-3a9a-485a-a0b6-6a24181af448",
-   "goal_candidate": "한국 요리 배우기",
+   "goal_candidate": "한국 음식을 만들어 보고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2129,7 +2129,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "380d65d7-e895-4372-a1f2-cbbc6c1348d9",
-   "goal_candidate": "유학 준비",
+   "goal_candidate": "한국에서 공부하고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2165,7 +2165,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "2b06dc9a-5e3b-4f0f-aa76-93f60f2ad077",
-   "goal_candidate": "한국 친구와 편하게 대화",
+   "goal_candidate": "한국 친구랑 편하게 이야기하고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2198,7 +2198,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "36b37714-7bf0-4506-a06b-91f7110de7bf",
-   "goal_candidate": "대학 진학",
+   "goal_candidate": "한국 대학에 가고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2231,7 +2231,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "b0ae26ee-3558-4491-ac78-4cb09af083ce",
-   "goal_candidate": "K-POP 가사 이해",
+   "goal_candidate": "좋아하는 노래 가사를 알아듣고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2263,7 +2263,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "5497b902-8069-4d05-a43c-5eb52aaf8b60",
-   "goal_candidate": "한국 드라마를 자막 없이 보기",
+   "goal_candidate": "드라마를 자막 없이 보고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2303,7 +2303,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "7dd2c2b0-9715-4b55-ad9c-28d3cc460f59",
-   "goal_candidate": "TOPIK 4급",
+   "goal_candidate": "Солонгос хэлний шалгалтад тэнцэх",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2331,7 +2331,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "1368a0b4-6729-4689-a86a-19c2b705650a",
-   "goal_candidate": "한국어로 일기 쓰기",
+   "goal_candidate": "한국어로 일기를 써 보고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2367,7 +2367,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "670d8db9-99ca-4453-a4d1-6d1aac21d2a5",
-   "goal_candidate": "한국 여행에서 혼자 다니기",
+   "goal_candidate": "한국에 가서 혼자 다녀 보고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2398,7 +2398,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "c93b797f-2e81-4bc4-aa62-8a592941d1eb",
-   "goal_candidate": "한국 회사 취업",
+   "goal_candidate": "한국 회사에서 일하고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2438,7 +2438,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "a30b9045-3e1e-4cd4-af8d-25b13dc292c4",
-   "goal_candidate": "한국 요리 배우기",
+   "goal_candidate": "한국 음식을 만들어 보고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2469,7 +2469,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "803673db-5084-442e-aa2d-8894528e423f",
-   "goal_candidate": "유학 준비",
+   "goal_candidate": "한국에서 공부하고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2507,7 +2507,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "45fa2076-9cf0-4f32-a27c-ba69741c8e70",
-   "goal_candidate": "한국 친구와 편하게 대화",
+   "goal_candidate": "한국 친구랑 편하게 이야기하고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2541,7 +2541,7 @@
    "level": "Lv4",
    "상태갈래": "표본적음",
    "learner_id": "52d94791-3391-4be4-ab6f-0382d351754e",
-   "goal_candidate": "대학 진학",
+   "goal_candidate": "한국 대학에 가고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2576,7 +2576,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "b16c9a40-93ae-4032-ace9-b718a992ca4b",
-   "goal_candidate": "K-POP 가사 이해",
+   "goal_candidate": "좋아하는 노래 가사를 알아듣고 싶어요",
    "estimator_confidence": 0.44,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2620,7 +2620,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "48dba66d-bb34-4fc2-a364-7f0f08473239",
-   "goal_candidate": "한국 드라마를 자막 없이 보기",
+   "goal_candidate": "드라마를 자막 없이 보고 싶어요",
    "estimator_confidence": 0.47,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2672,7 +2672,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "93145d33-b248-454b-a54b-9761466bc03f",
-   "goal_candidate": "TOPIK 4급",
+   "goal_candidate": "Солонгос хэлний шалгалтад тэнцэх",
    "estimator_confidence": 0.5,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2735,7 +2735,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "54f04fc4-9e99-430b-a65c-d26782d3b2ab",
-   "goal_candidate": "한국어로 일기 쓰기",
+   "goal_candidate": "한국어로 일기를 써 보고 싶어요",
    "estimator_confidence": 0.52,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2802,7 +2802,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "d19c4332-af9d-4dab-ae2e-ad238357fef1",
-   "goal_candidate": "한국 여행에서 혼자 다니기",
+   "goal_candidate": "한국에 가서 혼자 다녀 보고 싶어요",
    "estimator_confidence": 0.55,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2853,7 +2853,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "2f9bc97e-b59b-48d9-a0f6-bb86b66c4e86",
-   "goal_candidate": "한국 회사 취업",
+   "goal_candidate": "한국 회사에서 일하고 싶어요",
    "estimator_confidence": 0.57,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2913,7 +2913,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "3000166f-99fe-4260-a8b1-24710b89ab45",
-   "goal_candidate": "한국 요리 배우기",
+   "goal_candidate": "한국 음식을 만들어 보고 싶어요",
    "estimator_confidence": 0.58,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -2978,7 +2978,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "252ea621-bb0d-4c8c-aa8b-ca4254fa1f92",
-   "goal_candidate": "유학 준비",
+   "goal_candidate": "한국에서 공부하고 싶어요",
    "estimator_confidence": 0.6,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -3048,7 +3048,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "592f5926-0b11-4330-abd7-49c295b9a3e7",
-   "goal_candidate": "한국 친구와 편하게 대화",
+   "goal_candidate": "한국 친구랑 편하게 이야기하고 싶어요",
    "estimator_confidence": 0.62,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -3102,7 +3102,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "470fa4d7-6189-4935-a5e8-73ecd42bd6a6",
-   "goal_candidate": "대학 진학",
+   "goal_candidate": "한국 대학에 가고 싶어요",
    "estimator_confidence": 0.63,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -3167,7 +3167,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "cfa73f2f-ccf3-42d1-a215-f198ecce5316",
-   "goal_candidate": "K-POP 가사 이해",
+   "goal_candidate": "좋아하는 노래 가사를 알아듣고 싶어요",
    "estimator_confidence": 0.64,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -3235,7 +3235,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "64fe9a4a-19db-4120-a43a-3f36e18519c6",
-   "goal_candidate": "한국 드라마를 자막 없이 보기",
+   "goal_candidate": "드라마를 자막 없이 보고 싶어요",
    "estimator_confidence": 0.66,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -3311,7 +3311,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "7cf58093-5474-45dd-aff3-ced8de0a6baa",
-   "goal_candidate": "TOPIK 4급",
+   "goal_candidate": "Солонгос хэлний шалгалтад тэнцэх",
    "estimator_confidence": 0.44,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -3361,7 +3361,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "ae48de79-155f-4556-a67f-a27494522f46",
-   "goal_candidate": "한국어로 일기 쓰기",
+   "goal_candidate": "한국어로 일기를 써 보고 싶어요",
    "estimator_confidence": 0.47,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -3415,7 +3415,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "efcc649e-01cb-4c48-aca8-f76cd443232e",
-   "goal_candidate": "한국 여행에서 혼자 다니기",
+   "goal_candidate": "한국에 가서 혼자 다녀 보고 싶어요",
    "estimator_confidence": 0.5,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -3476,7 +3476,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "a48fd50a-3134-48c3-a9d8-71537449e1a9",
-   "goal_candidate": "한국 회사 취업",
+   "goal_candidate": "한국 회사에서 일하고 싶어요",
    "estimator_confidence": 0.52,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -3539,7 +3539,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "e6029291-b7b5-40b5-a786-4542468c542b",
-   "goal_candidate": "한국 요리 배우기",
+   "goal_candidate": "한국 음식을 만들어 보고 싶어요",
    "estimator_confidence": 0.55,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -3593,7 +3593,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "6f61aa5d-df22-4a87-a841-b6c8cfc4acc9",
-   "goal_candidate": "유학 준비",
+   "goal_candidate": "한국에서 공부하고 싶어요",
    "estimator_confidence": 0.57,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -3652,7 +3652,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "6a620931-b1b5-46ab-acc4-2bd9486f29f5",
-   "goal_candidate": "한국 친구와 편하게 대화",
+   "goal_candidate": "한국 친구랑 편하게 이야기하고 싶어요",
    "estimator_confidence": 0.58,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -3714,7 +3714,7 @@
    "level": "Lv4",
    "상태갈래": "표본풍부",
    "learner_id": "b44ab3c7-210f-45a1-a10f-051cca788ba2",
-   "goal_candidate": "대학 진학",
+   "goal_candidate": "한국 대학에 가고 싶어요",
    "estimator_confidence": 0.6,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -3784,7 +3784,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "d07af411-d1a8-4dbf-aa39-8e6cbd5e0425",
-   "goal_candidate": "K-POP 가사 이해",
+   "goal_candidate": "좋아하는 노래 가사를 알아듣고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -3812,7 +3812,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "e2a49ac0-7072-44c1-a4e5-f0bfff39a69a",
-   "goal_candidate": "한국 드라마를 자막 없이 보기",
+   "goal_candidate": "드라마를 자막 없이 보고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -3848,7 +3848,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "5ef83ce3-88a2-4c2c-aba4-e0094a88d31c",
-   "goal_candidate": "TOPIK 4급",
+   "goal_candidate": "Солонгос хэлний шалгалтад тэнцэх",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -3879,7 +3879,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "bff54595-829d-4dda-acc6-dc81fbc8ce07",
-   "goal_candidate": "한국어로 일기 쓰기",
+   "goal_candidate": "한국어로 일기를 써 보고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -3919,7 +3919,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "4c6fa4a3-2b16-4374-ab93-fdbc731bc39a",
-   "goal_candidate": "한국 여행에서 혼자 다니기",
+   "goal_candidate": "한국에 가서 혼자 다녀 보고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -3950,7 +3950,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "3d6c2d74-533d-488d-ac42-247679ccc217",
-   "goal_candidate": "한국 회사 취업",
+   "goal_candidate": "한국 회사에서 일하고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -3988,7 +3988,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "1ec34d8b-5b45-4c89-a9b3-c872c5f7a254",
-   "goal_candidate": "한국 요리 배우기",
+   "goal_candidate": "한국 음식을 만들어 보고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4022,7 +4022,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "b9bf5875-f85c-412c-af28-762b104e75e3",
-   "goal_candidate": "유학 준비",
+   "goal_candidate": "한국에서 공부하고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4057,7 +4057,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "815792ba-3e3e-4a63-a2e8-584d2961b4a9",
-   "goal_candidate": "한국 친구와 편하게 대화",
+   "goal_candidate": "한국 친구랑 편하게 이야기하고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4089,7 +4089,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "94d249f9-7ac4-4d77-aa7b-158d1881874c",
-   "goal_candidate": "대학 진학",
+   "goal_candidate": "한국 대학에 가고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4124,7 +4124,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "7ec529d6-a06f-4947-a5ae-e07a021e4ea4",
-   "goal_candidate": "K-POP 가사 이해",
+   "goal_candidate": "좋아하는 노래 가사를 알아듣고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4156,7 +4156,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "2039fb1d-8279-457e-a3e7-33b02fd1176d",
-   "goal_candidate": "한국 드라마를 자막 없이 보기",
+   "goal_candidate": "드라마를 자막 없이 보고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4191,7 +4191,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "9e181873-3ed6-441d-a874-43f6c555381f",
-   "goal_candidate": "TOPIK 4급",
+   "goal_candidate": "Солонгос хэлний шалгалтад тэнцэх",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4222,7 +4222,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "9ce4863d-67bc-434a-a7fc-cd4e4fb64535",
-   "goal_candidate": "한국어로 일기 쓰기",
+   "goal_candidate": "한국어로 일기를 써 보고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4261,7 +4261,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "e5122efc-603c-4f31-a8b9-65301bfe9d61",
-   "goal_candidate": "한국 여행에서 혼자 다니기",
+   "goal_candidate": "한국에 가서 혼자 다녀 보고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4291,7 +4291,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "b901ece3-552c-443d-a33e-8cdcdefbea89",
-   "goal_candidate": "한국 회사 취업",
+   "goal_candidate": "한국 회사에서 일하고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4326,7 +4326,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "42483f98-8e16-4997-ad76-409d145bb783",
-   "goal_candidate": "한국 요리 배우기",
+   "goal_candidate": "한국 음식을 만들어 보고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4356,7 +4356,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "def2aec8-7a65-497f-a790-28f0f216569a",
-   "goal_candidate": "유학 준비",
+   "goal_candidate": "한국에서 공부하고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4398,7 +4398,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "f5bcdab6-3796-4691-a8fd-0d81964c2dc2",
-   "goal_candidate": "한국 친구와 편하게 대화",
+   "goal_candidate": "한국 친구랑 편하게 이야기하고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4428,7 +4428,7 @@
    "level": "Lv5",
    "상태갈래": "표본적음",
    "learner_id": "8d301858-2a10-48a1-aa6f-5369da0c6027",
-   "goal_candidate": "대학 진학",
+   "goal_candidate": "한국 대학에 가고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4465,7 +4465,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "3a3ec496-2162-4707-ae81-5ff67516dc14",
-   "goal_candidate": "K-POP 가사 이해",
+   "goal_candidate": "좋아하는 노래 가사를 알아듣고 싶어요",
    "estimator_confidence": 0.44,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4515,7 +4515,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "3bf81e76-2438-4093-adbb-5b67d15c76f6",
-   "goal_candidate": "한국 드라마를 자막 없이 보기",
+   "goal_candidate": "드라마를 자막 없이 보고 싶어요",
    "estimator_confidence": 0.47,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4569,7 +4569,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "63257012-c699-4e07-aeaa-02ee928dcbc0",
-   "goal_candidate": "TOPIK 4급",
+   "goal_candidate": "Солонгос хэлний шалгалтад тэнцэх",
    "estimator_confidence": 0.5,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4630,7 +4630,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "a796578a-39f8-436c-a592-84f8ed87df53",
-   "goal_candidate": "한국어로 일기 쓰기",
+   "goal_candidate": "한국어로 일기를 써 보고 싶어요",
    "estimator_confidence": 0.52,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4693,7 +4693,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "a2c19035-b251-4c53-a367-6703657d8755",
-   "goal_candidate": "한국 여행에서 혼자 다니기",
+   "goal_candidate": "한국에 가서 혼자 다녀 보고 싶어요",
    "estimator_confidence": 0.55,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4747,7 +4747,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "3a526119-5ee0-4f51-a422-1fad1241a7e1",
-   "goal_candidate": "한국 회사 취업",
+   "goal_candidate": "한국 회사에서 일하고 싶어요",
    "estimator_confidence": 0.57,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4806,7 +4806,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "e73f2357-1a20-4667-a4f2-6aefbf0d605b",
-   "goal_candidate": "한국 요리 배우기",
+   "goal_candidate": "한국 음식을 만들어 보고 싶어요",
    "estimator_confidence": 0.58,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4868,7 +4868,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "ceaf0d87-87e5-4915-aa51-6c892295ec40",
-   "goal_candidate": "유학 준비",
+   "goal_candidate": "한국에서 공부하고 싶어요",
    "estimator_confidence": 0.6,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4938,7 +4938,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "3b2ff6a9-a53a-48ef-ae8d-e73eac76dc8c",
-   "goal_candidate": "한국 친구와 편하게 대화",
+   "goal_candidate": "한국 친구랑 편하게 이야기하고 싶어요",
    "estimator_confidence": 0.62,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -4995,7 +4995,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "96e5d0d7-5b1d-40f2-a194-07ab9d29231b",
-   "goal_candidate": "대학 진학",
+   "goal_candidate": "한국 대학에 가고 싶어요",
    "estimator_confidence": 0.63,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5054,7 +5054,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "7e8797de-8585-4b72-a17b-98240da649dd",
-   "goal_candidate": "K-POP 가사 이해",
+   "goal_candidate": "좋아하는 노래 가사를 알아듣고 싶어요",
    "estimator_confidence": 0.64,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5118,7 +5118,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "d82060a0-d124-40b9-a685-5ed96bec837a",
-   "goal_candidate": "한국 드라마를 자막 없이 보기",
+   "goal_candidate": "드라마를 자막 없이 보고 싶어요",
    "estimator_confidence": 0.66,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5195,7 +5195,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "182e83a8-2643-45cc-a18f-5751d16752e7",
-   "goal_candidate": "TOPIK 4급",
+   "goal_candidate": "Солонгос хэлний шалгалтад тэнцэх",
    "estimator_confidence": 0.44,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5240,7 +5240,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "a7fe50ba-2a24-4b6a-a0fa-4378de23973f",
-   "goal_candidate": "한국어로 일기 쓰기",
+   "goal_candidate": "한국어로 일기를 써 보고 싶어요",
    "estimator_confidence": 0.47,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5291,7 +5291,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "a87a792b-bdea-43c7-ab32-625891292ac3",
-   "goal_candidate": "한국 여행에서 혼자 다니기",
+   "goal_candidate": "한국에 가서 혼자 다녀 보고 싶어요",
    "estimator_confidence": 0.5,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5353,7 +5353,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "4ffec876-8572-4486-ac53-50fb08ad83c0",
-   "goal_candidate": "한국 회사 취업",
+   "goal_candidate": "한국 회사에서 일하고 싶어요",
    "estimator_confidence": 0.52,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5420,7 +5420,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "dfc88a79-35e4-4a85-a33c-7f8acaf93081",
-   "goal_candidate": "한국 요리 배우기",
+   "goal_candidate": "한국 음식을 만들어 보고 싶어요",
    "estimator_confidence": 0.55,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5468,7 +5468,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "d288ca11-8e0b-4d41-a2ff-773850caecdf",
-   "goal_candidate": "유학 준비",
+   "goal_candidate": "한국에서 공부하고 싶어요",
    "estimator_confidence": 0.57,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5524,7 +5524,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "d3324960-6e46-49f0-aa42-97ad357bb0aa",
-   "goal_candidate": "한국 친구와 편하게 대화",
+   "goal_candidate": "한국 친구랑 편하게 이야기하고 싶어요",
    "estimator_confidence": 0.58,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5591,7 +5591,7 @@
    "level": "Lv5",
    "상태갈래": "표본풍부",
    "learner_id": "2aec25b1-8ef6-48a9-a0f2-cca0a5eb6cd9",
-   "goal_candidate": "대학 진학",
+   "goal_candidate": "한국 대학에 가고 싶어요",
    "estimator_confidence": 0.6,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5662,7 +5662,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "1c111cc5-3ec6-4e7b-ab16-5eb5c1cd1af8",
-   "goal_candidate": "K-POP 가사 이해",
+   "goal_candidate": "좋아하는 노래 가사를 알아듣고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5693,7 +5693,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "fff838fa-e133-443b-a7cd-c79a2956ba80",
-   "goal_candidate": "한국 드라마를 자막 없이 보기",
+   "goal_candidate": "드라마를 자막 없이 보고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5732,7 +5732,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "c0afd59e-463d-4676-af1b-511f71aeb8d6",
-   "goal_candidate": "TOPIK 4급",
+   "goal_candidate": "Солонгос хэлний шалгалтад тэнцэх",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5762,7 +5762,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "d196dac3-00d3-447a-a262-7297ba232375",
-   "goal_candidate": "한국어로 일기 쓰기",
+   "goal_candidate": "한국어로 일기를 써 보고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5797,7 +5797,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "829f63db-6475-400f-a52d-ade84c0544c5",
-   "goal_candidate": "한국 여행에서 혼자 다니기",
+   "goal_candidate": "한국에 가서 혼자 다녀 보고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5827,7 +5827,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "e364bd05-3a5f-4030-a05c-894ec241289a",
-   "goal_candidate": "한국 회사 취업",
+   "goal_candidate": "한국 회사에서 일하고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5869,7 +5869,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "ac9ef553-9323-448a-af33-45059a25334d",
-   "goal_candidate": "한국 요리 배우기",
+   "goal_candidate": "한국 음식을 만들어 보고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5899,7 +5899,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "298169c6-c3ab-43c8-a896-ea352df4b803",
-   "goal_candidate": "유학 준비",
+   "goal_candidate": "한국에서 공부하고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5936,7 +5936,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "56a947d7-82b4-41fc-addb-92587e1bb97d",
-   "goal_candidate": "한국 친구와 편하게 대화",
+   "goal_candidate": "한국 친구랑 편하게 이야기하고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -5972,7 +5972,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "699c8938-c122-4560-a593-a3c3fba8abe5",
-   "goal_candidate": "대학 진학",
+   "goal_candidate": "한국 대학에 가고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6006,7 +6006,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "677be504-9989-4d2c-a65c-e50939840cdb",
-   "goal_candidate": "K-POP 가사 이해",
+   "goal_candidate": "좋아하는 노래 가사를 알아듣고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6037,7 +6037,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "7622774a-928e-4698-a6a5-e02c19d1d484",
-   "goal_candidate": "한국 드라마를 자막 없이 보기",
+   "goal_candidate": "드라마를 자막 없이 보고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6074,7 +6074,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "68962be2-fcfe-44b6-a1a2-623458880862",
-   "goal_candidate": "TOPIK 4급",
+   "goal_candidate": "Солонгос хэлний шалгалтад тэнцэх",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6105,7 +6105,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "f9fa2498-c384-4ca1-a491-b5c499604904",
-   "goal_candidate": "한국어로 일기 쓰기",
+   "goal_candidate": "한국어로 일기를 써 보고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6139,7 +6139,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "a072a566-b43b-413b-a9fd-6a42ee19b75e",
-   "goal_candidate": "한국 여행에서 혼자 다니기",
+   "goal_candidate": "한국에 가서 혼자 다녀 보고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6172,7 +6172,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "0dc0b20b-1ceb-4694-a888-a4a9582daa3b",
-   "goal_candidate": "한국 회사 취업",
+   "goal_candidate": "한국 회사에서 일하고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6210,7 +6210,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "a401c299-43e2-4e26-af37-5bab6efbaef7",
-   "goal_candidate": "한국 요리 배우기",
+   "goal_candidate": "한국 음식을 만들어 보고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6239,7 +6239,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "6512628a-7c0d-4239-aa75-0f7906cb314e",
-   "goal_candidate": "유학 준비",
+   "goal_candidate": "한국에서 공부하고 싶어요",
    "estimator_confidence": 0.29,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6276,7 +6276,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "3fd80270-0c60-422e-ac7f-9987b2e8ae1c",
-   "goal_candidate": "한국 친구와 편하게 대화",
+   "goal_candidate": "한국 친구랑 편하게 이야기하고 싶어요",
    "estimator_confidence": 0.17,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6305,7 +6305,7 @@
    "level": "Lv6",
    "상태갈래": "표본적음",
    "learner_id": "1234d1e5-4c51-4ea9-a06b-9d28849d5b36",
-   "goal_candidate": "대학 진학",
+   "goal_candidate": "한국 대학에 가고 싶어요",
    "estimator_confidence": 0.23,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6346,7 +6346,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "57312a7d-596c-4ad0-aca0-5e9f479e3a25",
-   "goal_candidate": "K-POP 가사 이해",
+   "goal_candidate": "좋아하는 노래 가사를 알아듣고 싶어요",
    "estimator_confidence": 0.44,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6391,7 +6391,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "d799154d-7703-4b18-a7e8-553f29a0983d",
-   "goal_candidate": "한국 드라마를 자막 없이 보기",
+   "goal_candidate": "드라마를 자막 없이 보고 싶어요",
    "estimator_confidence": 0.47,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6442,7 +6442,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "9f2c5802-e56a-4d65-a289-9a560c7ff7fb",
-   "goal_candidate": "TOPIK 4급",
+   "goal_candidate": "Солонгос хэлний шалгалтад тэнцэх",
    "estimator_confidence": 0.5,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6504,7 +6504,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "f5bc5bff-2a9c-44d2-ad0d-3f4dbf8be40b",
-   "goal_candidate": "한국어로 일기 쓰기",
+   "goal_candidate": "한국어로 일기를 써 보고 싶어요",
    "estimator_confidence": 0.52,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6571,7 +6571,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "ef482a20-0506-419a-ac7d-4b9255a18f41",
-   "goal_candidate": "한국 여행에서 혼자 다니기",
+   "goal_candidate": "한국에 가서 혼자 다녀 보고 싶어요",
    "estimator_confidence": 0.55,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6619,7 +6619,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "2e19f396-f23f-4666-a54e-d00a2db993ad",
-   "goal_candidate": "한국 회사 취업",
+   "goal_candidate": "한국 회사에서 일하고 싶어요",
    "estimator_confidence": 0.57,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6675,7 +6675,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "429e634e-142e-4701-aeff-7089687d041b",
-   "goal_candidate": "한국 요리 배우기",
+   "goal_candidate": "한국 음식을 만들어 보고 싶어요",
    "estimator_confidence": 0.58,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6742,7 +6742,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "5b2e444e-6c4a-475e-a739-bc56ecceae0d",
-   "goal_candidate": "유학 준비",
+   "goal_candidate": "한국에서 공부하고 싶어요",
    "estimator_confidence": 0.6,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6813,7 +6813,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "4ad4f8be-61bd-4f00-a13d-936c33ffb32f",
-   "goal_candidate": "한국 친구와 편하게 대화",
+   "goal_candidate": "한국 친구랑 편하게 이야기하고 싶어요",
    "estimator_confidence": 0.62,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6868,7 +6868,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "fe074148-d81c-4ea8-aff5-0eb07e110a81",
-   "goal_candidate": "대학 진학",
+   "goal_candidate": "한국 대학에 가고 싶어요",
    "estimator_confidence": 0.63,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -6932,7 +6932,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "92f08996-79ce-457f-aee2-7f6da4f70183",
-   "goal_candidate": "K-POP 가사 이해",
+   "goal_candidate": "좋아하는 노래 가사를 알아듣고 싶어요",
    "estimator_confidence": 0.64,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -7001,7 +7001,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "9b51c2eb-8e10-479e-a2ac-d1f52fef095a",
-   "goal_candidate": "한국 드라마를 자막 없이 보기",
+   "goal_candidate": "드라마를 자막 없이 보고 싶어요",
    "estimator_confidence": 0.66,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -7075,7 +7075,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "b8ba7dd0-36d5-495f-add5-0e84f881b7f9",
-   "goal_candidate": "TOPIK 4급",
+   "goal_candidate": "Солонгос хэлний шалгалтад тэнцэх",
    "estimator_confidence": 0.44,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -7121,7 +7121,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "8a8045c6-3f5e-4584-ab0c-436d1922617f",
-   "goal_candidate": "한국어로 일기 쓰기",
+   "goal_candidate": "한국어로 일기를 써 보고 싶어요",
    "estimator_confidence": 0.47,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -7178,7 +7178,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "9d746fee-254f-4666-a2c8-28f4f5592a73",
-   "goal_candidate": "한국 여행에서 혼자 다니기",
+   "goal_candidate": "한국에 가서 혼자 다녀 보고 싶어요",
    "estimator_confidence": 0.5,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -7238,7 +7238,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "c5c90d8c-d208-44b8-a25f-643e35ff4ab8",
-   "goal_candidate": "한국 회사 취업",
+   "goal_candidate": "한국 회사에서 일하고 싶어요",
    "estimator_confidence": 0.52,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -7306,7 +7306,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "14749fa6-891f-40ac-a244-945815dc0685",
-   "goal_candidate": "한국 요리 배우기",
+   "goal_candidate": "한국 음식을 만들어 보고 싶어요",
    "estimator_confidence": 0.55,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -7360,7 +7360,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "14fdbe76-081e-4db9-abb7-2a92dc209e64",
-   "goal_candidate": "유학 준비",
+   "goal_candidate": "한국에서 공부하고 싶어요",
    "estimator_confidence": 0.57,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -7418,7 +7418,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "5011c8bb-7e3b-43dd-ac70-c2ecbc426d74",
-   "goal_candidate": "한국 친구와 편하게 대화",
+   "goal_candidate": "한국 친구랑 편하게 이야기하고 싶어요",
    "estimator_confidence": 0.58,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",
@@ -7483,7 +7483,7 @@
    "level": "Lv6",
    "상태갈래": "표본풍부",
    "learner_id": "464f40fe-b91c-4ef0-a908-9e3345c6754d",
-   "goal_candidate": "대학 진학",
+   "goal_candidate": "한국 대학에 가고 싶어요",
    "estimator_confidence": 0.6,
    "evidence_refs": {
     "as_of": "2026-09-01T00:00:00.000Z",

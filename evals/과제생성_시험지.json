@@ -234,7 +234,7 @@
    "Lv6|skill-ko-grammar-connective-condition"
   ]
  },
- "채점표_판": "채점표.v2",
+ "채점표_판": "채점표.v3",
  "통과선": {
   "connect": 0.9,
   "answerable": 0.9,
@@ -268,6 +268,18 @@
     "조건": "ⓒ 문장과 무관한 질문 — 그래서 답할 마음이 안 든다",
     "sentence": "주말에 친구하고 영화를 봤어요.",
     "question": "한국어 공부는 언제 시작했어요?"
+   },
+   {
+    "anchor_id": "Z4",
+    "조건": "ⓓ 누구나 같은 답을 하는 질문 — 형식은 열려 있어도 물으나 마나다",
+    "sentence": "저녁을 먹고 나서 동네를 한 바퀴 걸었어요.",
+    "question": "하루 중에 몸을 움직이는 시간이 있어요?"
+   },
+   {
+    "anchor_id": "Z5",
+    "조건": "ⓔ 학생의 선택에 이유를 요구하는 질문 — 대화가 아니라 취조가 된다",
+    "sentence": "지갑에 천 원밖에 없어서 우유만 하나 샀어요.",
+    "question": "왜 그게 아까운 줄 모르고 사요?"
    }
   ],
   "1점앵커": [
@@ -288,6 +300,12 @@
     "기준": "ⓒ 그 학생의 맥락(목표·상태)이 들어가 «나한테 하는 말»로 읽히는 질문",
     "sentence": "시험 전날에는 일찍 자려고 해요.",
     "question": "시험 공부할 때 밤에 하는 편이에요, 아침에 하는 편이에요?"
+   },
+   {
+    "anchor_id": "A4",
+    "기준": "ⓓ 10대 후반에게 «비밀친구»처럼 — 가벼운 예시를 던져 웃으며 답하게 하는 질문",
+    "sentence": "저는 아침에 일어나면 제일 먼저 휴대폰을 봐요.",
+    "question": "요즘 아침에 일어나자마자 하는 일이 있어요? 여자친구한테 연락하기라든지, 비밀인가요?"
    }
   ],
   "중간사례기준": "ⓐ 앵커·0점 조건과 대조해 가까운 쪽으로 ⓑ 판단이 안 서면 0(게이트는 의심스러우면 막는다) ⓒ 그 사실을 grader_note 에 적는다(다음 판 앵커 후보)"
@@ -300,7 +318,7 @@
    "상태갈래": "표본적음",
    "learner_id": "db3fe71a-0b6f-4f6e-ac04-da6aebd24e49",
    "assign_date": "2026-09-01",
-   "goal": "K-POP 가사 이해",
+   "goal": "좋아하는 노래 가사를 알아듣고 싶어요",
    "skill_ids": [
     "skill-ko-grammar-connective-sequence",
     "skill-ko-grammar-honorific"
@@ -343,7 +361,7 @@
    "상태갈래": "표본적음",
    "learner_id": "4c9039e3-bff1-42e9-a10c-5f108b96db80",
    "assign_date": "2026-09-03",
-   "goal": "한국 드라마를 자막 없이 보기",
+   "goal": "드라마를 자막 없이 보고 싶어요",
    "skill_ids": [
     "skill-ko-grammar-particle-instrument",
     "skill-ko-grammar-particle-object"
@@ -393,7 +411,7 @@
    "상태갈래": "표본적음",
    "learner_id": "927df313-7df5-499a-a394-660dac835e5d",
    "assign_date": "2026-09-02",
-   "goal": "TOPIK 4급",
+   "goal": "Солонгос хэлний шалгалтад тэнцэх",
    "skill_ids": [
     "skill-ko-grammar-connective-contrast",
     "skill-ko-grammar-connective-purpose"
@@ -533,7 +551,7 @@
    "상태갈래": "표본풍부",
    "learner_id": "64ab21c4-86fb-4284-a459-455a8e129d93",
    "assign_date": "2026-09-04",
-   "goal": "K-POP 가사 이해",
+   "goal": "좋아하는 노래 가사를 알아듣고 싶어요",
    "skill_ids": [
     "skill-ko-grammar-negation",
     "skill-ko-grammar-particle-companion"
@@ -596,7 +614,7 @@
    "상태갈래": "표본풍부",
    "learner_id": "8e53e10b-66dd-4946-a3cb-ded9ff72845f",
    "assign_date": "2026-09-07",
-   "goal": "한국 드라마를 자막 없이 보기",
+   "goal": "드라마를 자막 없이 보고 싶어요",
    "skill_ids": [
     "skill-ko-grammar-particle-place",
     "skill-ko-grammar-particle-range"
@@ -880,7 +898,7 @@
    "상태갈래": "표본적음",
    "learner_id": "ea802616-7fdb-42f8-a441-8c967d7ffe5d",
    "assign_date": "2026-09-01",
-   "goal": "K-POP 가사 이해",
+   "goal": "좋아하는 노래 가사를 알아듣고 싶어요",
    "skill_ids": [
     "skill-ko-grammar-particle-range",
     "skill-ko-grammar-particle-topic"
@@ -922,7 +940,7 @@
    "상태갈래": "표본적음",
    "learner_id": "ac2285d0-02cc-4b91-a556-743c4f1f15c3",
    "assign_date": "2026-09-01",
-   "goal": "한국 드라마를 자막 없이 보기",
+   "goal": "드라마를 자막 없이 보고 싶어요",
    "skill_ids": [
     "skill-ko-grammar-connective-contrast",
     "skill-ko-grammar-connective-purpose"
@@ -976,7 +994,7 @@
    "상태갈래": "표본적음",
    "learner_id": "623e4aaa-cd58-4151-ad17-3f3eaf6674fb",
    "assign_date": "2026-09-01",
-   "goal": "TOPIK 4급",
+   "goal": "Солонгос хэлний шалгалтад тэнцэх",
    "skill_ids": [
     "skill-ko-grammar-tense-progressive",
     "skill-ko-grammar-connective-condition"
@@ -1118,7 +1136,7 @@
    "상태갈래": "표본풍부",
    "learner_id": "b16c9a40-93ae-4032-ace9-b718a992ca4b",
    "assign_date": "2026-09-03",
-   "goal": "K-POP 가사 이해",
+   "goal": "좋아하는 노래 가사를 알아듣고 싶어요",
    "skill_ids": [
     "skill-ko-grammar-particle-focus",
     "skill-ko-grammar-particle-instrument"
@@ -1175,7 +1193,7 @@
    "상태갈래": "표본풍부",
    "learner_id": "48dba66d-bb34-4fc2-a364-7f0f08473239",
    "assign_date": "2026-10-23",
-   "goal": "한국 드라마를 자막 없이 보기",
+   "goal": "드라마를 자막 없이 보고 싶어요",
    "skill_ids": [
     "skill-ko-grammar-honorific",
     "skill-ko-grammar-negation"
@@ -1460,7 +1478,7 @@
    "상태갈래": "표본적음",
    "learner_id": "d07af411-d1a8-4dbf-aa39-8e6cbd5e0425",
    "assign_date": "2026-09-01",
-   "goal": "K-POP 가사 이해",
+   "goal": "좋아하는 노래 가사를 알아듣고 싶어요",
    "skill_ids": [
     "skill-ko-grammar-tense-past",
     "skill-ko-grammar-tense-progressive"
@@ -1501,7 +1519,7 @@
    "상태갈래": "표본적음",
    "learner_id": "e2a49ac0-7072-44c1-a4e5-f0bfff39a69a",
    "assign_date": "2026-09-02",
-   "goal": "한국 드라마를 자막 없이 보기",
+   "goal": "드라마를 자막 없이 보고 싶어요",
    "skill_ids": [
     "skill-ko-grammar-particle-dative",
     "skill-ko-grammar-particle-focus"
@@ -1550,7 +1568,7 @@
    "상태갈래": "표본적음",
    "learner_id": "5ef83ce3-88a2-4c2c-aba4-e0094a88d31c",
    "assign_date": "2026-09-01",
-   "goal": "TOPIK 4급",
+   "goal": "Солонгос хэлний шалгалтад тэнцэх",
    "skill_ids": [
     "skill-ko-grammar-connective-purpose",
     "skill-ko-grammar-connective-reason"
@@ -1691,7 +1709,7 @@
    "상태갈래": "표본풍부",
    "learner_id": "3a3ec496-2162-4707-ae81-5ff67516dc14",
    "assign_date": "2026-09-02",
-   "goal": "K-POP 가사 이해",
+   "goal": "좋아하는 노래 가사를 알아듣고 싶어요",
    "skill_ids": [
     "skill-ko-grammar-negation",
     "skill-ko-grammar-particle-companion"
@@ -1754,7 +1772,7 @@
    "상태갈래": "표본풍부",
    "learner_id": "3bf81e76-2438-4093-adbb-5b67d15c76f6",
    "assign_date": "2026-09-03",
-   "goal": "한국 드라마를 자막 없이 보기",
+   "goal": "드라마를 자막 없이 보고 싶어요",
    "skill_ids": [
     "skill-ko-grammar-particle-instrument",
     "skill-ko-grammar-particle-object"
@@ -2038,7 +2056,7 @@
    "상태갈래": "표본적음",
    "learner_id": "1c111cc5-3ec6-4e7b-ab16-5eb5c1cd1af8",
    "assign_date": "2026-09-01",
-   "goal": "K-POP 가사 이해",
+   "goal": "좋아하는 노래 가사를 알아듣고 싶어요",
    "skill_ids": [
     "skill-ko-grammar-particle-focus",
     "skill-ko-grammar-particle-instrument"
@@ -2082,7 +2100,7 @@
    "상태갈래": "표본적음",
    "learner_id": "fff838fa-e133-443b-a7cd-c79a2956ba80",
    "assign_date": "2026-09-01",
-   "goal": "한국 드라마를 자막 없이 보기",
+   "goal": "드라마를 자막 없이 보고 싶어요",
    "skill_ids": [
     "skill-ko-grammar-particle-companion",
     "skill-ko-grammar-particle-dative"
@@ -2134,7 +2152,7 @@
    "상태갈래": "표본적음",
    "learner_id": "c0afd59e-463d-4676-af1b-511f71aeb8d6",
    "assign_date": "2026-09-02",
-   "goal": "TOPIK 4급",
+   "goal": "Солонгос хэлний шалгалтад тэнцэх",
    "skill_ids": [
     "skill-ko-grammar-particle-range",
     "skill-ko-grammar-particle-topic"
@@ -2268,7 +2286,7 @@
    "상태갈래": "표본풍부",
    "learner_id": "57312a7d-596c-4ad0-aca0-5e9f479e3a25",
    "assign_date": "2026-09-02",
-   "goal": "K-POP 가사 이해",
+   "goal": "좋아하는 노래 가사를 알아듣고 싶어요",
    "skill_ids": [
     "skill-ko-grammar-tense-past",
     "skill-ko-grammar-tense-progressive"
@@ -2326,7 +2344,7 @@
    "상태갈래": "표본풍부",
    "learner_id": "d799154d-7703-4b18-a7e8-553f29a0983d",
    "assign_date": "2026-09-02",
-   "goal": "한국 드라마를 자막 없이 보기",
+   "goal": "드라마를 자막 없이 보고 싶어요",
    "skill_ids": [
     "skill-ko-grammar-connective-contrast",
     "skill-ko-grammar-connective-purpose"
