@@ -10,9 +10,9 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { 학생번호맞나, 이메일, 학생번호표기, 뒤4자리, 뒷자리맞나, 시도상한 } = require('../lib/학생계정.js');
+const { 학생번호맞나, 직원번호맞나, 계정번호맞나, 이메일, 학생번호표기, 뒤4자리, 뒷자리맞나, 시도상한 } = require('../lib/학생계정.js');
 
-const { 코드만 } = require('./lib/소스검사.js');
+const { 코드만, 파일소스 } = require('./lib/소스검사.js');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -49,8 +49,64 @@ test('이메일: 서로 다른 학생번호는 서로 다른 주소다', () => {
 
 test('이메일: 규격 밖은 조용히 넘기지 않고 던진다', () => {
   /* 조용히 통과하면 엉뚱한 계정을 가리킨 채 「로그인이 안 된다」로만 보인다. */
-  for (const v of ['SYNK-42', '', 'abc', null]) {
-    assert.throws(() => 이메일(v), /학생번호 형식/, `${JSON.stringify(v)} 를 던지지 않았다`);
+  for (const v of ['SYNK-42', '', 'abc', null, 'SYNK-L1', 'SYNK-042-1']) {
+    assert.throws(() => 이메일(v), /계정번호 형식/, `${JSON.stringify(v)} 를 던지지 않았다`);
+  }
+});
+
+// ── 직원 번호 (유호 확정 2026-08-27 「글자 섞기」) ─────────────────
+test('🔴 직원 번호는 학생 번호와 «부딪힐 수 없다» — 대역 약속이 아니라 구조로 막는다', () => {
+  /* 학생 번호는 상담시트에서 «최대값 +1» 로 붙는다(appsscript 학생ID_최대번호_). 직원은 그
+     시트에 없으므로 채번기가 직원 번호를 못 본다 — 「900번대는 직원」 같은 약속은 학생이 900명을
+     넘는 날 조용히 깨진다. 글자가 든 번호는 채번기가 **만들 수 없어서** 그 날이 오지 않는다. */
+  assert.equal(직원번호맞나('SYNK-L01'), true);
+  assert.equal(학생번호맞나('SYNK-L01'), false, '직원 번호가 학생 검사를 통과했다 — 학생 전용 자리가 열린다');
+  assert.equal(직원번호맞나('SYNK-101'), false, '학생 번호가 직원 검사를 통과했다');
+
+  /* 🔑 정규형(하이픈 제거)을 거쳐도 안 겹친다 — 여기가 이 설계의 심장이다. */
+  assert.notEqual(이메일('SYNK-L01'), 이메일('SYNK-101'));
+  /* 학생 번호는 «전부» 숫자라 글자가 낄 자리가 원리상 없다 — 넉넉히 세어 확인한다. */
+  const 학생주소 = new Set();
+  for (let n = 1; n <= 3000; n += 1) 학생주소.add(이메일(`SYNK-${String(n).padStart(3, '0')}`));
+  for (const 글자 of 'abcdefghijklmnopqrstuvwxyz') {
+    for (let n = 1; n <= 99; n += 1) {
+      const 직원 = 이메일(`SYNK-${글자}${String(n).padStart(2, '0')}`);
+      assert.equal(학생주소.has(직원), false, `${직원} 이 학생 주소와 겹친다`);
+    }
+  }
+});
+
+test('직원 번호도 «로그인할 수 있는 번호»다 — 통로가 하나이기 때문이다', () => {
+  for (const v of ['SYNK-L01', 'synk-t01', 'SYNKD99', 'SYNK T01']) {
+    assert.equal(계정번호맞나(v), true, `${v} 를 막았다 — 직원이 로그인 화면을 못 지난다`);
+  }
+  for (const v of ['SYNK-042', 'SYNK-1000']) {
+    assert.equal(계정번호맞나(v), true, `${v} 를 막았다 — 학생이 못 들어온다`);
+  }
+  for (const v of ['SYNK-L1', 'SYNK-LL01', 'SYNK-42', 'L01']) {
+    assert.equal(계정번호맞나(v), false, `${v} 를 통과시켰다`);
+  }
+});
+
+test('🔑 넓힌 자리가 «둘»뿐이다 — 학생 전용 다섯은 그대로다', () => {
+  /* 넓은 검사를 기본값으로 두면 「직원 번호로 첫 등록을 시도할 수 있는」 막다른 길이 조용히 생긴다.
+     그래서 소스에서 직접 센다 — 문서가 아니라 기계가 분모를 쥔다. */
+  const 소스 = (p) => 코드만(파일소스(path.join(__dirname, '..', ...p.split('/'))));
+  const 서버 = 소스('supabase/functions/auth/index.ts');
+  assert.equal(/계정번호맞나/.test(서버), false,
+    'auth 함수가 넓은 검사를 쓴다 — 그 셋(reset·게이트·첫등록)은 학생 전용이어야 한다');
+  assert.equal((서버.match(/학생번호맞나\(/g) || []).length, 3,
+    'auth 의 학생 전용 게이트 수가 셋이 아니다 — 늘거나 줄었다면 이 검사도 함께 본다');
+
+  const 화면 = 소스('src/인증화면.js');
+  assert.match(화면, /const 번호형식 = 계정번호맞나/, '로그인 입력칸이 직원을 안 받는다');
+  assert.match(화면, /const 학생번호형식 = 학생번호맞나/, '첫등록·임시가 학생 전용이 아니다');
+  assert.equal((화면.match(/학생번호형식 &&/g) || []).length, 2,
+    '첫등록·임시 둘만 학생 전용이어야 한다');
+
+  /* 명부·원장 초기화는 학생만 다루는 자리다 — 넓은 검사가 새어 들면 안 된다. */
+  for (const p of ['lib/명부규칙.js', 'src/원장초기화.js']) {
+    assert.equal(/계정번호맞나/.test(소스(p)), false, `${p} 에 넓은 검사가 샜다`);
   }
 });
 
