@@ -34,7 +34,13 @@ import 회수모듈 from './성과회수.mjs';
 import 게임모듈 from './게임배정.mjs';
 import 라디오태스크모듈 from './라디오태스크.mjs';
 import 계약판모듈 from './계약판.mjs';
+import CORS모듈 from './CORS.mjs';
 import { 생성배달, 구제배달 } from './생성모드.ts';
+
+const { 예비응답 } = CORS모듈 as {
+  예비응답: (req: Request, 메서드?: string) => Response | null;
+  머리: () => Record<string, string>;
+};
 
 const { 행들에서판 } = 계약판모듈 as { 행들에서판: (행들: unknown) => string | null };
 
@@ -131,9 +137,13 @@ const 통로 = '발화녹음';
 const 종별상한 = 150;
 
 const 봉투 = (status: number, body: Record<string, unknown>) =>
-  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...CORS모듈.머리() } });
 
 Deno.serve(async (req: Request) => {
+  /* 🔴 preflight 는 **어떤 검사보다 앞**이다 — 커스텀 헤더를 안 싣고 오므로 계약판 검문에
+   걸려 죽는다(08-27 실측: 그 400 은 게이트웨이가 아니라 우리 코드가 냈다 · `lib/CORS.js`). */
+  const 예비 = 예비응답(req);
+  if (예비) return 예비;
   /* 호출자는 **JWT 의 `role` 로** 가른다 — 키 문자열 비교가 아니다(정본 `lib/토큰.js`).
    * 서명 검증은 플랫폼이 이미 했지만(`verify_jwt=true`) 그건 **anon 키도 통과시킨다**. */
   const 오늘 = 몽골날짜();

@@ -7,5 +7,6 @@
   "업로드경로.mjs": "lib/업로드경로.js",
   "음성헤더.mjs": "lib/음성헤더.js",
   "전사.mjs": "lib/전사.js",
-  "계약판.mjs": "lib/계약판.js"
+  "계약판.mjs": "lib/계약판.js",
+  "CORS.mjs": "lib/CORS.js"
 }

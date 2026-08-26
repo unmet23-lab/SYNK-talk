@@ -49,6 +49,12 @@ import 학생계정 from './학생계정.mjs';
 import 가입문항 from './가입문항.mjs';
 import 계약판모듈 from './계약판.mjs';
 import 사유모듈 from './벤더사유.mjs';
+import CORS모듈 from './CORS.mjs';
+
+const { 예비응답 } = CORS모듈 as {
+  예비응답: (req: Request, 메서드?: string) => Response | null;
+  머리: () => Record<string, string>;
+};
 
 const { 행들에서판 } = 계약판모듈 as { 행들에서판: (행들: unknown) => string | null };
 const { 벤더사유 } = 사유모듈 as { 벤더사유: (글: unknown, 상한?: number) => string | null };
@@ -80,7 +86,7 @@ type 오류 = { code: string; message: string; retryable: boolean; field?: strin
 function 봉투(status: number, body: Record<string, unknown>, ver: string) {
   return new Response(JSON.stringify({ contract_ver: ver, ...body }), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...CORS모듈.머리() },
   });
 }
 const 실패 = (status: number, e: 오류, ver: string) => 봉투(status, { ok: false, error: e }, ver);
@@ -331,6 +337,10 @@ function 비번규격(비밀번호: string, ver: string) {
 const 정규화 = (v: string) => v.trim().replace(/[-\s]/g, '').toUpperCase();
 
 Deno.serve(async (req: Request) => {
+  /* 🔴 preflight 는 **어떤 검사보다 앞**이다 — 커스텀 헤더를 안 싣고 오므로 계약판 검문에
+   걸려 죽는다(08-27 실측: 그 400 은 게이트웨이가 아니라 우리 코드가 냈다 · `lib/CORS.js`). */
+  const 예비 = 예비응답(req);
+  if (예비) return 예비;
   let ver = '';
   try {
     if (req.method !== 'POST') {

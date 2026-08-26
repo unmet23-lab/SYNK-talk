@@ -32,6 +32,12 @@ import 동의모듈 from './동의게이트.mjs';
 import 계약판모듈 from './계약판.mjs';
 import 사유모듈 from './벤더사유.mjs';
 import 생성문구모듈 from './문구_생성.mjs';
+import CORS모듈 from './CORS.mjs';
+
+const { 예비응답 } = CORS모듈 as {
+  예비응답: (req: Request, 메서드?: string) => Response | null;
+  머리: () => Record<string, string>;
+};
 
 /* 진단 한 칸(`blocked`)을 위해서만 쓴다 — 이 함수는 막는 게이트가 아니다(아래 주석). */
 const { 지금유효, 거절몸통 } = 동의모듈 as {
@@ -163,12 +169,16 @@ type 오류 = { code: string; message: string; retryable: boolean; field?: strin
 function 봉투(status: number, body: Record<string, unknown>, ver: string) {
   return new Response(JSON.stringify({ contract_ver: ver, ...body }), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...CORS모듈.머리() },
   });
 }
 const 실패 = (status: number, e: 오류, ver: string) => 봉투(status, { ok: false, error: e }, ver);
 
 Deno.serve(async (req: Request) => {
+  /* 🔴 preflight 는 **어떤 검사보다 앞**이다 — 커스텀 헤더를 안 싣고 오므로 계약판 검문에
+   걸려 죽는다(08-27 실측: 그 400 은 게이트웨이가 아니라 우리 코드가 냈다 · `lib/CORS.js`). */
+  const 예비 = 예비응답(req);
+  if (예비) return 예비;
   const 선언 = req.headers.get('X-Contract-Ver') ?? '';
   if (!선언) return 실패(400, { code: 'CONTRACT_VER_MISSING', message: 'X-Contract-Ver 헤더가 없습니다', retryable: false }, 선언);
   if (판번호(선언) === null) {

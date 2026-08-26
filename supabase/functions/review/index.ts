@@ -58,6 +58,12 @@ import 계약판모듈 from './계약판.mjs';
    재료는 행에 남아, 여기서 재든 나중에 승격 통로가 재든 **같은 답**이 나온다. */
 import 저작모듈 from './저작신뢰.mjs';
 import 작성과정모듈 from './작성과정.mjs';
+import CORS모듈 from './CORS.mjs';
+
+const { 예비응답 } = CORS모듈 as {
+  예비응답: (req: Request, 메서드?: string) => Response | null;
+  머리: () => Record<string, string>;
+};
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
 const { 버킷, 저장소헤더, 저장소키흠 } = 경로모듈 as {
@@ -142,7 +148,7 @@ type 거절코드 = keyof typeof 거절상태;
 function 봉투(status: number, body: Record<string, unknown>, ver: string) {
   return new Response(JSON.stringify({ contract_ver: ver, ...body }), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...CORS모듈.머리() },
   });
 }
 const 실패 = (status: number, e: 오류, ver: string) => 봉투(status, { ok: false, error: e }, ver);
@@ -164,6 +170,10 @@ const 큐열 = [
 ];
 
 Deno.serve(async (req: Request) => {
+  /* 🔴 preflight 는 **어떤 검사보다 앞**이다 — 커스텀 헤더를 안 싣고 오므로 계약판 검문에
+   걸려 죽는다(08-27 실측: 그 400 은 게이트웨이가 아니라 우리 코드가 냈다 · `lib/CORS.js`). */
+  const 예비 = 예비응답(req);
+  if (예비) return 예비;
   const 선언 = req.headers.get('X-Contract-Ver') ?? '';
   if (!선언) return 실패(400, { code: 'CONTRACT_VER_MISSING', message: 'X-Contract-Ver 헤더가 없습니다', retryable: false }, 선언);
   if (판번호(선언) === null) {

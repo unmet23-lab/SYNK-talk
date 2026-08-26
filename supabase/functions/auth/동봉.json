@@ -3,5 +3,6 @@
   "벤더사유.mjs": "lib/벤더사유.js",
   "로그인코드.mjs": "lib/로그인코드.js",
   "가입문항.mjs": "lib/가입문항.js",
-  "계약판.mjs": "lib/계약판.js"
+  "계약판.mjs": "lib/계약판.js",
+  "CORS.mjs": "lib/CORS.js"
 }

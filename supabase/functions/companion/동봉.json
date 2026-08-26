@@ -4,5 +4,6 @@
   "옛글자.mjs": "lib/옛글자.js",
   "교정엔진.mjs": "lib/교정엔진.js",
   "벤더사유.mjs": "lib/벤더사유.js",
-  "강사지식.mjs": "contents/강사지식.js"
+  "강사지식.mjs": "contents/강사지식.js",
+  "CORS.mjs": "lib/CORS.js"
 }

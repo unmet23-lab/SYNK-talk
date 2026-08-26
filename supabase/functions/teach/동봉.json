@@ -10,5 +10,6 @@
   "작성과정.mjs": "lib/작성과정.js",
   "라디오태스크.mjs": "lib/라디오태스크.js",
   "반피드백.mjs": "lib/반피드백.js",
-  "계약판.mjs": "lib/계약판.js"
+  "계약판.mjs": "lib/계약판.js",
+  "CORS.mjs": "lib/CORS.js"
 }

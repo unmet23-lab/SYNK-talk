@@ -1,5 +1,6 @@
 {
   "토큰.mjs": "lib/토큰.js",
   "계약판.mjs": "lib/계약판.js",
-  "문구감수.mjs": "lib/문구감수.js"
+  "문구감수.mjs": "lib/문구감수.js",
+  "CORS.mjs": "lib/CORS.js"
 }

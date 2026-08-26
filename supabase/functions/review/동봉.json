@@ -5,5 +5,6 @@
   "업로드경로.mjs": "lib/업로드경로.js",
   "계약판.mjs": "lib/계약판.js",
   "저작신뢰.mjs": "lib/저작신뢰.js",
-  "작성과정.mjs": "lib/작성과정.js"
+  "작성과정.mjs": "lib/작성과정.js",
+  "CORS.mjs": "lib/CORS.js"
 }
