@@ -15,6 +15,9 @@
  *   `service_role` 은 어떤 경우에도 앱에 두지 않는다(`tools/guard.js` 가 기계로 막는다).
  */
 import { 이메일, 학생번호표기 } from '../lib/학생계정.js';
+/* 🔑 문장은 여기 안 박는다 — 정본은 `contents/문구_오류.js` 하나다(키 = l10n string_id).
+ *   두 벌로 두면 몽골어가 붙는 날 한쪽만 번역되고, 안 된 쪽은 조용히 한국어로 남는다. */
+import { 말 } from '../contents/문구_오류.js';
 
 const URL_ = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -27,7 +30,7 @@ export function 설정됐나() {
 /** 앱이 분기하는 것은 `message` 가 아니라 **`code`** 다(C0 §5 — 문구는 몽골어 번역으로 계속 바뀐다). */
 export class 인증오류 extends Error {
   constructor(code, message, retryable) {
-    super(message || '잠시 뒤 다시 시도해 주세요');
+    super(message || 말('err.retry_later'));
     this.code = code || 'SERVER_ERROR';
     this.retryable = Boolean(retryable);
   }
@@ -112,7 +115,7 @@ async function 함수부르기(갈래, 본문, 토큰) {
     });
   } catch {
     // 네트워크가 없다 — 서버 오류와 **다른 사건**이라 다르게 말해야 다시 시도할 수 있다.
-    throw new 인증오류('NETWORK', '인터넷 연결을 확인해 주세요', true);
+    throw new 인증오류('NETWORK', 말('err.network'), true);
   }
   const 몸 = await r.json().catch(() => ({}));
   if (!r.ok || 몸.ok === false) {
@@ -132,13 +135,13 @@ export async function 로그인(학생번호, 비밀번호) {
       body: JSON.stringify({ email: 이메일(학생번호), password: 비밀번호 }),
     });
   } catch {
-    throw new 인증오류('NETWORK', '인터넷 연결을 확인해 주세요', true);
+    throw new 인증오류('NETWORK', 말('err.network'), true);
   }
   const 몸 = await r.json().catch(() => ({}));
   if (!r.ok) {
     // 🔴 GoTrue 의 원문을 그대로 보여주지 않는다 — 영어이고, 「없는 계정」과 「틀린 비밀번호」를
     //   가르는 문구라 학생번호의 존재가 샌다. 서버 게이트와 **같은 한 문장**으로 접는다.
-    throw new 인증오류('LOGIN_FAILED', '학생번호 또는 비밀번호가 맞지 않습니다', false);
+    throw new 인증오류('LOGIN_FAILED', 말('err.login_failed'), false);
   }
   /* 🔑 학생번호를 세션에 실어 보낸다 — 막힘 안내가 「선생님께 이 번호를 보여 주세요」로 끝나는데
    *   토큰에 실려 오는 것은 **합성 이메일**뿐이라, 안 실으면 화면이 그 번호를 모른다.
@@ -169,11 +172,11 @@ export async function 갱신(refresh_token, 학생번호) {
       body: JSON.stringify({ refresh_token }),
     });
   } catch {
-    throw new 인증오류('NETWORK', '인터넷 연결을 확인해 주세요', true);
+    throw new 인증오류('NETWORK', 말('err.network'), true);
   }
   const 몸 = await r.json().catch(() => ({}));
   if (!r.ok || !몸.access_token) {
-    throw new 인증오류('REFRESH_FAILED', '다시 로그인해 주세요', false);
+    throw new 인증오류('REFRESH_FAILED', 말('err.refresh_failed'), false);
   }
   return 기억({
     access_token: 몸.access_token,
@@ -247,9 +250,9 @@ export async function 비밀번호변경({ 학생번호, 현재비밀번호, 새
       body: JSON.stringify({ password: 새비밀번호 }),
     });
   } catch {
-    throw new 인증오류('NETWORK', '인터넷 연결을 확인해 주세요', true);
+    throw new 인증오류('NETWORK', 말('err.network'), true);
   }
-  if (!r.ok) throw new 인증오류('SERVER_ERROR', '잠시 뒤 다시 시도해 주세요', true);
+  if (!r.ok) throw new 인증오류('SERVER_ERROR', 말('err.retry_later'), true);
   return 세션;
 }
 

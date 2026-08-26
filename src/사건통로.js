@@ -20,6 +20,11 @@ import { 검증 } from '../lib/이벤트검증.js';
 // 멱등 충돌 때 지을 새 키. **키를 짓는 규칙은 저장소에 하나뿐이어야** 한다 — 여기서 따로
 // 지으면 기기에 `crypto` 가 없는 갈래(Hermes)가 이 자리에서만 조용히 깨진다(제출로그 머리말).
 import { 흐름id } from '../lib/제출로그.js';
+/* 🔑 학생이 읽는 글은 여기 안 박는다 — 정본은 `contents/문구_오류.js` 하나다.
+ *   까닭: 몽골어가 붙는 날 문장이 화면 파일마다 흩어져 있으면 번역이 그만큼 갈라진다
+ *   (`contents/문구_동의.js` 가 같은 이유로 먼저 그 길을 냈다). 키는 `l10n` 의 string_id 라
+ *   감수가 끝나면 그 파일의 `mn` 만 차면 이 자리가 그대로 병기로 선다. */
+import { 말 } from '../contents/문구_오류.js';
 
 const URL_ = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -51,12 +56,12 @@ async function 한번(길, 토큰, 몸, 읽기) {
       ...(읽기 ? {} : { body: JSON.stringify(몸) }),
     });
   } catch {
-    throw new 인증오류('NETWORK', '인터넷 연결을 확인해 주세요', true);
+    throw new 인증오류('NETWORK', 말('err.network'), true);
   }
 }
 
 export async function 부르기(길, 토큰, 몸) {
-  if (!URL_ || !ANON) throw new 인증오류('CONFIG', '서버 설정이 없어요', false);
+  if (!URL_ || !ANON) throw new 인증오류('CONFIG', 말('err.config'), false);
   const 읽기 = 몸 === undefined;
   let r = await 한번(길, 토큰, 몸, 읽기);
 
@@ -80,7 +85,7 @@ export async function 부르기(길, 토큰, 몸) {
      *   다시 로그인하면 나갈 수 있었던 발화를 버리는 셈이다. 그 한 칸만 메운다(우리 함수가
      *   낸 401 `AUTH_REQUIRED`(`retryable:false`)는 그대로 둔다 — 그건 재시도가 무의미한 게 맞다). */
     if (r.status === 401 && !e.code) {
-      throw new 인증오류('AUTH_EXPIRED', '로그인이 풀렸어요 — 다시 로그인해 주세요', true);
+      throw new 인증오류('AUTH_EXPIRED', 말('err.auth_expired'), true);
     }
     throw new 인증오류(e.code, e.message, e.retryable);
   }
@@ -101,16 +106,16 @@ export async function 부르기(길, 토큰, 몸) {
  * @returns {Promise<{event_id?: string, 오류?: string, 끝?: boolean}>}
  */
 export async function 사건보내기(토큰, 사건) {
-  if (!토큰) return { 오류: '로그인이 풀렸어요', 끝: false };
+  if (!토큰) return { 오류: 말('err.no_token'), 끝: false };
   /* 말투 = 시스템 말투 상시 규칙(유호 확정 08-22) — 영구 실패도 «선생님과 함께 챙기는» 프레임으로.
    * 「끝: true」(서버에 안 갔다)라는 사실은 화면 흐름이 지고, 학생 문장은 다음 걸음만 준다. */
-  if (!사건) return { 오류: '이 답은 선생님과 함께 챙길게요 — 이 화면을 보여 주세요!', 끝: true };
+  if (!사건) return { 오류: 말('err.kept.answer'), 끝: true };
 
   const v = 검증(사건, {});
   // 학생 오류칸에 그대로 뜬다 — 개발 어휘를 앞세우지 않고, 학생이 할 수 있는 다음 걸음을 먼저 준다.
   // 실패 가시성(P0 §4-1)은 괄호로 보존한다: 원인 문자열을 지우면 강사·개발이 못 쫓는다.
   if (!v.ok) {
-    return { 오류: `이 기록은 선생님과 함께 챙길게요 — 이 화면을 보여 주세요! (계약 위반: ${v.오류들.join(' · ')})`, 끝: true };
+    return { 오류: `${말('err.kept.record')} (계약 위반: ${v.오류들.join(' · ')})`, 끝: true };
   }
 
   const 첫판 = await 한벌쏘기(토큰, 사건);
@@ -127,7 +132,7 @@ export async function 사건보내기(토큰, 사건) {
   const 다시 = { ...사건, idempotency_key: 흐름id() };
   const 둘째판 = await 한벌쏘기(토큰, 다시);
   if (둘째판.충돌) {
-    return { 오류: '이 발화는 선생님과 함께 챙길게요 — 이 화면을 보여 주세요!', 끝: true };
+    return { 오류: 말('err.kept.speech'), 끝: true };
   }
   return 둘째판.결과;
 }
@@ -150,5 +155,5 @@ async function 한벌쏘기(토큰, 사건) {
   }
   const e = (한건 && 한건.error) || {};
   if (e.code === 'IDEMPOTENCY_CONFLICT') return { 충돌: true, 결과: null };
-  return { 충돌: false, 결과: { 오류: e.message || '전달이 조금 늦어지고 있어요', 끝: e.retryable === false } };
+  return { 충돌: false, 결과: { 오류: e.message || 말('err.delivery_slow'), 끝: e.retryable === false } };
 }

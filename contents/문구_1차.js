@@ -12,11 +12,12 @@
  *   👉 여기 든 넷은 전부 **기능이 막히는 자리**라 브랜드 톤이 바뀌어도 문장이 안 흔들린다.
  *
  * ■ 🔴 이 파일이 **아직 못 하는 것 둘** — 번역이 와도 화면에 안 뜬다. 미루는 것이지 없는 게 아니다.
- *   ① **오류 문구는 서버가 한국어로 만들어 보낸다.** 앱은 `e.message` 를 그대로 띄운다
- *      (`src/사건통로.js:85` · `src/인증API.js:120`). 계약은 이미 이걸 내다봤다 —
- *      「앱이 분기하는 것은 message 가 아니라 **code**」(`src/인증API.js:27` · C0 §5).
- *      ⇒ `err.*` 를 **코드로 키를 잡은** 이유가 이것이다. 번역이 서는 자리는 서버가 아니라
- *        앱의 code→문구 표이고, 그 표는 아직 없다. (다음 조각)
+ *   ① ✅ **닫혔다(08-26)** — code→문구 표가 섰다: `contents/문구_오류.js`.
+ *      전에는 서버가 한국어 `message` 를 만들어 보내고 앱이 그대로 띄워, 번역이 와도 붙일 자리가
+ *      없었다. 이제 문장은 앱이 쥐고 서버는 코드만 보낸다(C0 §5 「앱이 분기하는 것은 code」).
+ *      그래서 `err.*` 18줄의 `source_file` 이 그 표를 가리킨다 — 넷만 예외로 서버에 남아 있다
+ *      (`CONTRACT_VIOLATION` 처럼 코드 하나가 여러 말을 하는 갈래라 코드로 못 고른다).
+ *      ⇒ 감수가 끝나면 그 파일의 `mn` 만 채운다. 화면 코드는 한 줄도 안 바뀐다.
  *   ② **키릴 글리프를 가진 폰트가 없다.** `assets/fonts` = SUIT 4종 + DM Mono, 넷 다 키릴이 없다.
  *      정본은 Inter Tight cyrillic-ext 이고 미탑재다(`src/테마.js` `몽골어` 상수).
  *      지금은 `fontFamily` 를 **일부러 비워** 시스템 폰트가 그린다 — 뜨긴 뜨되 **브랜드 밖 글자**다.
@@ -119,7 +120,7 @@ const 목록 = [
     draft_mn: null,
     context: '전화가 서버에 아예 못 닿았을 때. 다시 시도하면 되는 종류다.',
     max_len: null,
-    source_file: 'src/사건통로.js',
+    source_file: 'contents/문구_오류.js',
   },
   {
     string_id: 'err.config',
@@ -127,7 +128,7 @@ const 목록 = [
     draft_mn: null,
     context: '앱이 서버 주소를 못 들고 있는 상태(우리 잘못). 학생이 할 수 있는 일이 없어 학원에 알려야 한다.',
     max_len: null,
-    source_file: 'src/사건통로.js',
+    source_file: 'contents/문구_오류.js',
   },
   {
     string_id: 'err.auth_expired',
@@ -135,7 +136,7 @@ const 목록 = [
     draft_mn: null,
     context: '한 시간 넘게 쓴 뒤 토큰이 만료됐을 때. 다시 로그인하면 바로 이어진다 — 「잃어버렸다」로 읽히면 안 된다.',
     max_len: null,
-    source_file: 'src/사건통로.js',
+    source_file: 'contents/문구_오류.js',
   },
   {
     string_id: 'err.no_token',
@@ -143,7 +144,7 @@ const 목록 = [
     draft_mn: null,
     context: '위와 같은 상황인데 화면이 다음 걸음을 따로 그려 주는 자리라 문장이 짧다.',
     max_len: null,
-    source_file: 'src/사건통로.js',
+    source_file: 'contents/문구_오류.js',
   },
   {
     string_id: 'err.kept.answer',
@@ -151,7 +152,7 @@ const 목록 = [
     draft_mn: null,
     context: '학생의 «답»이 서버에 못 갔을 때. 🔑 「실패」가 아니라 「선생님과 같이 챙긴다」로 말한다(유호 확정 08-22 시스템 말투). 아래 둘과 한 벌.',
     max_len: null,
-    source_file: 'src/사건통로.js',
+    source_file: 'contents/문구_오류.js',
   },
   {
     string_id: 'err.kept.record',
@@ -159,7 +160,7 @@ const 목록 = [
     draft_mn: null,
     context: '위와 같은 말인데 대상이 «기록»이다. 괄호 안에 개발용 원인이 덧붙는데 그건 옮기지 않는다.',
     max_len: null,
-    source_file: 'src/사건통로.js',
+    source_file: 'contents/문구_오류.js',
   },
   {
     string_id: 'err.kept.speech',
@@ -167,7 +168,7 @@ const 목록 = [
     draft_mn: null,
     context: '위와 같은 말인데 대상이 «발화(말한 것)»다.',
     max_len: null,
-    source_file: 'src/사건통로.js',
+    source_file: 'contents/문구_오류.js',
   },
   {
     string_id: 'err.delivery_slow',
@@ -175,7 +176,7 @@ const 목록 = [
     draft_mn: null,
     context: '서버가 이유를 안 알려줬을 때의 기본 문장. 잃어버린 게 아니라 늦는 것이라는 뜻이 살아야 한다.',
     max_len: null,
-    source_file: 'src/사건통로.js',
+    source_file: 'contents/문구_오류.js',
   },
   {
     string_id: 'err.retry_later',
@@ -183,7 +184,7 @@ const 목록 = [
     draft_mn: null,
     context: '서버가 잠깐 흔들렸을 때. 앱과 서버 양쪽이 같은 문장을 쓴다.',
     max_len: null,
-    source_file: 'src/인증API.js',
+    source_file: 'contents/문구_오류.js',
   },
   {
     string_id: 'err.login_failed',
@@ -191,7 +192,7 @@ const 목록 = [
     draft_mn: null,
     context: '🔑 어느 쪽이 틀렸는지 **일부러 안 알려준다**(남의 번호를 떠보지 못하게). 번역도 둘을 가르면 안 된다.',
     max_len: null,
-    source_file: 'src/인증API.js',
+    source_file: 'contents/문구_오류.js',
   },
   {
     string_id: 'err.refresh_failed',
@@ -199,7 +200,7 @@ const 목록 = [
     draft_mn: null,
     context: '자동 갱신이 실패했을 때. 학생이 할 일은 하나뿐이다.',
     max_len: null,
-    source_file: 'src/인증API.js',
+    source_file: 'contents/문구_오류.js',
   },
   {
     string_id: 'err.signup_gate_failed',
@@ -247,7 +248,7 @@ const 목록 = [
     draft_mn: null,
     context: '🔑 값이 비어 있는데 「맞지 않습니다」라고 하면 학생이 **자기 번호를 의심한다**. 그래서 우리 잘못임을 밝히는 문장이다.',
     max_len: null,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_오류.js',
   },
   {
     string_id: 'err.try_again',
@@ -255,7 +256,7 @@ const 목록 = [
     draft_mn: null,
     context: '화면이 이유를 못 받았을 때의 마지막 기본값.',
     max_len: null,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_오류.js',
   },
 
   /* ── ④ 로그인·첫등록 화면 ─────────────────────────────────────────────────
