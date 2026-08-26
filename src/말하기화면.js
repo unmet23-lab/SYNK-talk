@@ -38,6 +38,8 @@ import { 오늘의낭독, 낭독걸음 } from '../lib/라디오낭독.js';
 /* ②따라를 문장 단위로 가르는 어댑터(유호 확정 08-23) — 자르기는 `문장끊기`, 걸음 이름은 `걸음`.
    판정이 셋으로 흩어지지 않게 화면은 **부르기만** 한다. */
 import { 문장들 } from '../lib/문장끊기.js';
+/* 병기 글의 작성 과정 — G1·G4 와 **같은 조립기**(통로마다 다르게 재면 한 축으로 안 선다). */
+import { 계측시작, 타건, 계측payload } from '../lib/작성과정.js';
 import { 따라걸음, 따라차례 } from '../lib/걸음.js';
 /* 「골라서 답하기」의 조립기 — 자리를 섞는 것과 택1 판정이 여기 한 곳에 산다(`lib/선택로그.js`).
    화면은 **그 결과가 준 순서대로 그리기만** 한다: 안 그러면 행에 적힌 자리와 학생이 실제로 본
@@ -910,6 +912,13 @@ function 녹음카드({
   const [녹음, set녹음] = useState(null); // { uri, 바이트, duration_ms, hesitation_ms, spoke }
   const [경과, set경과] = useState(0); // 녹음중 타이머 — 스트림이 알려 준 시각
   const [병기글, set병기글] = useState('');
+  /* 🔴 **병기 글의 작성 과정**(철학 Ⅱ-9 · `lib/저작신뢰.js`). 이 칸이 선택 입력이라 가벼워 보이는데,
+   *   교정 엔진은 `coalesce(body_original, transcript)` 로 읽어 **병기 글이 전사를 이긴다**
+   *   (`functions/correct`). 즉 여기 들어온 글이 그날의 코퍼스 행이 되고, 검수·훈련 승격이
+   *   그 위에 앉는다 — 자유 서술 통로 중 유일하게 계측이 없던 자리였다(08-26 실측).
+   * 🔑 G1 메일·G4 서류관문과 **같은 조립기**를 쓴다(`lib/작성과정.js`) — 통로마다 다르게 재면
+   *   그 값들이 한 축으로 안 선다. 못 재면 키를 아예 안 만든다(반쪽 금지 · 그 파일 규칙 1). */
+  const 병기계측 = useRef(null);
   const [듣는중, set듣는중] = useState(false);
   const [문장듣는중, set문장듣는중] = useState(false); // 제시문 TTS — 「내 목소리 듣기」와 다른 것이라 칸을 나눈다
   const [막힘, set막힘] = useState(null); // 녹음이 시작되지 못한 이유 — 버튼 옆에 글자로 선다
@@ -1204,6 +1213,9 @@ function 녹음카드({
       spoke: 녹음 ? 녹음.spoke : false,
       threshold_db: 발화문턱_DB,
       text: 텍스트병기 && 병기글.trim() ? 병기글.trim() : null,
+      /* 🔴 **글이 실릴 때만 계측도 실린다.** 안 쓴 학생에게 「0초에 0번 고쳤다」를 적으면
+       *   「안 썼다」가 「즉답으로 썼다」가 된다 — 그 오독은 어디서도 안 빨개진다. */
+      compose_meta: 텍스트병기 && 병기글.trim() ? 계측payload(병기계측.current, 경과시계()) : null,
       audio,
       prompt_id,
       created_at: new Date().toISOString(),
@@ -1327,7 +1339,14 @@ function 녹음카드({
               placeholder="말한 문장을 글로도 남기고 싶으면 여기에 (선택)"
               placeholderTextColor={색.잉크_메타}
               value={병기글}
-              onChangeText={set병기글}
+              onChangeText={(t) => {
+                /* 계측은 **입력이 가능해진 순간**이 아니라 첫 글자에서 시작한다 — 이 칸은 확인
+                 * 카드가 뜬 뒤 «선택»으로 열리는 자리라, 안 쓰는 학생의 대기 시간이 「미룸」으로
+                 * 잡히면 안 된다(G1·G4 는 쓰기가 그 화면의 본업이라 반대 자리에서 시작한다). */
+                if (!병기계측.current) 병기계측.current = 계측시작(경과시계());
+                병기계측.current = 타건(병기계측.current, t, 경과시계());
+                set병기글(t);
+              }}
               multiline
             />
           )}

@@ -142,3 +142,68 @@ test('🔴 재료를 새 열이 아니라 «이미 있는 자리»에서 가져�
   assert.match(질의, /s\.body_original/, '본문 길이의 재료가 질의에 없다');
   assert.match(질의, /payload->'compose_meta'/, 'compose_meta 를 사건 payload 에서 안 읽는다');
 });
+
+/* ─────────────── ⑥ 통로 — 병기 글의 계측이 실제로 흐르는가 (08-26 신설) ───────────────
+ * 🔴 이 절이 있는 까닭: 말하기 ③의 «텍스트 병기»는 선택 입력이라 가벼워 보이는데, 교정 엔진이
+ *   `coalesce(body_original, transcript)` 로 읽어 **병기 글이 전사를 이긴다**(functions/correct).
+ *   즉 여기 들어온 글이 그날의 코퍼스 행이 되고 검수·훈련 승격이 그 위에 앉는다 — 자유 서술
+ *   통로 중 유일하게 계측이 없던 자리였다. */
+const { 항목추가: 항목추가2 } = require('../lib/제출로그.js');
+const { 제출사건: 제출사건2, 화면과제: 화면과제2 } = require('../lib/오늘과제.js');
+const { 한벌인가 } = require('../lib/작성과정.js');
+
+const 한벌 = { first_keystroke_ms: 2000, total_compose_ms: 9000, revision_count: 1, input_burst_max: 7 };
+const 폴백2 = { id: 'intro', 본문: '안녕하세요.', 핵심문장: '안녕하세요.', 질문: '이름이 뭐예요?' };
+const 서버항목2 = () => ({
+  task_id: 't1', task_ref: 'task-2026-08-26',
+  task_snapshot: {
+    ver: 1, 날짜: '2026-08-26',
+    호흡: [
+      { 차례: 1, 무엇: '듣기' },
+      { 차례: 2, 무엇: '따라말하기', task_format: '낭독', 문장: '저는 학교에 가요.' },
+      { 차례: 3, 무엇: '답하기', task_format: '자유발화', 프롬프트: '어떻게 가요?' },
+    ],
+  },
+  level_snapshot: 'Lv3', goal_snapshot: '유학', intervention: null,
+});
+
+const 항목입력 = () => ({
+  date: '2026-08-26', step: '답하기', status: 'submitted', duration_ms: 1200, hesitation_ms: 0,
+  spoke: true, threshold_db: -40, text: '저는 버스로 가요.', audio: null, prompt_id: 'p1',
+  created_at: '2026-08-26T01:00:00.000Z', capture_app: null,
+  correlation_id: '11111111-1111-4111-8111-111111111111', replayed_at: null,
+});
+
+const 봉투내기 = (compose_meta) => {
+  const { 제출재료 } = 화면과제2(서버항목2(), 폴백2);
+  const { 항목 } = 항목추가2([], { ...항목입력(), task_meta: 제출재료, compose_meta });
+  return { 항목, 사건: 제출사건2(항목, 'voice/a/b.m4a') };
+};
+
+test('🔴 항목이 계측을 «들고 간다» — 화면 ref 에 두면 사흘 밀린 항목의 과정이 사라진다', () => {
+  const { 항목 } = 봉투내기(한벌);
+  assert.deepEqual(항목.compose_meta, 한벌, '오프라인 큐 규율 — replayed_at·선택과 같은 자리');
+});
+
+test('한 벌이면 payload 에 실린다 — 저작 판정의 재료가 서버에 닿는 유일한 길', () => {
+  const { 사건 } = 봉투내기(한벌);
+  assert.deepEqual(사건.payload.compose_meta, 한벌);
+  assert.equal(사건.payload.attempt_no, 1, '기존 칸은 그대로다');
+});
+
+test('🔴 반쪽·없음이면 키 자체가 없다 — 「안 쟀다」가 「0회였다」로 안 바뀐다', () => {
+  for (const m of [null, undefined, { input_burst_max: 7 }, { ...한벌, 군더더기: 1 }]) {
+    const { 사건 } = 봉투내기(m);
+    assert.ok(!('compose_meta' in 사건.payload), JSON.stringify(m));
+    assert.equal(한벌인가(m), false, '한벌인가 판정과 봉투가 같은 답을 내야 한다');
+  }
+});
+
+test('🔴 화면은 «글이 실릴 때만» 계측을 싣는다 — 안 쓴 학생에게 「즉답」을 적지 않는다(소스층)', () => {
+  const 화면 = 파일소스(path.resolve(__dirname, '..', 'src', '말하기화면.js'));
+  const 코드 = 코드만(화면);
+  assert.match(코드, /compose_meta:\s*텍스트병기\s*&&\s*병기글\.trim\(\)\s*\?\s*계측payload\(/,
+    '병기 글이 비어도 계측이 실린다 — 그러면 안 쓴 학생이 「0초에 0번 고쳤다」로 남는다');
+  assert.match(코드, /if\s*\(!병기계측\.current\)\s*병기계측\.current = 계측시작\(/,
+    '계측이 첫 글자에서 시작하지 않는다 — 안 쓰는 학생의 대기가 「미룸」으로 잡힌다');
+});
