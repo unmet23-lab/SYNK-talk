@@ -55,3 +55,7 @@ assets/bgm/*.wav
 
 # §8-B 드라이런 «초안» — 정본이 아니다(벤더 0·채점 0). 정본 = evals/과제생성_결과.json(실물 응답 + 사람 채점)
 evals/과제생성_결과_초안.json
+
+# NPC 눈검수 시트 — 앱에 안 실린다(어디서도 require 하지 않는다) · 1.2MB 라 가드도 막는다.
+# tools/NPC변환.py 가 굽기 산출에서 언제든 다시 낸다. 판정 지면 정본은 appsscript docs/NPC_시안.html.
+assets/npc/NPC_시트.png

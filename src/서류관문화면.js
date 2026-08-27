@@ -18,6 +18,11 @@ import { 몽골날짜 } from '../lib/오늘과제.js';
 import { 게임큐읽기, 게임사건담기, 게임큐밀기, 게임이탈수거 } from './게임큐.js';
 import { 효과음 } from './소리.js';
 
+/* NPC 심사관 — 상대역. 이 모듈의 NPC 는 «상태 전이 자리»(판 시작·완료)에서만
+ * 바뀐다(게임층 설계 §4 규격 3) — 입력 중 움직이는 장치는 동시에 하나여야 하고, 그 하나는
+ * 이미 이 화면의 게이지가 쥐고 있다. 실시간 3단은 G3(알바변명) 전용이다. */
+import NPC from './NPC.js';
+import { 전이상태 } from '../lib/NPC연출.js';
 /**
  * G4 「서류 관문」 — 안내문을 읽고 빈칸을 직접 채우고 문장을 바꿔 쓰는 게임
  * (발주_게임모듈.md G4 §4 · 4모듈 중 유일하게 산출을 강제하는 자리).
@@ -333,6 +338,12 @@ export default function 서류관문화면({
   return (
     <ScrollView style={s.wrap} contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
       <머리 />
+
+      {/* 심사관 — 판 내내 «한 자리»에 산다(자리를 옮기면 학생 눈이 그 이동을 좇는다).
+          🔴 상태에 숫자·퍼센트를 병기하지 않는다(규격 3 · 모호함이 설계다). */}
+      <View style={s.NPC자리}>
+        <NPC 역="insp" 상태={단계 === '결과' ? 전이상태('완료') : 전이상태('시작')} 크기={88} />
+      </View>
       {오류 && <Text style={s.오류}>{오류}</Text>}
 
       {진행중 && (
@@ -517,6 +528,8 @@ function 머리() {
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: 색.바탕 },
+  /* NPC 한 자리 — 고정이다(옮기면 «움직임»이 되어 검사 ① 의 장치가 하나 더 생긴다). */
+  NPC자리: { alignItems: 'center', marginBottom: 4 },
   inner: { padding: 24, paddingTop: 68, paddingBottom: 48, gap: 20 },
 
   머리: { gap: 6 },

@@ -23,6 +23,11 @@ import { 게임큐읽기, 게임사건담기, 게임큐밀기, 게임이탈수�
  * 프로즈로 돌아간다. 이 화면의 소리는 발송 성취음 1회뿐이다(실패음 없음 — 킷 규칙 ②). */
 import { 효과음 } from './소리.js';
 
+/* NPC 교수님 — 상대역. 이 모듈의 NPC 는 «상태 전이 자리»(판 시작·완료)에서만
+ * 바뀐다(게임층 설계 §4 규격 3) — 입력 중 움직이는 장치는 동시에 하나여야 하고, 그 하나는
+ * 이미 이 화면의 게이지가 쥐고 있다. 실시간 3단은 G3(알바변명) 전용이다. */
+import NPC from './NPC.js';
+import { 전이상태 } from '../lib/NPC연출.js';
 /**
  * G1 「교수님 멘탈 구하기」 — 격식 메일 쓰기 게임 (발주_게임모듈.md G1 · 게임층 설계).
  * 흐름: 상황 카드 + 사과 전략 3장 → 메일 쓰기(멘탈 게이지) → 「교수님이 읽고 있어요」.
@@ -261,6 +266,12 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
   return (
     <ScrollView style={s.wrap} contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
       <머리 />
+
+      {/* 교수님 — 판 내내 «한 자리»에 산다(자리를 옮기면 학생 눈이 그 이동을 좇는다).
+          🔴 상태에 숫자·퍼센트를 병기하지 않는다(규격 3 · 모호함이 설계다). */}
+      <View style={s.NPC자리}>
+        <NPC 역="prof" 상태={단계 === '대기' ? 전이상태('완료') : 전이상태('시작')} 크기={88} />
+      </View>
       {오류 && <Text style={s.오류}>{오류}</Text>}
 
       {단계 === '전략' && (
@@ -409,6 +420,8 @@ function 머리() {
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: 색.바탕 },
+  /* NPC 한 자리 — 고정이다(옮기면 «움직임»이 되어 검사 ① 의 장치가 하나 더 생긴다). */
+  NPC자리: { alignItems: 'center', marginBottom: 4 },
   inner: { padding: 24, paddingTop: 68, paddingBottom: 48, gap: 20 },
 
   머리: { gap: 6 },
