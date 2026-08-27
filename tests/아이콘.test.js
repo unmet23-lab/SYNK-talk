@@ -61,13 +61,20 @@ async function 픽셀통계(file) {
   return { cnt, n, 투명, w: info.width, h: info.height, 비율: (c) => (cnt[c] || 0) / n, 근방 };
 }
 
+/* `펠트` = 이 그림의 브랜드색이 **펠트 필터를 지나서** 칠해진다는 표시.
+ * 🔴 08-28 에 아이콘 넷이 평면 「S.」에서 정본 기호(크림 펠트 꺾쇠 + 코랄 실땀)로 바뀌면서
+ *   이 눈금이 원리상 못 재는 자리가 됐다 — 실땀은 `sl-soft` 필터에 opacity 0.9/0.36 로 얹히므로
+ *   **정확한 #F96859 가 한 픽셀도 안 남는다**(실측: exact 0 · 근방 ±26 = 1.524%).
+ *   이 파일은 이미 같은 물리를 스플래시(알록)에서 겪고 근방으로 옮겼다 — 같은 처방을 여기 넓힌다.
+ *   ⚠ **면적 규율(5% 미만)은 안 건드린다.** 고친 것은 «재는 자»뿐이고 «재는 것»이 아니다.
+ *     그리고 잉크(CREAM)는 평평한 몸이라 정확한 hex 가 그대로 남으므로(실측 49,350px) 비율로 둔다. */
 const 파일들 = [
-  { f: 'icon.png', size: 1024, 배경: NAVY2 },
-  { f: 'android-icon-foreground.png', size: 1024, 배경: null },
+  { f: 'icon.png', size: 1024, 배경: NAVY2, 펠트: true },
+  { f: 'android-icon-foreground.png', size: 1024, 배경: null, 펠트: true },
   { f: 'android-icon-background.png', size: 1024, 배경: NAVY2 },
   { f: 'android-icon-monochrome.png', size: 1024, 배경: null },
   { f: 'splash-icon.png', size: 1024, 배경: null, 알록: true },
-  { f: 'favicon.png', size: 64, 배경: NAVY2 },
+  { f: 'favicon.png', size: 64, 배경: NAVY2, 펠트: true },
 ];
 
 test('아이콘 6종이 모두 있다', () => {
@@ -87,7 +94,7 @@ test('app.json 의 배경색이 정본 Ink Deep 과 같다', () => {
 // sharp 가 없는 환경에서는 픽셀 검사를 건너뛴다 — 다만 **조용히 통과시키지 않고 skip 으로 남긴다**.
 const 픽셀검사 = sharp ? test : test.skip;
 
-for (const { f, size, 배경, 알록 } of 파일들) {
+for (const { f, size, 배경, 알록, 펠트 } of 파일들) {
   픽셀검사(`${f} — 규격·정본색·R1`, async () => {
     const s = await 픽셀통계(A(f));
     assert.equal(s.w, size, `${f} 가로 규격`);
@@ -113,7 +120,7 @@ for (const { f, size, 배경, 알록 } of 파일들) {
           색은 살아 있으므로 눈금을 근방으로 옮기되, 면적 규율(5% 미만)은 그대로 건다. */
     /* 알록 «소프트» 정본(유호 08-25)은 색실이 전부 파스텔이라 **원색 코랄이 한 픽셀도 없다**
        (실측: Coral 근방 0 · Coral Soft 근방 0.09%). 코랄 계열이면 신호가 산 것으로 본다. */
-    const 신호면적 = 알록 ? s.근방(CORAL) + s.근방(CORAL_SOFT) : s.비율(CORAL);
+    const 신호면적 = 알록 ? s.근방(CORAL) + s.근방(CORAL_SOFT) : (펠트 ? s.근방(CORAL) : s.비율(CORAL));
     assert.ok(신호면적 < 0.05, `${f} Coral 면적 ${(신호면적 * 100).toFixed(2)}% — R1 위반`);
 
     // monochrome 은 OS 가 칠하므로 브랜드색이 없는 게 정상

@@ -34,6 +34,7 @@ import 반짝임, { 박자 } from './반짝임.js';
 import NPC from './NPC.js';
 import { 역들 as NPC역들, 상태들 as NPC상태들 } from '../lib/NPC연출.js';
 import 마스코트 from './마스코트';
+import 녹음띠, { 상태들 as 녹음상태들 } from './녹음띠.js';
 
 /* 서버 응답 모양 그대로 — 정본(`견줌`)이 화면이 읽는 꼴로 접는다.
    어제 1 → 오늘 3 (두 칸 오름) · 다시 말한 것 0 → 1 · 교정 재발화 있음 = 결론 두 줄이 다 선다. */
@@ -252,6 +253,46 @@ export default function 검수문({ 돌아가기 }) {
           </View>
         </View>
 
+        {/* ── ⑦ 녹음 단추 — 어디에 앉힐까 (유호님 픽 대기 · 08-28) ──
+            🔴 이 칸은 «보여주기»가 아니라 **판정 자리**다. 펠트 띠 셋은 08-25 에 구워 놓고
+            08-28 까지 앱에 한 장도 안 들어와 있었는데(받침이 켜져 알파가 프레임을 꽉 채웠다),
+            통로를 뚫고 나니 «어디에 앉히나»가 갈렸다.
+            🔑 갈린 까닭은 미학이 아니라 **규율**이다: 테마 R1 「신호 1점」이 말하기 화면의
+            신호자리를 녹음버튼으로 못박아 뒀는데, 띠의 «대기» 상태에는 코랄이 없다.
+            ⇒ ㉮로 가면 녹음 «전» 화면의 신호가 0점이 되고, ㉯로 가면 녹음 «중» 에 코랄이 둘이 된다.
+            ㉰는 지금 그대로다(띠를 안 쓴다). 셋 다 값과 대가가 있어 유호님 눈이 판정 축이다.
+            🔑 셋을 나란히 놓는 것이 이 칸의 전부다 — 한 안씩 따로 보면 「무엇을 잃는지」가 안 보인다. */}
+        <View style={s.칸}>
+          <View style={s.칸머리}>
+            <Text style={s.칸이름}>⑦ 녹음 단추 세 안 — 어디에 앉힐까 (유호님 픽 대기)</Text>
+          </View>
+          <Text style={s.눈금}>
+            띠가 말하는 문장 = 대기(실이 아직 안 꿰어짐 · 코랄 없음) → 말하는중(꿰는 중) → 맺음(매듭) ·
+            셋은 «한 자»로 잘려 같은 틀이라 상태가 바뀌어도 띠가 안 움직인다
+          </Text>
+
+          <Text style={s.안이름}>㉮ 띠를 «단추»로 — 원 설계 의도 · 대가 = 녹음 전 신호 0점</Text>
+          <View style={[s.무대, { alignItems: 'center', gap: 10, paddingVertical: 14 }]}>
+            {녹음상태들.map((상태) => (
+              <View key={`가-${상태}`} style={{ alignItems: 'center', gap: 4 }}>
+                <녹음띠 상태={상태} 폭={240} />
+                <Text style={s.잔글}>{상태}</Text>
+              </View>
+            ))}
+          </View>
+
+          <Text style={s.안이름}>㉯ 코랄 원은 단추로 두고 띠는 «상태 밴드» — 대가 = 녹음 중 코랄이 둘</Text>
+          <View style={[s.무대, { alignItems: 'center', gap: 12, paddingVertical: 14 }]}>
+            <녹음띠 상태="말하는중" 폭={220} />
+            <View style={s.코랄원보기}><View style={s.정지사각보기} /></View>
+          </View>
+
+          <Text style={s.안이름}>㉰ 지금 그대로 — 띠를 안 쓴다 (규율은 온전 · 대가 = 구운 것이 논다)</Text>
+          <View style={[s.무대, { alignItems: 'center', paddingVertical: 14 }]}>
+            <View style={s.코랄원보기}><View style={s.마이크점보기} /></View>
+          </View>
+        </View>
+
         <Pressable onPress={돌아가기} style={({ pressed }) => [s.back, pressed && s.눌림]}>
           <Text style={s.backText}>← 돌아가기</Text>
         </Pressable>
@@ -278,6 +319,18 @@ const s = StyleSheet.create({
   },
   무대_연기: { minHeight: 180, alignItems: 'center', justifyContent: 'center' },
   빈무대: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_메타 },
+
+  /* ⑦ 녹음 단추 세 안 — 안마다 «무엇을 잃는지»를 제목에 달아 둔다(고르는 자리라서). */
+  안이름: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_서브, marginTop: 14, marginBottom: 6 },
+  잔글: { fontFamily: 폰트.캡션, fontSize: 11, color: 색.잉크_메타 },
+  /* 말하기화면의 코랄 원을 «보기»로만 옮긴 것 — 값(84·14·22)은 그쪽 정본과 같아야 판정이 된다.
+     ⚠ 저기가 바뀌면 여기도 바뀌어야 한다. 지금은 한 화면 안의 대조라 눈으로 잡힌다. */
+  코랄원보기: {
+    width: 84, height: 84, borderRadius: 42, backgroundColor: 색.신호,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  마이크점보기: { width: 14, height: 14, borderRadius: 7, backgroundColor: 색.바탕 },
+  정지사각보기: { width: 22, height: 22, borderRadius: 5, backgroundColor: 색.바탕 },
 
   고름줄: { flexDirection: 'row', gap: 8 },
   고름: {
