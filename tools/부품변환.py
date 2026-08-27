@@ -61,10 +61,15 @@ def 잘라앉히기(몸, 접지, 상자):
     잘림 = 합.crop(상자)
 
     안쪽 = int(가로눈금 * (1 - 여백비 * 2))
-    배 = 안쪽 / 잘림.width
+    # 🔑 **긴 변에 맞춘다 — 그리고 «확대는 안 한다»**(08-28 실측으로 고침).
+    #   처음엔 «가로»에 맞췄는데, `조작2/풀다운` 처럼 세로로 긴 부품(내용 561×1687)이
+    #   가로를 채우려고 **1.68배로 늘어났다.** 확대는 정보를 안 늘리고 결만 뭉개며 파일을 불린다
+    #   (그리고 눈금이 부품마다 갈려 화면에서 굵기가 안 맞는다).
+    #   긴 변 기준이면 가로가 긴 띠는 그대로고(녹음 셋은 값이 안 바뀐다) 세로로 긴 것만 제자리를 찾는다.
+    배 = min(안쪽 / max(잘림.width, 잘림.height), 1.0)
     새 = 잘림.resize((max(1, round(잘림.width * 배)), max(1, round(잘림.height * 배))), Image.LANCZOS)
     여백 = int(가로눈금 * 여백비)
-    판 = Image.new('RGBA', (가로눈금, 새.height + 여백 * 2), (0, 0, 0, 0))
+    판 = Image.new('RGBA', (새.width + 여백 * 2, 새.height + 여백 * 2), (0, 0, 0, 0))
     판.paste(새, (여백, 여백), 새)
     return 판
 
@@ -77,6 +82,7 @@ def main():
 
     낸것 = 0
     빠진것 = []
+    분모 = {}          # 세트 → 굽기 폴더에 있던 이름 수(낸 수와 대조한다)
     for 세트 in sorted(os.listdir(원본뿌리)):
         방 = os.path.join(원본뿌리, 세트)
         if not os.path.isdir(방):
@@ -85,39 +91,66 @@ def main():
             continue
         낼방 = os.path.join(DST, 세트)
         os.makedirs(낼방, exist_ok=True)
-        이름들 = sorted({f[:-len('_몸.png')] for f in os.listdir(방) if f.endswith('_몸.png')})
+        # 🔴 **굽기 산출은 «두 꼴»이다 — `_몸`만 찾으면 한 꼴이 통째로 샌다**(08-28 실측).
+        #   요소굽기.py 는 그림자 «받이»가 0 이면 두 층이 뜻이 없어 `<이름>.png` **한 장**으로 낸다
+        #   (받이가 없으면 접지 패스가 «완전 투명 한 장»이다 — 그 파일 5246행이 그렇게 적어 뒀다).
+        #   `조작2/라디오` 가 그 갈래였다: 천 자체가 몸이라 받침이 없다. 성한 굽기인데
+        #   `_몸.png` 만 훑던 이 도구가 **말 한마디 없이 건너뛰었다** — 「못 냈다」에도 안 잡힌다
+        #   (빠진것은 `_몸` 이 있는데 `_접지` 가 없을 때만 울리니까). 전형적인 «0이 성공 얼굴»이다.
+        #   ⇒ 두 꼴을 다 받고, 아래에서 **센 수를 굽기 항목 수와 대조**해 침묵을 막는다.
+        두층 = sorted({f[:-len('_몸.png')] for f in os.listdir(방) if f.endswith('_몸.png')})
+        한장 = sorted({f[:-len('.png')] for f in os.listdir(방)
+                      if f.endswith('.png') and not f.endswith('_몸.png') and not f.endswith('_접지.png')})
+        이름들 = sorted(set(두층) | set(한장))
 
         # 🔴 **한 묶음은 한 자로 자른다** — 08-28 실측: 녹음 세 «상태»를 각자 제 알파로 잘랐더니
         #   높이가 444·482·363 으로 갈렸다. 그대로 앱에 넣으면 상태가 바뀔 때마다 단추가
         #   커졌다 작아졌다 한다(바늘이 위로 솟은 판만 키가 크다). 상태 묶음은 «같은 물건의
         #   다른 순간»이니 자도 하나여야 한다 — 이름의 `_` 앞이 같으면 한 묶음으로 본다.
         #   (묶음이 아닌 홑 부품은 제 상자를 그대로 쓴다 — 남의 여백을 물려받을 까닭이 없다.)
+        def 몸길(이름):
+            """이 이름의 «몸» 파일 — 두 층이면 `_몸.png`, 한 장 꼴이면 `<이름>.png`."""
+            p = os.path.join(방, 이름 + '_몸.png')
+            return p if os.path.exists(p) else os.path.join(방, 이름 + '.png')
+
         상자표 = {}
         묶음별 = {}
         for 이름 in 이름들:
-            if os.path.exists(os.path.join(방, 이름 + '_접지.png')):
-                묶음별.setdefault(이름.split('_')[0], []).append(이름)
+            묶음별.setdefault(이름.split('_')[0], []).append(이름)
         for 묶음, 식구 in 묶음별.items():
-            공통 = 합치기([몸상자(Image.open(os.path.join(방, n + '_몸.png')).convert('RGBA')) for n in 식구])
+            공통 = 합치기([몸상자(Image.open(몸길(n)).convert('RGBA')) for n in 식구])
             for n in 식구:
                 상자표[n] = 공통
             if len(식구) > 1:
                 print('  · %s/%s — %d상태를 한 자로 자른다 %s' % (세트, 묶음, len(식구), 공통))
 
         for 이름 in 이름들:
-            몸길 = os.path.join(방, 이름 + '_몸.png')
+            몸p = 몸길(이름)
             접길 = os.path.join(방, 이름 + '_접지.png')
-            if not os.path.exists(접길):
-                빠진것.append(세트 + '/' + 이름 + ' (접지 없음)')
+            if not os.path.exists(몸p):
+                빠진것.append(세트 + '/' + 이름 + ' (몸 없음)')
                 continue
-            판 = 잘라앉히기(Image.open(몸길).convert('RGBA'), Image.open(접길).convert('RGBA'), 상자표[이름])
+            몸 = Image.open(몸p).convert('RGBA')
+            # 받이 0 꼴은 접지가 «없는 것이 정상»이다 — 빈 층을 만들어 같은 통로로 흘린다.
+            접지 = (Image.open(접길).convert('RGBA') if os.path.exists(접길)
+                   else Image.new('RGBA', 몸.size, (0, 0, 0, 0)))
+            판 = 잘라앉히기(몸, 접지, 상자표[이름])
             낼길 = os.path.join(낼방, 이름 + '.webp')
             판.save(낼길, 'WEBP', quality=92, method=6)
-            print('  %-28s %dx%d  %5.1fKB' % (세트 + '/' + 이름, 판.width, 판.height,
-                                              os.path.getsize(낼길) / 1024))
+            꼴 = '두층' if 몸p.endswith('_몸.png') else '한장'
+            print('  %-28s %dx%d  %5.1fKB  %s' % (세트 + '/' + 이름, 판.width, 판.height,
+                                                  os.path.getsize(낼길) / 1024, 꼴))
             낸것 += 1
+        분모[세트] = len(이름들)
 
-    print('■ 부품 변환 — %d장 → assets/부품/' % 낸것)
+    # 🔑 **분모를 소리 내어 적는다** — 「몇 장 냈다」만으로는 «다 냈나»를 못 판정한다.
+    #   이 도구는 08-28 에 `라디오` 한 장을 «말 한마디 없이» 건너뛰었다(그 꼴을 안 물었다).
+    #   세트마다 「굽기 폴더에 있던 이름 수 = 낸 수」를 대조하면 그런 침묵이 원리상 불가능해진다.
+    print('■ 부품 변환 — %d장 → assets/부품/  (세트별 분모: %s)'
+          % (낸것, ' · '.join('%s %d' % (k, v) for k, v in sorted(분모.items()))))
+    if 낸것 != sum(분모.values()):
+        raise SystemExit('🔴 낸 수(%d) 와 굽기 폴더의 이름 수(%d) 가 다르다 — 조용히 샌 것이 있다'
+                         % (낸것, sum(분모.values())))
     if 빠진것:
         # 🔴 조용히 넘어가지 않는다 — 「0건」이 성공 얼굴을 하는 갈래다(08-28 하루에 넷).
         print('🔴 못 낸 것 %d:' % len(빠진것))
