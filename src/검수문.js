@@ -29,7 +29,8 @@ import { 연출대본 } from '../lib/마스코트생명.js';
 import { 배치, 목소리판정 } from '../lib/몽글목소리.js';
 import { 효과음 } from './소리.js';
 import 어제의나 from './어제의나';
-import 반짝임 from './반짝임.js';
+/* 🔑 `박자` 를 같이 들여온다 — 이 칸의 눈금이 수를 «글자로» 다시 적지 않게(08-27 · 반짝임.js 머리말). */
+import 반짝임, { 박자 } from './반짝임.js';
 import NPC from './NPC.js';
 import { 역들 as NPC역들, 상태들 as NPC상태들 } from '../lib/NPC연출.js';
 import 마스코트 from './마스코트';
@@ -209,8 +210,8 @@ export default function 검수문({ 돌아가기 }) {
             </Pressable>
           </View>
           <Text style={s.눈금}>
-            1.30초 · 구운 펠트 별 셋(요소 라이브러리 「기호=별」 · 1800px 재굽기)이
-            0 → 167 → 333ms 에 차례로 뜬다 · 털 후광이 그대로 빛번짐이 된다 ·
+            {(박자.총길이ms / 1000).toFixed(2)}초 · 구운 펠트 별 셋(요소 라이브러리 「기호=별」 · 1800px 재굽기)이{' '}
+            {박자.늦음들.join(' → ')}ms 에 차례로 뜬다 · 털 후광이 그대로 빛번짐이 된다 ·
             색은 킷의 「기쁨」 자리(Butter · Butter Soft) — 코랄은 «녹음 중»이라 안 쓴다
           </Text>
           {/* 🔑 두 크기를 같이 보인다 — 120 은 «쓸 크기»고 240 은 «재질을 판정할 크기»다.
