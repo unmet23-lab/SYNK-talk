@@ -24,6 +24,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { 색, 폰트, 모노트래킹, 몽골어폰트 } from './테마';
 import { 막힘안내 } from '../contents/문구_동의.js';
+import 부품 from './부품.js';
 
 /**
  * @param {{막힘: {code: string}|null, 학생번호?: string|null}} props
@@ -36,6 +37,12 @@ export default function 막힘카드({ 막힘, 학생번호 = null }) {
 
   return (
     <View style={s.카드}>
+      {/* 🔑 «내려놓은 바늘» — 이 카드가 말하려는 것을 그림이 대신 말한다.
+          막힌 날은 학생이 «잘못한» 것이 아니라 **일이 잠깐 멈춘** 것이고, 바늘을 내려놓은
+          모습이 그 뜻이다(꾸짖음이 아니라 쉼). 08-25 Loom 굽기 · 08-28 반입.
+          🔑 이 조각에 **유채가 없다** — 이 화면의 신호 1점은 녹음 버튼이라는 R1 규율을
+          그대로 지킨다(위 머리말). 그래서 이 자리에 설 수 있는 몇 안 되는 부품이다. */}
+      <부품 이름="내려놓은바늘" 폭={200} 스타일={s.바늘} 설명="바늘을 내려놓은 그림 — 오늘은 잠깐 멈춤이에요" />
       {안.제목.map((줄, i) => (
         <Text key={`제목${i}`} style={i === 0 ? s.제목 : s.제목_병기}>{줄}</Text>
       ))}
@@ -60,6 +67,8 @@ export default function 막힘카드({ 막힘, 학생번호 = null }) {
 
 const s = StyleSheet.create({
   카드: { backgroundColor: 색.바탕띄움, borderRadius: 20, padding: 22, gap: 14 },
+  /* 그림은 «말 앞»에 서되 주인공은 아니다 — 가운데로 모으고 살짝 낮춘다(0.9). */
+  바늘: { alignSelf: 'center', opacity: 0.9, marginBottom: 2 },
   제목: { fontFamily: 폰트.헤드, fontSize: 21, lineHeight: 31, color: 색.잉크 },
   본문: { fontFamily: 폰트.본문, fontSize: 16, lineHeight: 26, color: 색.잉크_서브 },
   /* 몽골어 병기 줄 — 한 단계 내린다(같은 뜻의 두 번째 목소리다). 지금은 `mn` 이 비어 있어
