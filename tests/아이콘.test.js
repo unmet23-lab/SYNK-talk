@@ -131,6 +131,32 @@ for (const { f, size, 배경, 알록, 펠트 } of 파일들) {
   });
 }
 
+/* 🔴 08-28 — 이 회귀가 **원리상 못 보던 자리**를 메운다.
+ *   위 검사들은 「규격·색·면적」만 봤다. 그래서 적응형 전경이 **너무 커서 마스크에 잘리는 것**을
+ *   통과시켰다: 첫 판은 마크가 보이는 원의 **94%**를 먹어 런처에서 꺾쇠가 잘렸고 펠트 글로가
+ *   테두리에 **분홍 띠**로 남았다. 회귀는 초록이었고 **에뮬레이터 홈 화면에서 눈으로** 잡았다.
+ *   ⇒ 안드로이드 적응형은 108dp 중 가운데 **72dp(66.7%)만 보장**한다. 그 안에 들어오나를 잰다.
+ *   ⚠ 재는 것은 «준 값»이 아니라 **알파 bbox** 다 — 펠트 글로가 번져 실제 칠은 준 폭보다 넓다
+ *     (그 갈림 때문에 굽는 쪽 손잡이가 한동안 아무 일도 안 하고 있었다). */
+픽셀검사('적응형 전경이 마스크 안전지대(66.7%) 안에 앉는다', async () => {
+  const { data, info } = await sharp(A('android-icon-foreground.png')).ensureAlpha().raw()
+    .toBuffer({ resolveWithObject: true });
+  let x0 = info.width, x1 = -1, y0 = info.height, y1 = -1;
+  for (let i = 0, p = 0; i < data.length; i += 4, p += 1) {
+    if (data[i + 3] < 8) continue;                 // 아주 옅은 글로 끝자락은 눈에 안 보인다
+    const x = p % info.width, y = (p / info.width) | 0;
+    if (x < x0) x0 = x; if (x > x1) x1 = x;
+    if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  const 가로 = (x1 - x0 + 1) / info.width;
+  const 세로 = (y1 - y0 + 1) / info.height;
+  const 원대비 = Math.max(가로, 세로) / (72 / 108);
+  assert.ok(원대비 < 0.85,
+    `적응형 전경이 보이는 원의 ${(원대비 * 100).toFixed(0)}% — 마스크에 잘린다(알파 ${(가로 * 100).toFixed(0)}×${(세로 * 100).toFixed(0)}%)`);
+  assert.ok(원대비 > 0.40,
+    `적응형 전경이 보이는 원의 ${(원대비 * 100).toFixed(0)}% — 너무 작아 런처에서 점처럼 보인다`);
+});
+
 픽셀검사('monochrome 은 단색 흰 도형이다 (OS 가 테마색으로 칠한다)', async () => {
   const s = await 픽셀통계(A('android-icon-monochrome.png'));
   assert.equal(s.비율(CORAL), 0, '테마 아이콘에 브랜드색이 남아 있으면 안 된다');
