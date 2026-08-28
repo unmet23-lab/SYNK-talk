@@ -19,6 +19,8 @@
 #
 # ⚠ **굽는 «중»인 세트를 넣지 마라** — 반쯤 난 세트는 몸만 있고 접지가 아직 없어 「못 낸 것」으로
 #   빨개진다(그 자체는 옳은 거동이다). 밤 배치가 도는 동안은 끝난 세트만 이름으로 고른다.
+import io
+import json
 import os
 import sys
 import numpy as np
@@ -82,6 +84,7 @@ def main():
 
     낸것 = 0
     빠진것 = []
+    치수 = {}        # '세트/이름' → [가로, 세로] · 만든 쪽이 적는다(아래 치수장부)
     분모 = {}          # 세트 → 굽기 폴더에 있던 이름 수(낸 수와 대조한다)
     for 세트 in sorted(os.listdir(원본뿌리)):
         방 = os.path.join(원본뿌리, 세트)
@@ -137,11 +140,34 @@ def main():
             판 = 잘라앉히기(몸, 접지, 상자표[이름])
             낼길 = os.path.join(낼방, 이름 + '.webp')
             판.save(낼길, 'WEBP', quality=92, method=6)
+            치수[세트 + '/' + 이름] = [판.width, 판.height]
             꼴 = '두층' if 몸p.endswith('_몸.png') else '한장'
             print('  %-28s %dx%d  %5.1fKB  %s' % (세트 + '/' + 이름, 판.width, 판.height,
                                                   os.path.getsize(낼길) / 1024, 꼴))
             낸것 += 1
         분모[세트] = len(이름들)
+
+    # 🔑 **치수 장부 — 만든 쪽이 적는다**(08-28 신설).
+    #   화면이 가로세로비를 «손으로» 적으면 그 수가 곧 두 곳에 산다. 실제로 이 도구를
+    #   「긴 변 기준·확대 금지」로 고치는 순간 1024 가 **1022** 가 됐고, `녹음띠.js` 에 박아 둔
+    #   `563/1024` 가 조용히 틀린 수가 될 뻔했다(눈에 안 띄는 0.2%).
+    #   ⚠ RN 의 `Image.resolveAssetSource` 로 물어보는 길도 있는데, 그건 **회귀에서 못 쓴다**
+    #     (테스트가 자산을 파일 이름 문자열로 세우므로 치수를 원리상 모른다 · 08-28 실측).
+    #   ⇒ 치수를 아는 것은 «자른 이»다. 그러니 자른 이가 적는다.
+    #   🔴 세트를 골라 돌릴 때 **남의 세트를 지우지 않는다** — 읽고 «합쳐서» 쓴다.
+    장부길 = os.path.join(DST, '치수.json')
+    옛장부 = {}
+    if os.path.exists(장부길):
+        try:
+            with io.open(장부길, encoding='utf-8') as f:
+                옛장부 = json.load(f)
+        except Exception:
+            옛장부 = {}          # 깨졌으면 이번 것으로 새로 세운다(값은 언제든 다시 만들 수 있다)
+    옛장부.update(치수)
+    with io.open(장부길, 'w', encoding='utf-8', newline='\n') as f:
+        json.dump(옛장부, f, ensure_ascii=False, indent=1, sort_keys=True)
+        f.write('\n')
+    print('  · 치수장부 %d항목 → assets/부품/치수.json (이번에 %d 갱신)' % (len(옛장부), len(치수)))
 
     # 🔑 **분모를 소리 내어 적는다** — 「몇 장 냈다」만으로는 «다 냈나»를 못 판정한다.
     #   이 도구는 08-28 에 `라디오` 한 장을 «말 한마디 없이» 건너뛰었다(그 꼴을 안 물었다).

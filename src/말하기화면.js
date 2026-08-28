@@ -24,6 +24,7 @@ import {
 import { useAudioStream } from 'expo-audio/build/AudioStream';
 import * as Speech from 'expo-speech';
 import { 색, 폰트, 모노트래킹 } from './테마';
+import 녹음띠 from './녹음띠.js';
 import { 상단밀림 } from './인셋';
 import { 머뭇거림추적, 발화문턱_DB, 데시벨, 다음호흡 } from '../lib/세호흡.js';
 import { wav조립 } from '../lib/wav조립.js';
@@ -1321,6 +1322,11 @@ function 녹음카드({
 
       {단계 === '확인' && 녹음 && (
         <View style={s.확인묶음}>
+          {/* 세 상태의 마지막 «맺음»이 갈 자리는 여기뿐이다 — 실이 끝까지 가고 매듭이 진다.
+              단추가 아니라 «다 꿰었다»는 표시라 누를 수 없다(누를 것은 아래 보조 버튼들이다). */}
+          <View style={{ alignItems: 'center' }}>
+            <녹음띠 상태="맺음" 폭={248} />
+          </View>
           <Text style={s.확인글}>
             {숫자숨김 ? '목소리가 담겼어요' : `${초표시(녹음.duration_ms)} 담겼어요`}
           </Text>
@@ -1406,6 +1412,26 @@ function 녹음카드({
 export { 녹음카드 };
 
 /* ── 녹음 버튼 — 화면 전체에서 코랄이 사는 유일한 자리 ── */
+/* 녹음 단추 — **펠트 띠**다 (유호 확정 08-28 「녹음띠는 ㉮로 가자」 · 검수문 ⑦ 세 안 중 ㉮).
+ *
+ * ■ 왜 코랄 원이 아니라 띠인가
+ *   Loom 이 08-25 에 구운 세 상태가 «문장»을 만든다 — 실이 아직 안 꿰어짐(대기) → 꿰는 중
+ *   (말하는중) → 매듭(맺음). 우리는 말하기 학원이고 이것이 학생이 가장 여러 번 누르는 단추다.
+ *   그 셋이 08-28 까지 앱에 한 장도 안 들어와 있었다(받침이 켜진 채로 구워져 알파를 못 잘랐다).
+ *
+ * ■ 🔴 알고 고른 대가 — «대기» 상태에 코랄이 없다
+ *   테마 R1 「신호 1점」은 이 화면의 신호자리를 녹음버튼으로 못박아 뒀는데(`신호자리.말하기`),
+ *   띠의 대기 판에는 유채가 없다 ⇒ **녹음 «전» 화면에는 신호가 0점이다.**
+ *   이것을 검수문 ⑦ 에 「대가 = 녹음 전 신호 0점」으로 적어 유호님께 세 안을 나란히 드렸고,
+ *   그 값을 아신 채로 ㉮ 를 고르셨다. **그러니 이것은 결함이 아니라 확정이다** —
+ *   「신호가 없다」를 고치겠다고 코랄 원을 되살리지 않는다. 되돌리려면 유호님 판정이 먼저다.
+ *   (녹음이 시작되면 코랄 땀이 들어와 신호가 선다 — 신호가 «없는» 것이 아니라 «늦게 온다».)
+ *
+ * ■ 맥박은 링이 아니라 띠 자신이 진다
+ *   옛 판은 원 둘레에 링을 돌렸는데 띠에는 그 자리가 없다. 띠를 통째로 아주 얕게 숨 쉬게 한다
+ *   (1 → 1.03). ⚠ `useNativeDriver` 라 **transform·opacity 만** 만진다(모션 스택 규율). */
+const 띠폭 = 248;
+
 function 녹음버튼({ 녹음중, onPress }) {
   const 맥박 = useRef(new Animated.Value(1)).current;
 
@@ -1413,29 +1439,29 @@ function 녹음버튼({ 녹음중, onPress }) {
     if (녹음중) {
       const loop = Animated.loop(
         Animated.sequence([
-          Animated.timing(맥박, { toValue: 1.35, duration: 900, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(맥박, { toValue: 1.03, duration: 900, easing: Easing.out(Easing.quad), useNativeDriver: true }),
           Animated.timing(맥박, { toValue: 1, duration: 900, easing: Easing.in(Easing.quad), useNativeDriver: true }),
         ])
       );
       loop.start();
       return () => loop.stop();
     }
+    맥박.setValue(1);   // 녹음이 끝나면 숨을 멈춘다 — 안 되돌리면 마지막 프레임에 걸려 있다
+    return undefined;
   }, [녹음중, 맥박]);
 
   return (
-    <View style={s.버튼자리}>
-      {녹음중 && (
-        <Animated.View style={[s.맥박링, { transform: [{ scale: 맥박 }] }]} />
-      )}
-      <Pressable
-        testID={녹음중 ? '녹음-끝' : '녹음-시작'}
-        onPress={onPress}
-        style={({ pressed }) => [s.코랄원, pressed && { transform: [{ scale: 0.96 }] }]}
-        accessibilityLabel={녹음중 ? '녹음 마치기' : '녹음 시작'}
-      >
-        {녹음중 ? <View style={s.정지사각} /> : <View style={s.마이크점} />}
-      </Pressable>
-    </View>
+    <Pressable
+      testID={녹음중 ? '녹음-끝' : '녹음-시작'}
+      onPress={onPress}
+      style={({ pressed }) => [s.띠자리, pressed && { transform: [{ scale: 0.97 }] }]}
+      accessibilityRole="button"
+      accessibilityLabel={녹음중 ? '녹음 마치기' : '녹음 시작'}
+    >
+      <Animated.View style={{ transform: [{ scale: 맥박 }] }}>
+        <녹음띠 상태={녹음중 ? '말하는중' : '대기'} 폭={띠폭} />
+      </Animated.View>
+    </Pressable>
   );
 }
 
@@ -1499,8 +1525,6 @@ function 어제넘음줄({ 글 }) {
   return <Animated.Text style={[s.어제넘음, 등장]}>{글}</Animated.Text>;
 }
 
-const 코랄지름 = 84;
-
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: 색.바탕 },
   // paddingTop + 상단밀림: 겉테 줄이 컷아웃 기기에서 내려오는 만큼 본문도 같이 (인셋.js)
@@ -1546,26 +1570,9 @@ const s = StyleSheet.create({
   선택지힌트: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_메타, marginTop: 2 },
 
   중앙: { alignItems: 'center', gap: 12, paddingVertical: 10 },
-  버튼자리: { width: 코랄지름 * 1.6, height: 코랄지름 * 1.6, alignItems: 'center', justifyContent: 'center' },
-  맥박링: {
-    position: 'absolute',
-    width: 코랄지름,
-    height: 코랄지름,
-    borderRadius: 코랄지름 / 2,
-    borderWidth: 2,
-    borderColor: 색.신호,
-    opacity: 0.35,
-  },
-  코랄원: {
-    width: 코랄지름,
-    height: 코랄지름,
-    borderRadius: 코랄지름 / 2,
-    backgroundColor: 색.신호,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  마이크점: { width: 14, height: 14, borderRadius: 7, backgroundColor: 색.바탕 },
-  정지사각: { width: 22, height: 22, borderRadius: 5, backgroundColor: 색.바탕 },
+  /* 띠 단추 자리 — 유호 확정 08-28 ㉮. 옛 `코랄원`·`맥박링`·`마이크점`·`정지사각` 넷은
+     소각했다(참조 0). 남겨 두면 다음 사람이 「원래 원이었나」로 되돌린다. */
+  띠자리: { alignItems: 'center', justifyContent: 'center', paddingVertical: 6 },
   타이머: { fontFamily: 폰트.모노, fontSize: 22, letterSpacing: 모노트래킹.타이머, color: 색.잉크 },
   녹음안내: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_서브 },
 
