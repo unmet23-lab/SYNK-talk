@@ -19,7 +19,8 @@ const 효과음자산 = {
   earn: () => require('../assets/sfx/synk-sound-earn.wav'),
   achieve: () => require('../assets/sfx/synk-sound-achieve.wav'),
   notify: () => require('../assets/sfx/synk-sound-notify.wav'),
-  /* 몽글 목소리 12종 — 상황마다 다른 소리다(유호 확정 08-25 · 배치 = lib/몽글목소리.js).
+  /* 가이드 목소리 18종 — 상황마다·캐릭터마다 다른 소리다(몽글 유호 확정 08-25 · 까몽·마린
+     08-28 · 배치 = lib/가이드목소리.js).
      🔑 Metro 는 require 를 정적으로 읽는다 — 이름을 코드로 파생할 수 없어 손 지도가 필요하고,
         그 지도가 게이트 화이트리스트와 갈라지는 것은 tests/소리.test.js 가 잡는다. */
   mu: () => require('../assets/sfx/synk-voice-mu.wav'),
@@ -34,6 +35,13 @@ const 효과음자산 = {
   muum: () => require('../assets/sfx/synk-voice-muum.wav'),
   moong: () => require('../assets/sfx/synk-voice-moong.wav'),
   muu: () => require('../assets/sfx/synk-voice-muu.wav'),
+  /* 까몽 3 · 마린 3 (08-28 반입) — 하이픈 이름이라 따옴표 키다. 이름 = 파일명 꼬리 그대로. */
+  'kkamong-bee': () => require('../assets/sfx/synk-voice-kkamong-bee.wav'),
+  'kkamong-hiik': () => require('../assets/sfx/synk-voice-kkamong-hiik.wav'),
+  'kkamong-nyamnyam': () => require('../assets/sfx/synk-voice-kkamong-nyamnyam.wav'),
+  'marine-gidong': () => require('../assets/sfx/synk-voice-marine-gidong.wav'),
+  'marine-wansu': () => require('../assets/sfx/synk-voice-marine-wansu.wav'),
+  'marine-mollae': () => require('../assets/sfx/synk-voice-marine-mollae.wav'),
 };
 
 let bgm플레이어 = null;
@@ -47,11 +55,11 @@ function 오디오() { return require('expo-audio'); }
 const 플레이어들 = {};
 
 /**
- * 효과음 — 킷 3종 + 목소리 12종만. 게이트 거부는 조용히 무음(오류가 아니라 설계다).
+ * 효과음 — 킷 3종 + 목소리 18종만. 게이트 거부는 조용히 무음(오류가 아니라 설계다).
  *
- * @param {string} 이름 자산 키(earn·achieve·notify · 목소리 mu·ppuu·myang…)
- * @param {number} [속도] 재생 속도 — **몽글 목소리의 «표정»이 이 값이다**(유호 확정 08-25 ·
- *   판정은 `lib/몽글목소리.js`). 지금은 ±3% «미세 변주»뿐이다 — 표정은 소리 자체가 진다.
+ * @param {string} 이름 자산 키(earn·achieve·notify · 목소리 mu·ppuu·myang·kkamong-bee…)
+ * @param {number} [속도] 재생 속도 — **가이드 목소리의 «표정»이 이 값이다**(유호 확정 08-25 ·
+ *   판정은 `lib/가이드목소리.js`). 지금은 ±3% «미세 변주»뿐이다 — 표정은 소리 자체가 진다.
  *   🔑 `shouldCorrectPitch=false` 를 함께 세운다: 보정이 켜지면 음높이가 그대로라 변주가 죽는다.
  *   🚫 킷 3종에는 안 쓴다 — 그 셋은 밸런스가 파일에 박혀 있다(볼륨·속도 재조정 금지).
  */

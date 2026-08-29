@@ -26,7 +26,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { 색, 폰트, 모노트래킹 } from './테마';
 import { 견줌 } from '../lib/견줌.js';
 import { 연출대본 } from '../lib/마스코트생명.js';
-import { 배치, 목소리판정 } from '../lib/몽글목소리.js';
+import { 기본캐릭터, 배치, 목소리판정 } from '../lib/가이드목소리.js';
 import { 효과음 } from './소리.js';
 import 어제의나 from './어제의나';
 /* 🔑 `박자` 를 같이 들여온다 — 이 칸의 눈금이 수를 «글자로» 다시 적지 않게(08-27 · 반짝임.js 머리말). */
@@ -148,7 +148,10 @@ export default function 검수문({ 돌아가기 }) {
               style={({ pressed }) => [s.표정칸, pressed && s.눌림]}
             >
               <Text style={s.표정이름}>{이름}</Text>
-              <Text style={s.표정속도}>{배치[이름].join('·')}</Text>
+              {/* ⚠ 이 칸은 **몽글 줄만** 들려준다(08-28 캐릭터 축 반입 뒤에도 그대로다) —
+                  까몽 3·마린 3 은 아직 «고르는 화면»이 없어 앱 어디서도 안 난다. 고르는 자리가
+                  서는 날 이 줄이 캐릭터 셋으로 늘어난다. */}
+              <Text style={s.표정속도}>{배치[기본캐릭터][이름].join('·') || '—'}</Text>
               <Text style={s.표정쓰임}>{쓰임}</Text>
             </Pressable>
           ))}
