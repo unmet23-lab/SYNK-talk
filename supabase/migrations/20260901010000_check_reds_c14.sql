@@ -1,11 +1,102 @@
+/* deliver-check 적색 «착지» 칸 둘 — generation_batch_runs (감사 08-31 · c14 물리 +2)
+ *
+ * ■ 왜 — deliver-check 는 SQL 직접 잡이라 적색이 cron.job_run_details 에만 남고, 그 표는 며칠이면
+ *   지워져 적색의 수명이 하루다(활성조각 주석 「수신자는 지금 로그뿐 — §373」). 그날 정본 실행
+ *   행에 도장하면 적색이 배치 계보와 같은 수명을 산다.
+ * ■ 무엇 —
+ *   ① deliver_check_reds text[] · deliver_check_at timestamptz(둘 다 널 허용): 그날 deliver-check
+ *      가 낸 적색 배열과 도장 시각. 초록 날도 빈 배열로 찍는다 — 「0건 = 안 돌았나」 모호 제거.
+ *      null = 아직 안 돌았다(활성 전·정본 행 부재의 날들). 쓰는 자리는 활성조각_c12 의
+ *      deliver-check do-블록 하나다.
+ *   ② engine.generation_batch_runs_freeze() 재정의 — 갱신 화이트리스트에 두 칸을 더한다.
+ *      그 함수의 설계가 「새 칸이 늘어도 닫힌 채로 실패한다」(20260821120000 갈래 18)라, 여기서
+ *      명시로 연다. 이 열들은 감시의 «기록»이지 계보가 아니다 — 재현·성과 귀속 축 무접촉.
+ *
+ * 되돌림: alter table engine.generation_batch_runs drop column deliver_check_reds, drop column deliver_check_at;
+ *         engine.generation_batch_runs_freeze() 를 20260821120000 본문(여섯 칸)으로 다시 붓는다;
+ *         delete from engine.schema_migrations where version='20260901010000'; */
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260901010000';
+  migration_name constant text := '20260901010000_check_reds_c14.sql';
+  expected_checksum constant text := '6432dc73569e7f0e5d92aff9d8924a20d6a02ad1c46f3747b0411621afc1f42d'; -- migration-checksum
+  base_version constant text := '20260901000000';
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 합본 위에서만 돈다 — engine.schema_migrations 가 없다(빈 DB 면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      'migration % 는 % 위에서만 돈다 — 체인이 끊겼다',
+      migration_version, base_version;
+  end if;
+end
+$migration$;
+
+-- ① 적색 착지 칸 둘 — 널 허용(값은 deliver-check 가 그날그날 찍는다). CHECK 변경 0.
+alter table engine.generation_batch_runs
+  add column if not exists deliver_check_reds text[];
+alter table engine.generation_batch_runs
+  add column if not exists deliver_check_at timestamptz;
+
+comment on column engine.generation_batch_runs.deliver_check_reds is
+  'deliver-check(감시 9항)가 그날 낸 적색 배열 — 빈 배열 = 돌았고 전부 초록 · null = 안 돌았다. 쓰는 자리는 활성조각 deliver-check do-블록 하나(수명 하루인 cron.job_run_details 의 착지판)';
+comment on column engine.generation_batch_runs.deliver_check_at is
+  'deliver-check 도장 시각 — deliver_check_reds 와 한 벌(null = 안 돌았다)';
+
+-- ② freeze 화이트리스트 +2 — 20260821120000 본문 그대로에 착지 칸 둘만 더한다(트리거는 그대로 산다).
+create or replace function engine.generation_batch_runs_freeze() returns trigger
+  language plpgsql as $function$
+declare
+  mutable_cols constant text[] := array[
+    'target_count','loaded_count','skipped_game_count','skipped_existing_count',
+    'partial_count','finished_at',
+    'deliver_check_reds','deliver_check_at'];
+begin
+  if to_jsonb(NEW) - mutable_cols is distinct from to_jsonb(OLD) - mutable_cols then
+    raise exception 'generation_batch_runs: 실행 계보는 고치지 않는다 — job 과 run 의 판이 갈리면 감시·재현·성과 귀속이 전부 거짓이 된다 (설계 §3-5-b · 갱신 가능 = 완주 채움 여섯 + deliver-check 착지 둘)';
+  end if;
+  return NEW;
+end
+$function$;
+
+do $migration2$
+declare
+  expected_checksum constant text := '6432dc73569e7f0e5d92aff9d8924a20d6a02ad1c46f3747b0411621afc1f42d'; -- migration-checksum
+begin
+  if not exists (select 1 from engine.schema_migrations where version = '20260901010000') then
+    insert into engine.schema_migrations(version, name, checksum)
+    values ('20260901010000', '20260901010000_check_reds_c14.sql', expected_checksum);
+  end if;
+end
+$migration2$;
+
+commit;
+
 -- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
---
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
 -- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -356,3 +447,42 @@ select case when 테이블수=23 and RLS켜짐=23 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
   from 셈;
+*/
+-- 사후 메모:
+-- ① 이 조각 = 적색 착지 칸 둘(deliver_check_reds·deliver_check_at) + freeze 화이트리스트 +2 — CHECK 변경 0.
+-- ② 아래 기대 목록은 20260831130000 이 세운 현행 그대로다(변경 0 — 마지막 조각이 이 줄을 든다).
+--    ⚠ 이 줄은 마지막 조각이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    ⚠ `season_no_overlap_c11`(EXCLUDE) · `…_once_c11`(UNIQUE) · `companion_qa_*_fkey` 는 여기
+--      없다 — CHECK 가 아니라 이 줄의 대상이 아니고, 이름도 c11 그대로 산다(값목록이 없어
+--      판 판별과 무관하다 · 위 기대제약 목록에는 그 이름 그대로 들어 있다).
+--    기대: attempts_gate_values_c14 · attempts_response_present_c14 · attempts_result_gate_c14
+--         · attempts_ver_nonempty_c14 · batch_runs_counts_order_c14 · batch_runs_counts_pair_c14
+--         · batch_runs_enrolled_nonneg_c14 · batch_runs_finished_cols_c14
+--         · batch_runs_level_dist_ok_c14 · batch_runs_partial_pair_c14
+--         · batch_runs_partial_range_c14 · batch_runs_roster_equation_c14
+--         · batch_runs_skipped_range_c14 · batch_runs_ver_nonempty_c14 · broadcast_segment_kind_c14
+--         · classes_key_nonblank_c14 · companion_qa_answer_paired_c14
+--         · companion_qa_question_nonblank_c14 · corrections_promotion_intent_c14
+--         · corrections_supersedes_not_self_c14 · corrections_verdict_c14 · cron_runs_outcome_c14
+--         · jobs_anchor_present_c14 · jobs_claim_cols_c14 · jobs_deciding_pair_c14
+--         · jobs_deciding_result_matches_c14 · jobs_deciding_scope_c14 · jobs_draft_present_c14
+--         · jobs_idle_cols_c14 · jobs_load_failed_cols_c14 · jobs_nontarget_cols_c14
+--         · jobs_nonterminal_cols_c14 · jobs_skill_ids_present_c14 · jobs_status_outcome_pairs_c14
+--         · jobs_terminal_cols_c14 · jobs_ver_nonempty_c14 · jobs_winner_fence_current_c14
+--         · jobs_winner_fence_pair_c14 · jobs_winner_only_success_c14 · jobs_winner_present_c14
+--         · jobs_winner_result_only_success_c14 · jobs_winner_result_pair_c14
+--         · l10n_reviews_final_paired_c14 · l10n_reviews_supersedes_not_self_c14
+--         · l10n_reviews_verdict_c14 · l10n_strings_id_ascii_c14
+--         · l10n_strings_ko_nonblank_c14 · l10n_strings_max_len_c14
+--         · l10n_strings_status_c14 · learners_gender_c14
+--         · learners_goal_track_c14 · learners_group_no_c14 · learners_home_aimag_c14
+--         · learners_seat_no_c14 · learners_signup_attempts_nonneg_c14
+--         · learners_temp_password_paired_c14 · learning_events_correction_target_c14
+--         · learning_events_event_type_c14 · learning_events_task_type_c14
+--         · pipeline_jobs_discard_reason_c14 · season_compass_answers_c14 · season_dates_c14
+--         · season_review_decided_c14 · season_review_self_c14 · season_review_verdict_c14
+--         · staff_role_c14 · submissions_due_paired_c14 · submissions_task_format_c14
+--         · submissions_translation_source_c14 · teacher_notes_body_nonblank_c14
+--         · teacher_notes_disposition_c14 · teacher_notes_origin_c14

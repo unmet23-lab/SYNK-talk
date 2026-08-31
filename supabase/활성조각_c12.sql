@@ -167,10 +167,13 @@ begin
 
       -- ④ 열린 시도(v5.6 B10 · v5.7 B7) — 세 갈래 «명시» 열거로 UNKNOWN 을 없앤다(회수가 비운
       --    lease_until 이 표적 그 자체다). 벤더를 부르고 버린 건이 쌓이는 자리(돈이 나간다).
+      --    처분 도장(acked_at · 마이그 20260901000000) 찍힌 시도는 뺀다 — 워커 사망의 열린 시도는
+      --    영영 안 닫혀 상시 적색이 되고, 상시 적색은 신호로서 죽는다(F103 — ⑤ 의 그 근거가 ④ 에도 걸린다).
       select count(*)::int into n
         from engine.generation_attempts a
         join engine.generation_jobs g on g.job_id = a.job_id
        where a.result is null
+         and a.acked_at is null
          and (g.lease_until < now() or g.lease_until is null or g.outcome is not null);
       if n > 0 then 적색 := 적색 || format('④ 열린 시도 %s건', n); end if;
 
@@ -238,6 +241,20 @@ begin
       if cardinality(정보) > 0 then
         raise notice 'deliver-check 정보(적색 아님): %', array_to_string(정보, ' · ');
       end if;
+
+      -- 적색 «착지»(마이그 20260901010000 이 칸을 세운다) — cron.job_run_details 는 며칠이면
+      --    지워져 적색의 수명이 하루다: 그날 정본 실행 행에 도장한다. 초록 날도 빈 배열을 찍어
+      --    「0건 = 안 돌았나」 모호를 없앤다. 정본 행이 없으면 착지 생략 — ②-a 적색이 그 이야기를 이미 한다.
+      if 정본.run_id is not null then
+        update engine.generation_batch_runs
+           set deliver_check_reds = 적색, deliver_check_at = now()
+         where run_id = 정본.run_id;
+      end if;
+      -- 도장은 아래 raise «전»에 commit 으로 굳힌다 — 같은 트랜잭션이면 적색 날의 raise 가 도장까지
+      --    되돌려, 적색일수록 안 남는 반대 물건이 된다. pg_cron 은 이 do 를 단문·autocommit 으로
+      --    돌리므로 plpgsql 트랜잭션 제어가 선다(착지 절차 5 손 실행이 이 전제를 검증한다).
+      commit;
+
       if cardinality(적색) > 0 then
         raise exception 'deliver-check 적색(§3-2-a 감시 9항): %', array_to_string(적색, ' · ');
       end if;

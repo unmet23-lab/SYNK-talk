@@ -24,8 +24,11 @@
  *
  * ■ 🔴 못 하는 이유의 층을 가른다(correct 선례):
  *   · `ANTHROPIC_API_KEY` 없음 = 그날 생성이 **원리상 불가** — 집은 job 을 즉시 `키없음` 폴백으로
- *     닫는다(마감까지 기다릴 이유가 0 — 즉시 폴백이 학생 경험에 낫고, «예산소진» 으로 가려지면
- *     배포 사고가 예산의 얼굴을 쓴다 · §4-1 이 값을 둔 이유).
+ *     닫는다(기다려도 안 변하는 실패라 기다릴 이유가 0 — 즉시 폴백이 학생 경험에 낫고, «예산소진»
+ *     으로 가려지면 배포 사고가 예산의 얼굴을 쓴다 · §4-1 이 값을 둔 이유). 단 **일과성**(타임아웃 ·
+ *     재시도가능 판정 429·5xx)은 층이 다르다 — 마감 전 + 그 job 첫 시도면 `jobs_release` 반납으로
+ *     다음 10분 회차가 새 fence 로 집는다(§4-2 개정 · job 당 시도 2회 상한 · 🚫검문탈락 재시도
+ *     금지는 그대로).
  *   · 워커 예산이 마르면 남은 job 을 **반납**(㉦)하고 끝낸다 — 행을 안 만든다(§3-2 · 다음 회차 몫).
  *   · `중복열림` 거절 = 앞 워커가 부르다 죽어 «받았는지 모르는» 열린 시도가 있다(갈래 12) —
  *     다시 부르면 중복 과금이라 **건너뛴다**(반납도 안 한다 — 반납하면 다음 회차가 같은 벽을
@@ -209,6 +212,17 @@ Deno.serve(async (req: Request) => {
     cpu: '플랫폼 함수 로그 cpu_time_used 가 진다 — 코드 미측정(숫자 0 을 안 만든다)',
   };
   첫요청 = false;
+  /* 요약 — ops.수확이 응답 본문을 left(2000) 로 끊어 장부에 싣는다(cron_ledger_c11). 계측은 마지막
+   * 키라 그 절단에 먼저 잘리므로, 핵심 넷은 «날짜 바로 뒤» 이른 키로 실어 2000자 안에 살린다
+   * (JSON 직렬화는 삽입 순서를 지킨다). 캐시성적을 켜는 날 그 칸도 이 자리에 든다. */
+  const 요약 = () => {
+    const 벤더들 = 계측.학생.map((s) => s.벤더_ms)
+      .filter((v): v is number => typeof v === 'number').sort((a, b) => a - b);
+    return {
+      콜드스타트_ms: 계측.콜드스타트_ms, claim_ms: 계측.claim_ms, 학생수: 계측.학생.length,
+      벤더중앙_ms: 벤더들.length ? 벤더들[Math.floor(벤더들.length / 2)] : null,
+    };
+  };
   const 키 = Deno.env.get('ANTHROPIC_API_KEY') ?? '';
   const owner = `deliver-one:${crypto.randomUUID()}`;
   const 계수: Record<string, number> = {};
@@ -293,7 +307,7 @@ Deno.serve(async (req: Request) => {
      * 셋 다 «할 일 없음»이지 사고가 아니고, B3 재호출 판정은 순찰(무조준)의 몫이다 — 조준
      * 미스가 오케스트레이터를 깨우면 앱 열기 한 번이 배치 재실행을 부르는 통로가 된다. */
     if (조준) {
-      return 봉투(200, { 날짜: 오늘, 회수, 집음: 0, 조준: true, 재호출: '불요', 계수, 오류: 오류들, 계측 });
+      return 봉투(200, { 날짜: 오늘, 요약: 요약(), 회수, 집음: 0, 조준: true, 재호출: '불요', 계수, 오류: 오류들, 계측 });
     }
     const b = (await sql`
       select (select count(*)::int from engine.generation_batch_runs r
@@ -333,7 +347,7 @@ Deno.serve(async (req: Request) => {
         }
       }
     }
-    return 봉투(200, { 날짜: 오늘, 회수, 집음: 0, 재호출, 계수, 오류: 오류들, 계측 });
+    return 봉투(200, { 날짜: 오늘, 요약: 요약(), 회수, 집음: 0, 재호출, 계수, 오류: 오류들, 계측 });
   }
 
   /* ── 자기 실행판(호출당 1회 — job 마다 다시 계산하면 한 회차 안에서 판이 갈릴 수 있다) ── */
@@ -422,6 +436,7 @@ Deno.serve(async (req: Request) => {
       /* ④ 벤더 왕복 — 타임아웃은 학생 예산 하나(§3-2). model 은 job 실행판(적용하려던 판). */
       let 원문: string | null = null;
       let 결과: string | null = null;   // attempts.result (부분집합 7)
+      let 벤더상태: number | null = null;   // 일과성 판정 재료(§4-2 — 재시도가능 은 status 를 받는다)
       벤더전 = Date.now();
       try {
         const r = await fetch(메시지경로, {
@@ -431,7 +446,7 @@ Deno.serve(async (req: Request) => {
           signal: AbortSignal.timeout(생성타임아웃_MS),
         });
         원문 = await r.text();
-        if (!r.ok) 결과 = '벤더오류';
+        if (!r.ok) { 결과 = '벤더오류'; 벤더상태 = r.status; }
       } catch (e) {
         결과 = (e as Error)?.name === 'TimeoutError' || (e as Error)?.name === 'AbortError'
           ? '타임아웃' : '벤더오류';
@@ -461,6 +476,23 @@ Deno.serve(async (req: Request) => {
         select engine.attempt_close(
           ${attempt_id}::uuid, ${원문}, ${결과}, ${사유들}) as ok`)[0].ok;
       if (!닫힘) { 센다(계수, '닫기경합'); continue; }   // 낡은 세대 — 착지도 남의 몫이다
+
+      /* 일과성 반납(§4-2 개정) — 타임아웃·재시도가능(429·5xx) 벤더오류만: 같은 회차 재시도가
+       * 아니라 jobs_release 반납이다(다음 10분 회차가 새 fence 로 집는다 — 중복 과금 축이 없다).
+       * 조건 셋 = 일과성 · 마감 전 · 그 job 시도가 이것 하나(job 당 시도 2회 상한). 🚫검문탈락은
+       * 대상이 아니다(같은 프롬프트 재시도 금지 그대로). 반납 실패(false = 펜스 낡음)면 남의
+       * 세대라 아래 현행 폴백 착지로 내려간다. */
+      if (결과 === '타임아웃' || (결과 === '벤더오류' && 벤더상태 != null && 재시도가능(벤더상태))) {
+        const 반납판 = (await sql`
+          select (now() < engine.gen_deadline(${오늘}::date)) as 마감전,
+                 (select count(*)::int from engine.generation_attempts a
+                   where a.job_id = ${j.job_id}::uuid) as 시도수`)[0];
+        if (반납판.마감전 && 반납판.시도수 === 1) {
+          const ok = (await sql`
+            select engine.jobs_release(${j.job_id}::uuid, ${j.fence as string}::bigint) as ok`)[0].ok;
+          if (ok) { 센다(계수, '일과성반납'); continue; }
+        }
+      }
 
       if (결과 === '성공' && 검문값) {
         /* ⑥ 성공 착지 — 문장·질문은 검문 «정규화 후» 값(§7 표 · 대조 ⑥ 파서와 동치). */
@@ -505,5 +537,5 @@ Deno.serve(async (req: Request) => {
   }
 
   console.log(`[deliver-one] 계측 — 콜드스타트 ${계측.콜드스타트_ms ?? 'warm'}ms · claim ${계측.claim_ms}ms · 학생 ${계측.학생.length}명`);
-  return 봉투(200, { 날짜: 오늘, 회수, 집음: jobs.length, 계수, 오류: 오류들, 계측 });
+  return 봉투(200, { 날짜: 오늘, 요약: 요약(), 회수, 집음: jobs.length, 계수, 오류: 오류들, 계측 });
 });
