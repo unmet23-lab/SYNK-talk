@@ -1169,7 +1169,11 @@ function 녹음카드({
     }
     : null); // { uri, 바이트, duration_ms, hesitation_ms, spoke }
   const [경과, set경과] = useState(0); // 녹음중 타이머 — 스트림이 알려 준 시각
-  const [병기글, set병기글] = useState('');
+  /* 🔴 controlled TextInput 금지(G1·G2·G4와 같은 규칙) — 매 글자 state로 되돌려 넣으면 한글
+   *   조합이 깨져(『안녕』→『ㅇㅏㄴㄴㅕㅇ』) 되돌림·덩어리 계측이 학생 손이 아니라 렌더 결함을
+   *   잰다(`lib/작성과정.js` 머리 규칙). 값은 ref에만 — 렌더가 이 글을 읽는 곳이 없어 state 불요.
+   *   확인 카드가 「다시」로 unmount됐다 돌아오므로 defaultValue={ref.current}로 값을 되살린다. */
+  const 병기글ref = useRef('');
   /* 🔴 **병기 글의 작성 과정**(철학 Ⅱ-9 · `lib/저작신뢰.js`). 이 칸이 선택 입력이라 가벼워 보이는데,
    *   교정 엔진은 `coalesce(body_original, transcript)` 로 읽어 **병기 글이 전사를 이긴다**
    *   (`functions/correct`). 즉 여기 들어온 글이 그날의 코퍼스 행이 되고, 검수·훈련 승격이
@@ -1497,10 +1501,10 @@ function 녹음카드({
       hesitation_ms: 녹음 ? 녹음.hesitation_ms : 0,
       spoke: 녹음 ? 녹음.spoke : false,
       threshold_db: 발화문턱_DB,
-      text: 텍스트병기 && 병기글.trim() ? 병기글.trim() : null,
+      text: 텍스트병기 && 병기글ref.current.trim() ? 병기글ref.current.trim() : null,
       /* 🔴 **글이 실릴 때만 계측도 실린다.** 안 쓴 학생에게 「0초에 0번 고쳤다」를 적으면
        *   「안 썼다」가 「즉답으로 썼다」가 된다 — 그 오독은 어디서도 안 빨개진다. */
-      compose_meta: 텍스트병기 && 병기글.trim() ? 계측payload(병기계측.current, 경과시계()) : null,
+      compose_meta: 텍스트병기 && 병기글ref.current.trim() ? 계측payload(병기계측.current, 경과시계()) : null,
       audio,
       prompt_id,
       created_at: new Date().toISOString(),
@@ -1647,14 +1651,14 @@ function 녹음카드({
               style={s.병기입력}
               placeholder="말한 문장을 글로도 남기고 싶으면 여기에 (선택)"
               placeholderTextColor={색.잉크_메타}
-              value={병기글}
+              defaultValue={병기글ref.current}
               onChangeText={(t) => {
                 /* 계측은 **입력이 가능해진 순간**이 아니라 첫 글자에서 시작한다 — 이 칸은 확인
                  * 카드가 뜬 뒤 «선택»으로 열리는 자리라, 안 쓰는 학생의 대기 시간이 「미룸」으로
                  * 잡히면 안 된다(G1·G4 는 쓰기가 그 화면의 본업이라 반대 자리에서 시작한다). */
                 if (!병기계측.current) 병기계측.current = 계측시작(경과시계());
                 병기계측.current = 타건(병기계측.current, t, 경과시계());
-                set병기글(t);
+                병기글ref.current = t;
               }}
               multiline
             />
