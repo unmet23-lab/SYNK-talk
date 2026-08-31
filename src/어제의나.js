@@ -23,7 +23,7 @@
  *   숫자는 DM Mono(숫자 전용) · 한글 라벨은 SUIT(모노에 한글 글리프가 없다).
  */
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { 색, 폰트, 모노트래킹 } from './테마';
+import { 색, 폰트, 모노트래킹, 판눈금, 글자배율상한 } from './테마';
 import { 부르기 } from './사건통로.js';
 import { 견줌, 늘어난말 } from '../lib/견줌.js';
 import { use등장, use세는수 } from '../lib/모션.js';
@@ -55,9 +55,9 @@ function 견줌줄({ 이름, 축 }) {
   return (
     <View style={s.줄}>
       <Text style={s.이름}>{이름}</Text>
-      <Text style={s.수}>{축.어제}</Text>
+      <Text style={s.수} maxFontSizeMultiplier={글자배율상한}>{축.어제}</Text>
       {/* 늘어난 칸만 잉크 100% — 색을 더하지 않고 밀도로만 위계를 준다(R2). */}
-      <Text style={[s.수, 축.늘었나 ? s.수_오늘 : null]}>{오늘수}</Text>
+      <Text style={[s.수, 축.늘었나 ? s.수_오늘 : null]} maxFontSizeMultiplier={글자배율상한}>{오늘수}</Text>
     </View>
   );
 }
@@ -124,7 +124,7 @@ const s = StyleSheet.create({
 
   머리: { fontFamily: 폰트.헤드, fontSize: 26, lineHeight: 36, color: 색.잉크 },
 
-  카드: { backgroundColor: 색.바탕띄움, borderRadius: 20, padding: 22, gap: 14 },
+  카드: { backgroundColor: 색.바탕띄움, borderRadius: 판눈금.반경, padding: 판눈금.여백, gap: 14 },
 
   줄: { flexDirection: 'row', alignItems: 'baseline', gap: 12 },
   이름: { flex: 1, fontFamily: 폰트.본문, fontSize: 16, lineHeight: 26, color: 색.잉크_서브 },

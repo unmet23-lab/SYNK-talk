@@ -254,3 +254,13 @@ test('화면·API 에 판정 코드값 사본이 0개다 — 문구는 서버가
     }
   }
 });
+
+/* ── 사유 상한도 어휘와 같은 규칙이다 — 서버가 안 주면 null 이지, 200 을 지어내지 않는다(G1-12).
+ *   손 폴백 200 은 lib/회고.js 상한이 바뀌는 날 화면만 옛 자로 자르는 두 번째 정본이었다. */
+test('열기: note_max 가 안 오면 사유상한은 null 이다 — 화면이 서버 상수를 손으로 안 적는다', async () => {
+  const { 세우기 } = require('./lib/앱모듈세우기.js');
+  const 가짜 = async () => ({ ok: true, status: 200, json: async () => ({ ok: true, learner_id: 'x' }) });
+  const api = 세우기(path.join(뿌리, 'src', '회고API.js'), 가짜);
+  const r = await api.열기('T', 'SYNK-001');
+  assert.equal(r.사유상한, null, '없는 값을 200 으로 접었다 — 폴백이 서버 상한과 갈려도 증상이 없다');
+});

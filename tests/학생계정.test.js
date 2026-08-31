@@ -10,7 +10,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { 학생번호맞나, 직원번호맞나, 계정번호맞나, 이메일, 학생번호표기, 학생번호접두, 뒤4자리, 뒷자리맞나, 시도상한 } = require('../lib/학생계정.js');
+const { 학생번호맞나, 직원번호맞나, 계정번호맞나, 이메일, 학생번호표기, 학생번호접두, 뒤4자리, 뒷자리맞나, 시도상한, uuid꼴인가 } = require('../lib/학생계정.js');
 
 const { 코드만, 파일소스 } = require('./lib/소스검사.js');
 
@@ -107,6 +107,18 @@ test('🔑 넓힌 자리가 «둘»뿐이다 — 학생 전용 다섯은 그대�
   /* 명부·원장 초기화는 학생만 다루는 자리다 — 넓은 검사가 새어 들면 안 된다. */
   for (const p of ['lib/명부규칙.js', 'src/원장초기화.js']) {
     assert.equal(/계정번호맞나/.test(소스(p)), false, `${p} 에 넓은 검사가 샜다`);
+  }
+});
+
+// ── uuid 라우팅 자 (나침반·회고 화면의 «가름» 전용 · G1-12) ────────
+test('uuid꼴인가: uuid 는 참 — 학생번호 칸이 learner_id 로 갈린다', () => {
+  assert.equal(uuid꼴인가('11111111-2222-4333-8444-555555555555'), true);
+  assert.equal(uuid꼴인가(' 11111111-2222-4333-8444-555555555555 '), true, '앞뒤 공백은 치기 편의로 접는다');
+});
+
+test('uuid꼴인가: 학생번호·빈 값은 거짓 — student_code 쪽으로 남는다', () => {
+  for (const v of ['SYNK-042', '', null, undefined, '11111111-2222-4333-8444-55555555555']) {
+    assert.equal(uuid꼴인가(v), false, `${JSON.stringify(v)} 가 uuid 로 갈렸다`);
   }
 });
 

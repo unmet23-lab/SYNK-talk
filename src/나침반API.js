@@ -24,6 +24,7 @@
  *   · 저장 성공을 낙관적으로 그리기 — 서버가 준 `recorded_at` 만 「적혔다」로 그린다.
  */
 import { 부르기 } from './사건통로.js';
+import { uuid꼴인가 } from '../lib/학생계정.js';
 
 /**
  * `GET /v1/teach/compass/open` — 이 학생에게 지금 무엇을 물어야 하나.
@@ -45,7 +46,7 @@ import { 부르기 } from './사건통로.js';
  *   지난5년답: string|null, 이미적힘: string|null}>}
  */
 export async function 열기(토큰, 학생번호) {
-  const 칸 = /^[0-9a-f-]{36}$/i.test(String(학생번호).trim()) ? 'learner_id' : 'student_code';
+  const 칸 = uuid꼴인가(학생번호) ? 'learner_id' : 'student_code';
   const 본문 = await 부르기(`teach/compass/open?${칸}=${encodeURIComponent(String(학생번호).trim())}`, 토큰);
   return {
     학생id: 본문.learner_id ?? '',

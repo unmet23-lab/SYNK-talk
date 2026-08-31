@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { 색, 폰트 } from './테마';
+import { 색, 폰트, 몽골어폰트, 판눈금 } from './테마';
 import { 목표사건 } from '../lib/목표확인.js';
 import { 목표반응 } from '../contents/문구_목표확인.js';
 import { 흐름id } from '../lib/제출로그.js';
@@ -39,7 +39,10 @@ export default function 목표카드({ 카드 = null, 토큰 = null, 답뒤 = nu
   if (답) {
     return (
       <View style={s.카드}>
-        <Text style={s.반응글}>{(목표반응(답) || []).join(' ')}</Text>
+        {/* ko/mn 줄배열 병기 — i===0 이 한국어, 뒤 줄은 몽골어폰트(막힘카드 눈금). */}
+        {(목표반응(답) || []).map((줄, i) => (
+          <Text key={i} style={i === 0 ? s.반응글 : s.반응글_병기}>{줄}</Text>
+        ))}
       </View>
     );
   }
@@ -48,7 +51,7 @@ export default function 목표카드({ 카드 = null, 토큰 = null, 답뒤 = nu
     <View style={s.카드}>
       <Text style={s.라벨}>오늘의 목표</Text>
       {(카드.문장 || []).map((줄, i) => (
-        <Text key={i} style={s.본문}>{String(줄)}</Text>
+        <Text key={i} style={i === 0 ? s.본문 : s.본문_병기}>{String(줄)}</Text>
       ))}
       <View style={s.단추줄}>
         {Object.entries(카드.답라벨 || {}).map(([값, 라벨]) => (
@@ -69,7 +72,7 @@ export default function 목표카드({ 카드 = null, 토큰 = null, 답뒤 = nu
 /* 스타일은 교수멘탈 확인 카드의 그 눈금 그대로다(카드/카드라벨/본문글/확인단추 —
  * 두 카드가 다른 무게로 서면 학생 눈에 「더 중요한 질문」이 생긴다 · 신호색 0). */
 const s = StyleSheet.create({
-  카드: { backgroundColor: 색.바탕띄움, borderRadius: 20, padding: 22, gap: 10, marginBottom: 12 },
+  카드: { backgroundColor: 색.바탕띄움, borderRadius: 판눈금.반경, padding: 판눈금.여백, gap: 10, marginBottom: 12 },
   라벨: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_태그 },
   본문: { fontFamily: 폰트.본문, fontSize: 15, lineHeight: 24, color: 색.잉크_서브 },
   단추줄: { flexDirection: 'row', gap: 8, marginTop: 4 },
@@ -77,4 +80,8 @@ const s = StyleSheet.create({
   눌림: { opacity: 0.7 },
   단추글: { fontFamily: 폰트.강조, fontSize: 14, color: 색.잉크 },
   반응글: { fontFamily: 폰트.본문, fontSize: 14, lineHeight: 21, color: 색.잉크_서브 },
+  /* 몽골어 병기 줄 둘 — 키릴은 몽골어폰트만(막힘카드 병기 눈금: 폰트짝 유지 · 크기·색 한 단 아래).
+     지금은 mn 이 비어 안 선다 — 감수가 채우는 날 병기가 선다. */
+  반응글_병기: { fontFamily: 몽골어폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_메타 },
+  본문_병기: { fontFamily: 몽골어폰트.본문, fontSize: 14, lineHeight: 23, color: 색.잉크_메타 },
 });

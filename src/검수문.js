@@ -21,13 +21,13 @@
  *   ✅ 박자·연기·배치처럼 «화면이 어떻게 움직이나»
  *   🚫 조회·전송·저장 — 여기 값은 가짜다. 그 층은 왕복시험과 회귀가 진다.
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { 색, 폰트, 모노트래킹 } from './테마';
 import { 견줌 } from '../lib/견줌.js';
 import { 연출대본 } from '../lib/마스코트생명.js';
 import { 기본캐릭터, 배치, 목소리판정 } from '../lib/가이드목소리.js';
-import { 효과음 } from './소리.js';
+import { 효과음, bgm재생, bgm정지 } from './소리.js';
 import 어제의나 from './어제의나';
 /* 🔑 `박자` 를 같이 들여온다 — 이 칸의 눈금이 수를 «글자로» 다시 적지 않게(08-27 · 반짝임.js 머리말). */
 import 반짝임, { 박자 } from './반짝임.js';
@@ -62,6 +62,9 @@ export default function 검수문({ 돌아가기 }) {
   /* 다시 재생 = **키를 갈아 재마운트**한다. 박자는 마운트당 1회라(lib/모션) 이 방법이 유일하다. */
   const [회차, set회차] = useState(0);
   const [연기, set연기] = useState(null);   // 지금 도는 몽글 대본 이름
+  const [bgm켬, setBgm켬] = useState(false); // ⑨ BGM 귀검수 — 문을 나가면 반드시 끈다(아래 effect)
+
+  useEffect(() => () => bgm정지(), []);
 
   const 다시 = () => { set회차((n) => n + 1); set연기(null); };
 
@@ -200,16 +203,17 @@ export default function 검수문({ 돌아가기 }) {
         </View>
 
         {/* ── ⑤ 반짝임 — «기쁨 한 박자» (유호 확정 08-27 ③ · 재질 정정 08-27 오후) ──
-            🔴 이 칸은 «어디에 쓸까»를 유호님이 정하시라고 있는 자리다.
+            ✅ **판정이 났다 — 유호 확정 08-31 「일단 준비만 해두고 나중에 필요할때 사용하자」.**
+            그래서 이 칸은 이제 «물으러 서 있는 자리»가 아니라 **준비된 것을 보여 주는 자리**다.
             앱의 축하는 지금 전부 몽글이가 진다(표정·소리·연기). 그리고 「어제의 나」는
             머리말에 「신호(코랄)가 없다 · 위계는 밀도로 준다」가 박혀 있고, 포인트·스토어·
-            리그도 유호님이 빼신 상태다 — 그래서 이 반짝임을 **아무 데도 자동으로 안 걸었다.**
-            걸 자리를 고르시면 그때 화면 하나에 `보임` 한 줄로 붙는다.
+            리그도 유호님이 빼신 상태다 — 억지로 걸면 그 설계를 깬다.
+            걸 자리가 정해지는 날 화면 하나에 `보임` 한 줄로 붙는다.
             🔑 별은 **구운 펠트 실물**이다(유호 지시 08-27 「loom 엔진 재질로 명품화」) —
                1판의 평면 벡터를 걷었다. 전말은 `src/반짝임.js` 머리말. */}
         <View style={s.칸}>
           <View style={s.칸머리}>
-            <Text style={s.칸이름}>⑤ 반짝임 — 기쁨 한 박자 (아직 «쓰는 자리» 없음)</Text>
+            <Text style={s.칸이름}>⑤ 반짝임 — 기쁨 한 박자 (준비됨 · 걸 자리는 나중에 · 유호 08-31)</Text>
             <Pressable onPress={다시} style={({ pressed }) => [s.버튼, pressed && s.눌림]}>
               <Text style={s.버튼글}>다시 재생</Text>
             </Pressable>
@@ -300,6 +304,24 @@ export default function 검수문({ 돌아가기 }) {
           <View style={[s.무대, { padding: 14 }]}>
             <막힘카드 막힘={{ code: 'CONSENT_MISSING' }} 학생번호="S-0000" />
           </View>
+        </View>
+
+        {/* ── ⑨ BGM — 게임 화면 밑에 깔리는 소리 (귀검수 통로 · 감사 D5-4) ──
+            게임 세 판(교수님 메일·보고서 교정·서류 관문)에 배선된 그 소리 그대로다(인자 없이 =
+            유호 선정 측정 트랙). 정말 깔지의 최종 판정은 유호님 귀 — 이 칸이 그 통로다. */}
+        <View style={s.칸}>
+          <View style={s.칸머리}>
+            <Text style={s.칸이름}>⑨ BGM — 게임 화면 밑에 깔리는 소리</Text>
+            <Pressable
+              onPress={() => { if (bgm켬) bgm정지(); else bgm재생(); setBgm켬(!bgm켬); }}
+              style={({ pressed }) => [s.버튼, pressed && s.눌림]}
+            >
+              <Text style={s.버튼글}>{bgm켬 ? 'BGM 끄기' : 'BGM 켜고 듣기'}</Text>
+            </Pressable>
+          </View>
+          <Text style={s.눈금}>
+            무한 루프로 깔립니다 — 녹음이 열리면 자동으로 조용해지고 닫히면 돌아옵니다(소리게이트).
+          </Text>
         </View>
 
         <Pressable onPress={돌아가기} style={({ pressed }) => [s.back, pressed && s.눌림]}>

@@ -43,7 +43,7 @@ import { VERDICT, 텍스트내는판정, 골든판정요청 } from '../lib/검�
 import { use등장 } from '../lib/모션.js';
 import 마스코트 from './마스코트.js';
 import { 강사순간고르기 } from '../lib/마스코트강사말.js';
-import { 마스코트기록읽기, 마스코트기록쓰기 } from './저장.js';
+import { 마스코트기록읽기, 마스코트기록쓰기, 화면설정읽기, 화면설정쓰기 } from './저장.js';
 
 /**
  * 큐 항목 상태 — 정본은 `functions/teach:75` 의 `상태` 다.
@@ -138,6 +138,7 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
   const [목록, set목록] = useState([]);
   const [불러오는중, set불러오는중] = useState(true);
   const [오류, set오류] = useState('');
+  const [재조회, set재조회] = useState(0);
 
   const [지금id, set지금id] = useState(null);
   const [편집, set편집] = useState(편집초기값);
@@ -148,6 +149,13 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
   const [끝낸수, set끝낸수] = useState(0);
   const [캐릭터말, set캐릭터말] = useState(null);
   const 말림참조 = useRef(null);
+
+  /* 접힘 취향은 기기에 남는다 — 처음 온 사람에겐 펼침(기본), 접은 사람에겐 접힘(감사 D8-13). */
+  useEffect(() => {
+    let 살아있음 = true;
+    화면설정읽기().then((p) => { if (살아있음 && p && p.강사기준접힘) set기준펼침(false); });
+    return () => { 살아있음 = false; };
+  }, []);
 
   /* 마스코트 발화 시도 — 판정(어느 줄·상한)은 lib 이 전부 지고, 여기는 신호 조립과 표시뿐이다
      (말할순간 §1-1 「표 밖 발화 금지」의 기계 자리 — 이 화면에는 문구가 한 글자도 없다).
@@ -191,7 +199,7 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
       }
     })();
     return () => { 살아있음 = false; };
-  }, [토큰]);
+  }, [토큰, 재조회]);
 
   /* 다음 항목은 화면 꼭대기에서 시작한다 — 앞 카드의 스크롤 위치를 안 물려받는다. */
   useEffect(() => {
@@ -253,7 +261,15 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
       </Text>
 
       {/* ① 기준 카드 — 세 값의 «뜻». 접이식(검수 화면과 같은 자리) */}
-      <Pressable onPress={() => set기준펼침((v) => !v)} hitSlop={6}>
+      <Pressable
+        onPress={() => set기준펼침((v) => {
+          const 다음 = !v;
+          화면설정읽기().then((p) => 화면설정쓰기({ ...(p || {}), 강사기준접힘: !다음 })).catch(() => {});
+          return 다음;
+        })}
+        hitSlop={{ top: 10, bottom: 10 }}
+        style={{ alignSelf: 'stretch' }}
+      >
         <Text style={s.접이머리}>{기준펼침 ? '▾' : '▸'} 판정 기준</Text>
       </Pressable>
       {기준펼침 && (
@@ -273,8 +289,9 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
 
       {불러오는중 && <Text style={s.메모}>이번 주 표본을 읽는 중이에요…</Text>}
 
-      {/* 🔴 「표본이 0」과 「풀이 0」을 가른다 — 안 가르면 강사는 시스템 고장으로 읽는다. */}
-      {!불러오는중 && 셈.전체 === 0 && (
+      {/* 🔴 「표본이 0」과 「풀이 0」을 가른다 — 안 가르면 강사는 시스템 고장으로 읽는다.
+          조회가 죽은 날(오류)은 이 카드를 안 세운다 — 「판정할 것이 없어요」가 거짓이 된다(감사 D7-9). */}
+      {!불러오는중 && !오류 && 셈.전체 === 0 && (
         <View style={s.카드}>
           <Text style={s.빈머리}>이번 주는 판정할 것이 없어요</Text>
           <Text style={s.메모}>
@@ -341,6 +358,9 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
                 <Pressable
                   key={이름}
                   onPress={() => set편집((v) => ({ ...v, verdict: 고름 ? '' : 이름 }))}
+                  hitSlop={{ top: 4, bottom: 4 }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: 고름 }}
                   style={({ pressed }) => [s.판정칩, 고름 && s.판정칩_고름, pressed && s.눌림]}
                 >
                   <Text style={[s.판정칩글, 고름 && s.판정칩글_고름]}>{이름}</Text>
@@ -377,7 +397,11 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
                 />
               </View>
 
-              <Pressable onPress={() => set태그펼침((v) => !v)} hitSlop={6}>
+              <Pressable
+                onPress={() => set태그펼침((v) => !v)}
+                hitSlop={{ top: 10, bottom: 10 }}
+                style={{ alignSelf: 'stretch' }}
+              >
                 <Text style={s.접이머리}>
                   {태그펼침 ? '▾' : '▸'} 오류 태그
                   {편집.태그.length > 0 ? ` (${편집.태그.length})` : ''}
@@ -402,7 +426,11 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
 
               {/* 모국어 출처 — 선택. 기본은 접는다: 주 5건이 끝나는 것이 이 화면의 값이라
                   필수가 아닌 칸이 흐름 위에 서면 안 된다. */}
-              <Pressable onPress={() => set출처펼침((v) => !v)} hitSlop={6}>
+              <Pressable
+                onPress={() => set출처펼침((v) => !v)}
+                hitSlop={{ top: 10, bottom: 10 }}
+                style={{ alignSelf: 'stretch' }}
+              >
                 <Text style={s.접이머리}>{출처펼침 ? '▾' : '▸'} 몽골어에서 온 표현 (선택)</Text>
               </Pressable>
               {출처펼침 && (
@@ -425,7 +453,7 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
             onPress={저장}
             disabled={!!막힘문구 || 보내는중}
             style={({ pressed }) => [
-              s.저장, (!!막힘문구 || 보내는중) && s.잠김, pressed && s.눌림,
+              s.저장, !!막힘문구 && s.잠김, pressed && s.눌림,
             ]}
           >
             <Text style={s.저장글}>{보내는중 ? '저장하는 중…' : '판정 저장'}</Text>
@@ -436,6 +464,18 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
       )}
 
       {!항목 && 오류 ? <Text style={s.오류글}>{오류}</Text> : null}
+
+      {/* 첫 조회가 죽은 날의 손잡이 — NETWORK 실패는 서버에 안 닿은 갈래라 「조회 한 번 =
+          감사 1행」(첫 조회 효과 머리말)의 분모를 안 흐린다(감사 D7-9). */}
+      {오류 && 목록.length === 0 && !불러오는중 ? (
+        <Pressable
+          onPress={() => { set오류(''); set불러오는중(true); set재조회((n) => n + 1); }}
+          hitSlop={6}
+          style={({ pressed }) => [s.back, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={s.backText}>다시 불러오기</Text>
+        </Pressable>
+      ) : null}
 
       <Pressable onPress={돌아가기} style={({ pressed }) => [s.back, pressed && { opacity: 0.7 }]}>
         <Text style={s.backText}>← 돌아가기</Text>
@@ -528,6 +568,8 @@ const s = StyleSheet.create({
     backgroundColor: 색.신호, borderRadius: 14, paddingVertical: 14, alignItems: 'center',
   },
   저장글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.바탕 },
+  /* 잠김 = 미충족 전용. 진행 중(…는 중)은 disabled 만 걸고 면은 산 채로 둔다 —
+     잠김꼴 위 글자는 2.3:1 이라 진행 문구가 안 읽힌다(감사 D6-3). */
   잠김: { backgroundColor: 색.잉크_희미 },
   눌림: { opacity: 0.7 },
 

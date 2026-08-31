@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
-import { 색, 폰트, 모노트래킹 } from './테마';
+import { 색, 폰트, 모노트래킹, 판눈금 } from './테마';
 import { use등장, use줄임 } from '../lib/모션.js';
 import { 제출재료 } from '../lib/알바변명제출.js';
 /* 발화 사슬의 판정들 — 「냈다」(학습출석 = ③답하기 submitted)와 「닿았다」(배달상태 = 서버가
@@ -73,7 +73,7 @@ export function 게임항목입력(재료, 항목입력) {
 const 녹음상한초 = 30;
 
 export default function 알바변명화면({
-  재료, date, 로그, 기록추가, 학생번호 = null, 시작단계 = '상황',
+  재료, date, 로그, 기록추가, 학생번호 = null, 시작단계 = '상황', 완주때 = null,
 }) {
   const [단계, set단계] = useState(시작단계); // 상황 | 녹음 | 끝
   const [읽는중, set읽는중] = useState(false);
@@ -207,7 +207,14 @@ export default function 알바변명화면({
           안내={재료.지시문}
           date={date}
           로그={로그}
-          기록추가={(항목입력) => 기록추가(게임항목입력(재료, 항목입력))}
+          기록추가={(항목입력) => {
+            const r = 기록추가(게임항목입력(재료, 항목입력));
+            /* «보냈다»(status submitted — 녹음카드가 싣는 값)에만 1회 — abandoned·retried 무음.
+               G1·G2·G4 의 achieve 뜻(보냈다)과 같은 자다. 소리 실물은 프롭(완주때) 너머 화면 밖 —
+               이 파일은 소리를 직접 내지 않는다(⑪). */
+            if (항목입력.status === 'submitted') 완주때 && 완주때();
+            return r;
+          }}
           완료={() => set단계('끝')}
           prompt_id={재료.prompt_seed}
           자동시작
@@ -272,7 +279,7 @@ const s = StyleSheet.create({
   오류: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크, lineHeight: 19 },
   메모: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조, lineHeight: 18 },
 
-  카드: { backgroundColor: 색.바탕띄움, borderRadius: 20, padding: 22, gap: 16 },
+  카드: { backgroundColor: 색.바탕띄움, borderRadius: 판눈금.반경, padding: 판눈금.여백, gap: 16 },
   카드라벨: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_태그 },
   상황글: { fontFamily: 폰트.헤드, fontSize: 21, lineHeight: 32, color: 색.잉크 },
   본문글: { fontFamily: 폰트.본문, fontSize: 15, lineHeight: 24, color: 색.잉크_서브 },

@@ -48,10 +48,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
-import { 색, 폰트, 몽골어, 몽골어폰트 } from './테마';
+import { 색, 폰트, 몽골어, 몽골어폰트, 판눈금, 눌림층, 글자배율상한 } from './테마';
 import { 교정앉음, 열람사건, 응답사건, 교정사건보내기, 학생응답값 } from './교정API.js';
 import { 항목추가, 응답값, 전송기록, 보낼것 } from '../lib/교정로그.js';
 import { 무오류인가, 무오류표식 } from '../lib/꼬리.js';
+/* 병기 «가르는 자» 정본 — 화면마다 split 을 적으면 갈라진다(`contents/문구_오류.js` 머리말). */
+import { 줄들 } from '../contents/문구_오류.js';
 import { 교정로그읽기, 교정로그쓰기 } from './저장.js';
 /* 목소리 고르기는 말하기 화면의 것(캐시 한 벌)을 그대로 빌린다 — 같은 기기에서 화면마다
    목소리가 갈리면 「어제 듣던 목소리」가 화면 따라 바뀐다(알바변명화면과 같은 무늬 · 순환 0). */
@@ -123,9 +125,9 @@ export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = nu
    *   보내면 서버가 `CONSENT_MISSING`(`retryable:false`)으로 접고 앱은 그것을 `send_final` 로
    *   적어 큐에서 영영 뺀다 — 동의가 다시 서는 날 나갈 수 있었던 답이 죽는다(append-only ·
    *   소급 0). **멈추는 것이지 기기에서 지우는 것이 아니다** — 항목은 그대로 남아 다음에 나간다.
-   *   ⚠ 그 「다음」은 **이 화면을 다시 여는 날**이다. 교정 큐에는 말하기 화면의 `AppState` 복귀
-   *     같은 상시 배출구가 없다(이 처방 이전에도 그랬다 — 새 천장이 아니라 원래 천장이다).
-   *     답장 링크는 이미 읽은 교정에도 계속 서므로 닫히는 문은 아니지만, 보장도 아니다.
+   *   ⚠ 그 「다음」 = 이 화면을 다시 여는 날, 그리고 **말하기화면 공용 배출구(밀린것보내기)에
+   *     합류했다(08-31)** — 마운트·`AppState` 복귀가 이 큐도 민다(같은 항목·같은 전송기록이라
+   *     직렬로 겹쳐도 안 덮는다).
    * 🔑 전송 자리가 **여기 하나**라서 호출부(마운트·답하기)마다 막힘을 물을 필요가 없다.
    *   말하기 화면이 두 자리(마운트·`AppState` 복귀)를 각각 고쳐야 했던 것과 다른 점이다.
    */
@@ -316,14 +318,21 @@ export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = nu
                   pressed && s.버튼_눌림,
                 ]}
               >
-                <Text style={[s.버튼글, 값 === '수정' && s.버튼글_보조]}>{답문구[값]}</Text>
+                <Text style={[s.버튼글, 값 === '수정' && s.버튼글_보조]} maxFontSizeMultiplier={글자배율상한}>{답문구[값]}</Text>
               </Pressable>
             ))}
         </View>
       )}
 
-      {못보낸답 ? <Text style={s.알림}>답이 저장되지 않았어요. 선생님께 알려 주세요.</Text> : null}
-      {오류 ? <Text style={s.알림}>{오류}</Text> : null}
+      {/* accessibilityLiveRegion — Android 전용 속성(iOS 는 무시되어 무해) · 동적 등장 알림. */}
+      {못보낸답 ? <Text accessibilityLiveRegion="polite" style={s.알림}>답이 저장되지 않았어요. 선생님께 알려 주세요.</Text> : null}
+      {오류 ? (
+        <View accessibilityLiveRegion="assertive">
+          {줄들(오류).map((줄, i) => (
+            <Text key={i} style={i === 0 ? s.알림 : s.알림_병기}>{줄}</Text>
+          ))}
+        </View>
+      ) : null}
 
       <Pressable onPress={돌아가기} style={({ pressed }) => [s.back, pressed && { opacity: 0.7 }]}>
         <Text style={s.backText}>← 말하기로 돌아가기</Text>
@@ -343,7 +352,7 @@ const s = StyleSheet.create({
 
   머리: { fontFamily: 폰트.헤드, fontSize: 26, lineHeight: 36, color: 색.잉크 },
 
-  카드: { backgroundColor: 색.바탕띄움, borderRadius: 20, padding: 22, gap: 14 },
+  카드: { backgroundColor: 색.바탕띄움, borderRadius: 판눈금.반경, padding: 판눈금.여백, gap: 14 },
   고친이: { fontFamily: 폰트.캡션, fontSize: 14, lineHeight: 22, color: 색.잉크_메타 },
   문장: { fontFamily: 폰트.본문, fontSize: 20, lineHeight: 32, color: 색.잉크 },
   듣기글: { fontFamily: 폰트.강조, fontSize: 13, lineHeight: 20, color: 색.잉크_서브 },
@@ -375,13 +384,15 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   버튼_보조: { backgroundColor: 'transparent', borderWidth: 1, borderColor: 색.잉크_희미 },
-  버튼_잠김: { opacity: 0.35 },
-  버튼_눌림: { opacity: 0.82 },
+  버튼_잠김: { opacity: 눌림층.잠김 },
+  버튼_눌림: { opacity: 눌림층.버튼 },
   버튼글: { fontFamily: 폰트.강조, fontSize: 16, color: 색.바탕 },
   버튼글_보조: { color: 색.잉크_서브 },
 
   답한줄: { fontFamily: 폰트.강조, fontSize: 15, lineHeight: 24, color: 색.잉크_서브 },
   알림: { fontFamily: 폰트.캡션, fontSize: 14, lineHeight: 22, color: 색.잉크_서브 },
+  /* ko/mn 병기의 mn 줄 — 폰트를 가르고(키릴은 킷 한글 폰트에 없다) 세기는 한 단 내린다. */
+  알림_병기: { fontFamily: 몽골어폰트.캡션, fontSize: 14, lineHeight: 22, color: 색.잉크_메타 },
 
   back: { paddingTop: 8 },
   /* 08-31 감사 D6-7 — 한글 문장에 DM Mono(한글 글리프 0 · 테마.js 자백)를 지정해 글자 단위

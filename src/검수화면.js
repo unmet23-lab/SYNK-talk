@@ -55,14 +55,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { 색, 폰트, 모노트래킹, 몽골어 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어, 눌림층 } from './테마';
 import {
   큐받기, 반목록받기, 오디오서명받기, 열어봤다알리기, 승인하기, 폐기하기, 폐기사유, 오류태그,
-  기본쪽크기, 반쪽크기,
+  검수쪽크기, 반쪽크기,
 } from './검수API.js';
 import { 청취문턱, 세그먼트펴기 } from '../lib/검수확정.js';
 import { 새계측, 재기, 들은ms } from '../lib/청취계측.js';
 import { use등장 } from '../lib/모션.js';
+import { 화면설정읽기, 화면설정쓰기 } from './저장.js';
 
 /** 기준 3줄 — 원어민의 언어 감각은 있어도 **이 시스템의 라벨 규격**은 없다(발주 §3 UX ①). */
 const 기준3줄 = [
@@ -209,6 +210,13 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
   const [폐기열림, set폐기열림] = useState(false);
   const [보내는중, set보내는중] = useState(false);
 
+  /* 접힘 취향은 기기에 남는다 — 처음 온 사람에겐 펼침(기본), 접은 사람에겐 접힘(감사 D8-13). */
+  useEffect(() => {
+    let 살아있음 = true;
+    화면설정읽기().then((p) => { if (살아있음 && p && p.검수기준접힘) set기준펼침(false); });
+    return () => { 살아있음 = false; };
+  }, []);
+
   /* §3-2 반 모드 — 「오늘 수업 반」(숙제서클 §10-3). `반 === null` = 기본 큐 그대로. */
   const [반목록, set반목록] = useState(null);   // null = 아직 못 읽음 · [] = 반 0개(다리 전)
   const [반목록오류, set반목록오류] = useState('');
@@ -287,7 +295,7 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
       let 쪽수 = 0;
       for (;;) {
         const { 목록: 온것, 다음커서: 다음 } = await 큐받기(토큰, {
-          개수: 반 ? 반쪽크기 : 기본쪽크기, 커서: 이번커서, 반: 반 ? 반.id : null,
+          개수: 반 ? 반쪽크기 : 검수쪽크기, 커서: 이번커서, 반: 반 ? 반.id : null,
         });
         if (요청번호.current !== 내번호) return;   // 그 사이 반이 바뀌었다 — 이 응답은 남의 화면이다
         set목록((앞) => (이번커서 || 쪽수 ? [...앞, ...온것] : 온것));
@@ -554,7 +562,15 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
       </Text>
 
       {/* ① 기준 카드 — 상시 접이식 3줄 */}
-      <Pressable onPress={() => set기준펼침((v) => !v)} hitSlop={6}>
+      <Pressable
+        onPress={() => set기준펼침((v) => {
+          const 다음 = !v;
+          화면설정읽기().then((p) => 화면설정쓰기({ ...(p || {}), 검수기준접힘: !다음 })).catch(() => {});
+          return 다음;
+        })}
+        hitSlop={{ top: 10, bottom: 10 }}
+        style={{ alignSelf: 'stretch' }}
+      >
         <Text style={s.접이머리}>{기준펼침 ? '▾' : '▸'} 검수 기준</Text>
       </Pressable>
       {기준펼침 && (
@@ -690,6 +706,7 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
                     key={`${구간.시작ms}-${i}`}
                     onPress={() => 구간재생(구간)}
                     disabled={!서명}
+                    hitSlop={{ top: 8, bottom: 8, left: 2, right: 2 }}
                     style={({ pressed }) => [
                       s.칩, 구간.저신뢰 && s.칩_저신뢰, 여기 && s.칩_현재, pressed && s.눌림,
                     ]}
@@ -725,7 +742,7 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
               <Text style={s.ai글} selectable>AI: {항목.ai_corrected_text}</Text>
               <Pressable
                 onPress={() => set교정문(String(항목.ai_corrected_text))}
-                hitSlop={6}
+                hitSlop={{ top: 8, bottom: 8 }}
                 style={({ pressed }) => [s.작은버튼, pressed && s.눌림]}
               >
                 {/* ⚠ 문구 초안 — 확정은 유호님 몫 */}
@@ -756,7 +773,11 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
           />
 
           {/* 태그 — 고른 것은 늘 보이고, 목록은 접는다 */}
-          <Pressable onPress={() => set태그펼침((v) => !v)} hitSlop={6}>
+          <Pressable
+            onPress={() => set태그펼침((v) => !v)}
+            hitSlop={{ top: 10, bottom: 10 }}
+            style={{ alignSelf: 'stretch' }}
+          >
             <Text style={s.접이머리}>{태그펼침 ? '▾' : '▸'} 태그 {태그.length}개</Text>
           </Pressable>
           <View style={s.칩줄}>
@@ -764,6 +785,7 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
               <Pressable
                 key={t}
                 onPress={() => 태그토글(t)}
+                hitSlop={{ top: 8, bottom: 8, left: 2, right: 2 }}
                 style={({ pressed }) => [s.칩, 태그.includes(t) && s.칩_고름, pressed && s.눌림]}
               >
                 <Text style={s.칩글}>{t}</Text>
@@ -772,7 +794,11 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
           </View>
 
           {/* 승격 의사 — 기본은 **안 함**이다(§5-1 🚫) */}
-          <Pressable onPress={() => set승격((v) => !v)} hitSlop={6} style={s.체크줄}>
+          <Pressable
+            onPress={() => set승격((v) => !v)}
+            hitSlop={{ top: 10, bottom: 10 }}
+            style={[s.체크줄, { alignSelf: 'stretch' }]}
+          >
             <Text style={s.체크}>{승격 ? '■' : '□'}</Text>
             <Text style={s.체크글}>학습 데이터로 승격</Text>
           </Pressable>
@@ -788,6 +814,7 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
             <Pressable
               onPress={() => set폐기열림((v) => !v)}
               disabled={보내는중}
+              hitSlop={{ top: 8, bottom: 8 }}
               style={({ pressed }) => [s.작은버튼, pressed && s.눌림]}
             >
               <Text style={s.작은버튼글}>폐기</Text>
@@ -848,6 +875,7 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
           <Pressable
             onPress={재열기}
             disabled={!직전.url || 만료됨 || 보내는중}
+            hitSlop={{ top: 8, bottom: 8 }}
             style={({ pressed }) => [s.작은버튼, (!직전.url || 만료됨) && s.잠김, pressed && s.눌림]}
           >
             <Text style={s.작은버튼글}>다시 열기 (Z)</Text>
@@ -867,6 +895,7 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
       {더받기보임({ 다음커서, 재검수있음: Boolean(재검수), 불러오는중 }) ? (
         <Pressable
           onPress={() => 큐읽기(다음커서)}
+          hitSlop={{ top: 8, bottom: 8 }}
           style={({ pressed }) => [s.작은버튼, pressed && s.눌림]}
         >
           <Text style={s.작은버튼글}>다음 쪽 더 받기</Text>
@@ -987,11 +1016,11 @@ const s = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 10,
   },
   작은버튼글: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_서브 },
-  잠김: { opacity: 0.35 },
+  잠김: { opacity: 눌림층.잠김 },
   /* 잠긴 확정은 색을 빼고 밝기로 낮춘다(강사화면 저장 버튼과 같은 실물). 테두리 작은버튼의
      잠김(opacity)은 그대로다 — 면을 깔면 투명 바탕 버튼이 채워진 버튼으로 변한다. */
   확정_잠김: { backgroundColor: 색.잉크_희미 },
-  눌림: { opacity: 0.82 },
+  눌림: { opacity: 눌림층.버튼 },
 
   폐기판: { gap: 8, borderTopWidth: 1, borderTopColor: 색.잉크_희미, paddingTop: 12 },
 

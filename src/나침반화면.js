@@ -140,7 +140,7 @@ export default function 나침반화면({ 토큰, 돌아가기 }) {
           <Pressable
             onPress={열기누름}
             disabled={도는중}
-            style={({ pressed }) => [s.저장, 도는중 && s.잠김, pressed && s.눌림]}
+            style={({ pressed }) => [s.저장, pressed && s.눌림]}
           >
             <Text style={s.저장글}>{여는중 ? '여는 중…' : '열기'}</Text>
           </Pressable>
@@ -199,7 +199,7 @@ export default function 나침반화면({ 토큰, 돌아가기 }) {
         <Pressable
           onPress={저장누름}
           disabled={!채워짐 || 도는중}
-          style={({ pressed }) => [s.저장, (!채워짐 || 도는중) && s.잠김, pressed && s.눌림]}
+          style={({ pressed }) => [s.저장, !채워짐 && s.잠김, pressed && s.눌림]}
         >
           <Text style={s.저장글}>{도는중 ? '적는 중…' : '적기'}</Text>
         </Pressable>
@@ -289,7 +289,8 @@ const 입력바탕 = {
  * (답장 교정카드틀과 같은 이유: 응답이 오기 전에 박자가 끝나 버린다). */
 function 적혔어요줄({ 글 }) {
   const 등장 = use등장({ 올라옴: 6, 시간: 200 });
-  return <Animated.Text style={[s.안내글, 등장]}>{글}</Animated.Text>;
+  /* accessibilityLiveRegion — Android 전용 속성(iOS 는 무시되어 무해) · 동적 등장 알림. */
+  return <Animated.Text accessibilityLiveRegion="polite" style={[s.안내글, 등장]}>{글}</Animated.Text>;
 }
 
 const s = StyleSheet.create({
@@ -318,8 +319,9 @@ const s = StyleSheet.create({
   판정칩글: { fontFamily: 폰트.본문, fontSize: 14, lineHeight: 20, color: 색.잉크_서브 },
   판정칩글_고름: { fontFamily: 폰트.강조, color: 색.잉크 },
 
-  안내글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_서브 },
-  오류글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_메타 },
+  안내글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_메타 },
+  /* 실패 ≥ 잉크_서브 · 운영 안내 = 잉크_메타 — 강사화면 자 · 감사 D6-4 */
+  오류글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_서브 },
   /* 상한 85% 부터만 선다 — 평소에 숫자 시계를 두지 않는다(숫자·슬래시뿐이라 DM Mono 안전). */
   카운터: { fontFamily: 폰트.모노, fontSize: 12, lineHeight: 20, color: 색.잉크_메타, alignSelf: 'flex-end' },
 
@@ -328,6 +330,8 @@ const s = StyleSheet.create({
     backgroundColor: 색.신호, borderRadius: 14, paddingVertical: 14, alignItems: 'center',
   },
   저장글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.바탕 },
+  /* 잠김 = 미충족 전용. 진행 중(…는 중)은 disabled 만 걸고 면은 산 채로 둔다 —
+     잠김꼴 위 글자는 2.3:1 이라 진행 문구가 안 읽힌다(감사 D6-3). */
   잠김: { backgroundColor: 색.잉크_희미 },
   눌림: { opacity: 0.7 },
 

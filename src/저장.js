@@ -35,7 +35,9 @@ export async function 로그읽기() {
   try {
     const f = new FS.File(FS.Paths.document, 'talk_log.jsonl');
     if (!f.exists) return { 로그: [], 깨진줄: 0 };
-    return 역직렬화(f.textSync());
+    /* 비동기 판으로 읽는다 — 동기 읽기는 파일 크기만큼 JS 스레드를 세운다(쓰기엔 비동기 판이
+       없어 파일을 작게 유지하는 압축이 그쪽 처방이다 · `lib/제출로그.압축`). */
+    return 역직렬화(await f.text());
   } catch (e) {
     // 읽기 실패를 빈 로그로 둔갑시키지 않는다 — 호출부가 오류를 화면에 띄운다
     throw new Error('기록을 읽지 못했어요: ' + (e && e.message));
@@ -62,7 +64,8 @@ export async function 교정로그읽기() {
   try {
     const f = new FS.File(FS.Paths.document, 'correction_log.jsonl');
     if (!f.exists) return { 로그: [], 깨진줄: 0 };
-    return 역직렬화(f.textSync());
+    return 역직렬화(await f.text()); // 비동기 판 — 로그읽기와 같은 이유
+
   } catch (e) {
     // 읽기 실패를 빈 로그로 둔갑시키지 않는다 — 빈 로그로 보면 이미 본 교정을 다시 「처음」으로
     // 취급해 열람 사건이 두 벌 나간다(그게 이 로그가 막는 것이다).
@@ -89,7 +92,8 @@ export async function 게임로그읽기() {
   try {
     const f = new FS.File(FS.Paths.document, 'game_log.jsonl');
     if (!f.exists) return { 로그: [], 깨진줄: 0 };
-    return 역직렬화(f.textSync());
+    return 역직렬화(await f.text()); // 비동기 판 — 로그읽기와 같은 이유
+
   } catch (e) {
     // 읽기 실패를 빈 로그로 둔갑시키지 않는다 — 빈 로그로 보면 같은 앉음의 사건이 두 벌 나간다
     throw new Error('게임 기록을 읽지 못했어요: ' + (e && e.message));
@@ -138,6 +142,38 @@ export async function 마스코트기록쓰기(기록) {
   }
 }
 
+/* ── 화면 설정 (접힘 상태 같은 UI 취향 · 마스코트기록과 같은 무늬) ────────────
+ * 🔴 **큐가 아니다** — 서버로 나가는 것이 0이라 `못보낸수` 에 안 더한다. 모양도 로그가 아니라
+ *   «키 → 값» 지도다.
+ * 🔑 깨진 기록은 빈 것으로 접고 쓰기 실패는 삼킨다 — 최악이 「다시 펼쳐짐」뿐이라(UI 편의),
+ *   던져서 화면이 죽는 쪽이 언제나 더 나쁘다(마스코트기록과 같은 판단). */
+let 메모리화면설정 = {};
+
+export async function 화면설정읽기() {
+  if (웹) return 메모리화면설정;
+  try {
+    const f = new FS.File(FS.Paths.document, 'ui_prefs.json');
+    if (!f.exists) return {};
+    const 값 = JSON.parse(f.textSync());
+    return 값 && typeof 값 === 'object' && !Array.isArray(값) ? 값 : {};
+  } catch {
+    return {};
+  }
+}
+
+export async function 화면설정쓰기(설정) {
+  if (웹) {
+    메모리화면설정 = 설정 || {};
+    return;
+  }
+  try {
+    const f = new FS.File(FS.Paths.document, 'ui_prefs.json');
+    f.write(JSON.stringify(설정 || {}));
+  } catch {
+    /* 못 쓰면 다음에 다시 펼쳐질 뿐이다 — UI 취향이 화면을 죽이지 않는다 */
+  }
+}
+
 /**
  * 아직 서버에 닿지 않은 것의 수 — **모든 큐를 합산한다**(나가기 게이트의 유일한 근거 · B1).
  *
@@ -172,6 +208,54 @@ export async function 음성쓰기(바이트, 이름) {
   const f = new FS.File(dir, 이름);
   f.write(바이트);
   return f.uri;
+}
+
+/* ── 임시 녹음 메타 (G2-2 — 보내기 전에 죽은 발화의 복구 단서) ─────────────────
+ * 🔴 **큐가 아니다** — 서버로 나가는 것이 0이라 `못보낸수` 에 안 더한다. WAV 원본은 이미
+ *   `음성쓰기` 가 디스크에 앉혔고, 여기는 «그 파일이 어느 시도였나» 한 장뿐이다.
+ * 🔑 깨진 메타는 null 로 접는다 — 최악이 「복구 카드가 안 뜸」이라, 던져서 마운트가 죽는
+ *   쪽이 언제나 더 나쁘다(마스코트기록과 같은 판단). 판정은 `lib/녹음복구.복구후보` 하나다. */
+export async function 임시녹음메타쓰기(메타) {
+  if (웹) return;
+  const dir = new FS.Directory(FS.Paths.document, 'recordings');
+  if (!dir.exists) dir.create();
+  const f = new FS.File(dir, '임시녹음.json');
+  f.write(JSON.stringify(메타 || {}));
+}
+
+/** @returns {Promise<object|null>} 없거나 깨졌으면 null (웹은 늘 null) */
+export async function 임시녹음메타읽기() {
+  if (웹) return null;
+  try {
+    const dir = new FS.Directory(FS.Paths.document, 'recordings');
+    const f = new FS.File(dir, '임시녹음.json');
+    if (!f.exists) return null;
+    const 값 = JSON.parse(f.textSync());
+    return 값 && typeof 값 === 'object' && !Array.isArray(값) ? 값 : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function 임시녹음메타지우기() {
+  if (웹) return;
+  try {
+    const dir = new FS.Directory(FS.Paths.document, 'recordings');
+    const f = new FS.File(dir, '임시녹음.json');
+    if (f.exists) f.delete();
+  } catch {
+    /* 못 지워도 다음 마운트의 복구후보 판정이 로그(이미 냈다)로 거른다 — 화면을 안 죽인다 */
+  }
+}
+
+/**
+ * 저장된 녹음 파일의 바이트 — 복구된 시도의 「내 목소리 듣기」·재제출 재료(G2-2).
+ * @param {string} 경로 음성쓰기가 돌려준 uri
+ * @returns {Promise<Uint8Array|null>} 웹·빈 경로는 null. 없는 파일은 던진다(호출부가 접는다).
+ */
+export async function 음성바이트읽기(경로) {
+  if (웹 || !경로) return null;
+  return new FS.File(경로).bytes();
 }
 
 /**
@@ -278,6 +362,12 @@ export async function 기기비우기() {
   /* 마스코트 발화 기록도 귀속이다 — 남기면 다음 사람이 첫 안내(T10)를 영영 못 받는다.
    * 서버로 나가는 것이 없어 소실 축은 없다(위 머리말 「큐가 아니다」). */
   await 마스코트기록쓰기({});
+  /* 화면 설정도 사람 귀속이다 — 남기면 기기를 같이 쓰는 다음 사람이 앞사람의 접힘 취향을
+   * 물려받는다. 서버로 나가는 것이 없어 소실 축은 없다(위 머리말 「큐가 아니다」). */
+  await 화면설정쓰기({});
+  /* 임시 녹음 메타도 귀속이다 — 남기면 다음 학생의 첫 마운트에 앞 학생의 목소리가
+   * 「아까 담은 녹음」으로 뜰 수 있다(같은 날 로그아웃·재로그인 자리). 서버 소실 축은 없다. */
+  await 임시녹음메타지우기();
   await 세션지우기();
   /* 🔴 **키체인만 지우면 절반이다** — 만료 갱신이 세션을 메모리에도 쥐고 있고(`인증API`),
    *   안 비우면 다음 학생의 첫 401 이 **앞 학생의 refresh_token 으로** 되살아난다. 그 뒤 발화는

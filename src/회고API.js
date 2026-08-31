@@ -25,6 +25,7 @@
  *   · 회고 화면에서 8축을 실시간 조회하기 — 창이 밀려 판정이 근거를 잃는다(설계 §4).
  */
 import { 부르기 } from './사건통로.js';
+import { uuid꼴인가 } from '../lib/학생계정.js';
 
 /**
  * `GET /v1/teach/retro/open` — 회고 한 벌을 연다(그리고 **그 순간 근거를 굳힌다**).
@@ -40,10 +41,10 @@ import { 부르기 } from './사건통로.js';
  * @returns {Promise<{학생id: string, 학생번호: string|null, 이름: string|null, 시즌: object,
  *   나침반: object, 굳힌것: object, 자기판정: string|null, 판정: string|null, 사유: string|null,
  *   판정갈래: {코드: string, 라벨: string, 라벨_학생: string, 라벨_mn: string|null}[],
- *   사유상한: number}>}
+ *   사유상한: number|null}>}
  */
 export async function 열기(토큰, 학생번호) {
-  const 칸 = /^[0-9a-f-]{36}$/i.test(String(학생번호).trim()) ? 'learner_id' : 'student_code';
+  const 칸 = uuid꼴인가(학생번호) ? 'learner_id' : 'student_code';
   const 본문 = await 부르기(`teach/retro/open?${칸}=${encodeURIComponent(String(학생번호).trim())}`, 토큰);
   return {
     학생id: 본문.learner_id ?? '',
@@ -56,7 +57,7 @@ export async function 열기(토큰, 학생번호) {
     판정: 본문.verdict ?? null,
     사유: 본문.note ?? null,
     판정갈래: Array.isArray(본문.verdict_options) ? 본문.verdict_options : [],
-    사유상한: Number(본문.note_max) || 200,
+    사유상한: Number(본문.note_max) > 0 ? Number(본문.note_max) : null,
   };
 }
 

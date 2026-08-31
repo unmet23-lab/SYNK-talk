@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { 색, 폰트, 모노트래킹 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어폰트, 판눈금 } from './테마';
 import {
   사과전략, 오늘추천, 보기세우기, 전략선택사건, 메일제출사건, 이탈사건, 이탈닻,
 } from '../lib/게임제출.js';
 import { 판정, 같은판정 } from '../lib/멘탈게이지.js';
 import { use줄임 } from '../lib/모션.js';
 import { 계측시작, 타건, 계측payload } from '../lib/작성과정.js';
+import { 경과시계 } from '../lib/경과시계.js';
 /* 잰 것을 **그 자리에서** 학생에게 돌려준다(철학 Ⅱ-8 셋째 실물). 판정·문구는 전부 저 조립기가
  * 지고 여기는 그릴 자리만 준다 — 화면이 문구를 손으로 적으면 「비교하지 않는다」가 화면마다
  * 다시 지켜져야 하고, 한 화면이 잊으면 그 자리에서만 조용히 깨진다. */
@@ -22,7 +23,10 @@ import { 몽골날짜 } from '../lib/오늘과제.js';
 import { 게임큐읽기, 게임사건담기, 게임큐밀기, 게임이탈수거 } from './게임큐.js';
 /* 소리는 전역 게이트 한 문으로만 — expo-audio 를 직접 잡으면 「녹음 중 0」 규칙(게임층 §3-1)이
  * 프로즈로 돌아간다. 이 화면의 소리는 발송 성취음 1회뿐이다(실패음 없음 — 킷 규칙 ②). */
-import { 효과음 } from './소리.js';
+import { 효과음, bgm재생, bgm정지 } from './소리.js';
+/* 판 종료 문장부호(D5-3) — 윗줄은 회귀(tests/감사회귀_R2B2 D5-4)가 원문으로 못박아 따로 들인다. */
+import { 도장햅틱 } from './소리.js';
+import { 관측보고 } from './관측';
 
 /* NPC 교수님 — 상대역. 이 모듈의 NPC 는 «상태 전이 자리»(판 시작·완료)에서만
  * 바뀐다(게임층 설계 §4 규격 3) — 입력 중 움직이는 장치는 동시에 하나여야 하고, 그 하나는
@@ -65,13 +69,11 @@ import { 전이상태 } from '../lib/NPC연출.js';
  * ■ 신호 1점 = **보내기 버튼**(코랄 면 · `테마.신호자리.교수멘탈`) — 말하기의 녹음 버튼과 같은 규칙.
  */
 
-/* 경과 시계 — `src/말하기화면.js` 와 같은 판정(벽시계 금지 · 없으면 null = 「안 쟀다」).
- * ⚠ 두 번째 사본이다 — 세 번째가 생기는 날 공용 통로로 뗀다(CLAUDE.md 신뢰성 규칙). */
-const 경과시계 = () =>
-  (typeof performance !== 'undefined' && performance && typeof performance.now === 'function'
-    ? performance.now() : null);
-
 export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null, 시작단계 = '전략', 확인 = null, 확인뒤 = null }) {
+  /* BGM — 판이 사는 동안 밑에 깔린다(인자 없이 = 유호 선정 측정 트랙 · 소리.js 머리말 계약).
+     녹음 게이트가 음소거·복원을 진다(소리게이트 'bgm시작'). */
+  useEffect(() => { bgm재생(); return () => bgm정지(); }, []);
+
   /* 표시 순서를 마운트 때 한 번 확정한다(`말하기화면` 녹음카드와 같은 규칙) — 매 렌더 섞으면
    * 행에 적힌 자리와 학생이 본 자리가 갈리고, 그 갈림은 증상이 없다. 추천은 시드에서 결정적. */
   const [보기] = useState(() => (재료 ? 보기세우기(사과전략.보기들, 오늘추천(재료.prompt_seed)) : null));
@@ -152,7 +154,7 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
     if (몽골날짜() === 시작날짜.current) return;
     const 사건 = 이탈사건(재료, { correlation_id: 앉음, idempotency_key: 흐름id() });
     if (!사건) return;
-    게임사건담기(사건).catch(() => { /* 기록 실패 — 관측을 지어내지 않는다 */ });
+    게임사건담기(사건).catch((e) => 관측보고(e, { spot: 'game_enqueue', game: 'G1' }));
     // 전송은 다음 마운트(말하기·게임 어느 쪽이든)의 밀기가 진다
   }, []);
 
@@ -171,7 +173,7 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
       const { 로그: 더한, 새것 } = await 게임사건담기(사건, 이탈닻(재료));
       set로그(더한);
       if (새것) 게임큐밀기(토큰, null).then(set로그, () => {}); // 기다리지 않는다 — 저장은 끝났다
-    } catch { /* 담기 실패 — 화면 흐름은 그대로 간다(고름은 우리가 잰 것이다) */ }
+    } catch (e) { 관측보고(e, { spot: 'game_enqueue', game: 'G1' }); /* 담기 실패 — 화면 흐름은 그대로 간다(고름은 우리가 잰 것이다) */ }
   };
 
   const 입력됨 = (글) => {
@@ -221,6 +223,7 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
     /* 발송 성취음 1회(게임층 §3-1 — achieve 자리 「G1 발송」). 게이트 거부·자산 없음은
      * 조용히 무음이다 — 소리가 흐름을 막지 않는다. 다시 열어 대기로 점프한 날은 안 난다. */
     try { 효과음('achieve'); } catch { /* 무음 — 실패음도 오류도 내지 않는다 */ }
+    try { 도장햅틱(); } catch { /* 무음 */ }
     게임큐밀기(토큰, null).then(set로그, () => {}); // 화면은 안 기다린다 — 도착은 대기 카드가 말한다
   };
 
@@ -260,7 +263,7 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
       const { 로그: 더한, 새것 } = await 게임사건담기(사건, null);
       set로그(더한);
       if (새것) 게임큐밀기(토큰, null).then(set로그, () => {});
-    } catch { /* 담기 실패 — 반응은 이미 섰고, 다음 노출은 서버 행 기준이라 거짓 하루1회가 안 생긴다 */ }
+    } catch (e) { 관측보고(e, { spot: 'game_enqueue', game: 'G1' }); /* 담기 실패 — 반응은 이미 섰고, 다음 노출은 서버 행 기준이라 거짓 하루1회가 안 생긴다 */ }
     if (확인뒤) 확인뒤();
   };
 
@@ -401,7 +404,9 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
               </View>
             </View>
           ) : null}
-          {확인답 ? <Text style={s.관찰}>{(반응안내(확인답) || []).join(' ')}</Text> : null}
+          {확인답 ? (반응안내(확인답) || []).map((줄, i) => (
+            <Text key={i} style={i === 0 ? s.관찰 : s.관찰_병기}>{줄}</Text>
+          )) : null}
           {/* 산출물 렌더 — 「보냈다」의 기록이지 「맞았다」의 전시가 아니다(게임층 §2 한 수 더). */}
           {보낸메일 ? (
             <View style={s.카드}>
@@ -451,7 +456,7 @@ const s = StyleSheet.create({
   오류: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크, lineHeight: 19 },
   메모: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조, lineHeight: 18 },
 
-  카드: { backgroundColor: 색.바탕띄움, borderRadius: 20, padding: 22, gap: 16 },
+  카드: { backgroundColor: 색.바탕띄움, borderRadius: 판눈금.반경, padding: 판눈금.여백, gap: 16 },
   카드라벨: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_태그 },
   상황글: { fontFamily: 폰트.헤드, fontSize: 21, lineHeight: 32, color: 색.잉크 },
   본문글: { fontFamily: 폰트.본문, fontSize: 15, lineHeight: 24, color: 색.잉크_서브 },
@@ -489,6 +494,8 @@ const s = StyleSheet.create({
   /* 관찰 한 줄 — 카드 밖 · 신호(코랄) 없음. 이 화면의 코랄은 게이지 자리라 여기 쓰면 그 뜻이
    * 흐려지고, 관찰이 «성적»으로 읽힌다. 위계는 색이 아니라 밀도로 준다(`어제의나` 와 같은 규칙). */
   관찰: { fontFamily: 폰트.캡션, fontSize: 14, lineHeight: 22, color: 색.잉크_보조, paddingHorizontal: 4 },
+  /* 몽골어 병기 줄 — 키릴은 몽골어폰트만(막힘카드 병기 눈금: 폰트짝 유지 · 크기·색 한 단 아래). */
+  관찰_병기: { fontFamily: 몽골어폰트.캡션, fontSize: 13, lineHeight: 21, color: 색.잉크_메타, paddingHorizontal: 4 },
   편지글: { fontFamily: 폰트.본문, fontSize: 16, lineHeight: 27, color: 색.잉크 },
   /* Ⅲ⑥ 확인 단추 — 신호색 0(확신 토글과 같은 결) · 두 단추는 같은 무게다(어느 답도 밀지 않는다). */
   확인줄: { flexDirection: 'row', gap: 8 },

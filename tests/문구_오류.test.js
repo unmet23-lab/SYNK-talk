@@ -12,7 +12,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 const { 코드만, 파일소스 } = require('./lib/소스검사.js');
-const { 문구, 코드별, 말, 코드로말, 아는코드 } = require('../contents/문구_오류.js');
+const { 문구, 코드별, 말, 줄들, 코드로말, 아는코드 } = require('../contents/문구_오류.js');
 const { 문구_1차 } = require('../contents/문구_1차.js');
 
 const 목록err = 문구_1차.filter((e) => e.string_id.startsWith('err.'));
@@ -51,6 +51,15 @@ test('④ 몽골어가 비면 한 줄만 낸다 — 빈 줄은 화면에서 버�
   const 짝 = { ko: '가', mn: 'Сайн' };
   const 두줄 = [짝.ko, 짝.mn].filter(Boolean).join('\n');
   assert.equal(두줄.split('\n').length, 2);
+});
+
+test('④-병기 `줄들` — mn 채운 짝은 두 줄, 빈 mn 은 한 줄(화면 줄배열 병기의 가르는 자)', () => {
+  /* 화면(인증·말하기·답장)이 이 함수로 갈라 그리므로, 여기가 갈라지면 병기 렌더가 통째로 갈린다. */
+  const 두줄짝 = [{ ko: '가', mn: 'Сайн' }.ko, { ko: '가', mn: 'Сайн' }.mn].filter(Boolean).join('\n');
+  assert.deepEqual(줄들(두줄짝), ['가', 'Сайн'], 'mn 채운 짝이 두 줄로 안 갈라진다');
+  assert.deepEqual(줄들(말('err.network')), ['인터넷 연결을 확인해 주세요'], '빈 mn 인데 한 줄이 아니다');
+  assert.deepEqual(줄들(''), [], '빈 글에서 빈 줄을 지어냈다');
+  assert.deepEqual(줄들(null), [], 'null 에서 던지거나 줄을 지어냈다');
 });
 
 test('⑤ `{n}` 은 채워지고, 안 채우면 그대로 남는다', () => {

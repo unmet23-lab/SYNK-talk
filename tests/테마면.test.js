@@ -28,6 +28,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const path = require('node:path');
+const { 코드만, 파일소스 } = require('./lib/소스검사.js');
 const { 킷색 } = require('../tools/테마색.js');
 
 /* ── 색 계산 (WCAG 2.x 상대휘도 · CIE L*) ── */
@@ -127,4 +129,23 @@ test('픽스처: Deep Wool 카드는 «잡힌다» — Stone·Coral 이 그 면�
 test('픽스처: 08-20 에 기각된 면 2단(Graphite 2 = 8.26)이 문턱에 걸린다', () => {
   const 들림 = Math.abs(Lstar('#1D1D1C') - Lstar('#08090C')); // 옛 무채 카드 — 「안 떠 있다」로 기각된 실측
   assert.ok(들림 < 10.0, `기각된 값이 문턱을 넘어 버렸다 — ΔL* ${들림.toFixed(2)}`);
+});
+
+/* ── D6-15 — OS 글자 확대 캡 ─────────────────────────────────────────────────
+ * 상한 «값»은 테마가 한 곳에 쥐고(글자배율상한), 고정 치수 상자를 가진 화면이 자리별
+ * maxFontSizeMultiplier prop 으로 쓴다 — RN 0.86+React 19 는 Text.defaultProps 를 소비하지
+ * 않아 전역 한 줄이 불가(08-31 실측). 본문(자유 배율)은 일부러 안 캡한다. */
+test('글자배율상한 — 값은 테마 한 곳, 고정 치수 네 화면이 자리별 prop 으로 쓴다', () => {
+  const 테마 = 코드만(파일소스(path.join(__dirname, '..', 'src', '테마.js')));
+  assert.match(테마, /export const 글자배율상한 = 1\.2;/, '테마.js 가 글자배율상한을 안 내보낸다');
+  const 소스들 = [
+    ['src/답장화면.js', 코드만(파일소스(path.join(__dirname, '..', 'src', '답장화면.js')))],
+    ['src/인증화면.js', 코드만(파일소스(path.join(__dirname, '..', 'src', '인증화면.js')))],
+    ['src/원장초기화.js', 코드만(파일소스(path.join(__dirname, '..', 'src', '원장초기화.js')))],
+    ['src/어제의나.js', 코드만(파일소스(path.join(__dirname, '..', 'src', '어제의나.js')))],
+  ];
+  for (const [f, 소스] of 소스들) {
+    assert.ok(/maxFontSizeMultiplier=\{글자배율상한\}/.test(소스),
+      `${f} 에 maxFontSizeMultiplier={글자배율상한} 자리가 없다 — 고정 치수 상자 글자가 OS 확대에 넘친다`);
+  }
 });

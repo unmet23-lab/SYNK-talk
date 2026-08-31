@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { 색, 폰트, 모노트래킹 } from './테마';
+import { 색, 폰트, 모노트래킹, 글자배율상한, 눌림층 } from './테마';
 import { 학생번호맞나 } from '../lib/학생계정.js';
 import * as API from './인증API';
 
@@ -85,7 +85,7 @@ export default function 원장초기화({ 토큰, 닫기 }) {
         disabled={!쓸수있나}
         style={({ pressed }) => [s.버튼, !쓸수있나 && s.버튼_잠김, pressed && s.버튼_눌림]}
       >
-        <Text style={s.버튼글}>{도는중 ? '만드는 중' : '임시번호 만들기'}</Text>
+        <Text style={s.버튼글} maxFontSizeMultiplier={글자배율상한}>{도는중 ? '만드는 중' : '임시번호 만들기'}</Text>
       </Pressable>
 
       {확인 && !결과 && (
@@ -101,7 +101,7 @@ export default function 원장초기화({ 토큰, 닫기 }) {
             disabled={도는중}
             style={({ pressed }) => [s.버튼, 도는중 && s.버튼_잠김, pressed && s.버튼_눌림]}
           >
-            <Text style={s.버튼글}>{도는중 ? '초기화하는 중' : '초기화하기'}</Text>
+            <Text style={s.버튼글} maxFontSizeMultiplier={글자배율상한}>{도는중 ? '초기화하는 중' : '초기화하기'}</Text>
           </Pressable>
         </View>
       )}
@@ -161,8 +161,8 @@ const s = StyleSheet.create({
     backgroundColor: 색.잉크, borderRadius: 14, height: 52,
     alignItems: 'center', justifyContent: 'center',
   },
-  버튼_잠김: { opacity: 0.35 },
-  버튼_눌림: { opacity: 0.82 },
+  버튼_잠김: { opacity: 눌림층.잠김 },
+  버튼_눌림: { opacity: 눌림층.버튼 },
   버튼글: { fontFamily: 폰트.강조, fontSize: 16, color: 색.바탕 },
 
   결과: { backgroundColor: 색.바탕띄움, borderRadius: 16, padding: 20, gap: 10, marginTop: 4 },

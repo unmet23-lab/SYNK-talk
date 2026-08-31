@@ -234,7 +234,7 @@ export default function 반피드백화면({ 토큰, 돌아가기 }) {
             onPress={보내기}
             disabled={!글.trim() || !처분 || 도는중}
             style={({ pressed }) => [
-              s.저장, (!글.trim() || !처분 || 도는중) && s.잠김, pressed && s.눌림,
+              s.저장, (!글.trim() || !처분) && s.잠김, pressed && s.눌림,
             ]}
           >
             <Text style={s.저장글}>{도는중 ? '남기는 중…' : '남기기'}</Text>
@@ -351,6 +351,14 @@ export default function 반피드백화면({ 토큰, 돌아가기 }) {
 
       {오류 && <Text style={오류.운영 ? s.안내글 : s.오류글}>{오류.말}</Text>}
 
+      {/* 첫 조회가 죽은 날의 손잡이 — 재시도는 사람 손이라 「조회 1회 = 감사 1행」의 분모를
+          안 흐린다(감사 D7-9). 목록이 이미 있으면(반 안에서 난 오류) 이 줄은 안 선다. */}
+      {오류 && !목록 ? (
+        <Pressable onPress={첫조회} style={({ pressed }) => [s.줄버튼, pressed && s.눌림]}>
+          <Text style={s.줄버튼글}>다시 불러오기</Text>
+        </Pressable>
+      ) : null}
+
       <Pressable onPress={돌아가기} style={s.back} hitSlop={8}>
         <Text style={s.backText}>← 돌아가기</Text>
       </Pressable>
@@ -440,14 +448,17 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   저장글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.바탕 },
+  /* 잠김 = 미충족 전용. 진행 중(…는 중)은 disabled 만 걸고 면은 산 채로 둔다 —
+     잠김꼴 위 글자는 2.3:1 이라 진행 문구가 안 읽힌다(감사 D6-3). */
   잠김: { backgroundColor: 색.잉크_희미 },
   눌림: { opacity: 0.65 },
 
   /* 운영 안내와 오류를 **밝기**로 가른다 — 「남이 이미 썼다」를 오류색으로 그리면 강사는 앱을
      의심하고, 그러면 그날의 피드백이 통째로 밀린다(밀린 피드백 = 한 마디 0).
      🚫 코랄을 쓰지 않는다: 이 화면의 신호 1점은 **남기기 버튼**이다(`테마.신호자리`). */
-  안내글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_서브 },
-  오류글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_메타 },
+  안내글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_메타 },
+  /* 실패 ≥ 잉크_서브 · 운영 안내 = 잉크_메타 — 강사화면 자 · 감사 D6-4 */
+  오류글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_서브 },
 
   back: { paddingVertical: 10 },
   backText: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_메타 },

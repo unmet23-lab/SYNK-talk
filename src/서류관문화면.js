@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { 색, 폰트, 모노트래킹 } from './테마';
+import { 색, 폰트, 모노트래킹, 판눈금, 눌림층 } from './테마';
 import { use등장 } from '../lib/모션.js';
 import {
   빈칸제출사건, 모름제출사건, 변환제출사건, 이탈사건, 이탈닻,
@@ -11,12 +11,16 @@ import {
 import { 채점 } from '../lib/서류관문.js';
 import { 다음시도번호, 턴항목 } from '../lib/게임로그.js';
 import { 계측시작, 타건, 계측payload } from '../lib/작성과정.js';
+import { 경과시계 } from '../lib/경과시계.js';
 import { 흐름id, 깨진기록안내 } from '../lib/제출로그.js';
 import { 몽골날짜 } from '../lib/오늘과제.js';
 /* 게임 로그의 읽기·쓰기·전송은 **직렬 통로 하나**로만 간다(B3 · `src/게임큐.js`) — 화면이
  * 저장을 직접 잡으면 동시 쓰기가 파일을 덮어 남의 사건을 지운다(오류 없이 「성공」의 모양). */
 import { 게임큐읽기, 게임사건담기, 게임큐밀기, 게임이탈수거 } from './게임큐.js';
-import { 효과음 } from './소리.js';
+import { 효과음, bgm재생, bgm정지 } from './소리.js';
+/* 판 종료 문장부호(D5-3) — 윗줄은 회귀(tests/감사회귀_R2B2 D5-4)가 원문으로 못박아 따로 들인다. */
+import { 도장햅틱 } from './소리.js';
+import { 관측보고 } from './관측';
 
 /* NPC 심사관 — 상대역. 이 모듈의 NPC 는 «상태 전이 자리»(판 시작·완료)에서만
  * 바뀐다(게임층 설계 §4 규격 3) — 입력 중 움직이는 장치는 동시에 하나여야 하고, 그 하나는
@@ -59,13 +63,6 @@ import { 전이상태 } from '../lib/NPC연출.js';
  * ■ 몽골어 병기 0 — 팩 `검수확정=false` 라 `mn` 이 없다(발주_게임콘텐츠팩 §3). 지어내지 않는다.
  */
 
-/* 경과 시계 — `src/말하기화면.js`·`src/교수멘탈화면.js`·`src/보고서교정화면.js` 와 같은 판정
- * (벽시계 금지 · 없으면 null = 「안 쟀다」). ⚠ 네 번째 사본이다 — 공용 통로로 뗄 자리인데
- * lib 층은 이 커밋 범위 밖이라(화면 트랙) 옮기지 못했다. 뗄 때 네 화면을 한 번에 걷을 것. */
-const 경과시계 = () =>
-  (typeof performance !== 'undefined' && performance && typeof performance.now === 'function'
-    ? performance.now() : null);
-
 /* 이 턴이 빈칸 스테이지인가 — 판정 기준은 스냅샷의 `빈칸` 키 하나다(§6-8 규칙 1: 변환 턴엔
  * 그 키가 없다). 조립기(`빈칸제출사건`·`변환제출사건`)가 교차 호출을 거르는 그 눈과 같은 축. */
 const 빈칸턴인가 = (원소) => !!(원소 && 원소.스냅샷 && '빈칸' in 원소.스냅샷);
@@ -74,6 +71,10 @@ export default function 서류관문화면({
   벌, 토큰, 학생번호 = null, 시작턴 = 0, 시작단계 = '진행', 시작답들 = null,
 }) {
   const 성립 = Array.isArray(벌) && 벌.length > 0;
+
+  /* BGM — 판이 사는 동안 밑에 깔린다(인자 없이 = 유호 선정 측정 트랙 · 소리.js 머리말 계약).
+     녹음 게이트가 음소거·복원을 진다(소리게이트 'bgm시작'). */
+  useEffect(() => { bgm재생(); return () => bgm정지(); }, []);
 
   const [턴, set턴] = useState(시작턴);
   const [단계, set단계] = useState(시작단계); // 진행 | 결과
@@ -182,7 +183,7 @@ export default function 서류관문화면({
     if (몽골날짜() === 시작날짜.current) return;
     const 사건 = 이탈사건(성립 ? 벌[0] : null, { correlation_id: 앉음, idempotency_key: 흐름id() }, s.스테이지);
     if (!사건) return;
-    게임사건담기(사건).catch(() => { /* 기록 실패 — 관측을 지어내지 않는다 */ });
+    게임사건담기(사건).catch((e) => 관측보고(e, { spot: 'game_enqueue', game: 'G4' }));
   }, []);
 
   /* ── 손잡이 ── */
@@ -246,6 +247,7 @@ export default function 서류관문화면({
         /* 관문 완주 성취음 1회 — G1 「발송」·G2 「앉음 완료」와 같은 뜻(보냈다). 정답 신호가
          * 아니고(즉시 표시는 연출) 실패음 짝도 없다(킷 규칙 ②). 되세움 점프에서는 안 난다. */
         try { 효과음('achieve'); } catch { /* 무음 — 소리가 흐름을 막지 않는다 */ }
+        try { 도장햅틱(); } catch { /* 무음 */ }
       } else {
         set턴(다음);
         상태참조.current = { ...상태참조.current, 스테이지: 빈칸턴인가(벌[다음]) ? '빈칸' : '변환' };
@@ -391,7 +393,8 @@ export default function 서류관문화면({
               <Pressable
                 key={값}
                 onPress={() => set확신도(확신도 === 값 ? null : 값)}
-                accessibilityRole="button"
+                accessibilityRole="togglebutton"
+                accessibilityState={{ checked: 확신도 === 값 }}
                 style={({ pressed }) => [s.확신토글, 확신도 === 값 && s.확신토글_켬, pressed && s.눌림]}
               >
                 <Text style={[s.확신글, 확신도 === 값 && s.확신글_켬]}>{라벨}</Text>
@@ -540,7 +543,7 @@ const s = StyleSheet.create({
   오류: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크, lineHeight: 19 },
   메모: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조, lineHeight: 18 },
 
-  카드: { backgroundColor: 색.바탕띄움, borderRadius: 20, padding: 22, gap: 16 },
+  카드: { backgroundColor: 색.바탕띄움, borderRadius: 판눈금.반경, padding: 판눈금.여백, gap: 16 },
   카드라벨: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_태그 },
   본문글: { fontFamily: 폰트.본문, fontSize: 15, lineHeight: 24, color: 색.잉크_서브 },
   지문글: { fontFamily: 폰트.본문, fontSize: 16, lineHeight: 27, color: 색.잉크 },
@@ -564,7 +567,7 @@ const s = StyleSheet.create({
 
   /* 기본 버튼 = Paper 면 + Ink Deep 글자(테마 머리말) — 코랄은 판정 오류 표시 하나뿐이다. */
   제출버튼: { backgroundColor: 색.잉크, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
-  제출_대기: { opacity: 0.35 },
+  제출_대기: { opacity: 눌림층.잠김 },
   제출글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.바탕 },
   모름버튼: {
     borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 14,

@@ -29,7 +29,7 @@ import { 부르기 } from './사건통로.js';
  *   받고 그 자리에서 죽는다. 회귀 = `tests/문구감수화면.test.js` ④ 가 화면이 lib 을 쓰는지 문다. */
 
 /** 한 번에 받아 오는 줄 수. 서버 상한(`쪽상한`)보다 작게 잡는다 — 감수는 한 화면에서 훑는 일이다. */
-export const 기본쪽크기 = 20;
+export const 감수쪽크기 = 20;
 
 /**
  * `GET /v1/l10n/queue` — 감수 대기 문장 한 쪽.
@@ -46,7 +46,7 @@ export const 기본쪽크기 = 20;
  */
 export async function 큐받기(토큰, 옵션 = {}) {
   const 질의 = [];
-  질의.push(`limit=${encodeURIComponent(String(옵션.개수 || 기본쪽크기))}`);
+  질의.push(`limit=${encodeURIComponent(String(옵션.개수 || 감수쪽크기))}`);
   if (옵션.커서) 질의.push(`after=${encodeURIComponent(옵션.커서)}`);
   const 본문 = await 부르기(`l10n/queue?${질의.join('&')}`, 토큰);
   return {

@@ -37,7 +37,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
-import { 색, 폰트, 모노트래킹, 몽골어 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어, 눌림층 } from './테마';
 import * as API from './문구감수API';
 import { VERDICT, 원문결함, 확정요청 } from '../lib/문구감수.js';
 
@@ -255,7 +255,7 @@ function 문장카드({ 줄, 토큰, 끝냈다 }) {
           testID={`확정-${줄.string_id}`}
           onPress={() => 보내기(판정)}
           disabled={도는중 || !적음}
-          style={({ pressed }) => [s.주버튼, (도는중 || !적음) && s.잠김, pressed && { opacity: 0.82 }]}
+          style={({ pressed }) => [s.주버튼, (도는중 || !적음) && s.잠김, pressed && { opacity: 눌림층.버튼 }]}
         >
           {도는중 ? <ActivityIndicator color={색.바탕} /> : <Text style={s.주버튼글}>확정</Text>}
         </Pressable>
@@ -330,7 +330,7 @@ const s = StyleSheet.create({
   주버튼글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.바탕 },
   곁버튼: { paddingVertical: 10 },
   곁버튼글: { fontFamily: 폰트.본문, fontSize: 13, color: 색.잉크_보조 },
-  잠김: { opacity: 0.35 },
+  잠김: { opacity: 눌림층.잠김 },
 
   빈자리: { backgroundColor: 색.바탕띄움, borderRadius: 16, padding: 20, gap: 6 },
   빈글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.잉크 },

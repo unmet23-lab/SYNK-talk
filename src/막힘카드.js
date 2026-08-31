@@ -22,7 +22,7 @@
  *   이 화면의 신호 1점은 **녹음 버튼**이다 — 여기엔 코랄을 쓰지 않는다. 위계는 밀도로 준다.
  */
 import { StyleSheet, Text, View } from 'react-native';
-import { 색, 폰트, 모노트래킹, 몽골어폰트 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어폰트, 판눈금 } from './테마';
 import { 막힘안내 } from '../contents/문구_동의.js';
 import 부품 from './부품.js';
 
@@ -66,7 +66,7 @@ export default function 막힘카드({ 막힘, 학생번호 = null }) {
 }
 
 const s = StyleSheet.create({
-  카드: { backgroundColor: 색.바탕띄움, borderRadius: 20, padding: 22, gap: 14 },
+  카드: { backgroundColor: 색.바탕띄움, borderRadius: 판눈금.반경, padding: 판눈금.여백, gap: 14 },
   /* 그림은 «말 앞»에 서되 주인공은 아니다 — 가운데로 모으고 살짝 낮춘다(0.9). */
   바늘: { alignSelf: 'center', opacity: 0.9, marginBottom: 2 },
   제목: { fontFamily: 폰트.헤드, fontSize: 21, lineHeight: 31, color: 색.잉크 },

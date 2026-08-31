@@ -10,7 +10,7 @@
  * ■ 디자인 — 막힘카드와 같은 밀도·같은 위계(신호 1점 = 녹음 버튼 · 여기엔 코랄 0). `테마.js` R1.
  */
 import { StyleSheet, Text, View } from 'react-native';
-import { 색, 폰트, 모노트래킹, 몽골어폰트 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어폰트, 판눈금 } from './테마';
 import { 생성안내 } from '../contents/문구_생성.js';
 
 /**
@@ -47,7 +47,7 @@ export default function 생성카드({ 상태, 학생번호 = null, 이름 = nul
 }
 
 const s = StyleSheet.create({
-  카드: { backgroundColor: 색.바탕띄움, borderRadius: 20, padding: 22, gap: 14 },
+  카드: { backgroundColor: 색.바탕띄움, borderRadius: 판눈금.반경, padding: 판눈금.여백, gap: 14 },
   제목: { fontFamily: 폰트.헤드, fontSize: 21, lineHeight: 31, color: 색.잉크 },
   본문: { fontFamily: 폰트.본문, fontSize: 16, lineHeight: 26, color: 색.잉크_서브 },
   /* 🔴 **몽골어 줄이다** — 킷 한글 폰트(SUIT)를 박으면 키릴 자형이 없어 두부(□□□)가 된다.

@@ -187,7 +187,7 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
           <Pressable
             onPress={열기누름}
             disabled={도는중}
-            style={({ pressed }) => [s.저장, 도는중 && s.잠김, pressed && s.눌림]}
+            style={({ pressed }) => [s.저장, pressed && s.눌림]}
           >
             <Text style={s.저장글}>{여는중 ? '여는 중…' : '열기'}</Text>
           </Pressable>
@@ -279,6 +279,8 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
                 key={o.코드}
                 onPress={() => set자기고름(o.코드)}
                 disabled={자기저장됨 != null || 건너뜀}
+                accessibilityRole="button"
+                accessibilityState={{ selected: 자기고름 === o.코드, disabled: 자기저장됨 != null || 건너뜀 }}
                 style={({ pressed }) => [
                   s.판정칩, s.판정칩_학생, 자기고름 === o.코드 && s.판정칩_고름,
                   (자기저장됨 != null || 건너뜀) && s.칩잠김, pressed && s.눌림,
@@ -300,7 +302,7 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
               <Pressable
                 onPress={자기제출}
                 disabled={!자기고름 || 도는중}
-                style={({ pressed }) => [s.저장, (!자기고름 || 도는중) && s.잠김, pressed && s.눌림]}
+                style={({ pressed }) => [s.저장, !자기고름 && s.잠김, pressed && s.눌림]}
               >
                 <Text style={s.저장글}>{도는중 ? '적는 중…' : '학생 답 적기'}</Text>
               </Pressable>
@@ -327,6 +329,8 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
               <Pressable
                 key={o.코드}
                 onPress={() => set강사고름(o.코드)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: 강사고름 === o.코드 }}
                 style={({ pressed }) => [s.판정칩, 강사고름 === o.코드 && s.판정칩_고름, pressed && s.눌림]}
               >
                 <Text style={[
@@ -341,15 +345,18 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
           <TextInput
             style={s.입력}
             value={사유}
-            onChangeText={(t) => set사유(t.slice(0, 세션?.사유상한 ?? 200))}
+            onChangeText={(t) => set사유(세션?.사유상한 ? t.slice(0, 세션.사유상한) : t)}
             placeholder="왜 그렇게 봤는지 한 줄"
             placeholderTextColor={색.잉크_메타}
           />
+          {세션?.사유상한 == null && (
+            <Text style={s.안내글}>사유 글자수 규칙을 서버가 안 보냈어요 — 잠시 뒤 다시 열어 주세요</Text>
+          )}
           <Pressable
             onPress={확정누름}
-            disabled={!강사고름 || !사유.trim() || 도는중}
+            disabled={!강사고름 || !사유.trim() || 도는중 || 세션?.사유상한 == null}
             style={({ pressed }) => [
-              s.저장, (!강사고름 || !사유.trim() || 도는중) && s.잠김, pressed && s.눌림,
+              s.저장, (!강사고름 || !사유.trim() || 세션?.사유상한 == null) && s.잠김, pressed && s.눌림,
             ]}
           >
             <Text style={s.저장글}>{도는중 ? '확정하는 중…' : '확정'}</Text>
@@ -444,8 +451,9 @@ const s = StyleSheet.create({
   판정칩글_학생: { fontSize: 16, lineHeight: 24 },
   칩잠김: { opacity: 0.55 },
 
-  안내글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_서브 },
-  오류글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_메타 },
+  안내글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_메타 },
+  /* 실패 ≥ 잉크_서브 · 운영 안내 = 잉크_메타 — 강사화면 자 · 감사 D6-4 */
+  오류글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_서브 },
   보조글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_메타 },
 
   /* 이 화면의 신호 1점 = 진행 버튼(`테마.신호자리` 규칙). 잠기면 색을 빼고 밝기로 낮춘다. */
@@ -453,6 +461,8 @@ const s = StyleSheet.create({
     backgroundColor: 색.신호, borderRadius: 14, paddingVertical: 14, alignItems: 'center',
   },
   저장글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.바탕 },
+  /* 잠김 = 미충족 전용. 진행 중(…는 중)은 disabled 만 걸고 면은 산 채로 둔다 —
+     잠김꼴 위 글자는 2.3:1 이라 진행 문구가 안 읽힌다(감사 D6-3). */
   잠김: { backgroundColor: 색.잉크_희미 },
   눌림: { opacity: 0.7 },
 

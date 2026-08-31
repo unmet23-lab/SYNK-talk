@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { 색, 폰트, 모노트래킹 } from './테마';
+import { 색, 폰트, 모노트래킹, 판눈금 } from './테마';
 import { 짚음제출사건, 무산출사건, 이탈사건 } from '../lib/보고서교정제출.js';
 import { 교정문만들기 } from '../lib/보고서교정.js';
 import { 다음시도번호, 턴항목 } from '../lib/게임로그.js';
 import { 흐름id, 깨진기록안내 } from '../lib/제출로그.js';
+import { 경과시계 } from '../lib/경과시계.js';
 import { 몽골날짜 } from '../lib/오늘과제.js';
 import { use줄임 } from '../lib/모션.js';
 /* 게임 로그의 읽기·쓰기·전송은 **직렬 통로 하나**로만 간다(B3 · `src/게임큐.js`) — 화면이
  * 저장을 직접 잡으면 동시 쓰기가 파일을 덮어 남의 사건을 지운다(오류 없이 「성공」의 모양). */
 import { 게임큐읽기, 게임사건담기, 게임큐밀기, 게임이탈수거 } from './게임큐.js';
-import { 효과음 } from './소리.js';
+import { 효과음, bgm재생, bgm정지 } from './소리.js';
+/* 판 종료 문장부호(D5-3) — 윗줄은 회귀(tests/감사회귀_R2B2 D5-4)가 원문으로 못박아 따로 들인다. */
+import { 도장햅틱 } from './소리.js';
+import { 관측보고 } from './관측';
 
 /* NPC 팀장님 — 상대역. 이 모듈의 NPC 는 «상태 전이 자리»(판 시작·완료)에서만
  * 바뀐다(게임층 설계 §4 규격 3) — 입력 중 움직이는 장치는 동시에 하나여야 하고, 그 하나는
@@ -60,17 +64,14 @@ import { 전이상태 } from '../lib/NPC연출.js';
  * ■ 몽골어 병기 0 — 팩 `검수확정=false` 라 `mn` 이 없다(발주_게임콘텐츠팩 §3). 지어내지 않는다.
  */
 
-/* 경과 시계 — `src/말하기화면.js`·`src/교수멘탈화면.js` 와 같은 판정(벽시계 금지 · 없으면 null
- * = 「안 쟀다」). ⚠ 세 번째 사본이라 공용 통로로 뗄 자리다(CLAUDE.md 신뢰성 규칙 — 이 커밋은
- * 화면 트랙이라 여기서 옮기면 세 화면을 한꺼번에 건드리게 된다). */
-const 경과시계 = () =>
-  (typeof performance !== 'undefined' && performance && typeof performance.now === 'function'
-    ? performance.now() : null);
-
 export default function 보고서교정화면({
   벌, 토큰, 학생번호 = null, 시작턴 = 0, 시작단계 = '짚기', 시작짚은것 = null,
 }) {
   const 성립 = Array.isArray(벌) && 벌.length > 0;
+
+  /* BGM — 판이 사는 동안 밑에 깔린다(인자 없이 = 유호 선정 측정 트랙 · 소리.js 머리말 계약).
+     녹음 게이트가 음소거·복원을 진다(소리게이트 'bgm시작'). */
+  useEffect(() => { bgm재생(); return () => bgm정지(); }, []);
 
   const [턴, set턴] = useState(시작턴);
   const [단계, set단계] = useState(시작단계); // 짚기 | 고침 | 대기
@@ -156,7 +157,7 @@ export default function 보고서교정화면({
     if (몽골날짜() === 시작날짜.current) return;
     const 사건 = 이탈사건(벌 && 벌[0], { correlation_id: 앉음, idempotency_key: 흐름id() });
     if (!사건) return;
-    게임사건담기(사건).catch(() => { /* 기록 실패 — 관측을 지어내지 않는다 */ });
+    게임사건담기(사건).catch((e) => 관측보고(e, { spot: 'game_enqueue', game: 'G2' }));
   }, []);
 
   /** 그 턴을 닫고 다음으로 — 마지막 턴이면 대기 카드로. */
@@ -172,6 +173,7 @@ export default function 보고서교정화면({
       /* 발송 성취음 1회 — G1 「발송」과 **같은 뜻**이다(보냈다). 🚫 정답 신호가 아니다: 이
        * 기기엔 정답이 없다. 킷 규칙 ② 실패음 없음이라 짝이 되는 소리도 없다. */
       try { 효과음('achieve'); } catch { /* 무음 — 소리가 흐름을 막지 않는다 */ }
+      try { 도장햅틱(); } catch { /* 무음 */ }
       return;
     }
     상태참조.current = { 단계: '짚기', 글: '', 냈나: false };
@@ -339,7 +341,8 @@ export default function 보고서교정화면({
                   <Pressable
                     key={값}
                     onPress={() => set확신도(확신도 === 값 ? null : 값)}
-                    accessibilityRole="button"
+                    accessibilityRole="togglebutton"
+                    accessibilityState={{ checked: 확신도 === 값 }}
                     style={({ pressed }) => [s.확신토글, 확신도 === 값 && s.확신토글_켬, pressed && s.눌림]}
                   >
                     <Text style={[s.확신글, 확신도 === 값 && s.확신글_켬]}>{라벨}</Text>
@@ -433,7 +436,7 @@ const s = StyleSheet.create({
   오류: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크, lineHeight: 19 },
   메모: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조, lineHeight: 18 },
 
-  카드: { backgroundColor: 색.바탕띄움, borderRadius: 20, padding: 22, gap: 16 },
+  카드: { backgroundColor: 색.바탕띄움, borderRadius: 판눈금.반경, padding: 판눈금.여백, gap: 16 },
   카드라벨: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_태그 },
   본문글: { fontFamily: 폰트.본문, fontSize: 15, lineHeight: 24, color: 색.잉크_서브 },
 

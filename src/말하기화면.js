@@ -3,6 +3,7 @@ import {
   Animated,
   AppState,
   Easing,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -23,18 +24,18 @@ import {
  *     `package.json main` 이 가리키는 `build/` 다. 판이 올라 배럴이 고쳐지면 되돌린다. */
 import { useAudioStream } from 'expo-audio/build/AudioStream';
 import * as Speech from 'expo-speech';
-import { 색, 폰트, 모노트래킹 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어폰트, 판눈금 } from './테마';
 import 녹음띠 from './녹음띠.js';
 import { 상단밀림 } from './인셋';
 import { 머뭇거림추적, 발화문턱_DB, 데시벨, 다음호흡 } from '../lib/세호흡.js';
 import { wav조립 } from '../lib/wav조립.js';
 import { 정본 as 음성정본 } from '../lib/음성헤더.js';
 import { 마이크준비, 마이크끄기 } from '../lib/마이크권한.js';
-import { 흐름id, 항목추가, 다음시도번호, 학습출석, 전송기록, 보낼것, 되듣기기록, 되듣기보낼것, 선택기록, 선택보낼것, 배달상태, 깨진기록안내 } from '../lib/제출로그.js';
+import { 흐름id, 항목추가, 다음시도번호, 학습출석, 전송기록, 보낼것, 되듣기기록, 되듣기보낼것, 선택기록, 선택보낼것, 배달상태, 압축, 깨진기록안내 } from '../lib/제출로그.js';
 /* 문구는 「어제의 나」 화면과 **같은 함수**에서 나온다 — 두 곳에 적으면 한쪽만 고쳐지고,
    갈라진 날 학생은 같은 사실을 두 문장으로 듣는다(`lib/견줌.js`). */
 import { 늘어난말 } from '../lib/견줌.js';
-import { use등장 } from '../lib/모션.js';
+import { use등장, use줄임 } from '../lib/모션.js';
 import { 화면과제, 몽골날짜, 복귀행동, 열람사건, 되듣기사건, 선택사건 } from '../lib/오늘과제.js';
 import { 오늘의낭독, 낭독걸음 } from '../lib/라디오낭독.js';
 /* ②따라를 문장 단위로 가르는 어댑터(유호 확정 08-23) — 자르기는 `문장끊기`, 걸음 이름은 `걸음`.
@@ -42,6 +43,9 @@ import { 오늘의낭독, 낭독걸음 } from '../lib/라디오낭독.js';
 import { 문장들 } from '../lib/문장끊기.js';
 /* 병기 글의 작성 과정 — G1·G4 와 **같은 조립기**(통로마다 다르게 재면 한 축으로 안 선다). */
 import { 계측시작, 타건, 계측payload } from '../lib/작성과정.js';
+/* 경과 시계 = 단조 시계(performance.now · 없으면 null) — 정본은 lib/경과시계.js 하나다(사본 넷을 걷었다).
+ * 🔴 latency 를 Date.now() 로 되재지 않는다 — 근거·회귀는 그 파일 머리말과 tests/경과시계.test.js. */
+import { 경과시계 } from '../lib/경과시계.js';
 import { 따라걸음, 따라차례 } from '../lib/걸음.js';
 /* 「골라서 답하기」의 조립기 — 자리를 섞는 것과 택1 판정이 여기 한 곳에 산다(`lib/선택로그.js`).
    화면은 **그 결과가 준 순서대로 그리기만** 한다: 안 그러면 행에 적힌 자리와 학생이 실제로 본
@@ -50,7 +54,16 @@ import { 보기세우기, 선택payload } from '../lib/선택로그.js';
 import { 사건보내기 } from './사건통로.js';
 /* AI 네 낱말 한 줄 — 문장은 저기(카피 확정 08-24 · 문구_생성.js와 같은 층), 여기는 배치만. */
 import { AI한줄 } from '../contents/문구_AI네낱말.js';
-import { 로그읽기, 로그쓰기, 음성쓰기, 지속저장 } from './저장.js';
+import {
+  로그읽기, 로그쓰기, 음성쓰기, 지속저장, 교정로그읽기, 교정로그쓰기,
+  임시녹음메타쓰기, 임시녹음메타읽기, 임시녹음메타지우기, 음성바이트읽기,
+} from './저장.js';
+/* 교정 큐의 상시 배출구(D7-2) — 항목의 `사건` 을 그대로 보내는 통로는 답장화면과 같은 것 하나다. */
+import { 교정사건보내기 } from './교정API.js';
+/* 복구 판정은 순수 함수 하나(G2-2) — 화면 안에 조건을 적으면 회귀가 그 갈래를 못 만든다. */
+import { 복구후보 } from '../lib/녹음복구.js';
+/* 복구 카드 문구 — 정본은 오류 문구 표다(번역이 착지할 자리 · 화면은 배치만). */
+import { 말 as 문구말, 줄들 } from '../contents/문구_오류.js';
 import { 오늘과제받기 } from './과제API.js';
 import { 발화보내기 } from './제출API.js';
 import 막힘카드 from './막힘카드.js';
@@ -60,7 +73,7 @@ import 생성카드 from './생성카드.js';
  * 이번 확정으로 «상주 금지 · 연출 한시 등장만»으로 갱신됐다: 연기가 끝나면 몸을 내리고(끝나면 콜백),
  * 녹음이 시작되면 남은 걸음이 접힌다(마스코트 자체 게이트). 회귀 = tests/마스코트배선.test.js. */
 import 마스코트 from './마스코트.js';
-import { 연출대본 } from '../lib/마스코트생명.js';
+import { 연출대본, 연출대본가져오기, 오랜만복귀인가 } from '../lib/마스코트생명.js';
 import { 급수편지 } from '../contents/첫편지.js';
 /* G1 갈래 — 오늘 배정이 미니게임이면 이 화면 대신 게임 화면이 선다(발주_게임모듈 G1 §4).
  * 판정은 `게임재료` 하나다(H5): challenge_id 대조·시드 펴기·검수확정 게이트가 그 안에 살아서
@@ -87,12 +100,13 @@ import { 게임재료 as G4게임재료, 관문재료 } from '../lib/서류관�
  * 마이크 되먹임 차단(녹음 중 효과음·햅틱 0·BGM 음소거)의 판정은 전부 저쪽 한 곳이다.
  * `효과음` 은 자동 시작의 신호음 하나뿐이다(G3 §4-3 ③) — **녹음이 열리기 전**에만 울리므로
  * 「녹음 중 효과음 0」과 안 부딪친다(게이트가 어차피 한 번 더 거른다). */
-import { 녹음시작, 녹음끝, 효과음 } from './소리.js';
+import { 녹음시작, 녹음끝, 효과음, 도장햅틱 } from './소리.js';
 /* 게임 큐의 배출구가 이 화면에도 있어야 한다(B2) — G1 은 주 2회 상한이라 게임 화면만 밀면
  * 비-G1 날의 밀린 게임 사건(메일·고름·이탈)이 영영 안 나간다. 되듣기 큐와 같은 선례다.
  * 수거(H2)도 같은 이유로 여기 있다 — 게임 화면만 걷으면 다음 게임날까지 죽은 앉음이 이탈로
  * 안 서고, 그 사이 앱을 지우면 영영 없다. */
-import { 게임큐밀기, 게임이탈수거 } from './게임큐.js';
+import { 게임큐읽기, 게임큐밀기, 게임이탈수거, 압축돌리기 } from './게임큐.js';
+import { 보낼것 as 게임보낼것 } from '../lib/게임로그.js';
 
 /**
  * 「말하기」 — 학생 앱의 유일한 동사. 정본 = docs/말하기_설계.md
@@ -194,6 +208,7 @@ export default function 말하기화면({
    * = 안 걷는다(오귀속보다 0건 · 기기 시계로 대신 끊지 않는다 — 배정 task_ref 는 날짜 스코프라
    * 서버 값끼리의 대조가 곧 「그날이 지났다」다 · 발주 §6-6 ⑩). */
   const 게임수거참조 = useRef(null);
+  const 게임밀린수참조 = useRef(0);
   const [date, setDate] = useState(몽골날짜); // 서버가 답하면 **서버 날짜**로 바꾼다(아래)
   const [호흡, set호흡] = useState('듣기');
   /* ②따라의 **문장 차례**(1부터) — 계약이 1~3문장이 되면서(유호 확정 08-23) ②가 「문장마다
@@ -207,6 +222,11 @@ export default function 말하기화면({
   /* 완료 축하는 방향이 반대다 — 기본 false 로 두고 답하기를 «지금» 마친 콜백만 켠다.
    * 어제 마치고 오늘 다시 연 화면(마운트부터 완료)에 또 축하가 뜨면 특별함이 소진된다(별눈 규율의 결). */
   const [축하연기, set축하연기] = useState(false);
+  const [무발화연기, set무발화연기] = useState(false);
+  /* G2-2 — 보내기 전에 죽은 녹음의 복구. 제안 = 마운트가 찾은 메타(카드가 선다) ·
+   * 복구녹음 = 학생이 「들어보고 정하기」를 고른 뒤 되살린 바이트(그 걸음 카드가 '확인'으로 선다). */
+  const [복구제안, set복구제안] = useState(null);
+  const [복구녹음, set복구녹음] = useState(null);
   const [로그, set로그] = useState([]);
   const [오류, set오류] = useState(null); // 「모름」을 「정상」으로 바꾸지 않는다 — 실패는 글자로 보인다
   const [저장경고, set저장경고] = useState(!지속저장());
@@ -278,7 +298,7 @@ export default function 말하기화면({
     }
     await 로그갱신(전송기록(로그참조.current, 항목.id, r));
     if (r.오류) {
-      set오류(r.오류);
+      if (항목.task_meta) set오류(r.오류);
       return;
     }
     /* 🔴 **「내 목소리를 되들었다」 — c9 `content.viewed` 의 둘째 생산자**(절단문서 ①-2 의 마지막 값).
@@ -342,6 +362,13 @@ export default function 말하기화면({
    * 🔑 `살아있나` 를 인자로 받는 이유는 두 자리의 옳은 답이 다르기 때문이다 — 마운트 쪽은 화면이
    *   사라지면 멈춰야 하고(다음 화면에서 또 밀게 된다), 복귀 쪽은 이미 시작한 전송을 끝까지
    *   보내는 편이 옳다(기기 저장은 이미 끝났고, 중간에 접으면 그 항목이 다음 열림까지 밀린다). */
+  const 게임밀린세기 = async () => {
+    try {
+      const { 로그 } = await 게임큐읽기();
+      게임밀린수참조.current = 게임보낼것(로그, 막힘참조.current).length;
+    } catch { /* 못 읽은 날은 이전 값 유지 */ }
+  };
+
   const 밀린것보내기 = async (살아있나 = () => true) => {
     /* 🔑 **고름을 먼저 민다.** 제출 루프는 WAV 업로드를 끼고 있어 몽골 회선에서 몇십 초씩 걸리고,
      *   그 사이 화면이 사라지면 `살아있나()` 가 false 가 되어 뒤에 있는 것은 통째로 밀린다.
@@ -371,6 +398,22 @@ export default function 말하기화면({
      * 밀기로 나간다. 로컬 쓰기뿐이라 회선과 무관하고, 실패는 조용히 다음 열림에 또 걷는다. */
     await 게임이탈수거(게임수거참조.current).catch(() => {});
     await 게임큐밀기(토큰, 막힘참조.current).catch(() => {});
+    await 게임밀린세기();
+    /* 🔴 교정 큐도 여기서 민다(D7-2) — 답장 화면만 밀면 그 화면을 다시 여는 날까지 상시
+     *   배출구가 없다(그 화면 흘려보내기 머리말의 그 천장). 항목·전송기록은 답장화면과 같은
+     *   조립(lib/교정로그 재수출)이라 판정이 두 벌로 갈라지지 않는다. */
+    try {
+      const { 로그: 교정기록 } = await 교정로그읽기();
+      let 다음 = 교정기록;
+      let 변했다 = false;
+      for (const 항목 of 보낼것(교정기록, 막힘참조.current)) {
+        if (!살아있나()) break;
+        const 결과 = await 교정사건보내기(토큰, 항목.사건);
+        다음 = 전송기록(다음, 항목.id, 결과);
+        변했다 = true;
+      }
+      if (변했다) await 교정로그쓰기(다음).catch(() => {});
+    } catch { /* 읽기 실패는 조용히 — 답장화면과 같은 규칙 */ }
   };
 
   useEffect(() => {
@@ -384,6 +427,13 @@ export default function 말하기화면({
       try {
         const r = await 로그읽기();
         기록 = r.로그;
+        /* 로그 압축(G2-9) — 읽기 직후 이 한 번뿐이다. 걷을 것이 없으면 `압축` 이 원본 참조를
+           그대로 내므로 쓰기 0회 — 되쓰는 날은 보존창을 넘긴 행이 생긴 첫 열림뿐이다. */
+        const 줄인 = 압축(기록, 몽골날짜());
+        if (줄인 !== 기록) {
+          기록 = 줄인;
+          await 로그쓰기(줄인).catch(() => {}); // 못 쓰면 다음 마운트가 다시 걷는다 — 화면은 진행
+        }
         if (!살아있음) return;
         로그참조.current = 기록;
         set로그(기록);
@@ -392,6 +442,9 @@ export default function 말하기화면({
       } catch (e) {
         if (살아있음) set오류(String(e.message || e));
       }
+      /* 게임 로그도 같은 자리에서 걷는다 — 실행은 직렬 사슬 «안»이다(`src/게임큐.압축돌리기`).
+         실패는 조용히: 다음 열림이 다시 걷는다(우리가 관리하는 무게지 학생이 한 일이 아니다). */
+      압축돌리기().catch(() => {});
 
       /* 오늘 낼 것을 **서버에서** 받는다(C0 §4-3 ①). 못 받아도 화면은 선다 —
        * 고정 과제로 내려가되 그 사실을 글자로 낸다(`화면과제` 가 사유를 함께 낸다). */
@@ -457,6 +510,15 @@ export default function 말하기화면({
        * 멈춘 차례가 남으면 오늘 ②가 없는 문장을 그리고, 그때 `제시문` 은 `undefined` 다. */
       set문장차례(1);
 
+      /* G2-2 — 「담겼는데 보내기 전에 죽은」 녹음이 있으면 복구 카드를 세운다.
+       * 판정은 복구후보 하나(그날 것·발화 있음·오늘 미제출) · 못 읽으면 카드 없이 현행. */
+      set복구제안(null);
+      set복구녹음(null);
+      try {
+        const 임시메타 = await 임시녹음메타읽기();
+        if (살아있음 && 복구후보(임시메타, 그날, 기록)) set복구제안(임시메타);
+      } catch { /* 메타를 못 읽은 날은 현행 그대로 — 복구는 편의지 통로가 아니다 */ }
+
       // 마이크 권한은 여기서 묻지 않는다 — 녹음 버튼을 누를 때 묻는다(lib/마이크권한.js).
       // 여기서 켜는 건 재생뿐이다: 무음 스위치가 켜진 폰에서도 ①듣기가 들려야 한다.
       try {
@@ -488,12 +550,20 @@ export default function 말하기화면({
       /* «생성중»에 두고 나갔다 온 복귀는 즉시 다시 묻는다 — 세대 재초기화가 오늘과제받기
        * 재호출 + 화면 되세움 + 밀린것보내기까지 한 벌로 돈다(아래 복귀행동 줄은 그대로다). */
       if (생성상태참조.current === '생성중') { set세대((n) => n + 1); return; }
-      const 할일 = 복귀행동(date, 몽골날짜(), 보낼것(로그참조.current, 막힘참조.current).length);
+      /* ⓒ갈래 재료(D7-4) — 고정 폴백으로 열렸고 아직 아무것도 안 낸 ①듣기라면 같은 날에도
+       * 되세워 회선을 다시 묻는다. 판정은 복귀행동(순수) 하나 — 여기서는 재서 넘기기만 한다.
+       * 🔑 되세움 물음이 앞이다(재초기화가 밀린것을 이긴다 — 날짜 갈래와 같은 우선순위) ·
+       *    큐 물음(합산 호출)은 기존 원문 그대로다. */
+      const 할일 = 복귀행동(date, 몽골날짜(), 0, {
+        고정폴백: !!(과제 && 과제.출처 === '고정'),
+        오늘제출0: !학습출석(로그참조.current, date),
+        듣기중: 호흡 === '듣기',
+      }) || 복귀행동(date, 몽골날짜(), 보낼것(로그참조.current, 막힘참조.current).length + 게임밀린수참조.current);
       if (할일 === '재초기화') set세대((n) => n + 1);
       else if (할일 === '밀린것') 밀린것보내기();
     });
     return () => 구독.remove();
-  }, [date, 토큰]);
+  }, [date, 토큰, 과제, 호흡]);
 
   /* «생성중» 폴링 — 곧 온다는 화면을 학생이 손대지 않아도 과제가 오면 저절로 바뀌게.
    * 과제가 오면 초기화 효과가 생성 상태를 null 로 접으므로 이 효과는 스스로 멈춘다. */
@@ -583,6 +653,37 @@ export default function 말하기화면({
     if (!r.오류) 열람.current.보냈다 = true;
   };
 
+  /* G2-2 — 복구 카드의 두 문. 「들어보고 정하기」는 바이트를 되살려 그 걸음의 확인 카드를
+   * 그대로 세우고(들어보기·다시 말하기·보내기 전부 산다), 「새로 말하기」는 단서를 지우고
+   * 현행 흐름 그대로다. 파일을 못 읽으면 카드 없이 현행(복구는 편의지 통로가 아니다). */
+  const 복구열기 = async () => {
+    const 메타 = 복구제안;
+    if (!메타) return;
+    try {
+      const 바이트 = await 음성바이트읽기(메타.uri);
+      if (!바이트 || !바이트.length) { set복구제안(null); return; }
+      const 차례 = 따라차례(메타.step);
+      if (메타.step === '답하기') set호흡('답하기');
+      else if (차례 != null || 메타.step === '따라') { set문장차례(차례 || 1); set호흡('따라'); }
+      else { set복구제안(null); return; }
+      set복구녹음({
+        step: 메타.step,
+        uri: 메타.uri,
+        바이트,
+        duration_ms: 메타.duration_ms || 0,
+        hesitation_ms: 메타.hesitation_ms || 0,
+        spoke: !!메타.spoke,
+      });
+      set복구제안(null);
+    } catch {
+      set복구제안(null);
+    }
+  };
+  const 복구버리기 = () => {
+    임시녹음메타지우기().catch(() => {});
+    set복구제안(null);
+  };
+
   /* 🔴 **막힌 학생에게는 흐름을 아예 열지 않는다.** 열어 두면 90초를 말하고 나서 업로드가
    *   403 으로 죽고, 그 발화는 어디에도 안 남는다 — 학생 눈엔 「했는데 사라졌다」다.
    *   배정이 있어도 같다(배정 뒤 철회한 학생은 과제를 보면서 업로드만 막힌다).
@@ -592,7 +693,14 @@ export default function 말하기화면({
     return (
       <ScrollView style={s.wrap} contentContainerStyle={s.inner}>
         <머리 호흡={호흡} />
-        {오류 && <Text style={s.오류}>{오류}</Text>}
+        {/* accessibilityLiveRegion — Android 전용 속성(iOS 는 무시되어 무해) · 동적 등장 알림. */}
+      {오류 && (
+        <View accessibilityLiveRegion="assertive">
+          {줄들(오류).map((줄, i) => (
+            <Text key={i} style={i === 0 ? s.오류 : s.오류_병기}>{줄}</Text>
+          ))}
+        </View>
+      )}
         <막힘카드 막힘={서버막힘} 학생번호={학생번호} />
       </ScrollView>
     );
@@ -603,7 +711,14 @@ export default function 말하기화면({
     return (
       <ScrollView style={s.wrap} contentContainerStyle={s.inner}>
         <머리 호흡={호흡} />
-        {오류 && <Text style={s.오류}>{오류}</Text>}
+        {/* accessibilityLiveRegion — Android 전용 속성(iOS 는 무시되어 무해) · 동적 등장 알림. */}
+      {오류 && (
+        <View accessibilityLiveRegion="assertive">
+          {줄들(오류).map((줄, i) => (
+            <Text key={i} style={i === 0 ? s.오류 : s.오류_병기}>{줄}</Text>
+          ))}
+        </View>
+      )}
         <생성카드 상태={서버생성상태} 학생번호={학생번호} />
       </ScrollView>
     );
@@ -638,6 +753,7 @@ export default function 말하기화면({
         로그={로그}
         기록추가={기록추가}
         학생번호={학생번호}
+        완주때={() => { try { 효과음('achieve'); 도장햅틱(); } catch { /* 무음 */ } }}
       />
     );
   }
@@ -653,7 +769,14 @@ export default function 말하기화면({
       {저장경고 && (
         <Text style={s.경고}>웹 미리보기 — 기록이 기기에 남지 않아요. 실사용은 앱에서.</Text>
       )}
-      {오류 && <Text style={s.오류}>{오류}</Text>}
+      {/* accessibilityLiveRegion — Android 전용 속성(iOS 는 무시되어 무해) · 동적 등장 알림. */}
+      {오류 && (
+        <View accessibilityLiveRegion="assertive">
+          {줄들(오류).map((줄, i) => (
+            <Text key={i} style={i === 0 ? s.오류 : s.오류_병기}>{줄}</Text>
+          ))}
+        </View>
+      )}
       {/* c14 교실 수집 ② — 「오늘 아침에 말한 목표, 해냈어요?」 (숙제 화면 «머리» · 유호 확정
           08-31 · 정본 = appsscript docs/교실수집_목표왕복_설계_v1.md). 서버(progress)가 낼지
           정하고 여기는 배치만 — null 이면 안 그린다(«없어도 되는» 꼬리 · 과제 흐름 무접촉). */}
@@ -670,6 +793,30 @@ export default function 말하기화면({
       )}
 
       {!과제 && <불러오는중 />}
+
+      {/* G2-2 — 보내기 전에 죽은 녹음의 복구 카드(문구는 오류 문구 표 · ⚠카피 초안, 확정은
+          유호님). 학생이 고르기 전에는 흐름을 안 바꾼다 — 카드 하나가 더 설 뿐이다. */}
+      {과제 && 호흡 === '듣기' && 복구제안 && !복구녹음 && (
+        <View style={s.카드}>
+          <Text style={s.확인글}>{문구말('err.recover.found')}</Text>
+          <View style={s.가로}>
+            <Pressable
+              testID="말하기-복구-듣기"
+              onPress={복구열기}
+              style={({ pressed }) => [s.주버튼, s.늘림, pressed && s.눌림]}
+            >
+              <Text style={s.주버튼글}>들어보고 정하기</Text>
+            </Pressable>
+            <Pressable
+              testID="말하기-복구-새로"
+              onPress={복구버리기}
+              style={({ pressed }) => [s.보조버튼, s.늘림, pressed && s.눌림]}
+            >
+              <Text style={s.보조버튼글}>새로 말하기</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
 
       {과제 && 호흡 === '듣기' && (
         <듣기카드
@@ -702,6 +849,8 @@ export default function 말하기화면({
             else set호흡(다음호흡('따라'));
           }}
           prompt_id={편지.id}
+          무발화알림={() => set무발화연기(true)}
+          초기녹음={복구녹음 && 복구녹음.step === 이번걸음 ? 복구녹음 : null}
         />
       )}
 
@@ -721,6 +870,8 @@ export default function 말하기화면({
           기록추가={기록추가}
           완료={() => { set호흡('완료'); set축하연기(true); }}
           prompt_id={편지.id}
+          무발화알림={() => set무발화연기(true)}
+          초기녹음={복구녹음 && 복구녹음.step === '답하기' ? 복구녹음 : null}
         />
       )}
 
@@ -758,7 +909,14 @@ export default function 말하기화면({
         <마스코트
           잡담={false}
           자리={{ top: 64, right: 16 }}
-          연출={{ 대본: 연출대본.말하기인트로, 끝나면: () => set인트로연기끝(true) }}
+          연출={{
+            /* 오랜만 복귀(D4-8)면 반김 인트로 — 판정은 오랜만복귀인가(순수) 하나 · 캐릭터판
+             * 대본은 연출대본가져오기(캐릭터 인자는 D4-1 배선이 서는 날 한 낱말)로 꺼낸다. */
+            대본: 오랜만복귀인가(로그, date)
+              ? 연출대본가져오기('말하기인트로복귀')
+              : 연출대본가져오기('말하기인트로'),
+            끝나면: () => set인트로연기끝(true),
+          }}
         />
       )}
       {/* 답하기 진입 — 몽글이 «내 숙제의 그 질문»을 물어봐 준다(질문 텍스트는 서버 과제 데이터 —
@@ -767,7 +925,7 @@ export default function 말하기화면({
         <마스코트
           잡담={false}
           자리={{ top: 64, right: 16 }}
-          연출={{ 대본: 연출대본.답하기질문, 채움: { 질문: 편지.질문 }, 끝나면: () => set질문연기끝(true) }}
+          연출={{ 대본: 연출대본가져오기('답하기질문'), 채움: { 질문: 편지.질문 }, 끝나면: () => set질문연기끝(true) }}
         />
       )}
       {/* 완료 축하 — 답하기를 «지금» 마친 순간에만(위 축하연기 주석 · 재접속 완료엔 안 뜬다).
@@ -777,7 +935,14 @@ export default function 말하기화면({
         <마스코트
           잡담={false}
           자리={{ top: 64, right: 16 }}
-          연출={{ 대본: 연출대본.완료축하, 끝나면: () => set축하연기(false) }}
+          연출={{ 대본: 연출대본.완료축하, 상황: '완료축하', 끝나면: () => set축하연기(false) }}
+        />
+      )}
+      {무발화연기 && (
+        <마스코트
+          잡담={false}
+          자리={{ top: 64, right: 16 }}
+          연출={{ 대본: 연출대본.무발화위로, 끝나면: () => set무발화연기(false) }}
         />
       )}
     </ScrollView>
@@ -795,11 +960,32 @@ function 머리({ 호흡 }) {
       <View style={s.진행줄}>
         {순서.map((k, i) => (
           <View key={k} style={s.진행칸}>
-            <View style={[s.점, i <= idx - 0 && i < idx ? s.점_지남 : i === idx ? s.점_현재 : null]} />
+            <진행점 상태={i < idx ? '지남' : i === idx ? '현재' : '남'} />
             <Text style={[s.점라벨, i === idx && s.점라벨_현재]}>{호흡라벨[k]}</Text>
           </View>
         ))}
       </View>
+    </View>
+  );
+}
+
+/* 진행 점 하나 — 호흡 전환 때 «현재»의 불이 스타일 즉시 교체가 아니라 잉크 덮개의
+ * 짧은 페이드(180ms)로 옮겨 붙는다. 바닥 View 가 지남/남을, 덮개가 현재를 진다. */
+function 진행점({ 상태 }) {
+  const 줄임 = use줄임();
+  const 값 = useRef(new Animated.Value(상태 === '현재' ? 1 : 0)).current;
+  useEffect(() => {
+    if (줄임) { 값.setValue(상태 === '현재' ? 1 : 0); return; }
+    Animated.timing(값, {
+      toValue: 상태 === '현재' ? 1 : 0,
+      duration: 180,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+  }, [상태]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <View style={[s.점, 상태 === '지남' && s.점_지남]}>
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 색.잉크, borderRadius: 4, opacity: 값 }]} />
     </View>
   );
 }
@@ -809,12 +995,25 @@ function 머리({ 호흡 }) {
  * 도는 것이 하나 더 생기면 눈이 그리로 간다. 카드 자리를 그대로 잡아 두면 도착했을 때
  * 레이아웃이 안 튄다 — 위계는 움직임이 아니라 밀도로. */
 function 불러오는중() {
+  const [오래됨, set오래됨] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => set오래됨(true), 7500);
+    return () => clearTimeout(t);
+  }, []);
   return (
     <View style={s.카드}>
       <Text style={s.카드라벨}>01</Text>
       <Text style={s.불러오는글}>오늘의 문장을 가져오는 중이에요…</Text>
+      {오래됨 && <느린회선줄 />}
     </View>
   );
+}
+
+/* 느린 회선의 진행 공개 — 스피너·퍼센트 없이 글자 한 줄(문구 초안 · 확정은 유호님).
+ * D7-5 시한(15초)과 짝: 7.5초 말 걸어줌 → 15초 폴백의 세 단이 선다. */
+function 느린회선줄() {
+  const 등장 = use등장({ 올라옴: 4, 시간: 220 });
+  return <Animated.Text style={[s.메모, 등장]}>회선이 느린가 봐요 — 조금만 더 기다려 주세요</Animated.Text>;
 }
 
 /* ── ① 듣기 ── */
@@ -858,7 +1057,7 @@ function 듣기카드({ 편지, 라벨 = '편지가 왔어요', 다음, 들었�
        * 카드에만 둔다. 이름은 로그인 세션에 아직 안 실려(생성카드 실측) 이름없음 판이 나간다.
        * 조판(스타일 분리·위치 다듬기)은 화면 세션 몫 — 지금은 안내 스타일 재사용. */}
       {AI한줄('말하기')?.글.map((줄, i) => (
-        <Text key={`ai${i}`} style={s.녹음안내}>{줄}</Text>
+        <Text key={`ai${i}`} style={i === 0 ? s.녹음안내 : s.녹음안내_병기}>{줄}</Text>
       ))}
       {/* 전체 그림 한 줄 — 처음 온 학생이 「이 숙제가 뭔지」를 첫 카드에서 안다(유호 실측 08-22
        * 「가이드가 없어서 뭘 하라는건지 이해가 안 갈 것」 · 직관 축). 첫 걸음에만 둔다 —
@@ -898,15 +1097,6 @@ function 듣기카드({ 편지, 라벨 = '편지가 왔어요', 다음, 들었�
     </View>
   );
 }
-
-/* 경과 시계 — `latency_ms` 를 재는 **유일한** 자리다(`lib/선택로그.js` 머리말).
- * 🔴 `Date.now()` 로 재지 않는다: 두 벽시계 시점의 차는 그 사이 시각 동기화·타임존 변경이
- *   음수나 몇 시간짜리 값을 만들고, 그 행은 오류가 아니라 «아주 오래 망설인 학생»으로 읽힌다.
- * 🔑 `performance` 가 없는 런타임이면 `null` 을 낸다 — 그러면 조립기가 `latency_ms: null`
- *   (「안 쟀다」)로 접는다. 0 으로 접으면 «즉답»이 되어 확신도 축이 조용히 거짓이 된다. */
-const 경과시계 = () =>
-  (typeof performance !== 'undefined' && performance && typeof performance.now === 'function'
-    ? performance.now() : null);
 
 /* 자동 시작의 무음 게이트 — 신호음과 녹음 시작 사이를 **시간축으로** 가른다(발주 G3 §4-3 ③ ·
  * §9-1 에코 처방 ①). AEC 를 켜는 것은 그 자체가 음성처리라 소급 불가 배선과 부딪치고, 끄면
@@ -948,7 +1138,7 @@ export function 재시도남았나(로그, date, step, 상한) {
 function 녹음카드({
   step, 제시문, 안내, 선택지, 선택차원, 텍스트병기, date, 로그, 기록추가, 완료, prompt_id,
   자동시작 = false, 상한초 = null, 재시도상한 = null, 신호음 = null, 숫자숨김 = false,
-  들려줄것 = null,
+  들려줄것 = null, 무발화알림 = null, 초기녹음 = null,
 }) {
   /* 🔴 **표시 순서를 마운트 때 한 번 확정한다.** 추천을 늘 첫째에 두면 「1번을 습관적으로 누르는
    *   손버릇」과 「그 선택지를 좋아함」이 영원히 같은 모양이 되므로 자리를 섞고, 섞은 그 순서를
@@ -963,8 +1153,15 @@ function 녹음카드({
    * ref 인 이유: 이 값이 화면을 바꾸지 않는다(리렌더를 부를 이유가 없다). */
   const 바꾼횟수 = useRef(0);
   const 보기뜬때 = useRef(경과시계());
-  const [단계, set단계] = useState('대기'); // 대기 | 녹음중 | 확인 | 무발화
-  const [녹음, set녹음] = useState(null); // { uri, 바이트, duration_ms, hesitation_ms, spoke }
+  /* 초기녹음(G2-2 가산 프롭 · 기본 null = 현행 불변) — 복구된 시도는 «확인» 카드에서 시작한다:
+   * 기존 확인 카드(들어보기·다시 말하기·보내기)가 전부 산다. */
+  const [단계, set단계] = useState(초기녹음 ? '확인' : '대기'); // 대기 | 녹음중 | 확인 | 무발화
+  const [녹음, set녹음] = useState(초기녹음
+    ? {
+      uri: 초기녹음.uri, 바이트: 초기녹음.바이트, duration_ms: 초기녹음.duration_ms,
+      hesitation_ms: 초기녹음.hesitation_ms, spoke: 초기녹음.spoke,
+    }
+    : null); // { uri, 바이트, duration_ms, hesitation_ms, spoke }
   const [경과, set경과] = useState(0); // 녹음중 타이머 — 스트림이 알려 준 시각
   const [병기글, set병기글] = useState('');
   /* 🔴 **병기 글의 작성 과정**(철학 Ⅱ-9 · `lib/저작신뢰.js`). 이 칸이 선택 입력이라 가벼워 보이는데,
@@ -977,6 +1174,9 @@ function 녹음카드({
   const [듣는중, set듣는중] = useState(false);
   const [문장듣는중, set문장듣는중] = useState(false); // 제시문 TTS — 「내 목소리 듣기」와 다른 것이라 칸을 나눈다
   const [막힘, set막힘] = useState(null); // 녹음이 시작되지 못한 이유 — 버튼 옆에 글자로 선다
+  /* D1-2 — 권한이 «영구 거절»이라 앱 안에서 다시 못 묻는 상태(마이크준비의 재요청가능=false).
+   * 그때만 「설정 열기」 문이 선다 — 막힘 글자만으로는 학생의 다음 걸음이 없다. */
+  const [설정필요, set설정필요] = useState(false);
   const [끊김, set끊김] = useState(false); // 배경으로 나가 녹음이 중간에 멈췄다 — 아래 `AppState`
   const 추적 = useRef(null);
   const 플레이어 = useRef(null);
@@ -1058,6 +1258,7 @@ function 녹음카드({
     Speech.stop();
     set문장듣는중(false);
     set막힘(null);
+    set설정필요(false);
     // 권한은 「지금」 묻는다 — 학생이 무엇을 하려는지 아는 순간에.
     const 준비 = await 마이크준비({
       권한요청: () => AudioModule.requestRecordingPermissionsAsync(),
@@ -1065,6 +1266,7 @@ function 녹음카드({
     });
     if (!준비.ok) {
       set막힘(준비.메시지);
+      set설정필요(준비.재요청가능 === false);
       return;
     }
     try {
@@ -1101,6 +1303,7 @@ function 녹음카드({
     if (조각들.current.length === 0 || !실규격.current) {
       set녹음({ uri: null, 바이트: null, duration_ms: 0, hesitation_ms: 0, spoke: false });
       set단계('무발화');
+      if (무발화알림) 무발화알림();
       return;
     }
 
@@ -1132,9 +1335,16 @@ function 녹음카드({
     } catch (_) {
       uri = null;
     }
+    /* G2-2 — 파일이 디스크에 앉은 그 순간 복구 단서 한 장. 프로세스가 여기서 죽어도 다음
+     * 마운트가 「들어보고 보낼까요?」를 세울 수 있다(판정 = lib/녹음복구.복구후보). */
+    if (uri) {
+      임시녹음메타쓰기({ date, step, uri, duration_ms, hesitation_ms: r.머뭇거림_ms, spoke: r.발화있음 })
+        .catch(() => {});
+    }
 
     set녹음({ uri, 바이트: 조립.바이트, duration_ms, hesitation_ms: r.머뭇거림_ms, spoke: r.발화있음 });
     set단계(r.발화있음 ? '확인' : '무발화');
+    if (!r.발화있음 && 무발화알림) 무발화알림();
   };
 
   /* 🔴 **배경으로 나가면 마이크가 끊긴다 — 그런데 화면은 계속 '녹음중'이었다.**
@@ -1259,7 +1469,7 @@ function 녹음카드({
       if (선택) 선택때 = new Date().toISOString();
     }
 
-    return 기록추가({
+    const 새로그 = await 기록추가({
       date,
       step,
       status,
@@ -1278,6 +1488,10 @@ function 녹음카드({
       prompt_id,
       created_at: new Date().toISOString(),
     });
+    /* G2-2 — 이 시도는 방금 로그에 앉았다(submitted·retried·abandoned 전부). 복구 단서는
+     * 여기서 소멸한다 — 남기면 다음 마운트가 이미 적힌 시도를 「보낼까요?」로 되묻는다. */
+    임시녹음메타지우기().catch(() => {});
+    return 새로그;
   };
 
   const 다시 = async () => {
@@ -1364,7 +1578,17 @@ function 녹음카드({
               ? (신호음 ? '신호음이 울리면 바로 말해요' : '곧 녹음이 시작돼요 — 바로 말해요')
               : '탭하면 녹음이 시작돼요'}
           </Text>
-          {막힘 && <Text style={s.오류}>{막힘}</Text>}
+          {막힘 && <Text accessibilityLiveRegion="assertive" style={s.오류}>{막힘}</Text>}
+          {/* 영구 거절만 이 문이 선다(D1-2) — iOS 는 한 번 거절하면 앱 안에서 다시 못 묻는다. */}
+          {막힘 && 설정필요 && (
+            <Pressable
+              testID="말하기-설정열기"
+              onPress={() => Linking.openSettings()}
+              style={({ pressed }) => [s.보조버튼, pressed && s.눌림]}
+            >
+              <Text style={s.보조버튼글}>설정 열기</Text>
+            </Pressable>
+          )}
         </중앙>
       )}
 
@@ -1572,7 +1796,7 @@ function 완료카드({ 로그, date, 견줌 = null, 견줌다시읽기 = null, 
   /* 🔴 「도착」은 서버가 받은 것만이다 — 기기에 저장됐다고 도착이 아니다. 이 카드가 무조건
    *   「도착했어요」라고 말하면, 몽골 회선에서 전송이 상시 실패해도 학생도 우리도 그걸 모른다. */
   const 배달 = 배달상태(로그, date);
-  const 다닿음 = 배달.보내는중 === 0 && 배달.못보냄 === 0;
+  const 다닿음 = 배달.보내는중 === 0 && 배달.못보냄 === 0 && 배달.기기보관 === 0;
   const [다시보내는중, set다시보내는중] = useState(false);
 
   /* 🔑 「어제의 나」를 **여기서** 한 번 다시 읽는다(유호님 확정 2026-08-09) — 값이 참이 되는
@@ -1591,15 +1815,19 @@ function 완료카드({ 로그, date, 견줌 = null, 견줌다시읽기 = null, 
   return (
     <Animated.View style={[s.카드, 카드등장]}>
       <Text style={s.카드라벨}>오늘의 말하기 · 끝</Text>
-      <Text style={s.완료제목}>{다닿음 ? '목소리가 도착했어요' : '오늘 말하기, 끝냈어요'}</Text>
+      <완료줄 key={다닿음 ? '도착' : '끝'} 스타일={s.완료제목} 글={다닿음 ? '목소리가 도착했어요' : '오늘 말하기, 끝냈어요'} />
       <Text style={s.완료설명}>
         오늘 {시도}번 말했어요{다시한번 > 0 ? ` — 그중 ${다시한번}번은 스스로 다시 도전했어요. 그게 실력이 느는 순간이에요.` : '.'}
       </Text>
       {배달.보내는중 > 0 && (
         <Text style={s.메모}>목소리 {배달.보내는중}개는 보내는 중이에요 — 앱을 다시 열면 이어서 보내요.</Text>
       )}
+      {/* 폴백 날(서버 과제를 못 받아 기기에만 저장) — 실패 얼굴을 하지 않는다. 도착 선언도 안 한다. */}
+      {배달.기기보관 > 0 && (
+        <Text style={s.메모}>오늘 목소리는 이 폰에 잘 담아 뒀어요.</Text>
+      )}
       {배달.못보냄 > 0 && (
-        <Text style={s.오류}>목소리 {배달.못보냄}개를 보내지 못했어요. 선생님께 알려 주세요.</Text>
+        <Text accessibilityLiveRegion="polite" style={s.오류}>목소리 {배달.못보냄}개를 보내지 못했어요. 선생님께 알려 주세요.</Text>
       )}
       {/* 학생이 그 자리에서 다시 밀어 볼 문 — 배달 수 재계산은 밀린것보내기→보내기→로그갱신이 이미 진다. */}
       {배달.못보냄 > 0 && 다시보내기 ? (
@@ -1618,7 +1846,7 @@ function 완료카드({ 로그, date, 견줌 = null, 견줌다시읽기 = null, 
           학생이 어느 쪽을 믿어야 할지 모르기 때문이다. */}
       {다닿음 && 늘었다 && <어제넘음줄 글={늘었다} />}
       {/* 답장 약속은 **닿은 뒤에만** 한다 — 안 닿은 목소리에 답장은 오지 않는다. */}
-      {다닿음 && <Text style={s.완료메타}>내일, 오늘 목소리에 대한 답장이 와요.</Text>}
+      {다닿음 && <완료줄 스타일={s.완료메타} 글="내일, 오늘 목소리에 대한 답장이 와요." />}
     </Animated.View>
   );
 }
@@ -1630,6 +1858,12 @@ function 완료카드({ 로그, date, 견줌 = null, 견줌다시읽기 = null, 
 function 어제넘음줄({ 글 }) {
   const 등장 = use등장({ 올라옴: 4, 시간: 220, 지연: 90 });
   return <Animated.Text style={[s.어제넘음, 등장]}>{글}</Animated.Text>;
+}
+
+/* 다닿음이 눈앞에서 뒤집히는 순간 글자만 툭 바뀌던 자리 — key 재마운트로 도착이 한 박자로 선다. */
+function 완료줄({ 스타일, 글 }) {
+  const 등장 = use등장({ 올라옴: 4, 시간: 220, 지연: 90 });
+  return <Animated.Text style={[스타일, 등장]}>{글}</Animated.Text>;
 }
 
 const s = StyleSheet.create({
@@ -1644,19 +1878,20 @@ const s = StyleSheet.create({
   진행칸: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   점: { width: 7, height: 7, borderRadius: 4, backgroundColor: 색.잉크_희미 },
   점_지남: { backgroundColor: 색.잉크_서브 },
-  점_현재: { backgroundColor: 색.잉크 },
   점라벨: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_메타 },
   점라벨_현재: { fontFamily: 폰트.강조, color: 색.잉크 },
 
   경고: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_서브, lineHeight: 18 },
   오류: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크, lineHeight: 19 },
+  /* ko/mn 병기의 mn 줄 — 폰트를 가르고(키릴은 킷 한글 폰트에 없다) 세기는 한 단 내린다. */
+  오류_병기: { fontFamily: 몽골어폰트.강조, fontSize: 13, lineHeight: 19, color: 색.잉크_서브 },
   /* 3번째 글자 층(Stone) — 상태 메모는 본문도 오류도 아니다. 바닥이 Ink Deep 이라 허용 안이다.
      🔴 코랄로 칠하지 않는다: 이 화면의 신호 1점은 녹음 버튼이다(테마 `신호자리`). */
   메모: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조, lineHeight: 18 },
   /* 기계 원인(raw 오류문)의 자리 — 막힘카드 「모르는 코드 메모」 무늬 그대로(모노·라벨 트래킹). */
   사유원인: { fontFamily: 폰트.모노, fontSize: 11, letterSpacing: 모노트래킹.라벨, color: 색.잉크_보조 },
 
-  카드: { backgroundColor: 색.바탕띄움, borderRadius: 20, padding: 22, gap: 16 },
+  카드: { backgroundColor: 색.바탕띄움, borderRadius: 판눈금.반경, padding: 판눈금.여백, gap: 16 },
   카드라벨: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_태그 },
   불러오는글: { fontFamily: 폰트.본문, fontSize: 17, lineHeight: 28, color: 색.잉크_메타 },
   편지문: { fontFamily: 폰트.본문, fontSize: 19, lineHeight: 31, color: 색.잉크 },
@@ -1664,6 +1899,10 @@ const s = StyleSheet.create({
 
   선택지묶음: { gap: 8 },
   선택지: {
+    /* 면을 채워 표시한다(인증 보기칩 규칙의 확장) — 단 이 선택지는 바탕띄움 카드 «안»이라
+       같은 색이면 안 보인다. 카드 속 파인 면 = 색.바탕은 강사·검수·나침반 입력바탕과
+       판정칩_고름이 이미 쓰는 킷 안 무늬다(감사 D6-5). */
+    backgroundColor: 색.바탕,
     borderWidth: 1,
     borderColor: 색.잉크_희미,
     borderRadius: 12,
@@ -1684,6 +1923,9 @@ const s = StyleSheet.create({
   띠자리: { alignItems: 'center', justifyContent: 'center', paddingVertical: 6 },
   타이머: { fontFamily: 폰트.모노, fontSize: 22, letterSpacing: 모노트래킹.타이머, color: 색.잉크 },
   녹음안내: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_서브 },
+  /* 몽골어 병기 줄 — 킷 한글 폰트(SUIT)에 키릴 자형이 없어 반드시 몽골어폰트를 지난다
+     (막힘카드 병기 눈금 그대로: 폰트짝 유지 · 크기·색 한 단 아래). 지금은 mn 이 비어 안 선다. */
+  녹음안내_병기: { fontFamily: 몽골어폰트.캡션, fontSize: 12, lineHeight: 19, color: 색.잉크_메타 },
 
   확인묶음: { gap: 12 },
   확인글: { fontFamily: 폰트.강조, fontSize: 16, color: 색.잉크 },
