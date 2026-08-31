@@ -39,9 +39,12 @@ const 효과음자산 = {
   'kkamong-bee': () => require('../assets/sfx/synk-voice-kkamong-bee.wav'),
   'kkamong-hiik': () => require('../assets/sfx/synk-voice-kkamong-hiik.wav'),
   'kkamong-nyamnyam': () => require('../assets/sfx/synk-voice-kkamong-nyamnyam.wav'),
+  'kkamong-ansim': () => require('../assets/sfx/synk-voice-kkamong-ansim.wav'),
+  'kkamong-chukha': () => require('../assets/sfx/synk-voice-kkamong-chukha.wav'),
   'marine-gidong': () => require('../assets/sfx/synk-voice-marine-gidong.wav'),
   'marine-wansu': () => require('../assets/sfx/synk-voice-marine-wansu.wav'),
   'marine-mollae': () => require('../assets/sfx/synk-voice-marine-mollae.wav'),
+  'marine-ansim': () => require('../assets/sfx/synk-voice-marine-ansim.wav'),
 };
 
 let bgm플레이어 = null;
