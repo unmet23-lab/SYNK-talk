@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@sentry/react-native": "~7.11.0",
-    "@shopify/react-native-skia": "2.6.2",
+    "@shopify/react-native-skia": "2.11.1",
     "expo": "~57.0.18",
     "expo-audio": "~57.0.3",
     "expo-file-system": "~57.0.1",
