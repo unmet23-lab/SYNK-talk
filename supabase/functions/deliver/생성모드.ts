@@ -19,6 +19,7 @@ import 과제모듈 from './오늘과제.mjs';
 import 갈래모듈 from './갈래판정.mjs';
 import 기술모듈 from './기술선택.mjs';
 import 요약모듈 from './과제요약.mjs';
+import 읽기모듈 from './읽기기록.mjs';
 import 상태모듈 from './학습자상태.mjs';
 import 검문모듈 from './과제검문.mjs';
 import 상수모듈 from './생성상수.mjs';
@@ -44,6 +45,9 @@ const { 갈래판정 } = 갈래모듈 as {
 };
 const { 기술선택 } = 기술모듈 as {
   기술선택: (재료: Record<string, unknown>) => { skill_ids: string[]; 시작위치: number };
+};
+const { 읽기기록 } = 읽기모듈 as {
+  읽기기록: (재료: { skill_ids: string[]; 시즌목표: string | null; axes_used: string[]; 상태오류?: boolean }) => Record<string, unknown>;
 };
 const { 과제요약 } = 요약모듈 as {
   과제요약: (상태: Record<string, unknown>, 조각: Record<string, unknown>) =>
@@ -150,6 +154,12 @@ function 학생조립(학생: Record<string, unknown>, 재료: {
           estimator_confidence: (상태?.estimator_confidence ?? null) as number | null,
           evidence_refs: 요약산출.evidence_refs,
           요약: 요약산출.요약,
+          /* reads(c15 · 세층합류 §3) — 이 한 장이 세 층에서 무엇을 읽었는지, 적재 «순간»에 굳힌다.
+           * 착지봉투·마감 스윕이 task.assigned payload 로 나른다 — 읽기는 기록 없이는 없다. */
+          reads: 읽기기록({
+            skill_ids, 시즌목표: (학생.시즌목표 ?? null) as string | null,
+            axes_used: 요약산출.axes_used, 상태오류: 상태 === null,
+          }),
         },
       },
     };
