@@ -300,6 +300,11 @@ test('⑧ 경로를 «두 마디»로 가른다 — /v1/teach/아무거나/queue
     'feedback/classes': 'GET',
     'feedback/queue': 'GET',
     'feedback/give': 'POST',
+    /* c14 교실 관찰 셋(08-31). 🔑 `draft` 가 POST 인 것은 몸통(강사 원문)이 있어서지 쓰기라서가
+     * 아니다 — 그 경로는 DB 를 안 건드린다(위 ⑧ 검사가 그것을 잰다). */
+    'observe/roster': 'GET',
+    'observe/draft': 'POST',
+    'observe/note': 'POST',
   });
   // 안내문을 손으로 적으면 경로가 늘 때 낡는다 — 표에서 파생하는지 본다.
   assert.match(소스, /Object\.entries\(경로표\)/);
@@ -349,8 +354,67 @@ test('🚫 나침반 답을 사건으로 흘리지 않는다 — 새 event_type 
   assert.ok(!본문.includes('preference.stated'), 'c11 ⑦ 가드를 깎는 자리다');
 });
 
-test('⑧ ⏳ 관찰 경로는 아직 없다 — 유호님 계약 판정 전에 짓지 않는다', () => {
-  assert.ok(!소스.includes('observe'), 'observe 경로가 생겼다 — 계약 판정(observation.noted)이 선행이다');
+/* ── ⑧ 관찰 경로 셋 (c14 · 08-31) ────────────────────────────────────────────────
+ * ⚠ 이 자리엔 08-10~08-30 사이 **반대 방향의 잠금**이 서 있었다(`!소스.includes('observe')`) —
+ *   유호님 계약 판정 전에 짓지 못하게 막던 검사다. 판정이 08-31 「웅 그대로 가」로 서서 c14 가
+ *   났고, 그래서 잠금을 **지운 것이 아니라 뒤집었다**: 같은 자리가 이제 「규격대로 섰나」를 잰다.
+ *   지우기만 하면 그 자리는 아무도 안 보는 자리가 된다. */
+
+test('⑧ 관찰 경로 셋이 섰다 — 그리고 셋인 것이 규격이다', () => {
+  for (const 경로 of ['observe/roster', 'observe/draft', 'observe/note']) {
+    assert.ok(소스.includes(`'${경로}'`), `${경로} 가 없다 — 관찰 통로가 반쪽이면 생산량은 0이다`);
+  }
+});
+
+test('⑧ 🔴 초안은 사건이 아니다 — `관찰초안내기` 가 DB 를 한 글자도 안 건드린다', () => {
+  /* 설계 §2 의 **물리**다. 초안이 행을 남기면 「확정만 적재」가 코드가 아니라 화면 규약으로만
+   * 남고, 확정 전에 이탈한 초안이 확정 행세를 한다.
+   * 끝을 다음 함수로 못박는다(나침반 검사와 같은 사유 — 파일 끝까지 자르면 뒤 함수가 한 일을
+   * 이 함수가 한 것으로 읽고 거짓 적색을 낸다 · F287 계열). */
+  const i = 소스.indexOf('async function 관찰초안내기');
+  assert.ok(i > 0, '관찰초안내기 를 못 찾았다 — 이 검사가 통째로 미실행이다');
+  const 다음 = 소스.indexOf('\nasync function ', i + 1);
+  assert.ok(다음 > i, '관찰초안내기 의 끝 앵커를 못 찾았다 — 이 검사가 미실행이다');
+  const 본문 = 소스.slice(i, 다음);
+  for (const 금지 of ['sql', 'tx`', 'learning_events', 'staff_access_log']) {
+    assert.ok(!본문.includes(금지), `초안 경로가 DB 를 건드린다(${금지}) — 초안은 사건이 아니다`);
+  }
+});
+
+test('⑧ 확정은 물리칸 둘과 운영기록판을 싣는다 — 하나라도 빠지면 소급이 안 된다', () => {
+  const i = 소스.indexOf('async function 관찰확정');
+  assert.ok(i > 0, '관찰확정 을 못 찾았다 — 이 검사가 통째로 미실행이다');
+  const 본문 = 소스.slice(i);
+  /* 물리칸 2 — 없으면 강사별 무수정 통과율·퇴사 강사 관찰 격리·「누구의 정답지였나」가 원리상
+   * 불가하고(설계 §5), 그 셋은 **소급이 안 된다**. */
+  assert.ok(본문.includes('observer_staff_id'), '관찰자 식별을 안 싣는다');
+  assert.ok(본문.includes('draft_modified'), '자백 도장 칸을 안 싣는다');
+  /* 🔴 동의판이 아니라 운영기록판이다(c14 ③ · 표는 lib/사건출처.js 하나). 여기에 동의 조회가
+   *   끼면 관찰이 학생 기기 동의에 걸려 교실 기록 자체가 성립 불가가 된다. */
+  assert.ok(본문.includes('운영기록판'), 'consent_ver 에 운영기록판을 안 쓴다');
+  assert.ok(!본문.includes('지금유효') && !본문.includes('그때유효'),
+    '관찰이 동의 게이트를 지난다 — c14 ③ 이 「지나지 않되 조용히 버려짐도 없다」로 명문화한 자리다');
+  /* 학생 이름을 여는 통로라 감사 1행이 한 벌이다(설계 §5 ⚠). */
+  assert.ok(본문.includes('teach.observe.note'), '확정이 감사 행을 안 남긴다');
+});
+
+test('⑧ `draft_modified` 를 **서버가** 정한다 — 앱이 보낸 값을 그대로 싣지 않는다', () => {
+  const i = 소스.indexOf('async function 관찰확정');
+  const 본문 = 소스.slice(i);
+  /* 설계 §2 ㉡ — 앱이 불리언을 보내면 `서버칸` 규약이 막으려던 자기신고가 이름만 바꿔 돌아온다.
+   * 서버는 되실은 «초안»을 받아 `고쳤나()` 로 «정한다». 본문에서 직접 읽으면 그게 자기신고다. */
+  assert.ok(본문.includes('고쳤나('), '서버가 대조하지 않는다 — draft_modified 가 자기신고가 된다');
+  assert.ok(!/b\.draft_modified/.test(본문), '앱이 보낸 draft_modified 를 읽는다 — 자기신고다');
+});
+
+test('⑧ 관찰 화면에 앱 축 데이터가 없다 — ㉯ 기각의 화면 적용(설계 §2)', () => {
+  /* 앱의 의심을 관찰 «전»에 보여주면 그 뒤 관찰은 앱 사전확률의 확증 표본이 되고
+   * `source_kind='teacher'` 가 거짓이 된다. 로스터가 급수를 실어 오지만 그리지 않는 것이 규격. */
+  const 화면 = fs.readFileSync(path.join(__dirname, '..', 'src', '관찰화면.js'), 'utf8');
+  const 그리는곳 = 화면.slice(화면.indexOf('return ('));
+  for (const 금지 of ['level_current', '급수', 'error_tags', '오답', '진도']) {
+    assert.ok(!그리는곳.includes(금지), `관찰 화면이 앱 축 데이터를 그린다: ${금지}`);
+  }
 });
 
 /* ── ⑨ 반 큐가 «판정의 재료»를 싣는다 (§8-4 화면이 요구한 것) ──────────── */

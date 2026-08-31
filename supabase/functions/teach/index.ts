@@ -37,9 +37,16 @@
  *   `review` 처럼 `SUPABASE_DB_URL` 직결이라 **RLS 를 우회한다** — 방어선은 RLS 가 아니라
  *   문(역할 검사)+감사다. 그래서 teacher SELECT RLS 신설이 불요다(설계 §1-③).
  *
- * ■ ⏳ 관찰 경로(`/v1/teach/observe`)는 **여기 없다**
- *   `관찰태그_자동화_설계.md` 가 정본이고 선행이 유호님 계약 판정(`observation.noted`+물리칸 2
- *   +RLS 개정)이다. 골든 경로는 그 판정과 독립이라 먼저 선다 — 판정 전에 짓지 않는다.
+ * ■ ✅ 관찰 경로 셋 — `observe/roster`·`observe/draft`·`observe/note` (c14 · 08-31)
+ *   정본 = `관찰태그_자동화_설계.md` v1.1. 선행이던 유호님 계약 판정이 08-31 「웅 그대로 가」로
+ *   섰다(`observation.noted` + 물리칸 2 + RLS 개정 = c14). 이 셋이 그 판의 **생산자**다.
+ *   🔑 **`draft` 가 DB 를 한 번도 안 건드리는 것**이 설계 §2 「초안은 사건이 아니다」의 물리다 —
+ *     초안은 화면 위의 임시 상태고, 확정 전에 이탈하면 아무 데도 안 남는다. 벤더만 왕복한다.
+ *   🔑 `draft_modified` 는 **서버가 정한다**(§2 ㉡ 되싣기) — 앱이 불리언을 보내면 `서버칸`
+ *     규약이 막으려던 자기신고가 이름만 바꿔 돌아온다.
+ *   ⚠ 되싣은 초안의 **위조는 막지 않는다**(서명 0). 지금 문턱 상수가 0이라 무수정 통과율에
+ *     걸린 결과가 없어 위조 유인 자체가 없다 — 게이트를 세우는 날 이 자리가 재판정이다(§2
+ *     「먼저 세고, 실측이 쌓이면 게이트를 판정한다」). 「막았다」고 적지 않는 것이 이 줄의 일이다.
  */
 import postgres from 'npm:postgres@3.4.4';
 import 토큰모듈 from './토큰.mjs';
@@ -53,6 +60,9 @@ import 라디오태스크모듈 from './라디오태스크.mjs';
 import 반피드백모듈 from './반피드백.mjs';
 import 계약판모듈 from './계약판.mjs';
 import CORS모듈 from './CORS.mjs';
+import 관찰모듈 from './관찰초안.mjs';
+import 출처모듈 from './사건출처.mjs';
+import 교정모듈 from './교정엔진.mjs';
 
 const { 예비응답 } = CORS모듈 as {
   예비응답: (req: Request, 메서드?: string) => Response | null;
@@ -60,6 +70,43 @@ const { 예비응답 } = CORS모듈 as {
 };
 
 const { 토큰주체 } = 토큰모듈 as { 토큰주체: (req: Request) => string | null };
+
+/* 관찰 — 어휘·프롬프트·지문·분모 규칙의 정본은 `lib/관찰초안.js` 하나다(동봉본을 읽는다).
+ * 🚫 값록을 여기 다시 적지 않는다 — 두 곳이 알면 갈리고, 갈린 쪽은 조용히 틀린다. */
+type 초안 = { area: string | null; tags: string[]; confidence: number | null; draft_ver: string; 사유: string | null };
+const {
+  판정판: 초안판, 원문검사, 지시문: 관찰지시문, 사용자글: 관찰사용자글,
+  초안읽기, 빈초안, 고쳤나, 확정검사, 최대토큰: 관찰최대토큰,
+} = 관찰모듈 as {
+  판정판: string;
+  원문검사: (v: unknown) => { 값?: string; 거절?: string };
+  지시문: () => string;
+  사용자글: (원문: string) => string;
+  초안읽기: (글: string) => 초안;
+  빈초안: (사유?: string | null) => 초안;
+  고쳤나: (초안: unknown, 확정: unknown) => boolean | null;
+  확정검사: (area: unknown, tags: unknown) => { area?: string; tags?: string[]; 거절?: string; 칸?: string };
+  최대토큰: number;
+};
+
+/* 「어떻게 알게 됐나」와 「무엇 아래 모였나」 — 표는 `lib/사건출처.js` 하나다(둘 다 동봉본). */
+const { 사건출처, 운영기록판, 동의게이트지나나 } = 출처모듈 as {
+  사건출처: (event_type: string) => string | null;
+  운영기록판: string;
+  동의게이트지나나: (event_type: string) => boolean;
+};
+
+/* 벤더 주소·판·모델·상한 — `lib/교정엔진.js` 것을 **그대로** 쓴다(`functions/correct` 와 공용).
+ * 🚫 여기서 주소나 모델 이름을 다시 짓지 않는다: 둘이 갈리면 증상이 원인과 안 닮은 모양
+ *   (「키는 맞는데 401」)으로 온다 — 그 파일 머리말이 못박은 자리다. */
+const { 모델, 왕복제한밀리, 메시지경로, 벤더헤더, 응답글, 벤더사유 } = 교정모듈 as {
+  모델: string;
+  왕복제한밀리: number;
+  메시지경로: string;
+  벤더헤더: (키: string) => Record<string, string>;
+  응답글: (본문: unknown) => string | null;
+  벤더사유: (글: string) => string | null;
+};
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
 
@@ -167,6 +214,16 @@ const 경로표 = {
   'feedback/classes': 'GET',
   'feedback/queue': 'GET',
   'feedback/give': 'POST',
+  /* 교실 관찰 — 셋이다(관찰태그 설계 v1.1 §4 흐름: 학생 고르기 → 초안 → 확정).
+   * 🔴 `draft` 와 `note` 를 **가르는 것이 설계 §2 의 물리**다. 하나로 합치면 초안이 확정과
+   *   같은 왕복에 실려, 「초안은 사건이 아니다」가 코드가 아니라 화면 규약으로만 남는다.
+   *   갈라 두면 draft 는 DB 를 못 건드리는 함수가 되어 **원리상** 아무것도 안 남긴다.
+   * ⚠ `roster` 가 `feedback/classes` 와 다른 이유: 저쪽은 «반»과 이번 주 조용한 학생을 주고,
+   *   여기는 관찰을 적을 학생 하나를 고르는 목록이다. 합치면 관찰 화면이 남의 화면 재료
+   *   (한 마디 기다림 수)를 들고 다니게 되는데, 그건 §2 ㉯ 가 막은 **앱 축 데이터**다. */
+  'observe/roster': 'GET',
+  'observe/draft': 'POST',
+  'observe/note': 'POST',
 } as const;
 type 아는경로 = keyof typeof 경로표;
 const 안내 = Object.entries(경로표).map(([p, m]) => `${m} /v1/teach/${p}`).join(' · ');
@@ -202,7 +259,15 @@ const 거절상태 = {
    * `NOTE_BY_OTHER` = 같은 산출물에 **다른 강사**가 이미 한 마디를 남겼다(한 반에 강사 둘이
    *   정상이라 실제로 난다 · 설계 §1 ⓐ). 자기 것 개서는 이 코드로 안 온다. */
   NOTE_BY_OTHER: 409,
+  /* 관찰 — 「지금은 안 된다」라 409 다.
+   * `DRAFT_STALE` = 되실은 초안이 **이 판정판의 것이 아니다**(초안을 받아 둔 사이에 배포가
+   *   지나갔다). 그대로 대조하면 옛 판의 지문으로 `draft_modified` 를 세게 되어, 그 수는
+   *   「고쳤나」가 아니라 「판이 바뀌었나」를 센다. 처방은 재조립이 아니라 **초안 다시 받기**다. */
+  DRAFT_STALE: 409,
   CONSENT_MISSING: 403,
+  /* 초안만의 「지금 못 한다」 — 벤더 키가 없거나 왕복이 실패했다. 🔑 **거절이 아니다**:
+   * 이 경로는 빈 초안을 200 으로 돌려준다(비운 채 확정이 규격 · §3). 여기 남긴 것은 그
+   * 사실을 로그와 응답 `사유` 로 «말한다»는 뜻뿐이라, 상태표엔 실릴 코드가 없다. */
   INTERNAL: 500,
 } as const;
 type 거절코드 = keyof typeof 거절상태;
@@ -283,6 +348,7 @@ Deno.serve(async (req: Request) => {
     if (경로 === 'retro/open') return await 회고열기(url, staff_id, ver);
     if (경로 === 'feedback/classes') return await 내반목록(staff_id, ver);
     if (경로 === 'feedback/queue') return await 반큐읽기(url, staff_id, ver);
+    if (경로 === 'observe/roster') return await 관찰로스터(staff_id, ver);
     const 본문 = await 본문읽기(req);
     if (본문 === undefined) {
       return 실패(400, { code: 'CONTRACT_VIOLATION', message: 'JSON 이 아닙니다', retryable: false }, ver);
@@ -291,6 +357,8 @@ Deno.serve(async (req: Request) => {
     if (경로 === 'retro/self') return await 자기판정(본문, staff_id, ver);
     if (경로 === 'retro/judge') return await 회고판정(본문, staff_id, ver);
     if (경로 === 'feedback/give') return await 한마디주기(본문, staff_id, ver);
+    if (경로 === 'observe/draft') return await 관찰초안내기(본문, ver);
+    if (경로 === 'observe/note') return await 관찰확정(본문, staff_id, ver);
     return await 판정하기(본문, staff_id, ver);
   } catch (e) {
     console.error(`[teach/${경로}] 실패`, String((e as Error)?.message ?? e));
@@ -1412,6 +1480,215 @@ async function 한마디주기(본문: unknown, staff_id: string, ver: string) {
       updated_at: 행.updated_at ?? null,
       disposition: 값.disposition,
       origin: 값.origin,
+    };
+  });
+
+  if ('거절' in 결과) return 거절응답(결과 as { 거절: 거절코드; 문구: string; 칸?: string }, ver);
+  return 봉투(200, { ok: true, ...결과 }, ver);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════
+ * 교실 관찰 — 셋 (계약 c14 `observation.noted` · 정본 = `관찰태그_자동화_설계.md` v1.1)
+ *
+ * 흐름은 설계 §4 그대로다: **학생 고르기 → 자유 한 줄 → AI 초안 → 강사 확정**.
+ * 🔴 이 통로가 닫는 것: 앱은 발음·태도·위축을 **원리상** 못 본다. 교실에서만 보이는 것이
+ *   엔진에 닿는 길은 이 셋뿐이고, 그전까지는 라이브 구글 폼이 받아 `student_errors` 로만 갔다
+ *   (동의판·급수 스냅샷이 없는 행이라 학습 재료로 승격이 안 된다 · §4 ③).
+ * ══════════════════════════════════════════════════════════════════════════════════════ */
+
+/** 관찰을 적을 학생 목록 — 내 담당 반 전원. */
+async function 관찰로스터(staff_id: string, ver: string) {
+  const 결과 = await sql.begin(async (tx) => {
+    /* 권한은 라우트가 아니라 `staff_classes` 가 건다(:1123 과 같은 길). 담당이 없으면 빈 목록이지
+     * 403 이 아니다 — 「아직 반이 안 배정됐다」와 「강사가 아니다」는 다른 사실이다. */
+    const 행들 = await tx`
+      select l.learner_id, l.student_code, l.display_name, l.level_current,
+             c.class_id, c.class_key, c.display_name as class_name
+        from engine.staff_classes sc
+        join engine.classes c  on c.class_id = sc.class_id and c.active
+        join engine.learners l on l.class_id = c.class_id and l.active
+       where sc.staff_id = ${staff_id}::uuid
+       order by c.class_key, l.display_name, l.student_code`;
+
+    /* 🔴 **학생 이름을 여는 조회다** — 직원 통로 규약상 감사 1행이 한 벌이다(설계 §5).
+     *   0건도 남긴다(`feedback/classes` 와 같은 판정: 안 연 것과 열었는데 비었던 것은 다르다). */
+    const ids = 행들.map((r: Record<string, unknown>) => String(r.learner_id));
+    await tx`
+      insert into engine.staff_access_log (staff_id, action, target_ids)
+      values (${staff_id}::uuid, 'teach.observe.roster', ${ids}::uuid[])`;
+
+    return 행들.map((r: Record<string, unknown>) => ({
+      learner_id: String(r.learner_id),
+      student_code: r.student_code ?? null,
+      display_name: r.display_name ?? null,
+      /* 급수는 **화면이 안 그린다**(§2 ㉯ — 앱 축 데이터 표시 금지). 여기 싣는 이유는 하나뿐:
+       * 확정 시점의 `level_snapshot` 을 서버가 이 목록과 같은 값으로 박는다(아래 관찰확정). */
+      level_current: r.level_current ?? null,
+      class_key: r.class_key ?? null,
+      class_name: r.class_name ?? null,
+    }));
+  });
+  return 봉투(200, { ok: true, roster: 결과 }, ver);
+}
+
+/**
+ * 자유 한 줄 → 구조 초안. 🔴 **DB 를 한 번도 안 건드린다**(설계 §2 「초안은 사건이 아니다」).
+ * 그래서 `staff_id` 도 안 받는다 — 학생을 안 가리키므로 감사할 대상이 없다(문은 위에서 이미 났다).
+ * 🔑 실패는 **거절이 아니라 빈 초안**이다: 강사는 언제나 비운 채 확정할 수 있고(§3), AI 가
+ *   막혔다고 교실 관찰이 못 실리면 그 통로는 벤더 가동률만큼만 사는 통로가 된다.
+ */
+async function 관찰초안내기(본문: unknown, ver: string) {
+  const b = (본문 && typeof 본문 === 'object' ? 본문 : {}) as Record<string, unknown>;
+  const 검사 = 원문검사(b.note_text);
+  if (검사.거절) {
+    return 실패(400, { code: 'CONTRACT_VIOLATION', field: 'note_text', message: String(검사.거절), retryable: false }, ver);
+  }
+  const 원문 = String(검사.값);
+
+  const 키 = Deno.env.get('ANTHROPIC_API_KEY') ?? '';
+  if (!키) {
+    console.error('[teach/observe.draft] ANTHROPIC_API_KEY 가 없다 — 빈 초안으로 접는다');
+    return 봉투(200, { ok: true, draft: 빈초안('키없음') }, ver);
+  }
+
+  try {
+    const r = await fetch(메시지경로, {
+      method: 'POST',
+      headers: 벤더헤더(키),
+      /* 🔑 모델·주소·판은 `lib/교정엔진.js` 것을 그대로 쓴다 — 벤더 상수를 두 곳이 알면
+       *   갈리고, 갈린 증상은 「키는 맞는데 401」처럼 원인과 안 닮은 모양으로 온다.
+       * ⚠ 관찰 구조화는 교정보다 **쉬운 일**이라(한 줄 → 태그 2개) 나중에 값싼 급으로 내릴
+       *   여지가 있다. 지금 안 가르는 이유는 실측이 0이라서다 — 단가가 보이면 그때 판정이다. */
+      body: JSON.stringify({
+        model: 모델,
+        max_tokens: 관찰최대토큰,
+        system: 관찰지시문(),
+        messages: [{ role: 'user', content: 관찰사용자글(원문) }],
+      }),
+      signal: AbortSignal.timeout(왕복제한밀리),
+    });
+    if (!r.ok) {
+      const 실패글 = (await r.text()).slice(0, 300);
+      console.error('[teach/observe.draft] 벤더', r.status, 벤더사유(실패글) ?? 실패글.slice(0, 120));
+      return 봉투(200, { ok: true, draft: 빈초안('벤더:' + r.status) }, ver);
+    }
+    const 몸 = await r.json();
+    const 글 = 응답글(몸);
+    if (!글) return 봉투(200, { ok: true, draft: 빈초안('응답형식밖') }, ver);
+    return 봉투(200, { ok: true, draft: 초안읽기(글), model: (몸 as { model?: string }).model ?? null }, ver);
+  } catch (e) {
+    console.error('[teach/observe.draft] 예외', String((e as Error)?.name ?? e).slice(0, 60));
+    return 봉투(200, { ok: true, draft: 빈초안('예외') }, ver);
+  }
+}
+
+/**
+ * 확정 — **여기서만** 행이 남는다(§2 「확정만 적재」).
+ * `draft_modified` 는 되실은 초안과 확정값을 **서버가** 대조해 정한다(§2 ㉡).
+ */
+async function 관찰확정(본문: unknown, staff_id: string, ver: string) {
+  const b = (본문 && typeof 본문 === 'object' ? 본문 : {}) as Record<string, unknown>;
+  const learner_id = typeof b.learner_id === 'string' ? b.learner_id.trim() : '';
+  const 멱등키 = typeof b.idempotency_key === 'string' ? b.idempotency_key.trim() : '';
+
+  if (!/^[0-9a-f-]{36}$/i.test(learner_id)) {
+    return 실패(400, { code: 'CONTRACT_VIOLATION', field: 'learner_id', message: 'learner_id 가 필요합니다', retryable: false }, ver);
+  }
+  /* 🔑 멱등키를 **앱이 만든다**(`functions/events` 와 같은 규약) — 관찰은 같은 학생에게 하루에도
+   *   여러 번 정상으로 쌓이므로 서버가 내용으로 키를 지으면 「같은 관찰을 두 번 본 날」이 하나로
+   *   접힌다. 재전송 방어는 앱이 키를 재사용하는 것으로 선다. */
+  if (!멱등키) {
+    return 실패(400, { code: 'CONTRACT_VIOLATION', field: 'idempotency_key', message: 'idempotency_key 가 필요합니다', retryable: false }, ver);
+  }
+  const 글검사 = 원문검사(b.note_text);
+  if (글검사.거절) {
+    return 실패(400, { code: 'CONTRACT_VIOLATION', field: 'note_text', message: String(글검사.거절), retryable: false }, ver);
+  }
+  const 값검사 = 확정검사(b.area, b.tags);
+  if (값검사.거절) {
+    return 실패(400, { code: 'CONTRACT_VIOLATION', field: 값검사.칸 ?? 'area', message: String(값검사.거절), retryable: false }, ver);
+  }
+  const 확정 = { area: 값검사.area as string, tags: 값검사.tags as string[] };
+
+  /* 되실은 초안 — 없으면 「초안 없이 직접 썼다」이고 `draft_modified` 는 **null**(분모 밖).
+   * 🔴 판이 다른 초안은 거절한다: 옛 판 지문으로 대조하면 그 수는 「고쳤나」가 아니라
+   *   「판이 바뀌었나」를 센다(위 `DRAFT_STALE` 머리말). */
+  const 되실음 = (b.draft && typeof b.draft === 'object' ? b.draft : null) as Record<string, unknown> | null;
+  if (되실음 && 되실음.draft_ver !== 초안판) {
+    return 거절응답({ 거절: 'DRAFT_STALE', 문구: '초안을 다시 받아 주세요 — 그 사이에 초안 판이 바뀌었습니다', 칸: 'draft' }, ver);
+  }
+  const draft_modified = 되실음 ? 고쳤나(되실음, 확정) : null;
+
+  /* 🔴 동의 게이트를 **일부러 안 지난다** — 관찰은 학원 운영 기록 계열이다(계약 c14 ③).
+   *   강사 입력이 학생 기기 동의에 걸리면 교실 기록 자체가 성립 불가다. 그렇다고 조용히
+   *   버리지도 않는다 — `consent_ver` 에 동의판 대신 «운영기록»을 적어 그 사실을 행이 말한다
+   *   (표는 `lib/사건출처.js` 하나 · 형식이 `v18.9` 와 달라 섞여도 즉시 눈에 띈다).
+   * ⚠ 표가 바뀌면 **여기서 멈춘다** — 조용히 옛 동작을 이어가면 동의 없이 모인 행이 동의판을
+   *   달고 쌓이고, 그건 소급이 안 된다. */
+  if (동의게이트지나나('observation.noted')) {
+    console.error('[teach/observe.note] 관찰이 동의 계열 표에서 빠졌다 — 적재를 멈춘다');
+    return 실패(500, { code: 'INTERNAL', message: '관찰의 동의 계열이 바뀌었습니다 — 배포를 확인해 주세요', retryable: false }, ver);
+  }
+
+  const 결과 = await sql.begin(async (tx) => {
+    /* 🔴 호출자가 준 `learner_id` 를 **믿지 않는다** — 담당 반 밖이면 여기서 0행으로 막힌다
+     *   (`한마디주기` 와 같은 판단: 「없다」와 「내 것이 아니다」를 같은 코드로 묶는다). */
+    const [학생] = await tx`
+      select l.learner_id, l.level_current
+        from engine.learners l
+        join engine.staff_classes sc on sc.class_id = l.class_id
+       where l.learner_id = ${learner_id}::uuid
+         and l.active
+         and sc.staff_id = ${staff_id}::uuid`;
+    if (!학생) {
+      return { 거절: 'NOT_FOUND' as 거절코드, 문구: '담당 반의 학생이 아닙니다', 칸: 'learner_id' };
+    }
+
+    const [행] = await tx`
+      insert into engine.learning_events (
+        learner_id, event_type, actor_kind, occurred_at, idempotency_key,
+        level_snapshot, consent_ver, consent_id, source_kind, payload, schema_ver,
+        observer_staff_id, draft_modified
+      ) values (
+        ${learner_id}::uuid, 'observation.noted', 'teacher', now(), ${멱등키},
+        ${(학생.level_current ?? null) as string | null}, ${운영기록판},
+        /* 🔴 consent_id 는 **명시적으로 null** 이다 — 동의 «행»이 없기 때문이지 빠뜨린 것이
+         * 아니다. 열 목록에서 통째로 빼면 그 둘이 같은 모양이 되고, 회귀(동의귀속통로)가
+         * 「스탬프를 잊었다」로 잡는다(08-31 실측: 실제로 그렇게 걸렸다). 값은 없지만 «없다는
+         * 사실»은 적는다 — 그 사실을 말하는 칸이 위 consent_ver = 운영기록판 이다.
+         * ⚠ 이 주석은 SQL 템플릿 리터럴 **안**이다 — 백틱을 쓰면 문자열이 여기서 끊겨 함수가
+         *   번들조차 안 된다(08-31 실측: 처음에 백틱을 써서 실제로 깨졌다 · events 의 F180 과 같은 자리). */
+        ${null}::uuid,
+        ${사건출처('observation.noted')}::engine.source_kind,
+        ${sql.json({ ver: 1, area: 확정.area, tags: 확정.tags, note_text: String(글검사.값) })},
+        ${ver},
+        ${staff_id}::uuid, ${draft_modified}
+      )
+      on conflict (learner_id, idempotency_key) do nothing
+      returning occurred_at`;
+
+    /* 멱등 재전송은 오류가 아니다 — 원래 행이 있음을 확인하고 그 시각을 돌려준다
+     * (`functions/events` ③ 과 같은 규약).
+     * 🔴 `event_id` 를 **안 뽑는다** — ⑦ 과 같은 축이다(`review` ③): 그 값은 서버 안의 배선이라
+     *   브라우저로 나가면 안 된다. 화면이 필요로 하는 것은 「실렸나」와 「무엇으로 실렸나」뿐이고,
+     *   행을 가리킬 일이 생기면 그때는 이 통로가 아니라 감사 장부가 답한다. */
+    const [실린] = 행 ? [행] : await tx`
+      select occurred_at from engine.learning_events
+       where learner_id = ${learner_id}::uuid and idempotency_key = ${멱등키}`;
+    if (!실린) return { 거절: 'INTERNAL' as 거절코드, 문구: '관찰이 안 실렸습니다' };
+
+    await tx`
+      insert into engine.staff_access_log (staff_id, action, target_ids)
+      values (${staff_id}::uuid, 'teach.observe.note', array[${learner_id}::uuid])`;
+
+    return {
+      occurred_at: 실린.occurred_at,
+      area: 확정.area,
+      tags: 확정.tags,
+      /* 화면이 그 자리에서 안다 — 다시 조회하면 못 가른다(`한마디주기` 의 `updated_at` 과 같은 사유).
+       * `null` 은 「안 고쳤다」가 아니라 **분모 밖**이다(초안이 비었거나 없었다 · §2 분모 규칙). */
+      draft_modified,
+      새로실림: Boolean(행),
     };
   });
 

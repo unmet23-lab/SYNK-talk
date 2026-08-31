@@ -74,6 +74,12 @@ const 통로장부 = [
   'supabase/functions/deliver/index.ts',
   'supabase/functions/events/index.ts',
   'supabase/functions/radio-promote/index.ts',
+  /* c14 교실 관찰(08-31) — 넷째 생산자. **개입 사건을 안 나른다**(`observation.noted` 하나)라
+   * ②③ 의 스탬프·고리는 이 통로에 안 걸린다: 그 다섯 칸은 「엔진이 무엇을 왜 골라 줬나」의
+   * 재료인데, 관찰은 엔진이 고른 것이 아니라 사람이 교실에서 본 것이다(설계 §2 ㉮).
+   * ⚠ 그래도 장부에는 든다 — 「learning_events 에 붓는 자리가 여기 전부인가」는 개입과 무관하게
+   *   서야 하는 물음이고, 새 생산자가 조용히 늘어나는 것을 막는 것이 ① 의 일이다. */
+  'supabase/functions/teach/index.ts',
 ];
 
 function 통로실측() {

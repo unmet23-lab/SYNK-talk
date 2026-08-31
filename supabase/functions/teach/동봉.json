@@ -11,5 +11,10 @@
   "라디오태스크.mjs": "lib/라디오태스크.js",
   "반피드백.mjs": "lib/반피드백.js",
   "계약판.mjs": "lib/계약판.js",
-  "CORS.mjs": "lib/CORS.js"
+  "CORS.mjs": "lib/CORS.js",
+  "관찰초안.mjs": "lib/관찰초안.js",
+  "사건출처.mjs": "lib/사건출처.js",
+  "교정엔진.mjs": "lib/교정엔진.js",
+  "벤더사유.mjs": "lib/벤더사유.js",
+  "옛글자.mjs": "lib/옛글자.js"
 }
