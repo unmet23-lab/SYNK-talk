@@ -56,7 +56,9 @@ const s = StyleSheet.create({
   제목_병기: { fontFamily: 몽골어폰트.강조, fontSize: 17, lineHeight: 26, color: 색.잉크_서브 },
   본문_병기: { fontFamily: 몽골어폰트.캡션, fontSize: 15, lineHeight: 24, color: 색.잉크_메타 },
   번호칸: { alignItems: 'center', gap: 6, paddingVertical: 12 },
-  번호라벨: { fontFamily: 폰트.모노, fontSize: 12, letterSpacing: 모노트래킹, color: 색.잉크_메타 },
-  번호: { fontFamily: 폰트.모노, fontSize: 28, letterSpacing: 모노트래킹, color: 색.잉크 },
-  메모: { fontFamily: 폰트.모노, fontSize: 12, letterSpacing: 모노트래킹, color: 색.잉크_메타 },
+  /* 08-31 감사 D7-10 — letterSpacing 에 모노트래킹 «객체»를 통째로 넘기고 있었다(조용히 무시).
+     막힘카드와 같은 밀도·같은 위계라던 머리말 약속대로 그 규격(.라벨/.타이머 · 34px · 태그색)에 맞춘다. */
+  번호라벨: { fontFamily: 폰트.모노, fontSize: 11, letterSpacing: 모노트래킹.라벨, color: 색.잉크_태그 },
+  번호: { fontFamily: 폰트.모노, fontSize: 34, letterSpacing: 모노트래킹.타이머, color: 색.잉크 },
+  메모: { fontFamily: 폰트.모노, fontSize: 11, letterSpacing: 모노트래킹.라벨, color: 색.잉크_보조 },
 });

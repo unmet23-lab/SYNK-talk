@@ -143,7 +143,6 @@ const s = StyleSheet.create({
   늘어남: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 21, color: 색.잉크_보조 },
 
   back: { paddingTop: 8 },
-  backText: {
-    fontFamily: 폰트.모노, fontSize: 11, letterSpacing: 모노트래킹.라벨, color: 색.잉크_메타,
-  },
+  /* 08-31 감사 D6-7 — 한글 문장에 모노 폰트(한글 글리프 0) 지정이 걸려 있었다. 나침반 무늬로 통일. */
+  backText: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_서브 },
 });

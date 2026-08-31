@@ -75,9 +75,11 @@ export default function App() {
           }
         }
       } catch (e) {
-        /* 🔴 만료면 지우고, 네트워크면 남긴다. 둘 다 로그인 화면으로 보내지만 뒷일이 다르다 —
-           비행기 모드에서 지워 버리면 학생은 이유 없이 자격을 잃는다. */
-        if (e && e.code !== 'NETWORK') await 세션지우기().catch(() => {});
+        /* 🔴 만료면 지우고, «기다리면 낫는 것»이면 남긴다. 둘 다 로그인 화면으로 보내지만 뒷일이
+           다르다 — 비행기 모드에서 지워 버리면 학생은 이유 없이 자격을 잃는다.
+           🔑 가르는 자 = retryable(08-31 감사 G1-1) — code 이름(NETWORK)으로 가르면 서버 429/5xx
+           (SERVER_ERROR·retryable:true)가 만료로 읽혀 키체인이 영구 삭제된다. */
+        if (e && !e.retryable) await 세션지우기().catch(() => {});
       } finally {
         if (살아있음) set복원중(false);
       }

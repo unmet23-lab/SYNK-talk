@@ -443,7 +443,7 @@ const s = StyleSheet.create({
   다시고르기: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_보조, textAlign: 'center' },
   /* Ⅲ⑦ 확신도 토글 — 신호색 0(코랄은 녹음 버튼 하나 — 이 화면 규율 그대로) · 켬은 테두리·글자만. */
   확신줄: { flexDirection: 'row', gap: 8 },
-  확신토글: { flex: 1, borderWidth: 1, borderColor: 색.선, borderRadius: 12, paddingVertical: 8, alignItems: 'center' },
+  확신토글: { flex: 1, borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12, paddingVertical: 8, alignItems: 'center' },
   확신토글_켬: { borderColor: 색.잉크, backgroundColor: 색.바탕띄움 },
   확신글: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_보조 },
   확신글_켬: { color: 색.잉크 },

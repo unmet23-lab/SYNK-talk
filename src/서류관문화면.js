@@ -572,7 +572,7 @@ const s = StyleSheet.create({
   모름글: { fontFamily: 폰트.강조, fontSize: 14, color: 색.잉크_태그 },
   /* Ⅲ⑦ 확신도 토글 — 신호색 0 · 켬은 테두리·글자만(보고서교정화면과 같은 무늬). */
   확신줄: { flexDirection: 'row', gap: 8 },
-  확신토글: { flex: 1, borderWidth: 1, borderColor: 색.선, borderRadius: 12, paddingVertical: 8, alignItems: 'center' },
+  확신토글: { flex: 1, borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12, paddingVertical: 8, alignItems: 'center' },
   확신토글_켬: { borderColor: 색.잉크, backgroundColor: 색.바탕띄움 },
   확신글: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_보조 },
   확신글_켬: { color: 색.잉크 },

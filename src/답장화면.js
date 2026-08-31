@@ -47,7 +47,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { 색, 폰트, 모노트래킹, 몽골어 } from './테마';
+import { 색, 폰트, 몽골어 } from './테마';
 import { 교정앉음, 열람사건, 응답사건, 교정사건보내기, 학생응답값 } from './교정API.js';
 import { 항목추가, 응답값, 전송기록, 보낼것 } from '../lib/교정로그.js';
 import { 무오류인가, 무오류표식 } from '../lib/꼬리.js';
@@ -346,7 +346,7 @@ const s = StyleSheet.create({
   알림: { fontFamily: 폰트.캡션, fontSize: 14, lineHeight: 22, color: 색.잉크_서브 },
 
   back: { paddingTop: 8 },
-  backText: {
-    fontFamily: 폰트.모노, fontSize: 11, letterSpacing: 모노트래킹.라벨, color: 색.잉크_메타,
-  },
+  /* 08-31 감사 D6-7 — 한글 문장에 DM Mono(한글 글리프 0 · 테마.js 자백)를 지정해 글자 단위
+     시스템 폰트 폴백 + 라틴 라벨용 트래킹 2.4 가 걸려 있었다. 나침반·도착확인의 무늬로 통일. */
+  backText: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_서브 },
 });

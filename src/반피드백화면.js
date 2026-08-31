@@ -428,14 +428,16 @@ const s = StyleSheet.create({
   칩글: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_서브 },
   칩글_고름: { color: 색.바탕 },
 
+  /* 08-31 감사 D3-6 — 이 버튼이 색.잉크(Paper 면)라 «이 화면의 신호 1점 = 남기기 버튼»
+     (`테마.신호자리` · 아래 주석)이 선언만 있고 실물 코랄이 0점이었다. 회고·나침반 저장과 같은 규격. */
   저장: {
-    backgroundColor: 색.잉크,
+    backgroundColor: 색.신호,
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
   },
   저장글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.바탕 },
-  잠김: { opacity: 0.45 },
+  잠김: { backgroundColor: 색.잉크_희미 },
   눌림: { opacity: 0.65 },
 
   /* 운영 안내와 오류를 **밝기**로 가른다 — 「남이 이미 썼다」를 오류색으로 그리면 강사는 앱을

@@ -67,6 +67,18 @@ function 기억(세션) {
 }
 
 /**
+ * 지금 이 순간 가장 새 access_token — 기억이 있으면 기억, 없으면 화면이 쥔 prop 토큰.
+ *
+ * 🔑 왜 있나(08-31 감사 S1-3·G1-4): 화면 토큰은 App 이 로그인·복원 때 내린 prop 이라 갱신 뒤에도
+ *   낡은 채 남는다. 그러면 만료 «이후의 모든» 호출이 401 을 한 번 사고 재시도로 성공한다 —
+ *   자기 치유라 영영 안 보이는 이중 왕복 세금(몽골 회선에서 「오후만 되면 앱이 느려진다」).
+ *   첫 발사 «전에» 이 창구를 지나면 그 401 자체가 안 난다. 통로(사건통로.부르기) 한 곳만 쓴다.
+ */
+export function 현재토큰(prop토큰) {
+  return (최근세션 && 최근세션.access_token) || prop토큰;
+}
+
+/**
  * 만료된 토큰을 **한 번** 되살린다 — 401 을 만난 통로가 부른다(`src/사건통로.js`).
  *
  * @param {string} 쓴토큰  방금 401 을 맞은 access_token
@@ -91,9 +103,11 @@ export async function 토큰되살리기(쓴토큰) {
         return 새것.access_token;
       })
       .catch((e) => {
-        /* 만료면 기억을 버리고, 네트워크면 남긴다 — App.js 복원과 같은 규칙. 버리지 않으면
-           죽은 refresh_token 으로 호출마다 갱신을 한 번씩 더 사게 된다. */
-        if (!e || e.code !== 'NETWORK') 최근세션 = null;
+        /* 만료면 기억을 버리고, «기다리면 낫는 것»(네트워크·서버 일시 장애)이면 남긴다 — App.js
+           복원과 같은 규칙. 버리지 않으면 죽은 refresh_token 으로 호출마다 갱신을 한 번씩 더 산다.
+           🔑 가르는 자를 code 이름에서 retryable 로 바꿨다(08-31 감사 G1-1) — 429/5xx(SERVER_ERROR)
+           까지 기억을 지우면 서버 헛기침 하나에 학생 자격이 날아간다. */
+        if (!e || !e.retryable) 최근세션 = null;
         return null;
       })
       .finally(() => { 갱신중 = null; });
@@ -139,6 +153,12 @@ export async function 로그인(학생번호, 비밀번호) {
   }
   const 몸 = await r.json().catch(() => ({}));
   if (!r.ok) {
+    /* 🔴 08-31 감사 G1-2 — 429·5xx 까지 「비밀번호가 맞지 않습니다」로 접으면 서버 사정을 학생
+       탓으로 돌리는 거짓 비난이 된다(멀쩡한 비밀번호를 세 번 다시 치다 초기화 줄에 선다).
+       존재 누설 방지의 한 문장은 400/401 안에서만 유효한 논리다. */
+    if (r.status === 429 || r.status >= 500) {
+      throw new 인증오류('SERVER_ERROR', 말('err.retry_later'), true);
+    }
     // 🔴 GoTrue 의 원문을 그대로 보여주지 않는다 — 영어이고, 「없는 계정」과 「틀린 비밀번호」를
     //   가르는 문구라 학생번호의 존재가 샌다. 서버 게이트와 **같은 한 문장**으로 접는다.
     throw new 인증오류('LOGIN_FAILED', 말('err.login_failed'), false);
@@ -176,6 +196,13 @@ export async function 갱신(refresh_token, 학생번호) {
   }
   const 몸 = await r.json().catch(() => ({}));
   if (!r.ok || !몸.access_token) {
+    /* 🔴 08-31 감사 G1-1 — 429·5xx 는 일시 장애다. 만료(REFRESH_FAILED·retryable:false)로 접으면
+       App 복원·아래 catch 가 키체인·기억을 지워 **학생이 이유 없이 자격을 잃는다**(개원날 아침
+       한 반이 동시 접속해 GoTrue 가 429 를 뱉으면 걸린 학생들의 저장 세션이 영구 삭제되는 구조).
+       진짜 만료(400/401/403/404)만 지운다 — 「비행기 모드에서 지우면 자격을 잃는다」와 같은 규칙. */
+    if (r.ok === false && (r.status === 429 || r.status >= 500)) {
+      throw new 인증오류('SERVER_ERROR', 말('err.retry_later'), true);
+    }
     throw new 인증오류('REFRESH_FAILED', 말('err.refresh_failed'), false);
   }
   return 기억({

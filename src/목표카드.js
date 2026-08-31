@@ -73,7 +73,7 @@ const s = StyleSheet.create({
   라벨: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_태그 },
   본문: { fontFamily: 폰트.본문, fontSize: 15, lineHeight: 24, color: 색.잉크_서브 },
   단추줄: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  단추: { flex: 1, borderWidth: 1, borderColor: 색.선, borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
+  단추: { flex: 1, borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
   눌림: { opacity: 0.7 },
   단추글: { fontFamily: 폰트.강조, fontSize: 14, color: 색.잉크 },
   반응글: { fontFamily: 폰트.본문, fontSize: 14, lineHeight: 21, color: 색.잉크_서브 },

@@ -67,15 +67,27 @@ test('🔴 로그인 실패는 **한 문장으로 접힌다** — 없는 번호�
     { ok: false, status: 400, 몸: { error: 'invalid_grant', error_description: 'Invalid login credentials' } },
     { ok: false, status: 400, 몸: { error_description: 'Email not confirmed' } },
     { ok: false, status: 404, 몸: { msg: 'User not found' } },
-    { ok: false, status: 429, 몸: { msg: 'Too many requests' } },
   ]) {
     const { API } = 세우기({ 응답들: [r] });
     const e = await 던진것(() => API.로그인('SYNK-042', 'pw123456'));
     접힌것.push(`${e.code}|${e.message}`);
-    assert.ok(!/Invalid|not found|confirmed|requests/i.test(e.message),
+    assert.ok(!/Invalid|not found|confirmed/i.test(e.message),
       `🔴 GoTrue 원문이 그대로 샜다: ${e.message}`);
   }
   assert.equal(new Set(접힌것).size, 1, `🔴 실패 사유마다 답이 갈린다 — 학생번호의 존재가 샌다:\n  ${[...new Set(접힌것)].join('\n  ')}`);
+
+  /* 08-31 감사 G1-2 — 429·5xx 는 위 집합에서 뺐다: 전역 장애·전역 과부하는 «특정 계정»의 존재를
+     안 흘린다(누구에게나 같은 응답). 반대로 「맞지 않습니다」로 접으면 서버 사정이 학생 비난이 된다.
+     원문 누설 금지는 이 갈래에도 그대로 잰다. */
+  for (const r of [
+    { ok: false, status: 429, 몸: { msg: 'Too many requests' } },
+    { ok: false, status: 503, 몸: { msg: 'Service unavailable' } },
+  ]) {
+    const { API } = 세우기({ 응답들: [r] });
+    const e = await 던진것(() => API.로그인('SYNK-042', 'pw123456'));
+    assert.equal(e.code, 'SERVER_ERROR');
+    assert.ok(!/requests|unavailable/i.test(e.message), `🔴 GoTrue 원문이 그대로 샜다: ${e.message}`);
+  }
 });
 
 test('로그인 — 합성 이메일로 GoTrue 를 직접 부르고, 비밀번호는 손대지 않는다', async () => {
@@ -282,4 +294,29 @@ test('🔴 갱신 실패는 **네트워크와 만료를 가른다** — 비행�
 test('🔴 200 인데 access_token 이 없으면 성공으로 치지 않는다 (빈 세션이 서면 뒤의 쓰기가 전부 401)', async () => {
   const e = await 던진것(() => 세우기({ 응답들: [{ 몸: {} }] }).API.갱신('r', 'S-1'));
   assert.equal(e.code, 'REFRESH_FAILED');
+});
+
+/* ─── 08-31 감사 G1-1·G1-2 — 서버 사정과 학생 탓을 가른다 ─────────────────── */
+
+test('🔴 갱신의 429·5xx 는 만료가 아니다 — SERVER_ERROR·retryable:true (감사 G1-1: 개원날 아침 GoTrue 가 429 를 뱉으면, 만료로 접는 순간 걸린 학생들의 저장 세션이 영구 삭제된다)', async () => {
+  const 과부하 = await 던진것(() => 세우기({ 응답들: [{ ok: false, status: 429, 몸: {} }] }).API.갱신('r', 'S-1'));
+  assert.equal(과부하.code, 'SERVER_ERROR');
+  assert.equal(과부하.retryable, true, 'retryable:false 면 App 복원이 키체인을 지운다 — 서버는 3초 뒤 멀쩡했다');
+
+  const 장애 = await 던진것(() => 세우기({ 응답들: [{ ok: false, status: 503, 몸: {} }] }).API.갱신('r', 'S-1'));
+  assert.equal(장애.code, 'SERVER_ERROR');
+  assert.equal(장애.retryable, true);
+
+  const 만료 = await 던진것(() => 세우기({ 응답들: [{ ok: false, status: 400, 몸: {} }] }).API.갱신('r', 'S-1'));
+  assert.equal(만료.code, 'REFRESH_FAILED', '진짜 만료(400/401/403/404)는 그대로 접는다 — 죽은 토큰을 남기면 호출마다 갱신을 한 번씩 더 산다');
+});
+
+test('🔴 로그인의 429·5xx 는 「비밀번호가 맞지 않습니다」가 아니다 — 앱이 학생에게 하는 거짓 비난 금지 (감사 G1-2)', async () => {
+  const e = await 던진것(() => 세우기({ 응답들: [{ ok: false, status: 503, 몸: {} }] }).API.로그인('SYNK-001', 'pw'));
+  assert.equal(e.code, 'SERVER_ERROR');
+  assert.equal(e.retryable, true, '「잠시 뒤 다시」를 내야 학생이 멀쩡한 비밀번호를 의심하다 초기화 줄에 서지 않는다');
+
+  const 진짜 = await 던진것(() => 세우기({ 응답들: [{ ok: false, status: 400, 몸: {} }] }).API.로그인('SYNK-001', 'pw'));
+  assert.equal(진짜.code, 'LOGIN_FAILED', '400/401 은 그대로 한 문장으로 접는다 — 존재 누설 방지는 이 갈래에서만 유효한 논리다');
+  assert.equal(진짜.retryable, false);
 });

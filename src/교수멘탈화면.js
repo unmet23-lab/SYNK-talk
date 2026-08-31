@@ -270,7 +270,9 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
       {/* 교수님 — 판 내내 «한 자리»에 산다(자리를 옮기면 학생 눈이 그 이동을 좇는다).
           🔴 상태에 숫자·퍼센트를 병기하지 않는다(규격 3 · 모호함이 설계다). */}
       <View style={s.NPC자리}>
-        <NPC 역="prof" 상태={단계 === '대기' ? 전이상태('완료') : 전이상태('시작')} 크기={88} />
+        {/* 08-31 감사 D4-5 — 「메일을 보내지 못했어요」가 선 동안 교수님이 흡족(완료)하면 화면이
+            자기모순이다. 실패면 calm(시작)으로 되돌린다(흡족만 거둔다 — 기죽는 반응은 금지). */}
+        <NPC 역="prof" 상태={단계 === '대기' ? 전이상태(메일항목 && !메일항목.event_id && 메일항목.send_final ? '시작' : '완료') : 전이상태('시작')} 크기={88} />
       </View>
       {오류 && <Text style={s.오류}>{오류}</Text>}
 
@@ -471,6 +473,6 @@ const s = StyleSheet.create({
   편지글: { fontFamily: 폰트.본문, fontSize: 16, lineHeight: 27, color: 색.잉크 },
   /* Ⅲ⑥ 확인 단추 — 신호색 0(확신 토글과 같은 결) · 두 단추는 같은 무게다(어느 답도 밀지 않는다). */
   확인줄: { flexDirection: 'row', gap: 8 },
-  확인단추: { flex: 1, borderWidth: 1, borderColor: 색.선, borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
+  확인단추: { flex: 1, borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
   확인단추글: { fontFamily: 폰트.강조, fontSize: 14, color: 색.잉크 },
 });
