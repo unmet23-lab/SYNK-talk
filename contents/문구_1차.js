@@ -298,6 +298,38 @@ const 목록 = [
     max_len: null,
     source_file: 'contents/문구_오류.js',
   },
+  {
+    string_id: 'err.mic_denied',
+    source_ko: '마이크를 쓸 수 없어요 — 설정에서 마이크를 켜 주세요',
+    draft_mn: null,
+    context: '학생이 마이크 권한을 거절해 녹음을 못 여는 상태. 「어디서 푸는지(설정)」까지 함께 말한다 — 바로 곁에 「설정 열기」 버튼이 선다.',
+    max_len: null,
+    source_file: 'contents/문구_오류.js',
+  },
+  {
+    string_id: 'err.mic_check_failed',
+    source_ko: '마이크를 확인하지 못했어요',
+    draft_mn: null,
+    context: '권한을 묻는 것 자체가 실패했을 때. 뒤에 「: 기계 원인」이 덧붙는데 그건 옮기지 않는다.',
+    max_len: null,
+    source_file: 'contents/문구_오류.js',
+  },
+  {
+    string_id: 'err.audio_setup_failed',
+    source_ko: '소리를 준비하지 못했어요',
+    draft_mn: null,
+    context: '권한은 받았는데 녹음 모드 전환이 실패했을 때. 뒤에 「: 기계 원인」이 덧붙는데 그건 옮기지 않는다.',
+    max_len: null,
+    source_file: 'contents/문구_오류.js',
+  },
+  {
+    string_id: 'err.recover.found',
+    source_ko: '아까 담은 녹음이 있어요 — 들어보고 보낼까요?',
+    draft_mn: null,
+    context: '녹음을 담은 뒤 앱이 죽어 못 보낸 학생이 다시 열었을 때의 복구 카드. 실패가 아니라 「이어서 하자」로 말한다 — 버튼 둘(들어보고 정하기 · 새로 말하기)이 함께 선다.',
+    max_len: null,
+    source_file: 'contents/문구_오류.js',
+  },
 
   /* ── ④ 로그인·첫등록 화면 ─────────────────────────────────────────────────
    * 모든 학생의 **첫 화면**이다. 여기서 못 들어오면 나머지 300줄은 의미가 없다.
@@ -308,7 +340,7 @@ const 목록 = [
     draft_mn: null,
     context: '로그인 화면의 큰 제목(26px, 한 줄). 아래 버튼과 같은 낱말이다 — 같게 옮겨도 된다.',
     max_len: 18,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.title.first',
@@ -316,7 +348,7 @@ const 목록 = [
     draft_mn: null,
     context: '첫 등록 화면 제목. 반기는 말이지 안내가 아니다.',
     max_len: 18,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.title.temp',
@@ -324,7 +356,7 @@ const 목록 = [
     draft_mn: null,
     context: '비밀번호를 잊어 학원에서 6자리를 받아 온 학생의 화면 제목.',
     max_len: 18,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.title.change',
@@ -332,7 +364,7 @@ const 목록 = [
     draft_mn: null,
     context: '비밀번호 변경 화면 제목.',
     max_len: 18,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.button.login',
@@ -340,7 +372,7 @@ const 목록 = [
     draft_mn: null,
     context: '로그인 버튼(16px, 한 줄). 짧을수록 좋다.',
     max_len: 30,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.button.first',
@@ -348,7 +380,7 @@ const 목록 = [
     draft_mn: null,
     context: '첫 등록을 마치는 버튼. 「가입」이 아니라 「시작」이다 — 학생은 이미 학원에 등록돼 있다.',
     max_len: 30,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.button.temp',
@@ -356,7 +388,7 @@ const 목록 = [
     draft_mn: null,
     context: '임시번호를 새 비밀번호로 바꾸며 들어가는 버튼. 넷 중 가장 길다 — 폭 예산이 여기서 걸린다.',
     max_len: 30,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.button.change',
@@ -364,7 +396,7 @@ const 목록 = [
     draft_mn: null,
     context: '비밀번호 변경 버튼.',
     max_len: 30,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.field.student_id',
@@ -372,7 +404,7 @@ const 목록 = [
     draft_mn: null,
     context: '입력칸 라벨. 학원이 준 SYNK-042 꼴 번호. 이 낱말은 막힘 카드에도 나온다 — 같은 말로 옮겨야 학생이 같은 것으로 안다.',
     max_len: 22,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.field.phone_last4',
@@ -380,7 +412,7 @@ const 목록 = [
     draft_mn: null,
     context: '첫 등록에서 본인 확인에 쓰는 입력칸 라벨.',
     max_len: 22,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.field.temp_code',
@@ -388,7 +420,7 @@ const 목록 = [
     draft_mn: null,
     context: '임시번호 입력칸 라벨. 「어디서 받는지」가 라벨 안에 들어 있다 — 그 정보를 잃으면 안 된다.',
     max_len: 22,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.field.password',
@@ -396,7 +428,7 @@ const 목록 = [
     draft_mn: null,
     context: '로그인 화면의 비밀번호 입력칸 라벨.',
     max_len: 22,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.field.password_now',
@@ -404,7 +436,7 @@ const 목록 = [
     draft_mn: null,
     context: '변경 화면에서 «현재» 비밀번호를 넣는 칸. 아래 「새 비밀번호」와 **한눈에 갈려야** 한다.',
     max_len: 22,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.field.password_new',
@@ -412,7 +444,7 @@ const 목록 = [
     draft_mn: null,
     context: '변경 화면에서 새로 정하는 칸. 위 「지금 비밀번호」와 짝이다.',
     max_len: 22,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.field.password_set',
@@ -420,7 +452,7 @@ const 목록 = [
     draft_mn: null,
     context: '첫 등록·임시번호 화면에서 처음 정하는 칸(바꾸는 게 아니라 «정하는» 것이다).',
     max_len: 22,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.field.email',
@@ -428,7 +460,7 @@ const 목록 = [
     draft_mn: null,
     context: '첫 등록의 선택 입력칸.',
     max_len: 22,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.field.phone_alt',
@@ -436,7 +468,7 @@ const 목록 = [
     draft_mn: null,
     context: '첫 등록의 선택 입력칸(가족 번호 등). 위 「전화번호 뒤 4자리」와 다른 것임이 드러나야 한다.',
     max_len: 22,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.hint.password_min',
@@ -444,7 +476,7 @@ const 목록 = [
     draft_mn: null,
     context: '비밀번호 칸 오른쪽에 작게 붙는 도움말(12px). 라벨과 같은 줄을 나눠 쓰므로 **매우 짧아야** 한다. {n} 자리에 숫자가 들어간다(지금 6) — 그대로 둔다.',
     max_len: 12,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.contact.head',
@@ -452,7 +484,7 @@ const 목록 = [
     draft_mn: null,
     context: '첫 등록의 선택 묶음 머리말. 🔑 괄호 안이 핵심이다 — 이게 없으면 학생이 필수인 줄 알고 멈춘다.',
     max_len: 34,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.contact.tail',
@@ -460,7 +492,7 @@ const 목록 = [
     draft_mn: null,
     context: '위 묶음의 꼬리말(12px, 줄바꿈 자유). 개인정보를 왜 받는지·어디에 안 쓰는지 둘 다 말한다 — 뒷문장을 빼면 안 된다.',
     max_len: null,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.link.first',
@@ -468,7 +500,7 @@ const 목록 = [
     draft_mn: null,
     context: '로그인 화면 아래 작은 링크 → 첫 등록으로. 물음표 없는 물음이다.',
     max_len: 34,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.link.forgot',
@@ -476,7 +508,7 @@ const 목록 = [
     draft_mn: null,
     context: '로그인 화면 아래 작은 링크 → 임시번호 화면으로.',
     max_len: 34,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
   {
     string_id: 'auth.link.back',
@@ -484,7 +516,7 @@ const 목록 = [
     draft_mn: null,
     context: '로그인 화면으로 되돌아가는 링크. 화살표(←)는 그대로 두고 글자만 옮긴다.',
     max_len: 34,
-    source_file: 'src/인증화면.js',
+    source_file: 'contents/문구_인증.js',
   },
 
   /* ── ④-2 첫 등록 1회 문항 ─────────────────────────────────────────────────

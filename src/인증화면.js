@@ -3,7 +3,7 @@ import {
   ActivityIndicator, Animated, KeyboardAvoidingView, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
-import { 색, 폰트, 모노트래킹, 몽골어폰트 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어폰트, 눌림층, 글자배율상한 } from './테마';
 import { use등장 } from '../lib/모션.js';
 import { 학생번호맞나, 계정번호맞나, 학생번호접두 } from '../lib/학생계정.js';
 import { 문항, 답검사 } from '../lib/가입문항.js';
@@ -11,7 +11,11 @@ import * as API from './인증API';
 /* 학생이 읽는 글의 정본은 `contents/문구_오류.js` 다 — 화면은 «어느 말을 언제 쓰나»만 정한다.
    🔑 `코드로말` 은 **모르는 코드에서 서버 말을 버리지 않는다**: 우리 표로 덮으면 서버가 새
    코드를 내는 날 학생도 우리도 무엇이 막았는지 모른 채 일반 문구만 본다(F176). */
-import { 말, 코드로말 } from '../contents/문구_오류.js';
+import { 말, 줄들, 코드로말 } from '../contents/문구_오류.js';
+/* 인증 카피(제목·버튼·칸 라벨·곁길·연락처)의 정본은 `contents/문구_인증.js` 다 — 감수 목록
+   (`contents/문구_1차.js` `auth.*`)의 `source_file` 이 그 표를 가리키므로 문장을 고치는 자리도
+   그 표 하나다. `줄들` 은 문구_오류 의 것과 이름이 겹쳐 별칭으로 든다. */
+import { 문구 as 인증문구, 줄들 as 인증줄들 } from '../contents/문구_인증.js';
 
 /**
  * 인증 화면 — 한 파일 안의 네 걸음(로그인 · 첫 등록 · 임시번호 · 비밀번호 변경).
@@ -36,6 +40,10 @@ const 단계 = { 로그인: '로그인', 첫등록: '첫등록', 임시: '임시
  * 도움말에는 「6자 이상」이라고 적혀 있는 모양이다.
  * ⚠ 서버가 진짜 게이트다 — 여기 값은 화면을 미리 잠그는 편의일 뿐이다. */
 const 최소비번 = 6;
+
+/* 칸·곁길에 신는 라벨 짝 — `mn` 이 빈 동안 `라벨_mn` 은 null 이라 킷 폰트·한국어 그대로다.
+   감수가 차는 날 표(`문구_인증.js`)만 바뀐다(`고르기` 무늬 — 폰트는 글자를 따라간다). */
+const 라벨짝 = (id) => ({ 라벨: 인증문구[id].ko, 라벨_mn: 인증문구[id].mn || null });
 
 /* 🔴 `토큰` prop 은 **일부러 없다.** 비밀번호 변경이 그것으로 PUT 을 치던 것이 세션 삼분의
  * 원인이었다(전층감사 §2-6) — 받아 두면 다음 사람이 다시 그 자리에 쓴다. 이 화면이 쓰는
@@ -91,32 +99,32 @@ export default function 인증화면({ 로그인성공, 시작단계 = 단계.�
 
   const 제출 = {
     [단계.로그인]: {
-      제목: '들어가기',
+      제목: 인증문구['auth.title.login'].ko,
       쓸수있나: 번호형식 && 비번.length > 0,
-      버튼: '들어가기',
+      버튼: 인증문구['auth.button.login'].ko,
       실행: async () => 로그인성공(await API.로그인(학생번호, 비번)),
     },
     [단계.첫등록]: {
-      제목: '처음 오셨네요',
+      제목: 인증문구['auth.title.first'].ko,
       /* 🔴 세 문항을 **다 고르기 전엔 버튼이 안 열린다.** 선택으로 두면 건너뛴 학생의 세 칸이
          영구 null 이고 그건 되물어도 못 채운다 — 그래서 「밝히지 않음」은 성별 **보기 안에**
          있고(기록된 비공개 ≠ 빈 칸), 건너뛰기는 없다. 검사는 서버와 **같은 함수**를 쓴다. */
       쓸수있나: 학생번호형식 && 뒷자리.length === 4 && 새비번.length >= 최소비번 && !답검사(가입답),
-      버튼: '시작하기',
+      버튼: 인증문구['auth.button.first'].ko,
       실행: async () => 로그인성공(await API.첫등록({
         학생번호, 뒷자리, 비밀번호: 새비번, 복구이메일: 복구메일, 복구전화: 복구전화, 가입답,
       })),
     },
     [단계.임시]: {
-      제목: '임시번호로 들어가기',
+      제목: 인증문구['auth.title.temp'].ko,
       쓸수있나: 학생번호형식 && 임시번호.length === 6 && 새비번.length >= 최소비번,
-      버튼: '새 비밀번호로 시작하기',
+      버튼: 인증문구['auth.button.temp'].ko,
       실행: async () => 로그인성공(await API.임시번호로그인({ 학생번호, 임시번호, 새비밀번호: 새비번 })),
     },
     [단계.변경]: {
-      제목: '비밀번호 바꾸기',
+      제목: 인증문구['auth.title.change'].ko,
       쓸수있나: 번호형식 && 비번.length > 0 && 새비번.length >= 최소비번,
-      버튼: '바꾸기',
+      버튼: 인증문구['auth.button.change'].ko,
       실행: async () => {
         /* 🔴 **새 세션을 세우고 나서 닫는다.** 비밀번호가 바뀌는 순간 GoTrue 가 그 요청을 친
          * 세션만 남기고 나머지를 죽이므로(`인증API.비밀번호변경` 머리말 · 리허설 실측),
@@ -152,7 +160,7 @@ export default function 인증화면({ 로그인성공, 시작단계 = 단계.�
 
         <칸
           id="학생번호"
-          라벨="학생번호"
+          {...라벨짝('auth.field.student_id')}
           값={학생번호}
           바꾸기={(t) => set학생번호(학생번호접두(t))}
           자리표시="SYNK-042"
@@ -161,22 +169,23 @@ export default function 인증화면({ 로그인성공, 시작단계 = 단계.�
         />
 
         {지금 === 단계.첫등록 && (
-          <칸 id="뒷자리" 라벨="전화번호 뒤 4자리" 값={뒷자리} 바꾸기={set뒷자리} 자리표시="1234" 숫자 최대={4} 모노 도움말="상담 때 알려주신 번호예요" />
+          <칸 id="뒷자리" {...라벨짝('auth.field.phone_last4')} 값={뒷자리} 바꾸기={set뒷자리} 자리표시="1234" 숫자 최대={4} 모노 도움말="상담 때 알려주신 번호예요" />
         )}
         {지금 === 단계.임시 && (
-          <칸 id="임시번호" 라벨="학원에서 받은 6자리" 값={임시번호} 바꾸기={set임시번호} 자리표시="000000" 숫자 최대={6} 모노 />
+          <칸 id="임시번호" {...라벨짝('auth.field.temp_code')} 값={임시번호} 바꾸기={set임시번호} 자리표시="000000" 숫자 최대={6} 모노 />
         )}
         {(지금 === 단계.로그인 || 지금 === 단계.변경) && (
           <칸
             id="비밀번호"
-            라벨={지금 === 단계.변경 ? '지금 비밀번호' : '비밀번호'}
+            {...라벨짝(지금 === 단계.변경 ? 'auth.field.password_now' : 'auth.field.password')}
             값={비번} 바꾸기={set비번} 비밀
           />
         )}
         {지금 !== 단계.로그인 && (
           <칸
-            라벨={지금 === 단계.변경 ? '새 비밀번호' : '쓸 비밀번호'}
-            값={새비번} 바꾸기={set새비번} 비밀 도움말={`${최소비번}자 이상`}
+            {...라벨짝(지금 === 단계.변경 ? 'auth.field.password_new' : 'auth.field.password_set')}
+            값={새비번} 바꾸기={set새비번} 비밀
+            도움말={인증줄들('auth.hint.password_min', { 채움: { n: 최소비번 } })[0].글}
           />
         )}
 
@@ -190,12 +199,14 @@ export default function 인증화면({ 로그인성공, 시작단계 = 단계.�
 
         {지금 === 단계.첫등록 && (
           <View style={s.선택묶음}>
-            <Text style={s.선택머리}>연락처 (넣지 않아도 시작할 수 있어요)</Text>
-            <칸 라벨="이메일" 값={복구메일} 바꾸기={set복구메일} 자리표시="" 이메일 />
-            <칸 라벨="다른 전화번호" 값={복구전화} 바꾸기={set복구전화} 자리표시="" 숫자 />
-            <Text style={s.선택꼬리}>
-              비밀번호를 잊었을 때 학원이 본인인지 확인하는 데만 써요. 여기로 연락은 가지 않아요.
-            </Text>
+            {인증줄들('auth.contact.head').map((줄, i) => (
+              <Text key={`머리${i}`} style={줄.mn ? s.선택머리_병기 : s.선택머리}>{줄.글}</Text>
+            ))}
+            <칸 {...라벨짝('auth.field.email')} 값={복구메일} 바꾸기={set복구메일} 자리표시="" 이메일 />
+            <칸 {...라벨짝('auth.field.phone_alt')} 값={복구전화} 바꾸기={set복구전화} 자리표시="" 숫자 />
+            {인증줄들('auth.contact.tail').map((줄, i) => (
+              <Text key={`꼬리${i}`} style={줄.mn ? s.선택꼬리_병기 : s.선택꼬리}>{줄.글}</Text>
+            ))}
           </View>
         )}
 
@@ -228,18 +239,18 @@ export default function 인증화면({ 로그인성공, 시작단계 = 단계.�
         >
           {도는중
             ? <ActivityIndicator color={색.바탕} />
-            : <Text style={s.버튼글}>{제출.버튼}</Text>}
+            : <Text style={s.버튼글} maxFontSizeMultiplier={글자배율상한}>{제출.버튼}</Text>}
         </Pressable>
 
         <View style={s.갈래}>
           {지금 === 단계.로그인 && (
             <>
-              <곁길 id="첫등록" 글="처음 오셨나요" 버튼꼴 누르기={() => 옮기기(단계.첫등록)} />
-              <곁길 id="임시" 글="비밀번호를 잊었어요" 누르기={() => 옮기기(단계.임시)} />
+              <곁길 id="첫등록" 글={인증문구['auth.link.first'].ko} 라벨_mn={인증문구['auth.link.first'].mn || null} 버튼꼴 누르기={() => 옮기기(단계.첫등록)} />
+              <곁길 id="임시" 글={인증문구['auth.link.forgot'].ko} 라벨_mn={인증문구['auth.link.forgot'].mn || null} 누르기={() => 옮기기(단계.임시)} />
             </>
           )}
           {지금 !== 단계.로그인 && (
-            <곁길 id="뒤로" 글="← 돌아가기" 누르기={() => (지금 === 단계.변경 && 닫기 ? 닫기() : 옮기기(단계.로그인))} />
+            <곁길 id="뒤로" 글={인증문구['auth.link.back'].ko} 라벨_mn={인증문구['auth.link.back'].mn || null} 누르기={() => (지금 === 단계.변경 && 닫기 ? 닫기() : 옮기기(단계.로그인))} />
           )}
         </View>
       </ScrollView>
@@ -252,17 +263,26 @@ export { 단계 };
 /* `id` 는 **자동 밟기(Maestro)가 잡는 손잡이**다 — 라벨(카피)과 갈라 둔 이유가 이것이다.
    라벨로 잡으면 카피 한 줄만 다듬어도 흐름이 통째로 깨진다(카피 감사가 52곳을 한 번에
    바꾼 이력이 있다). 규약·전량 목록은 `tests/자동밟기손잡이.test.js` 가 정본으로 든다. */
-/* 오류 한 줄 — 위 오류칸 주석의 박자를 지는 자리. 세기는 다른 화면의 «응답» 줄과 같다. */
+/* 오류 한 줄 — 위 오류칸 주석의 박자를 지는 자리. 세기는 다른 화면의 «응답» 줄과 같다.
+   ko/mn 줄배열 병기 — i===0 이 한국어(킷폰트), 뒤 줄은 몽골어폰트(막힘카드 눈금 · 가르는 자 = `줄들`). */
 function 오류줄({ 글 }) {
   const 등장 = use등장({ 올라옴: 6, 시간: 200 });
-  return <Animated.Text style={[s.오류, 등장]}>{글}</Animated.Text>;
+  /* accessibilityLiveRegion — Android 전용 속성(iOS 는 무시되어 무해) · 동적 등장 알림. */
+  return (
+    <Animated.View accessibilityLiveRegion="assertive" style={등장}>
+      {줄들(글).map((줄, i) => (
+        <Text key={i} style={i === 0 ? s.오류 : s.오류_병기}>{줄}</Text>
+      ))}
+    </Animated.View>
+  );
 }
 
-function 칸({ id, 라벨, 값, 바꾸기, 자리표시, 비밀, 숫자, 이메일, 모노, 최대, 자동대문자, 도움말 }) {
+function 칸({ id, 라벨, 라벨_mn, 값, 바꾸기, 자리표시, 비밀, 숫자, 이메일, 모노, 최대, 자동대문자, 도움말 }) {
   const [보임, set보임] = useState(false);
   const 입력 = (
     <TextInput
       testID={id ? `입력-${id}` : undefined}
+      maxFontSizeMultiplier={글자배율상한}
       value={값}
       onChangeText={(t) => 바꾸기(숫자 ? t.replace(/\D/g, '') : t)}
       placeholder={자리표시}
@@ -278,7 +298,7 @@ function 칸({ id, 라벨, 값, 바꾸기, 자리표시, 비밀, 숫자, 이메�
   return (
     <View style={s.칸}>
       <View style={s.칸머리}>
-        <Text style={s.칸라벨}>{라벨}</Text>
+        <Text style={[s.칸라벨, 라벨_mn && { fontFamily: 몽골어폰트.본문 }]}>{라벨_mn || 라벨}</Text>
         {도움말 ? <Text style={s.칸도움말}>{도움말}</Text> : null}
       </View>
       {비밀 ? (
@@ -316,6 +336,8 @@ function 고르기({ 라벨, 라벨_mn, 보기, 값, 고르기: 눌렀다 }) {
             <Pressable
               key={b.값}
               onPress={() => 눌렀다(b.값)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: 골랐나 }}
               style={({ pressed }) => [s.보기, 골랐나 && s.보기_고름, pressed && { opacity: 0.7 }]}
             >
               <Text style={[
@@ -331,10 +353,10 @@ function 고르기({ 라벨, 라벨_mn, 보기, 값, 고르기: 눌렀다 }) {
   );
 }
 
-function 곁길({ id, 글, 누르기, 버튼꼴 }) {
+function 곁길({ id, 글, 라벨_mn, 누르기, 버튼꼴 }) {
   return (
     <Pressable testID={id ? `곁길-${id}` : undefined} onPress={누르기} hitSlop={10} style={({ pressed }) => [버튼꼴 && s.곁길버튼, pressed && { opacity: 0.6 }]}>
-      <Text style={버튼꼴 ? s.곁길버튼글 : s.곁길글}>{글}</Text>
+      <Text style={[버튼꼴 ? s.곁길버튼글 : s.곁길글, 라벨_mn && { fontFamily: 버튼꼴 ? 몽골어폰트.강조 : 몽골어폰트.본문 }]}>{라벨_mn || 글}</Text>
     </Pressable>
   );
 }
@@ -391,17 +413,23 @@ const s = StyleSheet.create({
     backgroundColor: 색.바탕띄움, borderRadius: 14, padding: 16, gap: 14,
   },
   선택머리: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_서브 },
+  /* 몽골어 병기 줄 — 키릴은 킷 한글 폰트에 글리프가 없다(두부가 된다). 규격은 그대로,
+     폰트만 가른다(`오류_병기` 와 같은 규율). `mn` 이 빈 동안 이 줄은 안 그려진다. */
+  선택머리_병기: { fontFamily: 몽골어폰트.강조, fontSize: 13, color: 색.잉크_서브 },
   선택꼬리: { fontFamily: 폰트.캡션, fontSize: 12, lineHeight: 18, color: 색.잉크_보조 },
+  선택꼬리_병기: { fontFamily: 몽골어폰트.캡션, fontSize: 12, lineHeight: 18, color: 색.잉크_보조 },
 
   오류칸: { minHeight: 20, justifyContent: 'center' },
   오류: { fontFamily: 폰트.강조, fontSize: 13, lineHeight: 19, color: 색.신호 },
+  /* 신호 1점 규율 유지 — 색은 그대로, 폰트만 가른다(키릴은 킷 한글 폰트에 없다 · 테마 `몽골어` 머리말). */
+  오류_병기: { fontFamily: 몽골어폰트.강조, fontSize: 13, lineHeight: 19, color: 색.신호 },
 
   버튼: {
     backgroundColor: 색.잉크, borderRadius: 14, height: 52,
     alignItems: 'center', justifyContent: 'center',
   },
-  버튼_잠김: { opacity: 0.35 },
-  버튼_눌림: { opacity: 0.82 },
+  버튼_잠김: { opacity: 눌림층.잠김 },
+  버튼_눌림: { opacity: 눌림층.버튼 },
   버튼글: { fontFamily: 폰트.강조, fontSize: 16, color: 색.바탕 },
 
   갈래: { gap: 14, alignItems: 'center', paddingTop: 6 },
