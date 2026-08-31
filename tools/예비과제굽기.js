@@ -27,12 +27,22 @@
  *   · 초급(Lv1~2)·미정 몫은 **굽지 않는다.** §8-B 표본이 Lv3~6 뿐이라(§7-1 초급은 생성 대상 밖)
  *     검증된 초급 문장이 0벌이다. 없는 것을 지어내지 않는다 — 그 갈래는 도입 폴백이 그대로 진다.
  *
- * ■ 낡음 — 생성물에 원본 파일 + 그 파일의 커밋을 함께 굽는다(강사지식빌드와 같은 무늬).
+ * ■ 낡음 — 생성물에 원본 파일 + **그 파일 내용의 지문(sha256)** 을 함께 굽는다.
  *   회전이 하나 더 돌면 이 도구를 다시 돌려 풀을 늘린다.
+ *
+ *   🔴 여기에 «커밋 해시»를 굽지 않는다 — 2026-08-31 에 그것으로 CI 가 닷새(런 30벌 연속) 빨갰다.
+ *   까닭: `git log -1 --format=%H -- <파일>` 은 **체크아웃 깊이에 따라 다른 답을 낸다.**
+ *   `actions/checkout` 의 기본값은 `fetch-depth: 1` 이라 CI 의 저장소는 **커밋 하나짜리 얕은 복제**고,
+ *   그 한 커밋은 부모가 없어(grafted) 트리의 «모든 파일이 거기서 태어난 것»으로 읽힌다.
+ *   ⇒ CI 는 원본의 진짜 커밋 대신 **HEAD 의 해시**를 굽는다. HEAD 는 푸시마다 바뀌니
+ *     구운 글이 저장소의 것과 **영원히** 안 맞는다 — 무엇을 고치든, 다시 구워도 빨강이다.
+ *   ⇒ 그래서 낡음의 자는 «역사»가 아니라 **«바이트»**다. 지문은 복제 깊이·OS·로케일·Node 판을
+ *     안 타고, git 이 아예 없는 tarball 에서도 같은 값이 나온다. 덤으로 «커밋 안 된 원본 수정»까지
+ *     잡는다(커밋 해시는 그걸 못 본다). 되돌리지 말 것 — 되돌리면 그 닷새가 그대로 돌아온다.
  */
 const fs = require('node:fs');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const crypto = require('node:crypto');
 const { 인자게이트 } = require('../lib/플래그.js');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -58,10 +68,13 @@ const argv = process.argv.slice(2);
 const 막힘 = 인자게이트('예비과제굽기', argv, ['--확인']);
 if (막힘) { console.error(막힘); process.exit(2); }
 
-/** 그 파일을 마지막으로 만진 커밋. 못 읽으면 `'(모름)'` — 없는 것을 지어내지 않는다. */
-function 커밋해시(상대) {
+/** 그 파일 **내용**의 지문(sha256). 못 읽으면 `'(모름)'` — 없는 것을 지어내지 않는다.
+ *  ⚠ 바이트를 그대로 문다(줄끝 정규화를 하지 않는다) — 이 저장소는 `.gitattributes` 의 `* text=auto eol=lf`
+ *    로 줄끝을 LF 로 못박아서(08-31 실측: 이 원본은 윈도우 작업본에서도 CRLF 0 · LF 1537) 줄끝은
+ *    환경 변수가 아니다. 그래도 혹시 CRLF 로 바뀌면 그것도 «원본이 움직인» 것이라 잡히는 편이 맞다. */
+function 원본지문(상대) {
   try {
-    return execFileSync('git', ['-C', ROOT, 'log', '-1', '--format=%H', '--', 상대], { encoding: 'utf8' }).trim() || '(모름)';
+    return crypto.createHash('sha256').update(fs.readFileSync(path.join(ROOT, 상대))).digest('hex');
   } catch { return '(모름)'; }
 }
 
@@ -96,7 +109,7 @@ function 걷기() {
       (급수별[급수] ||= []).push({ 문장, 질문, 판, case_id: r.case_id });
       뽑음 += 1;
     }
-    출처장부.push({ 판, 파일, 커밋: 커밋해시(파일), 행: 행.length, 뽑음 });
+    출처장부.push({ 판, 파일, 지문: 원본지문(파일), 행: 행.length, 뽑음 });
   }
 
   /* 순서를 못박는다 — 굽기가 결정적이어야 `--확인` 이 뜻을 갖는다. */
@@ -113,7 +126,7 @@ const 총 = Object.values(급수별).reduce((a, v) => a + v.length, 0);
 if (!총) { console.error('[예비과제] 뽑힌 것이 0벌이다 — 채점 파일이 비었거나 축 이름이 갈렸다'); process.exit(1); }
 
 const 표 = Object.entries(급수별).map(([k, v]) => `${k} ${v.length}벌`).join(' · ');
-const 장부표 = 출처장부.map((d) => ` *   · ${d.판}  ${d.파일}\n *       커밋 ${d.커밋} · 행 ${d.행} → 뽑음 ${d.뽑음}`).join('\n');
+const 장부표 = 출처장부.map((d) => ` *   · ${d.판}  ${d.파일}\n *       지문 sha256:${d.지문} · 행 ${d.행} → 뽑음 ${d.뽑음}`).join('\n');
 
 const 새글 = `/* 예비과제 — «빈손 방지» 풀 (생성물 · 손으로 고치지 않는다)
  *
@@ -147,4 +160,4 @@ if (argv.includes('--확인')) {
 
 fs.writeFileSync(생성물경로, 새글, 'utf8');
 console.log(`[예비과제] 구웠다 — ${총}벌 (${표}) → ${path.relative(ROOT, 생성물경로)}`);
-for (const d of 출처장부) console.log(`  · ${d.판.padEnd(3)} 행 ${String(d.행).padStart(3)} → 뽑음 ${String(d.뽑음).padStart(3)}  ${d.커밋.slice(0, 8)}`);
+for (const d of 출처장부) console.log(`  · ${d.판.padEnd(3)} 행 ${String(d.행).padStart(3)} → 뽑음 ${String(d.뽑음).padStart(3)}  ${d.지문.slice(0, 12)}`);
