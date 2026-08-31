@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
 import { 색, 폰트, 모노트래킹 } from './테마';
-import { use등장 } from '../lib/모션.js';
+import { use등장, use줄임 } from '../lib/모션.js';
 import { 제출재료 } from '../lib/알바변명제출.js';
 /* 발화 사슬의 판정들 — 「냈다」(학습출석 = ③답하기 submitted)와 「닿았다」(배달상태 = 서버가
  * 받은 것만)를 말하기 화면과 **같은 함수**로 읽는다. 여기 다시 적으면 갈라진 쪽이 조용히
@@ -79,6 +79,8 @@ export default function 알바변명화면({
   const [읽는중, set읽는중] = useState(false);
   /* 사장님 압박 단 — 녹음 중에만 흐른다. 값은 `lib/NPC연출.압박상태` 가 내고 화면은 그리기만 한다. */
   const [압박, set압박] = useState(() => 전이상태('시작'));
+  const 숨 = useRef(new Animated.Value(1)).current;
+  const 줄임 = use줄임();
 
   /* 이미 낸 날은 다시 열어도 끝 카드다(두 번 내지 않는다 — G1 「이미」 판정과 같은 축).
    * 판정은 `학습출석`(제출로그) 하나 — ③답하기 submitted 가 곧 이 게임의 「냈다」다(판정 ①).
@@ -102,6 +104,19 @@ export default function 알바변명화면({
     const 눈금 = setInterval(() => set압박(압박상태(Date.now() - 시작, 녹음상한초 * 1000)), 500);
     return () => clearInterval(눈금);
   }, [단계]);
+
+  useEffect(() => {
+    if (읽는중 && !줄임) {
+      const loop = Animated.loop(Animated.sequence([
+        Animated.timing(숨, { toValue: 1.015, duration: 900, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(숨, { toValue: 1, duration: 900, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      ]));
+      loop.start();
+      return () => { loop.stop(); 숨.setValue(1); };
+    }
+    숨.setValue(1);
+    return undefined;
+  }, [읽는중, 줄임, 숨]);
 
   const 대사재생 = async () => {
     if (읽는중) return;   // 08-31 감사 D8-14 — 재생 중 재탭이 처음부터 다시 읽는 것을 막는다
@@ -151,11 +166,13 @@ export default function 알바변명화면({
       <View style={s.사장님자리}>
         {/* 08-31 감사 D4-5 — 전송 실패 줄(「보내지 못했어요」)이 선 동안 사장님이 흡족(완료)하면
             화면이 자기모순이다. 실패면 calm(시작)으로 되돌린다 — back(돌아섬)은 기죽는 반응이라 금지. */}
-        <NPC
-          역="boss"
-          상태={단계 === '끝' ? 전이상태(배달.못보냄 > 0 ? '시작' : '완료') : 단계 === '녹음' ? 압박 : 전이상태('시작')}
-          크기={96}
-        />
+        <Animated.View style={{ transform: [{ scale: 숨 }] }}>
+          <NPC
+            역="boss"
+            상태={단계 === '끝' ? 전이상태(배달.못보냄 > 0 ? '시작' : '완료') : 단계 === '녹음' ? 압박 : 전이상태('시작')}
+            크기={96}
+          />
+        </Animated.View>
       </View>
 
       {단계 !== '끝' && (

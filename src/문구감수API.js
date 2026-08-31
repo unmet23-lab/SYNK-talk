@@ -42,7 +42,7 @@ export const 기본쪽크기 = 20;
  *
  * @param {string} 토큰
  * @param {{개수?: number, 커서?: string|null}} [옵션]
- * @returns {Promise<{목록: object[], 다음커서: string|null}>}
+ * @returns {Promise<{목록: object[], 다음커서: string|null, 총대기: number|null}>}
  */
 export async function 큐받기(토큰, 옵션 = {}) {
   const 질의 = [];
@@ -54,6 +54,8 @@ export async function 큐받기(토큰, 옵션 = {}) {
     /* 서버는 한 쪽을 꽉 채웠을 때만 커서를 준다 — 마지막 쪽이 정확히 limit 개면 빈 쪽을 한 번
        더 받는다. 화면은 **빈 응답을 끝으로 읽는다**(「없다」를 잘못 말하는 것보다 싸다). */
     다음커서: 본문.next ?? null,
+    /* 옛 서버 응답(total 없음)엔 null 로 접힌다 — 하위호환. */
+    총대기: Number.isFinite(본문.total) ? 본문.total : null,
   };
 }
 

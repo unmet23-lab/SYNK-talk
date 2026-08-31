@@ -45,6 +45,11 @@ import { VERDICT, 원문결함, 확정요청 } from '../lib/문구감수.js';
  * 순서(초벌이 맞다 · 고쳤다 · 원문을 고쳐야 한다)도 그 파일이 정한 그대로 쓴다. */
 const [초벌맞음, 고침] = VERDICT;
 
+/* 미확정 카드가 쌓이면 TextInput 수십 장이 ScrollView 에 동시 마운트된다 — FlatList 전환 대신
+ * 상한이 싼 처방. 값은 기본쪽크기 20 의 3쪽.
+ * ⚠ 실기기 프레임은 안 재봤다(emulator-review-blocked) — 60 은 추정이다. */
+const 미확정상한 = 60;
+
 export default function 문구감수화면({ 토큰, 돌아가기 }) {
   const [목록, set목록] = useState([]);
   const [커서, set커서] = useState(null);
@@ -52,6 +57,7 @@ export default function 문구감수화면({ 토큰, 돌아가기 }) {
   const [도는중, set도는중] = useState(false);
   const [오류, set오류] = useState('');
   const [끝낸수, set끝낸수] = useState(0);
+  const [서버총, set서버총] = useState(null);
 
   const 더받기 = useCallback(async (이어서) => {
     if (도는중) return;
@@ -60,6 +66,7 @@ export default function 문구감수화면({ 토큰, 돌아가기 }) {
       const r = await API.큐받기(토큰, 이어서 ? { 커서 } : {});
       set목록((앞) => (이어서 ? [...앞, ...r.목록] : r.목록));
       set커서(r.다음커서);
+      if (r.총대기 != null) set서버총(r.총대기);
       set불러옴(true);
     } catch (e) {
       set오류(String((e && e.message) || e));
@@ -70,11 +77,14 @@ export default function 문구감수화면({ 토큰, 돌아가기 }) {
 
   useEffect(() => { 더받기(false); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => { if (불러옴 && !도는중 && !오류 && !목록.length && 커서) 더받기(true); }, [불러옴, 도는중, 오류, 목록.length, 커서, 더받기]); // eslint-disable-line react-hooks/exhaustive-deps
+
   /* 끝난 줄은 **그 자리에서 뺀다.** 큐는 `pending` 만 담으므로 다시 받아도 안 나온다 —
      다시 받으면 감수자가 방금 판정한 자리 위로 목록이 튀어 어디까지 했는지를 잃는다. */
   const 끝냈다 = (string_id) => {
     set목록((앞) => 앞.filter((x) => x.string_id !== string_id));
     set끝낸수((n) => n + 1);
+    set서버총((n) => (n == null ? n : Math.max(0, n - 1)));
   };
 
   return (
@@ -86,7 +96,7 @@ export default function 문구감수화면({ 토큰, 돌아가기 }) {
       </Text>
 
       <View style={s.셈줄}>
-        <셈 이름="남은 것" 값={목록.length} />
+        <셈 이름="남은 것" 값={서버총 ?? 목록.length} />
         <셈 이름="오늘 끝낸 것" 값={끝낸수} />
       </View>
 
@@ -106,7 +116,9 @@ export default function 문구감수화면({ 토큰, 돌아가기 }) {
           </Text>
           <Text style={s.빈꼬리}>
             {끝낸수 > 0
-              ? '더 있으면 아래에서 이어 받습니다.'
+              ? (커서
+                ? '다음 문장을 이어 받다가 멈췄어요 — 아래 「더 불러오기」를 눌러 주세요.'
+                : '지금 받은 것은 여기까지예요.')
               : '문장이 아직 안 올라왔거나, 이미 다 끝났습니다. 원장에게 알려 주세요.'}
           </Text>
         </View>
@@ -114,10 +126,14 @@ export default function 문구감수화면({ 토큰, 돌아가기 }) {
 
       {도는중 ? <ActivityIndicator color={색.잉크} style={{ marginTop: 18 }} /> : null}
 
-      {커서 && !도는중 ? (
+      {커서 && !도는중 && 목록.length < 미확정상한 ? (
         <Pressable onPress={() => 더받기(true)} style={({ pressed }) => [s.더, pressed && { opacity: 0.7 }]}>
           <Text style={s.더글}>더 불러오기</Text>
         </Pressable>
+      ) : null}
+
+      {커서 && !도는중 && 목록.length >= 미확정상한 ? (
+        <Text style={s.빈꼬리}>화면에 {목록.length}문장이 쌓였어요 — 판정을 끝내면 이어서 받을 수 있어요.</Text>
       ) : null}
 
       <Pressable onPress={돌아가기} style={({ pressed }) => [s.뒤로, pressed && { opacity: 0.7 }]}>
@@ -208,9 +224,16 @@ function 문장카드({ 줄, 토큰, 끝냈다 }) {
       ) : null}
 
       {초벌.trim() ? (
-        <Text style={s.판정미리}>
-          지금 확정하면 「{판정}」으로 기록됩니다.
-        </Text>
+        <View style={s.미리줄}>
+          <Text style={s.판정미리}>
+            지금 확정하면 「{판정}」으로 기록됩니다.
+          </Text>
+          {번역.trim() !== 초벌.trim() ? (
+            <Pressable onPress={() => set번역(초벌)} hitSlop={6}>
+              <Text style={s.초벌버튼글}>초벌로 되돌리기</Text>
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
 
       {까닭칸열림 ? (
@@ -293,6 +316,8 @@ const s = StyleSheet.create({
   넘침글: { fontFamily: 폰트.캡션, fontSize: 12, lineHeight: 18, color: 색.신호_보조 },
 
   판정미리: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_메타 },
+  미리줄: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  초벌버튼글: { fontFamily: 폰트.본문, fontSize: 12, color: 색.잉크_서브 },
   막힘: { fontFamily: 폰트.강조, fontSize: 13, lineHeight: 19, color: 색.신호 },
 
   버튼줄: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },

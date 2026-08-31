@@ -204,6 +204,7 @@ async function 큐읽기(url: URL, ver: string) {
   const 행들 = c.값
     ? await sql`select * from engine.l10n_queue where string_id > ${c.값} order by string_id limit ${쪽.값}`
     : await sql`select * from engine.l10n_queue order by string_id limit ${쪽.값}`;
+  const 총 = await sql`select count(*)::int as n from engine.l10n_queue`;
 
   const 마지막 = 행들.length ? 행들[행들.length - 1].string_id : null;
   return 봉투(200, {
@@ -213,6 +214,7 @@ async function 큐읽기(url: URL, ver: string) {
        (마지막 쪽이 정확히 limit 개면 빈 쪽을 한 번 더 받는데, 그것이 「없다」를 잘못 말하는
        것보다 싸다 — 화면은 빈 응답을 끝으로 읽으면 된다.) */
     next: 행들.length === 쪽.값 ? 마지막 : null,
+    total: 총[0].n,
   }, ver);
 }
 
