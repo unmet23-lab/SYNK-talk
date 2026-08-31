@@ -112,10 +112,12 @@ const { renderToString } = require('react-dom/server');
 
 /** 화면을 실제로 그려 **글자만** 낸다 — 태그·클래스는 검사 대상이 아니다(그건 픽셀 쪽이다).
  * @param 상대경로 저장소 뿌리 기준(`src/어제의나.js`)
+ * @param 내보냄 이름 내보냄을 그릴 때 그 이름(예: `'문항카드'`) — 비우면 default.
+ *   화면이 조각을 순수 prop 조각으로 내보내면 «데이터가 찬 갈래»도 이 통로가 그린다.
  * @returns {string} 화면에 보이는 글자를 한 줄로 편 것 */
-function 그리기(상대경로, props = {}) {
+function 그리기(상대경로, props = {}, 내보냄 = null) {
   const 모듈 = require(path.join(ROOT, 상대경로));
-  const 화면 = 모듈.default || 모듈;
+  const 화면 = 내보냄 ? 모듈[내보냄] : (모듈.default || 모듈);
   return renderToString(React.createElement(화면, props))
     .replace(/<[^>]+>/g, ' ')
     .replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&')

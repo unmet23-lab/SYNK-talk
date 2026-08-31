@@ -116,6 +116,10 @@ export default function 나침반화면({ 토큰, 돌아가기 }) {
     } finally { set도는중(false); }
   }, [채워짐, 도는중, 문항들, 답값, 토큰, 세션, 시즌회차, 바꿨나]);
 
+  const 다음학생 = useCallback(() => {
+    set세션(null); set답({}); set바꿨나(null); set적힌시각(null); set오류(null); set학생번호입력('');
+  }, []);
+
   return (
     <ScrollView style={s.wrap} contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
       <Text style={s.label}>COMPASS</Text>
@@ -167,59 +171,29 @@ export default function 나침반화면({ 토큰, 돌아가기 }) {
       )}
 
       {세션 && 문항들.map((q) => (
-        <View key={q.키} style={s.카드}>
-          {/* 몽골어가 검수되면 서버만 채우면 된다 — 비면 한국어를 그린다(지어 넣지 않는다). */}
-          {/* 🔴 폰트가 글자를 따라간다 — 몽골어(키릴)는 킷 한글 폰트에 글리프가 없어 두부(□□□)가
-             된다. `라벨_mn` 이 아직 전부 null 이라 증상이 없을 뿐, 검수가 끝나 차는 날 이 자리만
-             깨졌을 것이다(08-27 실측 · `막힘카드`·`생성카드` 와 같은 계열).
-             ⚠ 이 주석은 08-31 까지 {} 없이 JSX 자식으로 놓여 있었다 — 문항 카드가 그려지는 순간
-             RN 이 「Text strings must be rendered within a <Text>」 로 죽는 자리였다(감사 D6-1). */}
-          <Text style={[s.칸이름, q.라벨_mn && { fontFamily: 몽골어폰트.강조 }]}>
-            {q.라벨_mn || q.라벨}
-          </Text>
-
-          {시즌회차 && q.키 === 'self_in_5y' ? (
-            <View style={s.칸}>
-              <Text style={s.문장}>{세션.지난5년답 || '(지난 답이 없어요)'}</Text>
-              <View style={s.칩줄}>
-                {[['그대로', 그대로값.그대로], ['바꿀래', 그대로값.바꿀래]].map(([글, 값]) => (
-                  <Pressable
-                    key={글}
-                    onPress={() => set바꿨나(값)}
-                    style={({ pressed }) => [s.판정칩, 바꿨나 === 값 && s.판정칩_고름, pressed && s.눌림]}
-                  >
-                    <Text style={[s.판정칩글, 바꿨나 === 값 && s.판정칩글_고름]}>{글}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              {바꿨나 === 그대로값.바꿀래 && (
-                <TextInput
-                  style={s.입력}
-                  value={답[q.키] ?? ''}
-                  onChangeText={(t) => set답((p) => ({ ...p, [q.키]: t.slice(0, q.상한) }))}
-                  placeholder="바뀐 5년 뒤의 나"
-                  placeholderTextColor={색.잉크_메타}
-                  multiline
-                />
-              )}
-            </View>
-          ) : (
-            <TextInput
-              style={s.입력}
-              value={답[q.키] ?? ''}
-              onChangeText={(t) => set답((p) => ({ ...p, [q.키]: t.slice(0, q.상한) }))}
-              placeholderTextColor={색.잉크_메타}
-              multiline={q.상한 > 200}
-            />
-          )}
-        </View>
+        <문항카드
+          key={q.키}
+          q={q}
+          시즌회차={시즌회차}
+          지난5년답={세션.지난5년답}
+          값={답[q.키] ?? ''}
+          바꾸기={(글) => set답((p) => ({ ...p, [q.키]: 글 }))}
+          바꿨나={바꿨나}
+          on바꿨나={set바꿨나}
+        />
       ))}
 
       {오류 && <Text style={오류.운영 ? s.안내글 : s.오류글}>{오류.말}</Text>}
       {/* 「적혔어요」 — 서버가 준 `적힌시각` 이 도착한 그 순간에만 선다(위 머리말: 낙관적으로
           그리지 않는다). 시즌에 한 번뿐이고 **소급이 원리상 불가능한** 입력이라(§8 ①), 학생이
           「적혔다」를 놓치면 안 적힌 것과 같아진다 — 그래서 이 줄은 박자를 갖는다(08-24). */}
-      {적힌시각 && <적혔어요줄 글={`적혔어요 — ${적힌시각}`} />}
+      {/* 문구 확장 초안(유호님 확정 뒤 잇는다): 「— 시즌이 끝나는 날, 이 말과 다시 만나요」 */}
+      {적힌시각 && <적혔어요줄 글={`적혔어요 — ${String(적힌시각).slice(0, 16).replace('T', ' ')}`} />}
+      {적힌시각 && (
+        <Pressable onPress={다음학생} hitSlop={8}>
+          <Text style={s.backText}>다음 학생 열기 →</Text>
+        </Pressable>
+      )}
 
       {세션 && (
         <Pressable
@@ -235,6 +209,68 @@ export default function 나침반화면({ 토큰, 돌아가기 }) {
         <Text style={s.backText}>← 돌아가기</Text>
       </Pressable>
     </ScrollView>
+  );
+}
+
+/** 문항 카드 한 장 — 순수 조각: 상태는 전부 prop 으로 받는다(판정을 lib 로 떼 온 그 무늬).
+ *  테스트가 이름 내보냄으로 «데이터가 찬 갈래»를 직접 그린다(`tests/화면렌더.test.js`). */
+export function 문항카드({ q, 시즌회차, 지난5년답, 값, 바꾸기, 바꿨나, on바꿨나 }) {
+  const 길이 = (값 ?? '').length;
+  return (
+    <View style={s.카드}>
+      {/* 몽골어가 검수되면 서버만 채우면 된다 — 비면 한국어를 그린다(지어 넣지 않는다). */}
+      {/* 🔴 폰트가 글자를 따라간다 — 몽골어(키릴)는 킷 한글 폰트에 글리프가 없어 두부(□□□)가
+         된다. `라벨_mn` 이 아직 전부 null 이라 증상이 없을 뿐, 검수가 끝나 차는 날 이 자리만
+         깨졌을 것이다(08-27 실측 · `막힘카드`·`생성카드` 와 같은 계열).
+         ⚠ 이 주석은 08-31 까지 {} 없이 JSX 자식으로 놓여 있었다 — 문항 카드가 그려지는 순간
+         RN 이 「Text strings must be rendered within a <Text>」 로 죽는 자리였다(감사 D6-1). */}
+      <Text style={[s.칸이름, q.라벨_mn && { fontFamily: 몽골어폰트.강조 }]}>
+        {q.라벨_mn || q.라벨}
+      </Text>
+
+      {시즌회차 && q.키 === 'self_in_5y' ? (
+        <View style={s.칸}>
+          <Text style={s.문장}>{지난5년답 || '(지난 답이 없어요)'}</Text>
+          <View style={s.칩줄}>
+            {[['그대로', 그대로값.그대로], ['바꿀래', 그대로값.바꿀래]].map(([글, 고름]) => (
+              <Pressable
+                key={글}
+                onPress={() => on바꿨나(고름)}
+                style={({ pressed }) => [s.판정칩, 바꿨나 === 고름 && s.판정칩_고름, pressed && s.눌림]}
+              >
+                <Text style={[s.판정칩글, 바꿨나 === 고름 && s.판정칩글_고름]}>{글}</Text>
+              </Pressable>
+            ))}
+          </View>
+          {바꿨나 === 그대로값.바꿀래 && (
+            <TextInput
+              style={s.입력}
+              value={값 ?? ''}
+              onChangeText={(t) => 바꾸기(t.slice(0, q.상한))}
+              placeholder="바뀐 5년 뒤의 나"
+              placeholderTextColor={색.잉크_메타}
+              multiline
+            />
+          )}
+          {바꿨나 === 그대로값.바꿀래 && 길이 >= Math.ceil(q.상한 * 0.85) && (
+            <Text style={s.카운터}>{길이}/{q.상한}</Text>
+          )}
+        </View>
+      ) : (
+        <View style={s.칸}>
+          <TextInput
+            style={s.입력}
+            value={값 ?? ''}
+            onChangeText={(t) => 바꾸기(t.slice(0, q.상한))}
+            placeholderTextColor={색.잉크_메타}
+            multiline={q.상한 > 200}
+          />
+          {길이 >= Math.ceil(q.상한 * 0.85) && (
+            <Text style={s.카운터}>{길이}/{q.상한}</Text>
+          )}
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -284,6 +320,8 @@ const s = StyleSheet.create({
 
   안내글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_서브 },
   오류글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_메타 },
+  /* 상한 85% 부터만 선다 — 평소에 숫자 시계를 두지 않는다(숫자·슬래시뿐이라 DM Mono 안전). */
+  카운터: { fontFamily: 폰트.모노, fontSize: 12, lineHeight: 20, color: 색.잉크_메타, alignSelf: 'flex-end' },
 
   /* 이 화면의 신호 1점 = 「적기」 버튼(`테마.신호자리` 규칙). 잠기면 색을 빼고 밝기로 낮춘다. */
   저장: {

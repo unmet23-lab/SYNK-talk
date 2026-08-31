@@ -34,9 +34,10 @@
  *   · 앱이 시즌·회차 고르기 — 서버가 정한다(소급 판정이 열린다).
  */
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { 색, 폰트, 모노트래킹, 몽골어폰트 } from './테마';
 import { 열기, 자기판정하기, 판정하기 } from './회고API.js';
+import { use등장 } from '../lib/모션.js';
 
 /** 굳힌 축 한 층에서 「축 이름 → 칸 → 값」을 뽑는다. **축 이름·칸 이름을 여기 안 적는다** —
  *  적는 순간 `학습자상태` 가 v7 로 오른 날 화면만 낡는다(굳힌 것을 그대로 훑는다). */
@@ -122,6 +123,11 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
     } finally { set도는중(false); }
   }, [토큰, 세션, 강사고름, 사유, 도는중]);
 
+  const 다음학생 = useCallback(() => {
+    set세션(null); set자기고름(null); set자기저장됨(null); set건너뜀(false);
+    set강사고름(null); set사유(''); set확정(null); set오류(null); set학생번호입력('');
+  }, []);
+
   const 갈래 = 세션?.판정갈래 ?? [];
   const 강사칸열림 = Boolean(세션) && (자기저장됨 != null || 건너뜀);
   const 나침반 = 세션?.나침반 ?? null;
@@ -133,6 +139,10 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
   );
   /* 「갈렸나」가 이 그릇의 가장 값진 신호다(설계 §7) — 확정하는 그 자리에서 보여 준다. */
   const 갈림 = 확정 && 확정.자기판정 != null && 확정.자기판정 !== 확정.판정;
+  /* 시즌을 연 날의 과녁 한 줄 — 화면은 문항키 사본 없이 «역할» 표식만 본다(어휘 사본 0 규칙).
+     서버가 아직 표식을 안 주면 이 줄은 조용히 빠진다. */
+  const 목표문항 = (나침반?.questions ?? []).find((q) => q.역할 === '목표');
+  const 목표답 = 목표문항 ? (나침반.answers || {})[목표문항.키] : null;
   /**
    * 판정 갈래 하나를 글로. **부르는 자리가 한국어 문장 «안»이라** 그냥 문자열을 돌려주면
    * 그 조각만 몽골어여도 부모 Text 의 킷 한글 폰트로 그려진다 — 키릴은 글리프가 없어
@@ -239,11 +249,14 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
           {축들.map(({ 축, 칸들 }) => (
             <View key={축} style={s.칸}>
               <Text style={s.메타}>{축}</Text>
-              {칸들.map(({ 칸, 전, 후 }) => (
-                <Text key={칸} style={s.줄}>
-                  {칸}  {값글(전)} → {값글(후)}
-                </Text>
-              ))}
+              {칸들.map(({ 칸, 전, 후 }) => {
+                const 오름 = typeof 전 === 'number' && typeof 후 === 'number' && 후 > 전;
+                return (
+                  <Text key={칸} style={[s.줄, 오름 && s.줄_오름]}>
+                    {칸}  {값글(전)} → {값글(후)}
+                  </Text>
+                );
+              })}
             </View>
           ))}
           {축들.length === 0 && (
@@ -267,14 +280,14 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
                 onPress={() => set자기고름(o.코드)}
                 disabled={자기저장됨 != null || 건너뜀}
                 style={({ pressed }) => [
-                  s.판정칩, 자기고름 === o.코드 && s.판정칩_고름,
+                  s.판정칩, s.판정칩_학생, 자기고름 === o.코드 && s.판정칩_고름,
                   (자기저장됨 != null || 건너뜀) && s.칩잠김, pressed && s.눌림,
                 ]}
               >
                 {/* 🔴 폰트가 글자를 따라간다 — 키릴은 킷 한글 폰트에 글리프가 없어 두부가 된다.
                     지금은 `라벨_mn_학생` 이 전부 null 이라 증상이 없을 뿐이다(08-27 실측). */}
                 <Text style={[
-                  s.판정칩글, 자기고름 === o.코드 && s.판정칩글_고름,
+                  s.판정칩글, s.판정칩글_학생, 자기고름 === o.코드 && s.판정칩글_고름,
                   o.라벨_mn_학생 && { fontFamily: 자기고름 === o.코드 ? 몽골어폰트.강조 : 몽골어폰트.본문 },
                 ]}>
                   {o.라벨_mn_학생 || o.라벨_학생}
@@ -345,20 +358,24 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
       )}
 
       {확정 && (
-        <View style={s.카드}>
+        <확정카드틀>
           <Text style={s.칸이름}>확정됐어요</Text>
           <Text style={s.문장}>강사 — {문구(확정.판정, false)}</Text>
           <Text style={s.문장}>
             학생 — {확정.자기판정 == null ? '(안 눌렀어요)' : 문구(확정.자기판정, true)}
           </Text>
+          {목표답 ? <Text style={s.메모}>그때 스스로 말한 것 — “{목표답}”</Text> : null}
           {/* 🔑 갈린 행이 «가장 값진» 행이다 — 자기인식축의 유일한 대조군(설계 §7 도전안).
               그러니 「틀렸다」로 그리지 않는다: 두 사람이 다르게 본 것 자체가 재료다. */}
           {갈림 && (
-            <Text style={s.안내글}>
+            <갈림안내>
               둘이 다르게 봤어요 — 학생이 자신을 어떻게 보는지 알 수 있는 귀한 기록이라 그대로 남아요.
-            </Text>
+            </갈림안내>
           )}
-        </View>
+          <Pressable onPress={다음학생} hitSlop={8}>
+            <Text style={s.backText}>다음 학생 열기 →</Text>
+          </Pressable>
+        </확정카드틀>
       )}
 
       {오류 && <Text style={오류.운영 ? s.안내글 : s.오류글}>{오류.말}</Text>}
@@ -368,6 +385,18 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
       </Pressable>
     </ScrollView>
   );
+}
+
+/* 확정 카드·갈림 안내의 등장 틀 — 확정 응답이 «도착한 순간» 마운트된다. 서버 왕복 뒤 마운트라
+   훅이 화면 최상위면 안 된다(나침반 적혔어요줄과 같은 이유). reduce-motion 은 use등장이 접는다. */
+function 확정카드틀({ children }) {
+  const 등장 = use등장({ 올라옴: 6, 시간: 260 });
+  return <Animated.View style={[s.카드, 등장]}>{children}</Animated.View>;
+}
+
+function 갈림안내({ children }) {
+  const 등장 = use등장({ 올라옴: 4, 시간: 220, 지연: 220 });
+  return <Animated.Text style={[s.안내글, 등장]}>{children}</Animated.Text>;
 }
 
 const 입력바탕 = {
@@ -395,6 +424,8 @@ const s = StyleSheet.create({
   문장: { fontFamily: 폰트.본문, fontSize: 16, lineHeight: 25, color: 색.잉크 },
   /* 전·후반 대조는 **자릿수가 맞아야** 「올라갔다」가 눈에 든다 — 모노가 그 일을 한다. */
   줄: { fontFamily: 폰트.모노, fontSize: 12, lineHeight: 20, color: 색.잉크_서브 },
+  /* 오른 칸만 잉크 100% — 색을 더하지 않고 밀도로만(「어제의 나」 무늬 · 색 추가 0). */
+  줄_오름: { color: 색.잉크 },
   메모: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_서브 },
   메타: { fontFamily: 폰트.캡션, fontSize: 12, lineHeight: 19, color: 색.잉크_메타 },
 
@@ -408,6 +439,9 @@ const s = StyleSheet.create({
   판정칩_고름: { backgroundColor: 색.바탕, borderColor: 색.잉크 },
   판정칩글: { fontFamily: 폰트.본문, fontSize: 14, lineHeight: 20, color: 색.잉크_서브 },
   판정칩글_고름: { fontFamily: 폰트.강조, color: 색.잉크 },
+  /* 학생이 «직접» 누르는 칩은 강사 칩보다 한 층 크다 — 색·폰트 토큰 불변, 크기만. */
+  판정칩_학생: { paddingHorizontal: 18, paddingVertical: 14, borderRadius: 16 },
+  판정칩글_학생: { fontSize: 16, lineHeight: 24 },
   칩잠김: { opacity: 0.55 },
 
   안내글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_서브 },
