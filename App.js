@@ -85,7 +85,7 @@ export default function App() {
   useEffect(() => {
     const 구독 = BackHandler.addEventListener('hardwareBackPress', () => {
       if (화면 === '말하기') return false;
-      const 시스템행 = ['검수', '강사', '문구감수', '반피드백', '나침반', '회고', '관찰'];
+      const 시스템행 = ['검수', '강사', '문구감수', '반피드백', '나침반', '회고', '관찰', '몽글'];
       set화면(시스템행.includes(화면) ? '시스템' : '말하기');
       return true;
     });

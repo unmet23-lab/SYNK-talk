@@ -13,11 +13,12 @@ const path = require('node:path');
 const { 그리기, ROOT } = require('./lib/화면세우기.js');
 
 test('① 넘어짐판 — fallback 문구와 「말하기로 돌아가기」 버튼이 실제로 그려진다', () => {
-  /* 문구는 여기서 짓지 않는다 — 정본은 contents/문구_오류.js 의 경계문구다(화면은 배치만). */
-  const { 경계문구 } = require(path.join(ROOT, 'contents', '문구_오류.js'));
-  assert.ok(경계문구 && 경계문구.ko, '정본에 경계문구가 없다 — fallback 이 그릴 재료가 없다');
+  /* 문구는 여기서 짓지 않는다 — 정본은 contents/문구_오류.js 표의 err.boundary_fell 이다(화면은 배치만). */
+  const { 문구 } = require(path.join(ROOT, 'contents', '문구_오류.js'));
+  const 짝 = 문구['err.boundary_fell'];
+  assert.ok(짝 && 짝.ko, '정본 표에 err.boundary_fell 이 없다 — fallback 이 그릴 재료가 없다');
   const 글 = 그리기('src/오류경계.js', { 되세우기() {} }, '넘어짐판');
-  assert.ok(글.includes(경계문구.ko), 'fallback 문구가 화면에 없다 — 학생은 빈 화면을 고장으로 읽는다');
+  assert.ok(글.includes(짝.ko), 'fallback 문구가 화면에 없다 — 학생은 빈 화면을 고장으로 읽는다');
   assert.match(글, /말하기로 돌아가기/, '되세우는 버튼이 없다 — 학생이 깨진 화면에 갇힌다');
 });
 

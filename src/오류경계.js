@@ -2,7 +2,7 @@ import { Component } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { 관측보고 } from './관측';
 import { 색, 폰트, 몽골어폰트, 눌림층, 글자배율상한 } from './테마';
-import { 경계문구 } from '../contents/문구_오류.js';
+import { 문구 } from '../contents/문구_오류.js';
 
 /**
  * 화면 렌더 예외의 울타리 (감사 G2-3) — 한 화면이 그리다 죽어도 앱 전체가 내려가지 않는다.
@@ -15,7 +15,7 @@ export function 넘어짐판({ 되세우기 }) {
   return (
     <View style={s.판}>
       {/* ko/mn 병기 — mn 이 빈 동안 한 줄만 선다(contents/문구_오류.js 규율). */}
-      {[경계문구.ko, 경계문구.mn].filter(Boolean).map((줄, i) => (
+      {[문구['err.boundary_fell'].ko, 문구['err.boundary_fell'].mn].filter(Boolean).map((줄, i) => (
         <Text key={줄} style={i === 0 ? s.글 : s.글_병기}>{줄}</Text>
       ))}
       <Pressable onPress={되세우기} style={({ pressed }) => [s.버튼, pressed && s.버튼_눌림]} hitSlop={8}>
