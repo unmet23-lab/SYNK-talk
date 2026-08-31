@@ -51,7 +51,7 @@ const { 몽골날짜, 시간대 } = 과제모듈 as { 몽골날짜: (때?: Date)
 /* Ⅲ⑥ — 오늘 보여줄 성향 확인 하나. 판정의 정본은 lib 하나(서버·앱·회귀가 같은 함수를 본다).
  * 리듬 «추정» 자체는 학습자상태() 그대로다 — 배정↔제출 구간 잇기를 SQL 로 다시 적으면 두 벌이다. */
 const { 확인카드, 부정키 } = 성향확인모듈 as {
-  확인카드: (리듬: unknown, 이력: unknown, 기준시각: string, 추정판: string) => Record<string, unknown> | null;
+  확인카드: (축들: unknown, 이력: unknown, 기준시각: string, 추정판: string) => Record<string, unknown> | null;
   부정키: (축: string, 키: string) => string;
 };
 /* c14 교실 수집 ② — 오늘 밤 목표 카드 하나. 판정의 정본은 lib 하나(성향확인과 같은 규율). */
@@ -60,7 +60,7 @@ const { 목표카드 } = 목표확인모듈 as {
 };
 const { 학습자상태 } = 상태모듈 as {
   학습자상태: (행들: unknown[], 옵션: Record<string, unknown>) =>
-    { estimator_version: string; 축: { 리듬: unknown } };
+    { estimator_version: string; 축: { 리듬: unknown; 작성과정: unknown; 집중띠: unknown } };
 };
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
@@ -190,13 +190,21 @@ Deno.serve(async (req: Request) => {
      * 실패는 null 로 낸다 — 확인 카드는 «없어도 되는» 꼬리라 본 응답을 절대 안 깨뜨린다. */
     let 오늘의확인: Record<string, unknown> | null = null;
     try {
-      /* 행만 걷는다 — 리듬 추정(배정↔제출 구간 잇기·마감 여유)은 학습자상태() 정본이 계산한다.
-       * 창(30일)도 그 함수의 as_of 절단이 지므로 여기선 40일을 넉넉히 걷는다(두 벌 방지). */
+      /* 행만 걷는다 — 추정(배정↔제출 구간 잇기·마감 여유·띠 갈래·되돌림 중앙)은 학습자상태()
+       * 정본이 계산한다. 창(30일)도 그 함수의 as_of 절단이 지므로 여기선 40일을 넉넉히 걷는다(두 벌 방지).
+       * v2(세층합류 §5 — 다축): ⓐ`session.abandoned` 를 더한다(집중띠축이 제출·이탈 «둘 다» 세는데
+       * 한쪽만 걷으면 완주율이 조용히 낮아진다 — 학습자상태 v10 그 비대칭) ⓑ`task_type`·
+       * `task_schema_ver` 를 싣는다(라디오 통로 제외 판별 — 안 실으면 낭독 행이 앱 행으로 읽히고
+       * 새는 방향은 「통과」다) ⓒpayload 는 `compose_meta` 조각만 조립해 싣는다(작성과정축 재료 —
+       * 통째로 걷으면 학생 글 본문까지 서버 메모리에 실린다: 필요한 칸만이 이 파일의 걷기 규율이다.
+       * compose_meta 없는 행은 payload null → 작성과정축이 「잴 것 없던 제출(음성 등)」로 정확히 접는다). */
       const 원행들 = await sql`
-        select e.event_id, e.event_type, e.occurred_at, e.due_at
+        select e.event_id, e.event_type, e.occurred_at, e.due_at, e.task_type, e.task_schema_ver,
+               case when e.payload ? 'compose_meta'
+                    then jsonb_build_object('compose_meta', e.payload->'compose_meta') end as payload
           from engine.learning_events e
          where e.learner_id = ${행.learner_id}::uuid
-           and e.event_type in ('task.assigned', 'submission.created')
+           and e.event_type in ('task.assigned', 'submission.created', 'session.abandoned')
            and e.occurred_at >= now() - interval '40 days'`;
       /* 🔴 「오늘」의 축 = ingested_at(서버 수신 시각 · default now()) — occurred_at 은 앱 시계라
        * (C0 「기기 시계는 못 믿는다」) 시계 앞선 기기가 «내일»로 찍으면 오늘 또 묻고 내일 억제된다
@@ -214,8 +222,10 @@ Deno.serve(async (req: Request) => {
         .map((p) => 부정키(String(p.축), String(p.키)));
       const 기준 = new Date().toISOString();
       const 상태 = 학습자상태(원행들 as unknown[], { as_of: 기준, 시간대 });
+      /* v2 — 후보 축 셋(리듬·작성과정·집중띠 · 세층합류 §5). 산출은 학습자상태() 그대로 넘긴다 —
+       * 여기서 골라 다듬으면 서버가 보여준 추정과 상태가 배운 추정이 갈린다(두 벌 금지 그대로). */
       오늘의확인 = 확인카드(
-        상태.축.리듬,
+        { 리듬: 상태.축.리듬, 작성과정: 상태.축.작성과정, 집중띠: 상태.축.집중띠 },
         { 오늘답함: Number(답이력.오늘답수) > 0, 부정키들 },
         기준, 상태.estimator_version);
     } catch (e) {
