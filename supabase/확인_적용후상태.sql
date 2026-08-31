@@ -12,6 +12,8 @@ with 기대열(t, c) as (values
   ('learning_events','parent_event_id'), ('learning_events','turn_no'),
   ('learning_events','correction_id'),
   ('learning_events','consent_id'),
+  -- 교실 수집 물리칸 2(20260831130000 · 관찰태그 설계 §5)
+  ('learning_events','observer_staff_id'), ('learning_events','draft_modified'),
   -- 동의 출처(20260807140000)
   ('consents','recorded_by'),
   -- 추정메타 물리 칸(20260807170000 · 절단문서 ①-7)
@@ -81,82 +83,82 @@ with 기대열(t, c) as (values
 ), 기대제약(n) as (values
   -- ── c12: CHECK 는 전부 _c13 접미 — 이 조각이 _c11 서른하나를 이름째 교체했다.
   --    UNIQUE·EXCLUDE·FK·PK 는 값목록이 없어 판 판별과 무관하니 c11 이름 그대로다.
-  ('learning_events_event_type_c13'), ('learning_events_task_type_c13'),
-  ('submissions_task_format_c13'), ('submissions_translation_source_c13'),
-  ('submissions_due_paired_c13'), ('corrections_verdict_c13'),
+  ('learning_events_event_type_c14'), ('learning_events_task_type_c14'),
+  ('submissions_task_format_c14'), ('submissions_translation_source_c14'),
+  ('submissions_due_paired_c14'), ('corrections_verdict_c14'),
   ('learning_events_retry_same_learner'), ('learning_events_parent_same_learner'),
   ('corrections_reviewed_same_submission'), ('schema_migrations_pkey'),
-  ('learners_signup_attempts_nonneg_c13'), ('staff_role_c13'),
-  ('learners_temp_password_paired_c13'),
-  ('learning_events_correction_target_c13'), ('learning_events_correction_id_fkey'),
+  ('learners_signup_attempts_nonneg_c14'), ('staff_role_c14'),
+  ('learners_temp_password_paired_c14'),
+  ('learning_events_correction_target_c14'), ('learning_events_correction_id_fkey'),
   -- 동의 귀속(20260807120000)
   ('learning_events_consent_id_fkey'),
   -- 검수 확정 칸 넷(20260809090000) — FK 도 함께 센다(열만 서고 고리가 없으면 계보가 거짓이다)
-  ('corrections_supersedes_not_self_c13'), ('corrections_promotion_intent_c13'),
-  ('corrections_supersedes_fkey'), ('pipeline_jobs_discard_reason_c13'),
+  ('corrections_supersedes_not_self_c14'), ('corrections_promotion_intent_c14'),
+  ('corrections_supersedes_fkey'), ('pipeline_jobs_discard_reason_c14'),
   -- 시즌 그릇(20260812140000) — 겹침 배제·날짜 순서·학생×시즌 유일·문항 묶음 + 고리 둘.
-  ('season_no_overlap_c11'), ('season_dates_c13'),
-  ('season_compass_once_c11'), ('season_compass_answers_c13'),
+  ('season_no_overlap_c11'), ('season_dates_c14'),
+  ('season_compass_once_c11'), ('season_compass_answers_c14'),
   ('season_compass_learner_id_fkey'), ('season_compass_season_id_fkey'),
   -- 시즌 회고(20260812170000) — 판정 3갈래 둘 + 「판정·사유·주체·시각 한 벌」 + 고리 둘.
-  ('season_review_once_c11'), ('season_review_verdict_c13'),
-  ('season_review_self_c13'), ('season_review_decided_c13'),
+  ('season_review_once_c11'), ('season_review_verdict_c14'),
+  ('season_review_self_c14'), ('season_review_decided_c14'),
   ('season_review_learner_id_fkey'), ('season_review_season_id_fkey'),
   -- 가입 1회 문항 값목록(20260812180000) — 세 칸 전부.
-  ('learners_home_aimag_c13'), ('learners_gender_c13'), ('learners_goal_track_c13'),
+  ('learners_home_aimag_c14'), ('learners_gender_c14'), ('learners_goal_track_c14'),
   -- 반(20260812200000) — 고리 넷 + 빈 좌표 금지.
-  ('classes_pkey'), ('classes_key_nonblank_c13'), ('classes_season_id_fkey'),
+  ('classes_pkey'), ('classes_key_nonblank_c14'), ('classes_season_id_fkey'),
   ('learners_class_id_fkey'),
   ('staff_classes_pkey'), ('staff_classes_staff_id_fkey'), ('staff_classes_class_id_fkey'),
   -- 강사 한 마디(20260812210000) — 유일(한 산출물에 하나) + 값목록 둘 + 빈 말 금지 + 고리 둘.
-  ('teacher_notes_pkey'), ('teacher_notes_once_c11'), ('teacher_notes_body_nonblank_c13'),
-  ('teacher_notes_origin_c13'), ('teacher_notes_disposition_c13'),
+  ('teacher_notes_pkey'), ('teacher_notes_once_c11'), ('teacher_notes_body_nonblank_c14'),
+  ('teacher_notes_origin_c14'), ('teacher_notes_disposition_c14'),
   ('teacher_notes_submission_id_fkey'), ('teacher_notes_staff_id_fkey'),
   -- 조·좌석 쓰레기 못(20260814100000)
-  ('learners_group_no_c13'), ('learners_seat_no_c13'),
+  ('learners_group_no_c14'), ('learners_seat_no_c14'),
   -- companion 빈칸 로그(20260814110000)
-  ('companion_qa_question_nonblank_c13'), ('companion_qa_answer_paired_c13'),
+  ('companion_qa_question_nonblank_c14'), ('companion_qa_answer_paired_c14'),
   ('companion_qa_staff_id_fkey'),
   -- 생성 실행 장부(20260821120000) — CHECK 34 + FK 3 + UNIQUE 3(전이·계보의 물리).
-  ('attempts_gate_values_c13'),
-  ('attempts_response_present_c13'),
-  ('attempts_result_gate_c13'),
-  ('attempts_ver_nonempty_c13'),
-  ('batch_runs_counts_order_c13'),
-  ('batch_runs_counts_pair_c13'),
-  ('batch_runs_enrolled_nonneg_c13'),
-  ('batch_runs_finished_cols_c13'),
-  ('batch_runs_level_dist_ok_c13'),
-  ('batch_runs_partial_pair_c13'),
-  ('batch_runs_partial_range_c13'),
-  ('batch_runs_roster_equation_c13'),
-  ('batch_runs_skipped_range_c13'),
-  ('batch_runs_ver_nonempty_c13'),
-  ('jobs_anchor_present_c13'),
-  ('jobs_claim_cols_c13'),
-  ('jobs_deciding_pair_c13'),
-  ('jobs_deciding_result_matches_c13'),
-  ('jobs_deciding_scope_c13'),
-  ('jobs_draft_present_c13'),
-  ('jobs_idle_cols_c13'),
-  ('jobs_load_failed_cols_c13'),
-  ('jobs_nontarget_cols_c13'),
-  ('jobs_nonterminal_cols_c13'),
-  ('jobs_skill_ids_present_c13'),
-  ('jobs_status_outcome_pairs_c13'),
-  ('jobs_terminal_cols_c13'),
-  ('jobs_ver_nonempty_c13'),
-  ('jobs_winner_fence_current_c13'),
-  ('jobs_winner_fence_pair_c13'),
-  ('jobs_winner_only_success_c13'),
-  ('jobs_winner_present_c13'),
-  ('jobs_winner_result_only_success_c13'),
-  ('jobs_winner_result_pair_c13'),
+  ('attempts_gate_values_c14'),
+  ('attempts_response_present_c14'),
+  ('attempts_result_gate_c14'),
+  ('attempts_ver_nonempty_c14'),
+  ('batch_runs_counts_order_c14'),
+  ('batch_runs_counts_pair_c14'),
+  ('batch_runs_enrolled_nonneg_c14'),
+  ('batch_runs_finished_cols_c14'),
+  ('batch_runs_level_dist_ok_c14'),
+  ('batch_runs_partial_pair_c14'),
+  ('batch_runs_partial_range_c14'),
+  ('batch_runs_roster_equation_c14'),
+  ('batch_runs_skipped_range_c14'),
+  ('batch_runs_ver_nonempty_c14'),
+  ('jobs_anchor_present_c14'),
+  ('jobs_claim_cols_c14'),
+  ('jobs_deciding_pair_c14'),
+  ('jobs_deciding_result_matches_c14'),
+  ('jobs_deciding_scope_c14'),
+  ('jobs_draft_present_c14'),
+  ('jobs_idle_cols_c14'),
+  ('jobs_load_failed_cols_c14'),
+  ('jobs_nontarget_cols_c14'),
+  ('jobs_nonterminal_cols_c14'),
+  ('jobs_skill_ids_present_c14'),
+  ('jobs_status_outcome_pairs_c14'),
+  ('jobs_terminal_cols_c14'),
+  ('jobs_ver_nonempty_c14'),
+  ('jobs_winner_fence_current_c14'),
+  ('jobs_winner_fence_pair_c14'),
+  ('jobs_winner_only_success_c14'),
+  ('jobs_winner_present_c14'),
+  ('jobs_winner_result_only_success_c14'),
+  ('jobs_winner_result_pair_c14'),
   -- 몽골어 문구 감수(20260826130000)
-  ('l10n_strings_id_ascii_c13'), ('l10n_strings_ko_nonblank_c13'),
-  ('l10n_strings_max_len_c13'), ('l10n_strings_status_c13'),
-  ('l10n_reviews_verdict_c13'), ('l10n_reviews_final_paired_c13'),
-  ('l10n_reviews_supersedes_not_self_c13'),
+  ('l10n_strings_id_ascii_c14'), ('l10n_strings_ko_nonblank_c14'),
+  ('l10n_strings_max_len_c14'), ('l10n_strings_status_c14'),
+  ('l10n_reviews_verdict_c14'), ('l10n_reviews_final_paired_c14'),
+  ('l10n_reviews_supersedes_not_self_c14'),
   ('jobs_winning_attempt_fk'), ('jobs_deciding_attempt_fk'), ('jobs_batch_run_fk'),
   ('attempts_id_job_result_uk'), ('attempts_id_job_fence_result_uk'), ('batch_runs_run_date_uq')
 ), 기대트리거(n) as (values
@@ -288,7 +290,7 @@ with 기대열(t, c) as (values
   -- c12 가 접미를 갈았다 — 옛 이름을 세면 「적용 전」과 「적용 후」가 같은 0 으로 보인다.
   (select count(*) from pg_constraint
     where connamespace=to_regnamespace('radio')
-      and conname='broadcast_segment_kind_c13') as 라디오kind제약,
+      and conname='broadcast_segment_kind_c14') as 라디오kind제약,
   (select count(*) from pg_trigger g
      join pg_class c2 on c2.oid=g.tgrelid
     where c2.relnamespace=to_regnamespace('radio')
@@ -313,11 +315,14 @@ with 기대열(t, c) as (values
   -- ops 회차 장부(20260815080000) — c12 가 outcome CHECK 접미를 갈았으니 새 이름을 센다.
   (select count(*) from pg_constraint
     where connamespace=to_regnamespace('ops')
-      and conname='cron_runs_outcome_c13') as 회차제약,
+      and conname='cron_runs_outcome_c14') as 회차제약,
   -- G11(08-24) — 확인 답 하루 1회의 물리 방벽(부분 유일 · engine.ub_date 식). CHECK 가 아니라
   -- 「기대:」 줄 대상이 아니고, pg_constraint 에도 안 잡혀 pg_indexes 로 센다(연동활성유일 선례).
   (select count(*) from pg_indexes
-    where schemaname='engine' and indexname='estimate_daily_once_c13') as 확인하루유일
+    where schemaname='engine' and indexname='estimate_daily_once_c13') as 확인하루유일,
+  -- c14 — 목표 답 하루 1회의 물리 방벽(estimate 동형 · 같은 pg_indexes 셈).
+  (select count(*) from pg_indexes
+    where schemaname='engine' and indexname='goal_daily_once_c14') as 목표하루유일
 )
 select case when 테이블수=23 and RLS켜짐=23 and 정책수=7
               and 새는테이블권한=0 and 새는스키마권한=0 and 삭제차단=5 and 실패상태=1
@@ -330,14 +335,14 @@ select case when 테이블수=23 and RLS켜짐=23 and 정책수=7
               and 연동보호트리거=1 and 연동활성유일=1 and 스킬시드수=30
               and 겹친한마디=0
               and 반검수뷰=1 and 반검수판열=26 and 반검수판원문=0
-              and 컴패니언열=11 and 컴패니언정책=0 and 회차제약=1 and 확인하루유일=1
+              and 컴패니언열=11 and 컴패니언정책=0 and 회차제약=1 and 확인하루유일=1 and 목표하루유일=1
               and (select v from 빠진열) is null
               and (select v from 빠진제약) is null
               and (select v from 빠진트리거) is null
-              and (select version from 현재이력)='20260826130000'
-              and (select checksum from 현재이력)='c80631b25ad14e4c998ed5b4cb74ee9c11e5197aa282a485555bde87ed3d78ba' -- migration-checksum
+              and (select version from 현재이력)='20260831130000'
+              and (select checksum from 현재이력)='8e117a108346266594a1a1386b4a099f98c7c0e51b6fe94e91c95647c3ef5d3f' -- migration-checksum
             then '✅ 전부 통과'
-            else '❌ 아래 칸을 그대로 알려주세요 (기대: 23·23·7·0·0·5·1·0·0·1·0·0·0·0·22·0·0·0·0·2·6·6·0·0·0·1·1·1·30·0·1·26·0·11·0·1·1 · 빠진 칸은 전부 비어 있어야 합니다)'
+            else '❌ 아래 칸을 그대로 알려주세요 (기대: 23·23·7·0·0·5·1·0·0·1·0·0·0·0·22·0·0·0·0·2·6·6·0·0·0·1·1·1·30·0·1·26·0·11·0·1·1·1 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
        (select version from 현재이력) as 현재버전,
        (select checksum from 현재이력) as checksum,

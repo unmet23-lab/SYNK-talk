@@ -14,6 +14,8 @@
   "갈래판정.mjs": "lib/갈래판정.js",
   "성향확인.mjs": "lib/성향확인.js",
   "문구_성향확인.mjs": "contents/문구_성향확인.js",
+  "목표확인.mjs": "lib/목표확인.js",
+  "문구_목표확인.mjs": "contents/문구_목표확인.js",
   "문구_동의.mjs": "contents/문구_동의.js",
   "학습자상태.mjs": "lib/학습자상태.js",
   "작성과정.mjs": "lib/작성과정.js",

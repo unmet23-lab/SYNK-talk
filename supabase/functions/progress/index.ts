@@ -37,6 +37,7 @@ import 토큰모듈 from './토큰.mjs';
 import 과제모듈 from './오늘과제.mjs';
 import 계약판모듈 from './계약판.mjs';
 import 성향확인모듈 from './성향확인.mjs';
+import 목표확인모듈 from './목표확인.mjs';
 import 상태모듈 from './학습자상태.mjs';
 import CORS모듈 from './CORS.mjs';
 
@@ -52,6 +53,10 @@ const { 몽골날짜, 시간대 } = 과제모듈 as { 몽골날짜: (때?: Date)
 const { 확인카드, 부정키 } = 성향확인모듈 as {
   확인카드: (리듬: unknown, 이력: unknown, 기준시각: string, 추정판: string) => Record<string, unknown> | null;
   부정키: (축: string, 키: string) => string;
+};
+/* c14 교실 수집 ② — 오늘 밤 목표 카드 하나. 판정의 정본은 lib 하나(성향확인과 같은 규율). */
+const { 목표카드 } = 목표확인모듈 as {
+  목표카드: (이력: { 오늘답함: boolean }, 오늘: string) => Record<string, unknown> | null;
 };
 const { 학습자상태 } = 상태모듈 as {
   학습자상태: (행들: unknown[], 옵션: Record<string, unknown>) =>
@@ -217,8 +222,24 @@ Deno.serve(async (req: Request) => {
       console.error('[progress] 오늘의확인 판정 실패(null 로 낸다)', String((e as Error)?.message ?? e));
     }
 
+    /* c14 교실 수집 ② — 오늘 밤 목표 카드(유호 확정 08-31 「웅 그대로 가」 · 정본 = appsscript
+     * docs/교실수집_목표왕복_설계_v1.md). 하루 1회는 goal.responded 행이 지고(오늘의확인과 같은
+     * ingested_at 축 — 심문 G12), 평일 근사·문구는 lib/목표확인.js 정본이 진다. 실패는 null —
+     * 목표 카드도 «없어도 되는» 꼬리라 본 응답을 절대 안 깨뜨린다. */
+    let 오늘의목표: Record<string, unknown> | null = null;
+    try {
+      const [목표이력] = await sql`
+        select count(*) filter (where (e.ingested_at at time zone ${시간대})::date = ${오늘}::date) as 오늘답수
+          from engine.learning_events e
+         where e.learner_id = ${행.learner_id}::uuid
+           and e.event_type = 'goal.responded'`;
+      오늘의목표 = 목표카드({ 오늘답함: Number(목표이력.오늘답수) > 0 }, 오늘);
+    } catch (e) {
+      console.error('[progress] 오늘의목표 판정 실패(null 로 낸다)', String((e as Error)?.message ?? e));
+    }
+
     // 두 날짜 고정이라 넘길 쪽이 없다(C0 §4-3 ③ — 쿼리 없음).
-    return 봉투(200, { ok: true, date: 오늘, data, next_cursor: null, 오늘의확인 }, ver);
+    return 봉투(200, { ok: true, date: 오늘, data, next_cursor: null, 오늘의확인, 오늘의목표 }, ver);
   } catch (e) {
     console.error('[progress] 조회 실패', String((e as Error)?.message ?? e));
     return 실패(500, { code: 'SERVER_ERROR', message: '잠시 뒤 다시 시도해 주세요', retryable: true }, ver);

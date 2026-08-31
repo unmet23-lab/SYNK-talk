@@ -557,11 +557,14 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
      * 같은 얼굴 — 앱 사건통로가 성공으로 접고 큐를 비운다). 아래 일반 갈래로 흘리면
      * SERVER_ERROR/retryable:true 라 앱이 영원히 재시도한다(그 줄 주석이 경고한 그 상태).
      * ⚠ 이 조회는 tx **밖**이다(begin 이 이미 롤백하고 던졌다) — 맨 sql 로 그날 행을 찾는다. */
-    if (/estimate_daily_once/i.test(글)) {
+    if (/estimate_daily_once|goal_daily_once/i.test(글)) {
+      /* c14 — 목표 답(goal.responded)의 하루 1회 색인(goal_daily_once_c14)도 같은 갈래다:
+       * 두 기기 경쟁의 늦은 쪽을 duplicate 로 접는다(학생 잘못도 서버 잘못도 아니다). */
+      const 중복사건 = /goal_daily_once/i.test(글) ? 'goal.responded' : 'estimate.responded';
       const 그날 = await sql`
         select event_id from engine.learning_events
          where learner_id = ${learner_id}::uuid
-           and event_type = 'estimate.responded'
+           and event_type = ${중복사건}
            and engine.ub_date(ingested_at) = engine.ub_date(now())
          limit 1`;
       return { idempotency_key: key, status: 'duplicate', event_id: 그날[0]?.event_id ?? null };

@@ -127,6 +127,21 @@ function 합성이력() {
           response: d % 14 === 0 ? '맞다' : '아니다',
           estimator_version: '학습자상태.v13+성향확인.v1', estimate_as_of: t(d + 0.5) } });
     }
+    /* ⑬ 목표 답(c14 교실 수집 ②) — 목표축 재료. 해냈다·아직을 다 낸다(하나면 「축이 값을
+     * 낸다」는 초록이 반쪽만 도는 상태를 덮는다 — ⑫와 같은 이유). class_date 는 그날 달력. */
+    if (d % 3 === 0) {
+      행들.push({ event_id: id('gr'), event_type: 'goal.responded', occurred_at: t(d + 0.6),
+        payload: { response: d % 6 === 0 ? '해냈다' : '아직',
+          class_date: String(t(d)).slice(0, 10), card_version: '목표확인.v1' } });
+    }
+    /* ⑭ 강사 관찰(c14) — 관찰축 재료. 태그 있는 관찰과 «태그 없는» 관찰(발음·태도 갈래)을
+     * 다 낸다 — 태그없는수 갈래가 안 돌면 그 셈이 죽은 채 초록이다. */
+    if (d % 5 === 0) {
+      행들.push({ event_id: id('ob'), event_type: 'observation.noted', occurred_at: t(d + 0.65),
+        payload: d % 10 === 0
+          ? { area: '문법', tags: ['조사:이가'], note_text: '조사 이/가 자리를 오늘 두 번 바꿔 말했다' }
+          : { area: '발음', tags: [], note_text: '받침 소리가 뭉개지는데 스스로 모른다' } });
+    }
 
     /* ⑪ G2 「보고서 교정」 지목 — 탐지축(v8). 세 갈래를 다 낸다: 짚음 · 「고칠 곳 없음」 ·
      * 무반응. 🔴 갈래가 하나면 「축이 값을 낸다」는 초록이 세 뜻 중 하나만 도는 상태를 덮는다.
