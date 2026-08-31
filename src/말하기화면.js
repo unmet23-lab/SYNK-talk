@@ -1071,7 +1071,7 @@ function 듣기카드({ 편지, 라벨 = '편지가 왔어요', 다음, 들었�
       <Text style={s.녹음안내}>딱 세 걸음이에요 — 듣고, 따라 말하고, 내 말로 답해요!</Text>
       <Text style={s.편지문}>{편지.본문}</Text>
       {읽기실패 && !들었다 && (
-        <Text style={s.녹음안내}>소리를 읽지 못했어요 — 글로 읽어 주세요</Text>
+        <Text style={s.녹음안내}>소리 대신 글로 읽어 볼까요? — 다시 들어볼 수도 있어요</Text>
       )}
       {/* 위계: 이 카드의 본동작은 «듣기»라 재생이 주버튼이다. 들었다(또는 소리가 안 나오는
           기기라 글로 읽었다)면 그 자리에 전진 주버튼이 선다.
@@ -1185,6 +1185,12 @@ function 녹음카드({
   const [설정필요, set설정필요] = useState(false);
   const [끊김, set끊김] = useState(false); // 배경으로 나가 녹음이 중간에 멈췄다 — 아래 `AppState`
   const 추적 = useRef(null);
+  /* 녹음 버튼이 학생 음량에 숨쉬는 게이지(0~1) — onBuffer 는 마운트 때 잡힌 클로저지만(아래 자동
+   *   종료 주석) Animated.Value·ref 는 안정 객체라 안전하고, setValue 는 리렌더를 안 부른다. */
+  /* D5-10 — 따라 카드는 문장마다 remount(key={이번걸음})라 걸음마다 박자가 돈다 · reduce-motion 은 use등장이 진다. */
+  const 카드등장 = use등장();
+  const 음량 = useRef(new Animated.Value(0)).current;
+  const 음량직전 = useRef(0);
   const 플레이어 = useRef(null);
   /* 🔴 「내 목소리 듣기」 관측 — **여기서 보내지 않는다**(절단문서 ①-2 의 마지막 값).
    *   이 관측의 부모는 아직 만들어지지도 않은 자기 제출 사건이라, 지금 보내면 부모 없는 사건으로
@@ -1218,7 +1224,12 @@ function 녹음카드({
       실규격.current = { sample_rate: buf.sampleRate, channels: buf.channels };
       const t_ms = Math.round((buf.timestamp || 0) * 1000);
       set경과(t_ms);
-      if (추적.current) 추적.current.표본(t_ms, 데시벨(조각));
+      const db = 데시벨(조각);
+      if (추적.current) 추적.current.표본(t_ms, db);
+      /* 접기 구간(-45~-15dB → 0~1 · 발화문턱_DB -35 가 중간)·감쇠 0.7/0.3 은 실기기 손맛 조율 몫이다. */
+      const 목표 = typeof db === 'number' ? Math.max(0, Math.min(1, (db + 45) / 30)) : 0;
+      음량직전.current = 음량직전.current * 0.7 + 목표 * 0.3;
+      음량.setValue(음량직전.current);
     },
   });
 
@@ -1533,7 +1544,7 @@ function 녹음카드({
   };
 
   return (
-    <View style={s.카드}>
+    <Animated.View style={[s.카드, 카드등장]}>
       <Text style={s.카드라벨}>
         {/* 호흡 번호도 숫자다 — G3 는 세 호흡 흐름이 아니라 이 번호가 뜻도 없이 숫자만 남긴다.
             🔑 모르는 걸음(라디오 낭독 등)은 번호 없이 안내만 — `undefined · ` 를 안 찍는다. */}
@@ -1600,7 +1611,7 @@ function 녹음카드({
 
       {단계 === '녹음중' && (
         <중앙>
-          <녹음버튼 녹음중 onPress={끝} />
+          <녹음버튼 녹음중 onPress={끝} 음량={음량} />
           {/* 숫자 숨김(G3) — 남은 시간을 시계로 주면 회피 지연 축이 「시계 반응」으로 오염된다. */}
           {!숫자숨김 && <Text style={s.타이머}>{초표시(경과)}</Text>}
           <Text style={s.녹음안내}>다 말했으면 탭해서 마쳐요</Text>
@@ -1626,7 +1637,7 @@ function 녹음카드({
           )}
           {/* 상한 자동 종료도 말한다 — 숫자는 0(G3 숫자숨김 규율) · 배경 끊김 문구와 안 겹치게. */}
           {!끊김 && 상한끊김 && (
-            <Text style={s.무발화설명}>여기서 매듭을 지었어요 — 들어 보고 그대로 보내도, 다시 말해도 돼요.</Text>
+            <Text style={s.무발화설명}>여기까지 담았어요 — 들어 보고 그대로 보내도, 다시 말해도 돼요.</Text>
           )}
           <Pressable testID="말하기-내목소리" onPress={내목소리} style={({ pressed }) => [s.보조버튼, pressed && s.눌림]}>
             <Text style={s.보조버튼글}>{듣는중 ? '재생 중…' : '내 목소리 듣기'}</Text>
@@ -1701,7 +1712,7 @@ function 녹음카드({
           </View>
         </View>
       )}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -1727,11 +1738,13 @@ export { 녹음카드, 듣기카드 };
  *
  * ■ 맥박은 링이 아니라 띠 자신이 진다
  *   옛 판은 원 둘레에 링을 돌렸는데 띠에는 그 자리가 없다. 띠를 통째로 아주 얕게 숨 쉬게 한다
- *   (1 → 1.03). ⚠ `useNativeDriver` 라 **transform·opacity 만** 만진다(모션 스택 규율). */
+ *   (기본 1 → 1.03 · 녹음 중엔 학생 음량 게이지가 0~0.02 를 더 얹어 1~1.05 — reduce-motion 이면
+ *   고정 맥박만). ⚠ `useNativeDriver` 라 **transform·opacity 만** 만진다(모션 스택 규율). */
 const 띠폭 = 248;
 
-function 녹음버튼({ 녹음중, onPress }) {
+function 녹음버튼({ 녹음중, onPress, 음량 = null }) {
   const 맥박 = useRef(new Animated.Value(1)).current;
+  const 줄임 = use줄임();
 
   useEffect(() => {
     if (녹음중) {
@@ -1756,7 +1769,7 @@ function 녹음버튼({ 녹음중, onPress }) {
       accessibilityRole="button"
       accessibilityLabel={녹음중 ? '녹음 마치기' : '녹음 시작'}
     >
-      <Animated.View style={{ transform: [{ scale: 맥박 }] }}>
+      <Animated.View style={{ transform: [{ scale: 녹음중 && 음량 && !줄임 ? Animated.add(맥박, Animated.multiply(음량, 0.02)) : 맥박 }] }}>
         <녹음띠 상태={녹음중 ? '말하는중' : '대기'} 폭={띠폭} />
       </Animated.View>
     </Pressable>

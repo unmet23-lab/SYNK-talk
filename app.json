@@ -10,7 +10,10 @@
     "scheme": "synktalk",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "lab.synk.talk"
+      "bundleIdentifier": "lab.synk.talk",
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"]
+      }
     },
     "android": {
       "package": "lab.synk.talk",
@@ -42,7 +45,8 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "말하기 연습을 녹음할 때만 마이크를 사용해요. · Зөвхөн ярианы дасгал бичих үед микрофон ашиглана."
+          "microphonePermission": "말하기 연습을 녹음할 때만 마이크를 사용해요. · Зөвхөн ярианы дасгал бичих үед микрофон ашиглана.",
+          "enableBackgroundRecording": true
         }
       ],
       "expo-font",
