@@ -44,7 +44,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { 색, 폰트, 모노트래킹, 몽골어 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어, 눌림감 } from './테마';
 import { 반목록, 반큐, 한마디주기 } from './반피드백API.js';
 import { 갈래 as 갈래값, 처분 as 처분값, 본문상한, 카드요약 } from '../lib/반피드백.js';
 
@@ -243,7 +243,7 @@ export default function 반피드백화면({ 토큰, 돌아가기 }) {
 
         {오류 && <Text style={오류.운영 ? s.안내글 : s.오류글}>{오류.말}</Text>}
 
-        <Pressable onPress={() => set항목(null)} style={s.back} hitSlop={8}>
+        <Pressable onPress={() => set항목(null)} style={s.back} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Text style={s.backText}>← 반으로</Text>
         </Pressable>
       </ScrollView>
@@ -302,7 +302,7 @@ export default function 반피드백화면({ 토큰, 돌아가기 }) {
 
         {오류 && <Text style={오류.운영 ? s.안내글 : s.오류글}>{오류.말}</Text>}
 
-        <Pressable onPress={() => { set반(null); set끝난것(null); set오류(null); }} style={s.back} hitSlop={8}>
+        <Pressable onPress={() => { set반(null); set끝난것(null); set오류(null); }} style={s.back} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Text style={s.backText}>← 내 반</Text>
         </Pressable>
       </ScrollView>
@@ -359,7 +359,7 @@ export default function 반피드백화면({ 토큰, 돌아가기 }) {
         </Pressable>
       ) : null}
 
-      <Pressable onPress={돌아가기} style={s.back} hitSlop={8}>
+      <Pressable onPress={돌아가기} style={s.back} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
         <Text style={s.backText}>← 돌아가기</Text>
       </Pressable>
     </ScrollView>
@@ -451,7 +451,7 @@ const s = StyleSheet.create({
   /* 잠김 = 미충족 전용. 진행 중(…는 중)은 disabled 만 걸고 면은 산 채로 둔다 —
      잠김꼴 위 글자는 2.3:1 이라 진행 문구가 안 읽힌다(감사 D6-3). */
   잠김: { backgroundColor: 색.잉크_희미 },
-  눌림: { opacity: 0.65 },
+  눌림: { opacity: 눌림감.면 },
 
   /* 운영 안내와 오류를 **밝기**로 가른다 — 「남이 이미 썼다」를 오류색으로 그리면 강사는 앱을
      의심하고, 그러면 그날의 피드백이 통째로 밀린다(밀린 피드백 = 한 마디 0).

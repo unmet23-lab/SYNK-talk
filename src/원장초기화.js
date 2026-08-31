@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { 색, 폰트, 모노트래킹, 글자배율상한, 눌림층 } from './테마';
+import { 색, 폰트, 모노트래킹, 글자배율상한, 눌림층, 눌림감 } from './테마';
 import { 학생번호맞나 } from '../lib/학생계정.js';
 import * as API from './인증API';
 
@@ -132,7 +132,7 @@ export default function 원장초기화({ 토큰, 닫기 }) {
       ))}
 
       {닫기 && (
-        <Pressable onPress={닫기} hitSlop={10} style={({ pressed }) => [s.돌아가기, pressed && { opacity: 0.6 }]}>
+        <Pressable onPress={닫기} hitSlop={10} style={({ pressed }) => [s.돌아가기, pressed && { opacity: 눌림감.글 }]}>
           <Text style={s.돌아가기글}>← 돌아가기</Text>
         </Pressable>
       )}

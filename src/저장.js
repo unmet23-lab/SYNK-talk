@@ -14,6 +14,7 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { 직렬화, 역직렬화, 밀린것 } from '../lib/제출로그.js';
 import { 세션남기기세움, 세션잊기 } from './인증API.js';
+import { 혼잣말캐릭터들 } from '../lib/마스코트생명.js';
 
 const 웹 = Platform.OS === 'web';
 
@@ -174,6 +175,52 @@ export async function 화면설정쓰기(설정) {
   }
 }
 
+/* ── 가이드 선택 (D4-1 · 몽글/까몽/마린 중 «누구랑 공부하나» · 마스코트기록과 같은 무늬) ──
+ * 🔴 **큐가 아니다** — 서버로 나가는 것이 0이라 `못보낸수` 에 안 더한다. 가입 페이로드에도
+ *   안 실린다(`lib/가입문항.js` 🚫 새 문항 금지 · auth 동봉) — 이 파일 하나가 정본이다.
+ * 🔑 깨짐·부재는 '몽글' 폴백 — 마스코트의 실패 모드는 조용함이지 오류 화면이 아니다.
+ *   이름 어휘는 `lib/마스코트생명.혼잣말캐릭터들` 하나에서 온다(사본을 두면 갈라진다). */
+let 메모리가이드 = null;
+
+export async function 가이드읽기() {
+  if (웹) return 메모리가이드 || '몽글';
+  try {
+    const f = new FS.File(FS.Paths.document, 'guide_choice.json');
+    if (!f.exists) return '몽글';
+    const 값 = JSON.parse(f.textSync());
+    return 혼잣말캐릭터들.includes(값) ? 값 : '몽글';
+  } catch {
+    return '몽글';
+  }
+}
+
+export async function 가이드쓰기(이름) {
+  const 값 = 혼잣말캐릭터들.includes(이름) ? 이름 : '몽글';
+  if (웹) {
+    메모리가이드 = 값;
+    return;
+  }
+  try {
+    const f = new FS.File(FS.Paths.document, 'guide_choice.json');
+    f.write(JSON.stringify(값));
+  } catch {
+    /* 못 쓰면 다음에 몽글로 시작할 뿐이다 — 가이드 선택이 화면을 죽이지 않는다 */
+  }
+}
+
+export async function 가이드지우기() {
+  if (웹) {
+    메모리가이드 = null;
+    return;
+  }
+  try {
+    const f = new FS.File(FS.Paths.document, 'guide_choice.json');
+    if (f.exists) f.delete();
+  } catch {
+    /* 못 지워도 남는 것은 캐릭터 취향뿐이다 — 학생 식별·큐 소실 축이 없다 */
+  }
+}
+
 /**
  * 아직 서버에 닿지 않은 것의 수 — **모든 큐를 합산한다**(나가기 게이트의 유일한 근거 · B1).
  *
@@ -316,18 +363,41 @@ export async function 세션쓰기(세션) {
  *   가 이 줄의 존재를 기계로 잰다. */
 세션남기기세움(세션쓰기);
 
-/** @returns {Promise<{refresh_token:string,학생번호:string}|null>} 없거나 깨졌으면 null */
-export async function 세션읽기() {
-  if (웹) return null;
+/* 키체인 JSON «그대로» — refresh_token 유무를 안 따진다. 만료 뒤에도 학생번호만은 남아
+ * 읽혀야 하는 자리(만료시지우기·학생번호읽기)가 쓴다. */
+async function 세션읽기_원시() {
   const 글 = await SecureStore.getItemAsync(세션키);
   if (!글) return null;
   try {
-    const s = JSON.parse(글);
-    return s && s.refresh_token ? s : null;
+    return JSON.parse(글);
   } catch {
     // 깨진 값은 없는 것과 같다 — 던지면 앱이 로그인 화면에도 못 닿는다
     return null;
   }
+}
+
+/** @returns {Promise<{refresh_token:string,학생번호:string}|null>} 없거나 깨졌으면 null */
+export async function 세션읽기() {
+  if (웹) return null;
+  const s = await 세션읽기_원시();
+  return s && s.refresh_token ? s : null;
+}
+
+/* 🔴 만료의 처방은 «전부 지우기»가 아니다(D7-12) — refresh_token 만 버리고 학생번호는
+ *   남긴다(기기 밖으로 안 나가는 값). 세션읽기 는 refresh_token 이 없으면 그대로 null 이라
+ *   로그인 폼으로 떨어지는 흐름은 불변이고, 남긴 번호가 그 폼의 첫 칸을 채운다.
+ *   기기 넘김 정문(기기비우기)은 현행 세션지우기() 그대로 — 거기서는 전부 지운다. */
+export async function 만료시지우기() {
+  if (웹) return;
+  const s = await 세션읽기_원시();
+  await SecureStore.setItemAsync(세션키, JSON.stringify({ 학생번호: (s && s.학생번호) || '' }));
+}
+
+/** 세션키 JSON 에서 학생번호만 — refresh_token 유무 무관. 없거나 웹이면 null. */
+export async function 학생번호읽기() {
+  if (웹) return null;
+  const s = await 세션읽기_원시();
+  return (s && s.학생번호) || null;
 }
 
 export async function 세션지우기() {
@@ -368,6 +438,9 @@ export async function 기기비우기() {
   /* 임시 녹음 메타도 귀속이다 — 남기면 다음 학생의 첫 마운트에 앞 학생의 목소리가
    * 「아까 담은 녹음」으로 뜰 수 있다(같은 날 로그아웃·재로그인 자리). 서버 소실 축은 없다. */
   await 임시녹음메타지우기();
+  /* 가이드 선택도 사람 귀속이다 — 남기면 기기를 같이 쓰는 다음 사람이 앞사람의 가이드로
+   * 시작한다. 서버로 나가는 것이 없어 소실 축은 없다(위 머리말 「큐가 아니다」). */
+  await 가이드지우기();
   await 세션지우기();
   /* 🔴 **키체인만 지우면 절반이다** — 만료 갱신이 세션을 메모리에도 쥐고 있고(`인증API`),
    *   안 비우면 다음 학생의 첫 401 이 **앞 학생의 refresh_token 으로** 되살아난다. 그 뒤 발화는

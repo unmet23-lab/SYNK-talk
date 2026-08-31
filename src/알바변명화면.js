@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
-import { 색, 폰트, 모노트래킹, 판눈금 } from './테마';
+import { 색, 폰트, 모노트래킹, 판눈금, 눌림감 } from './테마';
 import { use등장, use줄임 } from '../lib/모션.js';
 import { 제출재료 } from '../lib/알바변명제출.js';
 /* 발화 사슬의 판정들 — 「냈다」(학습출석 = ③답하기 submitted)와 「닿았다」(배달상태 = 서버가
@@ -287,7 +287,7 @@ const s = StyleSheet.create({
   /* 기본 버튼 = Paper 면 + Ink Deep 글자(테마 머리말) — 이 화면의 코랄은 녹음카드의 녹음 버튼뿐이다. */
   주버튼: { backgroundColor: 색.잉크, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
   주버튼글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.바탕 },
-  눌림: { opacity: 0.75 },
+  눌림: { opacity: 눌림감.면 },
 
   끝제목: { fontFamily: 폰트.헤드, fontSize: 24, color: 색.잉크 },
 });

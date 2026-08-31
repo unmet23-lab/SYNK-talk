@@ -23,7 +23,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { 색, 폰트, 모노트래킹 } from './테마';
+import { 색, 폰트, 모노트래킹, 눌림감 } from './테마';
 import { 견줌 } from '../lib/견줌.js';
 import { 연출대본 } from '../lib/마스코트생명.js';
 import { 기본캐릭터, 배치, 목소리판정 } from '../lib/가이드목소리.js';
@@ -324,7 +324,7 @@ export default function 검수문({ 돌아가기 }) {
           </Text>
         </View>
 
-        <Pressable onPress={돌아가기} style={({ pressed }) => [s.back, pressed && s.눌림]}>
+        <Pressable onPress={돌아가기} style={({ pressed }) => [s.back, pressed && { opacity: 눌림감.글 }]}>
           <Text style={s.backText}>← 돌아가기</Text>
         </Pressable>
       </ScrollView>
@@ -377,7 +377,7 @@ const s = StyleSheet.create({
     paddingVertical: 7, paddingHorizontal: 13,
   },
   버튼글: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크 },
-  눌림: { opacity: 0.7 },
+  눌림: { opacity: 눌림감.면 },
 
   back: { paddingTop: 14 },
   backText: {

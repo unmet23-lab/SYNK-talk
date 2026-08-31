@@ -37,7 +37,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
-import { 색, 폰트, 모노트래킹, 몽골어, 눌림층 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어, 눌림층, 눌림감 } from './테마';
 import * as API from './문구감수API';
 import { VERDICT, 원문결함, 확정요청 } from '../lib/문구감수.js';
 
@@ -127,7 +127,7 @@ export default function 문구감수화면({ 토큰, 돌아가기 }) {
       {도는중 ? <ActivityIndicator color={색.잉크} style={{ marginTop: 18 }} /> : null}
 
       {커서 && !도는중 && 목록.length < 미확정상한 ? (
-        <Pressable onPress={() => 더받기(true)} style={({ pressed }) => [s.더, pressed && { opacity: 0.7 }]}>
+        <Pressable onPress={() => 더받기(true)} style={({ pressed }) => [s.더, pressed && { opacity: 눌림감.글 }]}>
           <Text style={s.더글}>더 불러오기</Text>
         </Pressable>
       ) : null}
@@ -136,7 +136,7 @@ export default function 문구감수화면({ 토큰, 돌아가기 }) {
         <Text style={s.빈꼬리}>화면에 {목록.length}문장이 쌓였어요 — 판정을 끝내면 이어서 받을 수 있어요.</Text>
       ) : null}
 
-      <Pressable onPress={돌아가기} style={({ pressed }) => [s.뒤로, pressed && { opacity: 0.7 }]}>
+      <Pressable onPress={돌아가기} style={({ pressed }) => [s.뒤로, pressed && { opacity: 눌림감.글 }]}>
         <Text style={s.뒤로글}>← 돌아가기</Text>
       </Pressable>
     </ScrollView>
@@ -266,7 +266,7 @@ function 문장카드({ 줄, 토큰, 끝냈다 }) {
           testID={`원문결함-${줄.string_id}`}
           onPress={() => (까닭칸열림 ? 보내기(원문결함) : set까닭칸열림(true))}
           disabled={도는중}
-          style={({ pressed }) => [s.곁버튼, 도는중 && s.잠김, pressed && { opacity: 0.7 }]}
+          style={({ pressed }) => [s.곁버튼, 도는중 && s.잠김, pressed && { opacity: 눌림감.글 }]}
         >
           <Text style={s.곁버튼글}>{까닭칸열림 ? '원문 결함으로 보내기' : 원문결함}</Text>
         </Pressable>

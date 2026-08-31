@@ -30,7 +30,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { 색, 폰트, 모노트래킹 } from './테마';
+import { 색, 폰트, 모노트래킹, 눌림감 } from './테마';
 import { 로스터, 초안받기, 관찰보내기, 새멱등키 } from './관찰API.js';
 import { 영역들, 태그들, 태그실리는영역, 원문상한, 태그상한 } from '../lib/관찰초안.js';
 
@@ -172,7 +172,7 @@ export default function 관찰화면({ 토큰, 돌아가기 }) {
           <Pressable onPress={() => 학생고르기(학생)} style={({ pressed }) => [s.단추, pressed && s.단추_눌림]}>
             <Text style={s.단추글}>이 학생에게 하나 더 남기기</Text>
           </Pressable>
-          <Pressable onPress={() => set학생(null)} style={({ pressed }) => [s.연한단추, pressed && { opacity: 0.7 }]}>
+          <Pressable onPress={() => set학생(null)} style={({ pressed }) => [s.연한단추, pressed && { opacity: 눌림감.글 }]}>
             <Text style={s.연한단추글}>← 명단으로</Text>
           </Pressable>
         </View>
@@ -193,7 +193,7 @@ export default function 관찰화면({ 토큰, 돌아가기 }) {
 
             <View style={s.칩줄}>
               <Pressable onPress={초안누름} disabled={도는중 || !원문.trim()}
-                style={({ pressed }) => [s.연한단추, pressed && { opacity: 0.7 }, (도는중 || !원문.trim()) && s.흐림]}>
+                style={({ pressed }) => [s.연한단추, pressed && { opacity: 눌림감.글 }, (도는중 || !원문.trim()) && s.흐림]}>
                 <Text style={s.연한단추글}>{도는중 ? '…' : '초안 받기'}</Text>
               </Pressable>
             </View>
@@ -238,14 +238,14 @@ export default function 관찰화면({ 토큰, 돌아가기 }) {
               style={({ pressed }) => [s.단추, pressed && s.단추_눌림, (도는중 || !영역 || !원문.trim()) && s.흐림]}>
               <Text style={s.단추글}>{도는중 ? '남기는 중…' : '관찰 남기기'}</Text>
             </Pressable>
-            <Pressable onPress={() => set학생(null)} style={({ pressed }) => [s.연한단추, pressed && { opacity: 0.7 }]}>
+            <Pressable onPress={() => set학생(null)} style={({ pressed }) => [s.연한단추, pressed && { opacity: 눌림감.글 }]}>
               <Text style={s.연한단추글}>← 명단으로</Text>
             </Pressable>
           </View>
         </>
       )}
 
-      <Pressable onPress={돌아가기} style={({ pressed }) => [s.연한단추, pressed && { opacity: 0.7 }]}>
+      <Pressable onPress={돌아가기} style={({ pressed }) => [s.연한단추, pressed && { opacity: 눌림감.글 }]}>
         <Text style={s.연한단추글}>← 시스템으로</Text>
       </Pressable>
     </ScrollView>
@@ -282,7 +282,7 @@ const s = StyleSheet.create({
   /* 고른 칩은 **면**으로 든다 — 신호(코랄)를 안 쓴다(이 앱에서 코랄은 「지금 녹음 중」이라
      여기 쓰면 그 뜻이 흐려진다 · `어제의나` 머리말과 같은 판정). */
   칩_고름: { backgroundColor: 색.실땀, borderColor: 색.실땀 },
-  칩_눌림: { opacity: 0.7 },
+  칩_눌림: { opacity: 눌림감.면 },
   칩글: { fontFamily: 폰트.강조, fontSize: 13, lineHeight: 18, color: 색.잉크_서브 },
   칩글_고름: { color: 색.바탕 },
 
@@ -290,7 +290,7 @@ const s = StyleSheet.create({
     marginTop: 4, paddingVertical: 14, borderRadius: 14,
     backgroundColor: 색.실땀, alignItems: 'center',
   },
-  단추_눌림: { opacity: 0.8 },
+  단추_눌림: { opacity: 눌림감.면 },
   단추글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.바탕 },
   연한단추: { paddingVertical: 10, alignItems: 'center' },
   연한단추글: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_서브 },

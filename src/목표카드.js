@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { 색, 폰트, 몽골어폰트, 판눈금 } from './테마';
+import { 색, 폰트, 몽골어폰트, 판눈금, 눌림감 } from './테마';
 import { 목표사건 } from '../lib/목표확인.js';
 import { 목표반응 } from '../contents/문구_목표확인.js';
 import { 흐름id } from '../lib/제출로그.js';
@@ -59,6 +59,7 @@ export default function 목표카드({ 카드 = null, 토큰 = null, 답뒤 = nu
             key={값}
             onPress={() => 답하기(값)}
             accessibilityRole="button"
+            hitSlop={{ top: 4, bottom: 4 }}
             style={({ pressed }) => [s.단추, pressed && s.눌림]}
           >
             <Text style={s.단추글}>{String(라벨)}</Text>
@@ -77,7 +78,7 @@ const s = StyleSheet.create({
   본문: { fontFamily: 폰트.본문, fontSize: 15, lineHeight: 24, color: 색.잉크_서브 },
   단추줄: { flexDirection: 'row', gap: 8, marginTop: 4 },
   단추: { flex: 1, borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
-  눌림: { opacity: 0.7 },
+  눌림: { opacity: 눌림감.면 },
   단추글: { fontFamily: 폰트.강조, fontSize: 14, color: 색.잉크 },
   반응글: { fontFamily: 폰트.본문, fontSize: 14, lineHeight: 21, color: 색.잉크_서브 },
   /* 몽골어 병기 줄 둘 — 키릴은 몽골어폰트만(막힘카드 병기 눈금: 폰트짝 유지 · 크기·색 한 단 아래).

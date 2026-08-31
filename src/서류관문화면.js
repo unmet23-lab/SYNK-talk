@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { 색, 폰트, 모노트래킹, 판눈금, 눌림층 } from './테마';
+import { 색, 폰트, 모노트래킹, 판눈금, 눌림층, 눌림감 } from './테마';
 import { use등장 } from '../lib/모션.js';
 import {
   빈칸제출사건, 모름제출사건, 변환제출사건, 이탈사건, 이탈닻,
@@ -395,6 +395,7 @@ export default function 서류관문화면({
                 onPress={() => set확신도(확신도 === 값 ? null : 값)}
                 accessibilityRole="togglebutton"
                 accessibilityState={{ checked: 확신도 === 값 }}
+                hitSlop={{ top: 6, bottom: 6 }}
                 style={({ pressed }) => [s.확신토글, 확신도 === 값 && s.확신토글_켬, pressed && s.눌림]}
               >
                 <Text style={[s.확신글, 확신도 === 값 && s.확신글_켬]}>{라벨}</Text>
@@ -581,7 +582,7 @@ const s = StyleSheet.create({
   확신글: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_보조 },
   확신글_켬: { color: 색.잉크 },
   돌아가기: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_보조, textAlign: 'center' },
-  눌림: { opacity: 0.75 },
+  눌림: { opacity: 눌림감.면 },
 
   줄: { gap: 6, paddingVertical: 6 },
   통과: { fontFamily: 폰트.강조, fontSize: 14, color: 색.잉크 },

@@ -24,7 +24,7 @@ import {
  *     `package.json main` 이 가리키는 `build/` 다. 판이 올라 배럴이 고쳐지면 되돌린다. */
 import { useAudioStream } from 'expo-audio/build/AudioStream';
 import * as Speech from 'expo-speech';
-import { 색, 폰트, 모노트래킹, 몽골어폰트, 판눈금 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어폰트, 판눈금, 눌림감 } from './테마';
 import 녹음띠 from './녹음띠.js';
 import { 상단밀림 } from './인셋';
 import { 머뭇거림추적, 발화문턱_DB, 데시벨, 다음호흡 } from '../lib/세호흡.js';
@@ -184,7 +184,7 @@ export async function 한국어음성() {
 
 export default function 말하기화면({
   급수 = 0, 토큰 = null, 학생번호 = null, 견줌 = null, 견줌다시읽기 = null, 확인카드값 = null,
-  목표카드값 = null,
+  목표카드값 = null, 캐릭터 = '몽글',
 }) {
   const 폴백 = useMemo(() => 급수편지(급수), [급수]);
 
@@ -908,10 +908,13 @@ export default function 말하기화면({
       {과제 && 호흡 === '듣기' && !인트로연기끝 && (
         <마스코트
           잡담={false}
+          캐릭터={캐릭터}
           자리={{ top: 64, right: 16 }}
           연출={{
             /* 오랜만 복귀(D4-8)면 반김 인트로 — 판정은 오랜만복귀인가(순수) 하나 · 캐릭터판
-             * 대본은 연출대본가져오기(캐릭터 인자는 D4-1 배선이 서는 날 한 낱말)로 꺼낸다. */
+             * 대본은 연출대본가져오기(캐릭터 인자는 D4-1 배선이 서는 날 한 낱말)로 꺼낸다.
+             * ⚠ 캐릭터 인자를 아직 안 싣는 것은 tests/감사회귀_R3B1.test.js:122 가 이 줄을
+             *   몽글판 그대로 못박고 있어서다 — 그 핀이 풀리는 날 한 낱말로 잇는다. */
             대본: 오랜만복귀인가(로그, date)
               ? 연출대본가져오기('말하기인트로복귀')
               : 연출대본가져오기('말하기인트로'),
@@ -924,6 +927,7 @@ export default function 말하기화면({
       {호흡 === '답하기' && !질문연기끝 && (
         <마스코트
           잡담={false}
+          캐릭터={캐릭터}
           자리={{ top: 64, right: 16 }}
           연출={{ 대본: 연출대본가져오기('답하기질문'), 채움: { 질문: 편지.질문 }, 끝나면: () => set질문연기끝(true) }}
         />
@@ -934,6 +938,7 @@ export default function 말하기화면({
       {호흡 === '완료' && 축하연기 && (
         <마스코트
           잡담={false}
+          캐릭터={캐릭터}
           자리={{ top: 64, right: 16 }}
           연출={{ 대본: 연출대본.완료축하, 상황: '완료축하', 끝나면: () => set축하연기(false) }}
         />
@@ -943,6 +948,7 @@ export default function 말하기화면({
           잡담={false}
           자리={{ top: 64, right: 16 }}
           연출={{ 대본: 연출대본.무발화위로, 끝나면: () => set무발화연기(false) }}
+          캐릭터={캐릭터}
         />
       )}
     </ScrollView>
@@ -1961,7 +1967,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   보조버튼글: { fontFamily: 폰트.강조, fontSize: 14, color: 색.잉크_태그 },
-  눌림: { opacity: 0.75 },
+  눌림: { opacity: 눌림감.면 },
 
   완료제목: { fontFamily: 폰트.헤드, fontSize: 25, color: 색.잉크 },
   완료설명: { fontFamily: 폰트.본문, fontSize: 15, lineHeight: 24, color: 색.잉크_서브 },

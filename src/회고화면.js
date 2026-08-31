@@ -35,7 +35,7 @@
  */
 import { useCallback, useMemo, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { 색, 폰트, 모노트래킹, 몽골어폰트 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어폰트, 눌림감 } from './테마';
 import { 열기, 자기판정하기, 판정하기 } from './회고API.js';
 import { use등장 } from '../lib/모션.js';
 
@@ -387,7 +387,7 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
 
       {오류 && <Text style={오류.운영 ? s.안내글 : s.오류글}>{오류.말}</Text>}
 
-      <Pressable onPress={돌아가기} style={s.back} hitSlop={8}>
+      <Pressable onPress={돌아가기} style={s.back} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
         <Text style={s.backText}>← 돌아가기</Text>
       </Pressable>
     </ScrollView>
@@ -464,7 +464,7 @@ const s = StyleSheet.create({
   /* 잠김 = 미충족 전용. 진행 중(…는 중)은 disabled 만 걸고 면은 산 채로 둔다 —
      잠김꼴 위 글자는 2.3:1 이라 진행 문구가 안 읽힌다(감사 D6-3). */
   잠김: { backgroundColor: 색.잉크_희미 },
-  눌림: { opacity: 0.7 },
+  눌림: { opacity: 눌림감.면 },
 
   back: { marginTop: 8, alignSelf: 'flex-start' },
   backText: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_서브 },

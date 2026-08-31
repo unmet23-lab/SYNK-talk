@@ -55,7 +55,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { 색, 폰트, 모노트래킹, 몽골어, 눌림층 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어, 눌림층, 눌림감 } from './테마';
 import {
   큐받기, 반목록받기, 오디오서명받기, 열어봤다알리기, 승인하기, 폐기하기, 폐기사유, 오류태그,
   검수쪽크기, 반쪽크기,
@@ -902,7 +902,7 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
         </Pressable>
       ) : null}
 
-      <Pressable onPress={돌아가기} style={({ pressed }) => [s.back, pressed && { opacity: 0.7 }]}>
+      <Pressable onPress={돌아가기} style={({ pressed }) => [s.back, pressed && { opacity: 눌림감.글 }]}>
         <Text style={s.backText}>← 돌아가기</Text>
       </Pressable>
     </ScrollView>

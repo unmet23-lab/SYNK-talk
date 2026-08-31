@@ -23,7 +23,7 @@
  *   숫자는 DM Mono(숫자 전용) · 한글 라벨은 SUIT(모노에 한글 글리프가 없다).
  */
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { 색, 폰트, 모노트래킹, 판눈금, 글자배율상한 } from './테마';
+import { 색, 폰트, 모노트래킹, 판눈금, 눌림감, 글자배율상한 } from './테마';
 import { 부르기 } from './사건통로.js';
 import { 견줌, 늘어난말 } from '../lib/견줌.js';
 import { use등장, use세는수 } from '../lib/모션.js';
@@ -112,7 +112,11 @@ export default function 어제의나({ 값, 돌아가기 }) {
         </Animated.View>
       ) : null}
 
-      <Pressable onPress={돌아가기} style={({ pressed }) => [s.back, pressed && { opacity: 0.7 }]}>
+      <Pressable
+        onPress={돌아가기}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        style={({ pressed }) => [s.back, pressed && { opacity: 눌림감.글 }]}
+      >
         <Text style={s.backText}>← 말하기로 돌아가기</Text>
       </Pressable>
     </View>

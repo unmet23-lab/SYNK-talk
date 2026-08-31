@@ -3,10 +3,11 @@ import {
   ActivityIndicator, Animated, KeyboardAvoidingView, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
-import { 색, 폰트, 모노트래킹, 몽골어폰트, 눌림층, 글자배율상한 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어폰트, 눌림층, 눌림감, 글자배율상한 } from './테마';
 import { use등장 } from '../lib/모션.js';
 import { 학생번호맞나, 계정번호맞나, 학생번호접두 } from '../lib/학생계정.js';
 import { 문항, 답검사 } from '../lib/가입문항.js';
+import { 가이드쓰기 } from './저장.js';
 import * as API from './인증API';
 /* 학생이 읽는 글의 정본은 `contents/문구_오류.js` 다 — 화면은 «어느 말을 언제 쓰나»만 정한다.
    🔑 `코드로말` 은 **모르는 코드에서 서버 말을 버리지 않는다**: 우리 표로 덮으면 서버가 새
@@ -45,12 +46,23 @@ const 최소비번 = 6;
    감수가 차는 날 표(`문구_인증.js`)만 바뀐다(`고르기` 무늬 — 폰트는 글자를 따라간다). */
 const 라벨짝 = (id) => ({ 라벨: 인증문구[id].ko, 라벨_mn: 인증문구[id].mn || null });
 
+/* 가이드 셋(D4-1) — 값은 캐릭터 정본 낱말 그대로(`src/저장.가이드쓰기` 가 같은 어휘로 거른다).
+ * 마린은 그림 외주 대기(`lib/마스코트생명.표정컷` 머리말)라 비활성 「곧 와요」 — 숨기면
+ * 「셋 중 하나」라는 약속 자체가 안 보인다. */
+const 가이드보기 = Object.freeze([
+  Object.freeze({ 값: '몽글', 라벨: '몽글', 라벨_mn: null }),
+  Object.freeze({ 값: '까몽', 라벨: '까몽', 라벨_mn: null }),
+  Object.freeze({ 값: '마린', 라벨: '마린 · 곧 와요', 라벨_mn: null, 비활성: true }),
+]);
+
 /* 🔴 `토큰` prop 은 **일부러 없다.** 비밀번호 변경이 그것으로 PUT 을 치던 것이 세션 삼분의
  * 원인이었다(전층감사 §2-6) — 받아 두면 다음 사람이 다시 그 자리에 쓴다. 이 화면이 쓰는
- * 세션은 `API.비밀번호변경` 이 돌려주는 「살아남은」 것 하나뿐이다. */
-export default function 인증화면({ 로그인성공, 시작단계 = 단계.로그인, 닫기 }) {
+ * 세션은 `API.비밀번호변경` 이 돌려주는 「살아남은」 것 하나뿐이다.
+ * ⚠ `초기학생번호` 는 그 규율과 무관한 **표시값**이다(D7-12) — 만료가 남긴 학생번호로
+ *   로그인 단계의 첫 칸을 채울 뿐, 자격이 아니다. */
+export default function 인증화면({ 로그인성공, 시작단계 = 단계.로그인, 닫기, 초기학생번호 = null }) {
   const [지금, set지금] = useState(시작단계);
-  const [학생번호, set학생번호] = useState('');
+  const [학생번호, set학생번호] = useState(초기학생번호 || '');
   const [비번, set비번] = useState('');
   const [뒷자리, set뒷자리] = useState('');
   const [임시번호, set임시번호] = useState('');
@@ -60,11 +72,15 @@ export default function 인증화면({ 로그인성공, 시작단계 = 단계.�
   /* 가입 1회 문항 셋(`lib/가입문항.js`). 🔴 **첫 등록에만 있고 다시는 안 묻는다** — 나중에
      설정 화면으로 미루면 그때는 이미 그 값이 아니다(L0 §850 · 유일한 완전 소급 불가). */
   const [가입답, set가입답] = useState({});
+  /* 가이드 고름(D4-1) — 몽글이 기본으로 골라져 시작한다: 안 고르고 지나도 기본 가이드가
+     서고, 가입답과 달리 «영구 소급 불가» 축이 아니라 버튼 게이트에는 안 넣는다. */
+  const [가이드고름, set가이드고름] = useState('몽글');
   const [오류, set오류] = useState('');
   const [도는중, set도는중] = useState(false);
 
   const 초기화입력 = () => {
     set비번(''); set뒷자리(''); set임시번호(''); set새비번(''); set오류(''); set가입답({});
+    set가이드고름('몽글');
   };
   const 옮기기 = (다음) => { 초기화입력(); set지금(다음); };
 
@@ -111,9 +127,16 @@ export default function 인증화면({ 로그인성공, 시작단계 = 단계.�
          있고(기록된 비공개 ≠ 빈 칸), 건너뛰기는 없다. 검사는 서버와 **같은 함수**를 쓴다. */
       쓸수있나: 학생번호형식 && 뒷자리.length === 4 && 새비번.length >= 최소비번 && !답검사(가입답),
       버튼: 인증문구['auth.button.first'].ko,
-      실행: async () => 로그인성공(await API.첫등록({
-        학생번호, 뒷자리, 비밀번호: 새비번, 복구이메일: 복구메일, 복구전화: 복구전화, 가입답,
-      })),
+      실행: async () => {
+        const 새세션 = await API.첫등록({
+          학생번호, 뒷자리, 비밀번호: 새비번, 복구이메일: 복구메일, 복구전화: 복구전화, 가입답,
+        });
+        /* 가이드 선택은 서버 페이로드에 **안 싣는다**(`lib/가입문항.js` 🚫 새 문항 금지 ·
+           auth 동봉) — 기기 파일 하나에만 남기고(로그인성공 직전 · D4-1), 실패는 조용하다
+           (가이드쓰기 가 스스로 삼킨다 — 마스코트 실패 모드는 조용함). */
+        await 가이드쓰기(가이드고름);
+        로그인성공(새세션);
+      },
     },
     [단계.임시]: {
       제목: 인증문구['auth.title.temp'].ko,
@@ -197,6 +220,14 @@ export default function 인증화면({ 로그인성공, 시작단계 = 단계.�
             고르기={(v) => set가입답((앞) => ({ ...앞, [q.필드]: v }))} />
         ))}
 
+        {/* 가이드 고르기(D4-1) — 위 가입답과 **다른 축**이다: 서버로 안 나가고(🚫 새 문항 금지)
+            기기 파일 하나(guide_choice.json)에만 남는다. 언제든 다시 고를 수 있는 취향이라
+            소급 불가 축이 아니고, 그래서 버튼 게이트에도 안 들어간다. */}
+        {지금 === 단계.첫등록 && (
+          <고르기 라벨="누구랑 같이 공부할래요?" 라벨_mn={null} 보기={가이드보기} 값={가이드고름}
+            고르기={(v) => set가이드고름(v)} />
+        )}
+
         {지금 === 단계.첫등록 && (
           <View style={s.선택묶음}>
             {인증줄들('auth.contact.head').map((줄, i) => (
@@ -269,7 +300,7 @@ function 오류줄({ 글 }) {
   const 등장 = use등장({ 올라옴: 6, 시간: 200 });
   /* accessibilityLiveRegion — Android 전용 속성(iOS 는 무시되어 무해) · 동적 등장 알림. */
   return (
-    <Animated.View accessibilityLiveRegion="assertive" style={등장}>
+    <Animated.View accessibilityRole="alert" accessibilityLiveRegion="assertive" style={등장}>
       {줄들(글).map((줄, i) => (
         <Text key={i} style={i === 0 ? s.오류 : s.오류_병기}>{줄}</Text>
       ))}
@@ -282,6 +313,7 @@ function 칸({ id, 라벨, 라벨_mn, 값, 바꾸기, 자리표시, 비밀, 숫�
   const 입력 = (
     <TextInput
       testID={id ? `입력-${id}` : undefined}
+      accessibilityLabel={라벨}
       maxFontSizeMultiplier={글자배율상한}
       value={값}
       onChangeText={(t) => 바꾸기(숫자 ? t.replace(/\D/g, '') : t)}
@@ -336,9 +368,12 @@ function 고르기({ 라벨, 라벨_mn, 보기, 값, 고르기: 눌렀다 }) {
             <Pressable
               key={b.값}
               onPress={() => 눌렀다(b.값)}
+              disabled={Boolean(b.비활성)}
               accessibilityRole="button"
-              accessibilityState={{ selected: 골랐나 }}
-              style={({ pressed }) => [s.보기, 골랐나 && s.보기_고름, pressed && { opacity: 0.7 }]}
+              accessibilityState={{ selected: 골랐나, disabled: Boolean(b.비활성) }}
+              style={({ pressed }) => [
+                s.보기, 골랐나 && s.보기_고름, b.비활성 && s.보기_잠김, pressed && { opacity: 눌림감.면 },
+              ]}
             >
               <Text style={[
                 s.보기글,
@@ -355,7 +390,7 @@ function 고르기({ 라벨, 라벨_mn, 보기, 값, 고르기: 눌렀다 }) {
 
 function 곁길({ id, 글, 라벨_mn, 누르기, 버튼꼴 }) {
   return (
-    <Pressable testID={id ? `곁길-${id}` : undefined} onPress={누르기} hitSlop={10} style={({ pressed }) => [버튼꼴 && s.곁길버튼, pressed && { opacity: 0.6 }]}>
+    <Pressable testID={id ? `곁길-${id}` : undefined} onPress={누르기} hitSlop={10} style={({ pressed }) => [버튼꼴 && s.곁길버튼, pressed && { opacity: 눌림감.글 }]}>
       <Text style={[버튼꼴 ? s.곁길버튼글 : s.곁길글, 라벨_mn && { fontFamily: 버튼꼴 ? 몽골어폰트.강조 : 몽골어폰트.본문 }]}>{라벨_mn || 글}</Text>
     </Pressable>
   );
@@ -406,6 +441,8 @@ const s = StyleSheet.create({
     paddingVertical: 10,      // 칩 높이 ≈ 40 — 손가락이 닿는 최소치
   },
   보기_고름: { backgroundColor: 색.잉크, borderColor: 색.잉크 },
+  // 비활성 칩(가이드 「곧 와요」) — 잠긴 버튼과 같은 층(눌림층.잠김)이라 새 눈금이 아니다.
+  보기_잠김: { opacity: 눌림층.잠김 },
   보기글: { fontFamily: 폰트.본문, fontSize: 14, color: 색.잉크_서브 },
   보기글_고름: { fontFamily: 폰트.강조, color: 색.바탕 },
 

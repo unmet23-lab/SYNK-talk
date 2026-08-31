@@ -48,7 +48,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
-import { 색, 폰트, 몽골어, 몽골어폰트, 판눈금, 눌림층, 글자배율상한 } from './테마';
+import { 색, 폰트, 몽골어, 몽골어폰트, 판눈금, 눌림층, 눌림감, 글자배율상한 } from './테마';
 import { 교정앉음, 열람사건, 응답사건, 교정사건보내기, 학생응답값 } from './교정API.js';
 import { 항목추가, 응답값, 전송기록, 보낼것 } from '../lib/교정로그.js';
 import { 무오류인가, 무오류표식 } from '../lib/꼬리.js';
@@ -102,7 +102,7 @@ function 답한줄({ 글 }) {
  *   같은 카드가 말하기 화면과 다르게 동작한다.
  * @param {() => void} props.돌아가기
  */
-export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = null, 돌아가기 }) {
+export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = null, 돌아가기, 캐릭터 = '몽글' }) {
   const [로그, set로그] = useState([]);
   const [오류, set오류] = useState(null);
   const [도는중, set도는중] = useState(true);
@@ -250,7 +250,7 @@ export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = nu
                 testID="답장-문장듣기"
                 onPress={문장듣기}
                 hitSlop={8}
-                style={({ pressed }) => pressed && { opacity: 0.7 }}
+                style={({ pressed }) => pressed && { opacity: 눌림감.글 }}
               >
                 <Text style={s.듣기글}>{읽는중 ? '읽는 중…' : '♪ 이 문장 들어보기'}</Text>
               </Pressable>
@@ -309,6 +309,7 @@ export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = nu
                 key={값}
                 /* 손잡이는 **코드값**에서 짓는다 — `답문구[값]` 은 카피라 바뀌지만 `값` 은 계약이다. */
                 testID={`답장-${값}`}
+                accessibilityRole="button"
                 disabled={도는중 || !id}
                 onPress={() => 답하기(값)}
                 style={({ pressed }) => [
@@ -334,13 +335,18 @@ export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = nu
         </View>
       ) : null}
 
-      <Pressable onPress={돌아가기} style={({ pressed }) => [s.back, pressed && { opacity: 0.7 }]}>
+      <Pressable
+        onPress={돌아가기}
+        accessibilityRole="button"
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        style={({ pressed }) => [s.back, pressed && { opacity: 눌림감.글 }]}
+      >
         <Text style={s.backText}>← 말하기로 돌아가기</Text>
       </Pressable>
     </ScrollView>
       {/* 스크롤 밖(겉테 층) — 캐릭터는 화면에 «사는» 존재라 내용과 같이 흘러가지 않는다.
           🚫 코랄 0 · 면 0 — 이 화면의 신호 1점은 오류 태그 그대로다(`테마.신호자리`). */}
-      <마스코트 사건={캐릭터사건} />
+      <마스코트 사건={캐릭터사건} 캐릭터={캐릭터} />
     </View>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { 색, 폰트, 모노트래킹, 몽골어폰트, 판눈금 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어폰트, 판눈금, 눌림감 } from './테마';
 import {
   사과전략, 오늘추천, 보기세우기, 전략선택사건, 메일제출사건, 이탈사건, 이탈닻,
 } from '../lib/게임제출.js';
@@ -396,6 +396,7 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
                     key={값}
                     onPress={() => 확인답하기(값)}
                     accessibilityRole="button"
+                    hitSlop={{ top: 4, bottom: 4 }}
                     style={({ pressed }) => [s.확인단추, pressed && s.눌림]}
                   >
                     <Text style={s.확인단추글}>{라벨}</Text>
@@ -488,7 +489,7 @@ const s = StyleSheet.create({
   /* 잠기면 색을 빼고 밝기로 낮춘다 — 검수 확정·강사 저장 버튼과 같은 무늬. */
   보내기_대기: { backgroundColor: 색.잉크_희미 },
   보내기글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.바탕 },
-  눌림: { opacity: 0.75 },
+  눌림: { opacity: 눌림감.면 },
 
   대기제목: { fontFamily: 폰트.헤드, fontSize: 24, color: 색.잉크 },
   /* 관찰 한 줄 — 카드 밖 · 신호(코랄) 없음. 이 화면의 코랄은 게이지 자리라 여기 쓰면 그 뜻이

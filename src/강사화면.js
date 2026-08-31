@@ -36,7 +36,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { 색, 폰트, 모노트래킹, 몽골어 } from './테마';
+import { 색, 폰트, 모노트래킹, 몽골어, 눌림감 } from './테마';
 import { 큐받기, 판정하기 } from './강사API.js';
 import { 오류태그 } from './검수API.js';
 import { VERDICT, 텍스트내는판정, 골든판정요청 } from '../lib/검수확정.js';
@@ -471,13 +471,13 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
         <Pressable
           onPress={() => { set오류(''); set불러오는중(true); set재조회((n) => n + 1); }}
           hitSlop={6}
-          style={({ pressed }) => [s.back, pressed && { opacity: 0.7 }]}
+          style={({ pressed }) => [s.back, pressed && { opacity: 눌림감.글 }]}
         >
           <Text style={s.backText}>다시 불러오기</Text>
         </Pressable>
       ) : null}
 
-      <Pressable onPress={돌아가기} style={({ pressed }) => [s.back, pressed && { opacity: 0.7 }]}>
+      <Pressable onPress={돌아가기} style={({ pressed }) => [s.back, pressed && { opacity: 눌림감.글 }]}>
         <Text style={s.backText}>← 돌아가기</Text>
       </Pressable>
     </ScrollView>
@@ -571,7 +571,7 @@ const s = StyleSheet.create({
   /* 잠김 = 미충족 전용. 진행 중(…는 중)은 disabled 만 걸고 면은 산 채로 둔다 —
      잠김꼴 위 글자는 2.3:1 이라 진행 문구가 안 읽힌다(감사 D6-3). */
   잠김: { backgroundColor: 색.잉크_희미 },
-  눌림: { opacity: 0.7 },
+  눌림: { opacity: 눌림감.면 },
 
   back: { marginTop: 8, alignSelf: 'flex-start' },
   backText: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_서브 },

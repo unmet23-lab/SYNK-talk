@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { 색, 폰트, 모노트래킹, 판눈금 } from './테마';
+import { 색, 폰트, 모노트래킹, 판눈금, 눌림감 } from './테마';
 import { 짚음제출사건, 무산출사건, 이탈사건 } from '../lib/보고서교정제출.js';
 import { 교정문만들기 } from '../lib/보고서교정.js';
 import { 다음시도번호, 턴항목 } from '../lib/게임로그.js';
@@ -343,6 +343,7 @@ export default function 보고서교정화면({
                     onPress={() => set확신도(확신도 === 값 ? null : 값)}
                     accessibilityRole="togglebutton"
                     accessibilityState={{ checked: 확신도 === 값 }}
+                    hitSlop={{ top: 6, bottom: 6 }}
                     style={({ pressed }) => [s.확신토글, 확신도 === 값 && s.확신토글_켬, pressed && s.눌림]}
                   >
                     <Text style={[s.확신글, 확신도 === 값 && s.확신글_켬]}>{라벨}</Text>
@@ -475,7 +476,7 @@ const s = StyleSheet.create({
   확신토글_켬: { borderColor: 색.잉크, backgroundColor: 색.바탕띄움 },
   확신글: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_보조 },
   확신글_켬: { color: 색.잉크 },
-  눌림: { opacity: 0.75 },
+  눌림: { opacity: 눌림감.면 },
 
   대기제목: { fontFamily: 폰트.헤드, fontSize: 24, color: 색.잉크 },
   낸글: { fontFamily: 폰트.본문, fontSize: 16, lineHeight: 27, color: 색.잉크 },
