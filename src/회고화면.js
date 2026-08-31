@@ -119,7 +119,7 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
       });
       set확정(r);
     } catch (e) {
-      set오류({ 말: e?.message || '확정을 다시 해 볼게요!', 운영: e?.code === 'RETRO_NOT_OPENED' });
+      set오류({ 말: e?.message || '다시 확정해 볼게요!', 운영: e?.code === 'RETRO_NOT_OPENED' });
     } finally { set도는중(false); }
   }, [토큰, 세션, 강사고름, 사유, 도는중]);
 
@@ -380,7 +380,7 @@ export default function 회고화면({ 토큰, 돌아가기 }) {
             </갈림안내>
           )}
           <Pressable onPress={다음학생} hitSlop={8}>
-            <Text style={s.backText}>다음 학생 열기 →</Text>
+            <Text style={s.backText}>다음 학생 →</Text>
           </Pressable>
         </확정카드틀>
       )}

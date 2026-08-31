@@ -706,7 +706,7 @@ async function 나침반열기(url: URL, staff_id: string, ver: string) {
       /* 처방을 **그대로 실행할 수 있게** 적는다 — 「시즌이 없다」만 내면 강사는 앱이 고장난
        * 줄 안다. 시즌 행을 여는 것은 운영의 일이고, 그 사실을 말하는 자리가 여기뿐이다. */
       return { 거절: 'SEASON_NOT_OPEN' as const,
-        문구: '오늘이 속한 시즌이 아직 열려 있지 않습니다 — 교재 1권 단위로 시즌 행을 먼저 엽니다' };
+        문구: '오늘이 속한 시즌이 아직 열려 있지 않습니다 — 교재 1권 단위로 시즌을 먼저 엽니다' };
     }
     const [학생] = /^[0-9a-f-]{36}$/i.test(넘긴id)
       ? await tx`
@@ -780,11 +780,11 @@ async function 나침반저장(본문: unknown, staff_id: string, ver: string) {
     const [시즌] = await 이번시즌(tx);
     if (!시즌) {
       return { 거절: 'SEASON_NOT_OPEN' as const,
-        문구: '오늘이 속한 시즌이 아직 열려 있지 않습니다 — 교재 1권 단위로 시즌 행을 먼저 엽니다' };
+        문구: '오늘이 속한 시즌이 아직 열려 있지 않습니다 — 교재 1권 단위로 시즌을 먼저 엽니다' };
     }
     if (String(시즌.season_id) !== 화면시즌) {
       return { 거절: 'SEASON_ROLLED' as const, 칸: 'season_id',
-        문구: '화면을 연 뒤 시즌 경계가 넘어갔습니다 — 다시 열어 이번 시즌으로 적습니다' };
+        문구: '화면을 연 사이 날짜가 다음 시즌으로 넘어갔습니다 — 다시 열어 이번 시즌으로 적어 주세요' };
     }
     const [학생] = await tx`
       select goal_track from engine.learners where learner_id = ${learner_id}::uuid`;
@@ -1106,11 +1106,11 @@ async function 자기판정(본문: unknown, staff_id: string, ver: string) {
     const 행 = await 회고행(tx, learner_id, season_id);
     if (!행) {
       return { 거절: 'RETRO_NOT_OPENED' as const, 칸: 'season_id',
-        문구: '회고를 먼저 열어야 합니다 — 굳힌 근거 없이 판정만 적지 않습니다' };
+        문구: '회고를 먼저 열어야 합니다 — 근거 없이 판정만 적지 않습니다' };
     }
     if (행.verdict != null) {
       return { 거절: 'SELF_AFTER_JUDGE' as const, 칸: 'verdict_by_self',
-        문구: '강사 판정이 이미 끝났습니다 — 학생 판정은 그 전에만 적습니다(뒤에 적으면 메아리입니다)' };
+        문구: '강사 판정이 이미 끝났습니다 — 학생 판정은 그 전에만 적습니다' };
     }
 
     const [갱신] = await tx`
@@ -1156,7 +1156,7 @@ async function 회고판정(본문: unknown, staff_id: string, ver: string) {
     const 행 = await 회고행(tx, learner_id, season_id);
     if (!행) {
       return { 거절: 'RETRO_NOT_OPENED' as const, 칸: 'season_id',
-        문구: '회고를 먼저 열어야 합니다 — 굳힌 근거 없이 판정만 적지 않습니다' };
+        문구: '회고를 먼저 열어야 합니다 — 근거 없이 판정만 적지 않습니다' };
     }
 
     const [갱신] = await tx`

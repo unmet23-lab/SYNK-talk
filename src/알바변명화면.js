@@ -146,7 +146,7 @@ export default function 알바변명화면({
         <머리 />
         {/* 라우팅이 재료 없이 이 화면을 그렸다(배선 실수) — 못 읽은 것을 둔갑시키지 않는다. */}
         <View style={s.카드}>
-          <Text style={s.본문글}>오늘의 미션을 읽지 못했어요 — 잠시 뒤 앱을 다시 열어 주세요.</Text>
+          <Text style={s.본문글}>오늘의 미션을 불러오지 못했어요 — 잠시 뒤 앱을 다시 열어 주세요.</Text>
           {학생번호 ? <Text style={s.메모}>계속 그러면 선생님께 학생번호 {학생번호}를 보여 주세요.</Text> : null}
         </View>
       </ScrollView>

@@ -194,7 +194,7 @@ test('사과 전략 3장 — 발주 G1 §4-4 문구 그대로 · id 유일 · �
   assert.deepEqual([...사과전략.보기들].map((o) => String(o.label)), [
     '사정을 솔직히 말한다',
     '짧게 사과하고 바로 부탁한다',
-    '대신 할 수 있는 것을 제안한다',
+    '대신할 방법을 제안한다',
   ]);
   const ids = 사과전략.보기들.map((o) => o.option_id);
   assert.equal(new Set(ids).size, 3);

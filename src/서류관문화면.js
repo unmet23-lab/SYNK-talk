@@ -287,7 +287,7 @@ export default function 서류관문화면({
       idempotency_key: 흐름id(),
     });
     if (!사건) {
-      set오류('넘김을 다시 담아 볼게요! 잠시 뒤 다시 눌러 주세요');
+      set오류('지금은 넘기지 못했어요 — 잠시 뒤 다시 눌러 주세요');
       return;
     }
     await 담아넘기기(사건, 턴재료.스냅샷.prompt_seed, { 모름: true });
@@ -327,7 +327,7 @@ export default function 서류관문화면({
         <머리 />
         {/* 라우팅이 재료 없이 이 화면을 그렸다 — 못 읽은 것을 둔갑시키지 않는다(G1·G2 와 같은 자리). */}
         <View style={s.카드}>
-          <Text style={s.본문글}>오늘의 미션을 읽지 못했어요 — 잠시 뒤 앱을 다시 열어 주세요.</Text>
+          <Text style={s.본문글}>오늘의 미션을 불러오지 못했어요 — 잠시 뒤 앱을 다시 열어 주세요.</Text>
           {학생번호 ? <Text style={s.메모}>계속 그러면 선생님께 학생번호 {학생번호}를 보여 주세요.</Text> : null}
         </View>
       </ScrollView>
@@ -369,7 +369,7 @@ export default function 서류관문화면({
       {/* 접수창 지문 — 빈칸의 답이 이 안에 있다(읽기 이해 축). 변환 턴은 자기 제시문이 따로다. */}
       {빈칸중 && (
         <View style={s.카드}>
-          <Text style={s.카드라벨}>접수창 안내문</Text>
+          <Text style={s.카드라벨}>접수처 안내문</Text>
           <Text style={s.지문글} selectable>{활성.스냅샷.질문}</Text>
         </View>
       )}
@@ -467,8 +467,8 @@ export default function 서류관문화면({
                   <문장틀글 문장틀={빈칸.문장틀} 채움={답 && !답.모름 ? 답.본문 : null} />
                   {통과함 && <Text style={s.통과}>통과</Text>}
                   {/* 신호 1점 — 이 코랄 라벨이 `신호자리.서류관문`(판정오류표시)이다. */}
-                  {축오답 && <Text style={s.오류표시}>다음에 맞힐 칸</Text>}
-                  {!통과함 && <Text style={s.정답형태}>정답 형태: {빈칸.정답집합.join(' · ')}</Text>}
+                  {축오답 && <Text style={s.오류표시}>다음에 맞혀요</Text>}
+                  {!통과함 && <Text style={s.정답형태}>이렇게 써요: {빈칸.정답집합.join(' · ')}</Text>}
                   <Text style={s.메모}>{빈칸.해설}</Text>
                   {!통과함 && (
                     <Pressable onPress={() => 재도전열기(i)} accessibilityRole="button" style={({ pressed }) => [s.재도전버튼, pressed && s.눌림]}>
