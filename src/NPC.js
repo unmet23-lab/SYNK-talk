@@ -16,8 +16,9 @@
  * ■ Metro 는 require 를 정적으로 읽는다 — 목록을 코드로 파생할 수 없어 손 지도가 필요하고,
  *   그 지도가 `lib/NPC연출`(역×상태)과 갈라지는 것은 tests/npc배선.test.js 가 잡는다.
  */
-import { Image, StyleSheet, View } from 'react-native';
+import { Animated, Image, StyleSheet, View } from 'react-native';
 import { 역들, 상태들, 컷이름 } from '../lib/NPC연출.js';
+import { use등장 } from '../lib/모션.js';
 
 const 컷그림 = {
   'prof-calm': require('../assets/npc/prof-calm.webp'),
@@ -41,6 +42,26 @@ const 컷그림 = {
 /** 역 → 학생이 읽는 이름. ㉠직함만이다(유호 확정 08-11 — 사람 이름을 안 붙인다). */
 const 직함 = { prof: '교수님', lead: '팀장님', boss: '사장님', insp: '심사관' };
 
+/* 컷의 «전이 한 박자» — 역·상태가 바뀌어 이 컴포넌트가 새로 서는 순간(key 교체)에만
+ * 등장 박자(lib/모션.use등장 눈금 그대로 — 여기서 duration 을 새로 적지 않는다)가 돈다.
+ * 지속 장치가 아니다 — G3 「입력 중 움직이는 장치는 하나」 검사와 무충돌인 이유다.
+ * reduce-motion 은 use등장이 스스로 접는다(정지 화면). */
+function 컷등장({ 그림, 크기, 라벨 }) {
+  const 등장 = use등장();
+  return (
+    <Animated.View style={등장}>
+      <Image
+        source={그림}
+        style={{ width: 크기, height: 크기 }}
+        resizeMode="contain"
+        accessibilityLabel={라벨}
+        /* 안드로이드 Image 기본 페이드인(300ms) — 등장 박자와 겹치면 이중 페이드다. 끈다. */
+        fadeDuration={0}
+      />
+    </Animated.View>
+  );
+}
+
 /**
  * @param {object} props
  * @param {'prof'|'lead'|'boss'|'insp'} props.역
@@ -59,12 +80,8 @@ export default function NPC({ 역, 상태, 크기 = 84, 자리 = null }) {
 
   return (
     <View style={[s.자리, 자리]} pointerEvents="none">
-      <Image
-        source={그림}
-        style={{ width: 크기, height: 크기 }}
-        resizeMode="contain"
-        accessibilityLabel={직함[역] || 'NPC'}
-      />
+      {/* key = 컷 이름 — 역·상태 «전이»마다 재마운트되어 등장 한 박자가 돈다(즉시 교체 금지). */}
+      <컷등장 key={컷이름(역, 상태)} 그림={그림} 크기={크기} 라벨={직함[역] || 'NPC'} />
     </View>
   );
 }

@@ -15,7 +15,7 @@
  *   ① ✅ **닫혔다(08-26)** — code→문구 표가 섰다: `contents/문구_오류.js`.
  *      전에는 서버가 한국어 `message` 를 만들어 보내고 앱이 그대로 띄워, 번역이 와도 붙일 자리가
  *      없었다. 이제 문장은 앱이 쥐고 서버는 코드만 보낸다(C0 §5 「앱이 분기하는 것은 code」).
- *      그래서 `err.*` 18줄의 `source_file` 이 그 표를 가리킨다 — **다섯**만 서버에 남아 있다
+ *      그래서 `err.*` 전량의 `source_file` 이 그 표를 가리킨다 — **다섯**만 서버에 남아 있다
  *      (`CONTRACT_VIOLATION` 처럼 코드 하나가 여러 말을 하는 갈래라 코드로 못 고른다).
  *      ⇒ 감수가 끝나면 그 파일의 `mn` 만 채운다. 화면 코드는 한 줄도 안 바뀐다.
  *   ② **키릴 글리프를 가진 폰트가 없다.** `assets/fonts` = SUIT 4종 + DM Mono, 넷 다 키릴이 없다.
@@ -167,6 +167,46 @@ const 목록 = [
     source_ko: '이 발화는 선생님과 함께 챙길게요 — 이 화면을 보여 주세요!',
     draft_mn: null,
     context: '위와 같은 말인데 대상이 «발화(말한 것)»다.',
+    max_len: null,
+    source_file: 'contents/문구_오류.js',
+  },
+  {
+    string_id: 'err.kept.no_task',
+    source_ko: '그날 서버 과제를 못 받아 기기에만 남겼어요',
+    draft_mn: null,
+    context: '그날 서버가 과제를 못 줘 발화가 기기에만 남았을 때. 위 셋과 달리 다시 보내도 안 풀리는 갈래라 사실만 말한다 — 「기다리면 간다」로 읽히면 안 된다.',
+    max_len: null,
+    source_file: 'contents/문구_오류.js',
+  },
+  {
+    string_id: 'err.upload.bad_format',
+    source_ko: '올릴 수 없는 형식이에요: .{ext}',
+    draft_mn: null,
+    context: '녹음 파일의 형식을 서버가 받지 못할 때. {ext} 자리에 파일 확장자가 들어간다(예: m4a) — {ext} 는 그대로 둔다.',
+    max_len: null,
+    source_file: 'contents/문구_오류.js',
+  },
+  {
+    string_id: 'err.upload.file_missing',
+    source_ko: '녹음 파일을 찾지 못했어요',
+    draft_mn: null,
+    context: '올리려는 녹음 파일이 기기에서 사라졌을 때. 다시 녹음하면 풀리는 종류다.',
+    max_len: null,
+    source_file: 'contents/문구_오류.js',
+  },
+  {
+    string_id: 'err.upload.no_url',
+    source_ko: '업로드 주소를 받지 못했어요',
+    draft_mn: null,
+    context: '서버가 녹음 올릴 주소를 안 줬을 때(우리 쪽 문제). 잠시 뒤 다시 하면 되는 종류다.',
+    max_len: null,
+    source_file: 'contents/문구_오류.js',
+  },
+  {
+    string_id: 'err.upload.failed',
+    source_ko: '녹음을 올리지 못했어요: {원인}',
+    draft_mn: null,
+    context: '녹음 업로드가 실패했을 때. {원인} 자리에 실패 원인 문구가 들어간다 — {원인} 은 옮기지 말고 그대로 둔다.',
     max_len: null,
     source_file: 'contents/문구_오류.js',
   },

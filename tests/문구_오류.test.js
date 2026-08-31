@@ -94,7 +94,7 @@ test('⑦ 🔴 서버 message 와 표의 ko 가 갈라지지 않는다 — 두 �
 test('⑧ 🔑 화면·통로에 오류 문장 리터럴이 다시 생기지 않는다 — 사본이 갈라지는 유일한 길', () => {
   /* 문장이 화면 파일로 되돌아가면 몽골어가 붙는 날 그 자리만 한국어로 남는다(증상 없음).
      주석은 걷고 본다 — 안 그러면 이 검사가 자기 설명 때문에 빨개진다. */
-  const 겨눌것 = ['src/사건통로.js', 'src/인증API.js', 'src/인증화면.js'];
+  const 겨눌것 = ['src/사건통로.js', 'src/인증API.js', 'src/인증화면.js', 'src/제출API.js'];
   const 문장들 = Object.values(문구).map((v) => v.ko).filter((s) => s.length >= 8);
   const 걸린것 = [];
   for (const p of 겨눌것) {

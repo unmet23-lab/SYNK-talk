@@ -89,8 +89,10 @@ test('§3-2 반목록받기는 GET review/classes 를 부르고 waiting 을 대�
   assert.deepEqual(반들, [{ id: SID, 열쇠: '평일11A', 이름: null, 대기: 3 }]);
 });
 
-test('§3-2 classes 가 없어도 빈 배열이다 — 「반 0개」의 뜻은 화면이 가른다', async () => {
-  const { 모듈 } = 세운판({ ok: true });
+test('§3-2 classes 가 [] 면 빈 배열이다 — 「반 0개」의 뜻은 화면이 가른다', async () => {
+  /* ⚠ 칸이 아예 «없는» 응답은 이제 정상이 아니라 CONTRACT_VIOLATION 이다(감사 G1-10 ·
+     회귀 = tests/감사회귀_R1B22.test.js) — 여기서는 「빈 반 목록」이라는 정상만 잰다. */
+  const { 모듈 } = 세운판({ ok: true, classes: [] });
   assert.deepEqual(await 모듈.반목록받기('T'), []);
 });
 

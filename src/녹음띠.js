@@ -26,6 +26,7 @@
  *   탭 «직후»에 찍으면 띠가 없거나 반투명하게 나온다. 나는 그것을 「안 그려진다」로 한 번 오독했다.
  *   화면이 «가라앉을 때까지»(연속 두 장이 같아질 때까지) 기다렸다가 찍는다.
  *   단 녹음 «중»에는 맥박이 계속 뛰어 영영 안 가라앉으니, 그때는 여러 장 찍어 고른다.
+ *   (08-31 fadeDuration 0 으로 껐다 — 이 함정은 다른 Image 자리에만 남는다)
  */
 import { Image, StyleSheet, View } from 'react-native';
 
@@ -60,7 +61,7 @@ export default function 녹음띠({ 상태 = '대기', 폭 = 240, 스타일 }) {
   const 그것 = 그림[상태] || 그림.대기;
   return (
     <View style={[{ width: 폭, height: Math.round(폭 * 가로세로비) }, 스타일]}>
-      <Image source={그것} style={s.그림} resizeMode="contain" accessibilityIgnoresInvertColors />
+      <Image source={그것} style={s.그림} resizeMode="contain" accessibilityIgnoresInvertColors fadeDuration={0} />
     </View>
   );
 }

@@ -27,7 +27,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import {
-  AccessibilityInfo, Animated, Easing, Platform, Pressable, StyleSheet, Text,
+  AccessibilityInfo, Animated, Easing, PanResponder, Platform, Pressable, StyleSheet, Text,
 } from 'react-native';
 import { 색, 폰트 } from './테마.js';
 import { 상단밀림 } from './인셋.js';
@@ -36,7 +36,7 @@ import { 상단밀림 } from './인셋.js';
    바뀌었다 — 지금 금지는 「expo-audio 를 직접 잡는 것」이다(배선 회귀가 그걸 지킨다). */
 import { 지금녹음중, 효과음 } from './소리.js';
 import 마스코트몸, { 쓸수있나 as 몸쓸수있나 } from './마스코트몸.js';
-import { 밤인가, 평상혼잣말, 표정컷, 혼잣말 } from '../lib/마스코트생명.js';
+import { 잘시간인가, 탭반응고르기, 평상혼잣말, 표정컷, 혼잣말 } from '../lib/마스코트생명.js';
 import { 목소리판정 } from '../lib/가이드목소리.js';
 
 /* Metro 는 require 를 정적으로 읽는다 — 목록을 코드로 파생할 수 없어 손 지도가 필요하고,
@@ -46,6 +46,14 @@ const 컷그림 = {
   재염색_놀람: require('../assets/마스코트/재염색_놀람.webp'),
   재염색_눈웃음: require('../assets/마스코트/재염색_눈웃음.webp'),
   재염색_눈감음: require('../assets/마스코트/재염색_눈감음.webp'),
+  까몽_본체: require('../assets/마스코트/까몽_본체.webp'),
+  까몽_놀람: require('../assets/마스코트/까몽_놀람.webp'),
+  까몽_눈웃음: require('../assets/마스코트/까몽_눈웃음.webp'),
+  까몽_눈감음: require('../assets/마스코트/까몽_눈감음.webp'),
+  까몽_윙크: require('../assets/마스코트/까몽_윙크.webp'),
+  까몽_졸림: require('../assets/마스코트/까몽_졸림.webp'),
+  까몽_으쓱: require('../assets/마스코트/까몽_으쓱.webp'),
+  까몽_민망: require('../assets/마스코트/까몽_민망.webp'),
 };
 
 const 때 = Object.freeze({
@@ -81,7 +89,8 @@ const 때 = Object.freeze({
  *   이라 지금 화면들은 반입 전과 **한 톨도 다르지 않게** 돈다. 소리(lib/가이드목소리)와
  *   문구(lib/마스코트생명.혼잣말)가 이 한 값으로 함께 갈린다 — 화면은 캐릭터 이름 말고는
  *   아무것도 모른다(어느 소리·어느 문구인지는 lib 이 진다).
- *   ⚠ 그림(표정컷)은 아직 몽글 4컷뿐이다 — 까몽·마린 펠트 컷이 서는 날 `표정컷` 이 갈린다.
+ *   ⚠ 그림(표정컷)은 몽글·까몽 두 벌이다(까몽 = 친구공방_0825 8컷 · 08-31 반입) — 마린 컷이
+ *   서는 날 `표정컷` 에 칸이 하나 더 선다(그때까지 마린 그림은 몽글 컷으로 폴백).
  */
 export default function 마스코트({
   사건 = null, 자리 = null, 말건네기 = null, 잡담 = true, 연출 = null, 캐릭터 = '몽글',
@@ -94,6 +103,8 @@ export default function 마스코트({
   const [연출중, set연출중] = useState(false);
   /* 탭 순간 하나 — Skia 몸이 눌림 곡선을 세는 재료다(그 값은 네이티브 드라이버라 못 읽는다). */
   const [탭시각, set탭시각] = useState(0);
+  /* 기지개 순간 — 같은 원리로 Skia 몸이 «늘어남» 곡선을 센다(잠깸 몸짓 = 기지개). */
+  const [기지개시각, set기지개시각] = useState(0);
   /* Skia 가 이 기기에 있나 — 없으면(Expo Go·웹) 아래 <Animated.Image> 가 그대로 선다.
      판정은 한 번만 하면 되는 상수다(모듈 로드 시점에 정해진다). */
   const 몸된다 = 몸쓸수있나().된다;
@@ -106,9 +117,29 @@ export default function 마스코트({
   const 타이머들 = useRef([]).current;
   const 연출타이머들 = useRef([]).current; // 스킵이 이것만 걷는다 — 깜빡임·idle 타이머는 산다
   const 마지막입력 = useRef(Date.now());
+  const 쓰다듬는중 = useRef(false); // 손이 몸 위를 지나는 동안 — idle 두리번이 손을 방해하지 않게
+  const 연타 = useRef({ 수: 0, 마지막: 0 }); // 탭 연타 셈 — 창(1.2초) 안의 몇 번째 탭인가
 
   const 예약 = (fn, ms) => { const t = setTimeout(fn, ms); 타이머들.push(t); return t; };
   const 멈춤 = () => 줄임 || 지금녹음중(); // 정지 조건은 이 한 곳 — 늘리면 여기서 늘린다
+
+  /* 말풍선 퇴장 — 등장이 «뽁»인데 소멸이 뚝이면 라벨이 실에서 끊겨 떨어진다. 말이 걷힌 직후
+   * 한 박자(180ms)만 직전 문구로 라벨을 세워 두고, 말풍선이 등장 값을 역재생해 내려간다.
+   * 🔑 판정을 렌더 중에 세운다(effect 로 미루면 그 한 프레임에 라벨이 먼저 unmount 되어
+   * remount 퇴장이 된다 — key 유지가 무의미해진다). reduce-motion 이면 즉시 소멸 그대로다. */
+  const 마지막말 = useRef(null);
+  if (말) 마지막말.current = 말;
+  const [퇴장중, set퇴장중] = useState(false);
+  const 직전말 = useRef(말);
+  if (직전말.current !== 말) {
+    직전말.current = 말;
+    set퇴장중(!말 && !!마지막말.current && !줄임);
+  }
+  useEffect(() => {
+    if (!퇴장중) return undefined;
+    const t = setTimeout(() => set퇴장중(false), 180);
+    return () => clearTimeout(t);
+  }, [퇴장중]);
 
   /* 목소리 — **상황마다·캐릭터마다 다른 소리**가 난다(몽글 유호 확정 08-25 · 까몽·마린 08-28 ·
    * 배치 정본 = `lib/가이드목소리.js`).
@@ -221,8 +252,39 @@ export default function 마스코트({
     Animated.timing(기울기, { toValue: 각도, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web' }).start();
     예약(() => Animated.timing(기울기, { toValue: 0, duration: 320, useNativeDriver: Platform.OS !== 'web' }).start(), 지속 || 때.몸짓지속);
   };
-  const 깨우기 = () => { 마지막입력.current = Date.now(); if (졸림 && !밤인가(new Date())) set졸림(false); };
+  /* 기지개 — 잠에서 깨는 몸짓: 세로로 죽 늘었다가(음수 쫀득 = 늘어남) 스프링으로 돌아온다.
+   * 기존 몸짓 어휘의 재조합이라 새 컷이 없고, 잠깸 «소리»는 킷에 없으므로 안 메운다(정지선 ④). */
+  const 기지개 = () => {
+    set기지개시각(Date.now());   // 몸(Skia)이 있으면 이 숫자로 «발치부터» 늘어난다
+    Animated.sequence([
+      Animated.timing(쫀득, { toValue: -0.8, duration: 280, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web' }),
+      Animated.spring(쫀득, { toValue: 0, friction: 3.6, tension: 120, useNativeDriver: Platform.OS !== 'web' }),
+    ]).start();
+    기울이기(3, 600);
+  };
+  /* 깨우기 — 졸림→깸 «전이»에만 기지개가 붙는다(플래그 플립만으로는 잠이 몸에 안 보인다).
+   * 돌려주는 값 = 이 호출로 깼는가(탭이 «깨어나는 탭»을 가르는 재료 — 판정은 여기 한 곳). */
+  const 깨우기 = () => {
+    마지막입력.current = Date.now();
+    if (졸림 && !잘시간인가(캐릭터, new Date())) { set졸림(false); 기지개(); return true; }
+    return false;
+  };
   const 기본복귀 = (ms) => 예약(() => set표정('기본'), ms || 때.기본복귀);
+
+  /* 쓰다듬 — 손이 몸 위를 «미끄러지는» 동안 몸이 손 쪽으로 기운다(탭 말고 두 번째 촉각).
+   * 이동 문턱 8px 라 탭(Pressable onPress)은 안 뺏긴다. 렌더마다 재구성한다 — 줄임·연출중이
+   * state 라 useRef 로 굳히면 낡은 값을 문다(PanResponder.create 는 값싸다). 재질음·햅틱 0. */
+  const 쓰다듬끝 = () => {
+    쓰다듬는중.current = false;
+    Animated.spring(기울기, { toValue: 0, friction: 4, tension: 90, useNativeDriver: Platform.OS !== 'web' }).start();
+  };
+  const 쓰다듬 = PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => !줄임 && !지금녹음중() && !연출중 && Math.abs(g.dx) > 8,
+    onPanResponderGrant: () => { 쓰다듬는중.current = true; 깨우기(); },
+    onPanResponderMove: (_, g) => 기울기.setValue(Math.max(-10, Math.min(10, g.dx / 8))),
+    onPanResponderRelease: 쓰다듬끝,
+    onPanResponderTerminate: 쓰다듬끝,
+  });
 
   /* 연출 시퀀서 — 대본 걸음을 순차 재생한다(말건네기의 타임라인판 · 확률 0).
    * · 시작 400ms 지연: reduce-motion 판정(비동기)이 첫 프레임엔 아직 없다 — 숨 하나 쉬고
@@ -297,13 +359,17 @@ export default function 마스코트({
     const 두리번 = setInterval(() => {
       if (멈춤() || 말 || 연출중) return;
       const 지금 = new Date();
-      const 밤 = 밤인가(지금);
-      const 자야함 = 밤 || Date.now() - 마지막입력.current > 때.방치문턱;
+      /* 밤 «졸림»은 캐릭터의 것이다(까몽은 밤에 안 졸린다 — lib/마스코트생명.잘시간인가).
+         밤 «중얼 풀»(평상혼잣말→자리고르기)은 캐릭터 무관 그대로다 — 까몽의 밤 풀은 애초에
+         깨어 있는 문구라(「지금부터가 내 시간이지!」) 새 배선 없이 밤에 그 말이 난다. */
+      const 밤졸림 = 잘시간인가(캐릭터, 지금);
+      const 자야함 = 밤졸림 || Date.now() - 마지막입력.current > 때.방치문턱;
       /* 잠드는 순간의 한마디 — «왜» 잠드는지가 자리를 정한다: 밤이라서면 밤 풀, 한동안 안
          만져서면 방치 풀(08-28 신설 자리 넷 중 «밤»이 여기로 들어온다). idle 중얼은 졸림이
-         막으므로, 밤 문구가 실제로 나는 자리는 원리상 여기 하나다. */
-      if (자야함 !== 졸림) { set졸림(자야함); if (자야함) { 목소리('잠결'); 가끔말하기(혼잣말(캐릭터, 밤 ? '밤' : '방치'), '잠결'); } return; }
-      if (졸림 || 표정 !== '기본') return;
+         막으므로, 밤 문구가 잠결로 나는 자리는 원리상 여기 하나다 — 밤중 «방치»로 조는 날
+         (까몽이 그렇다) 각성 문구가 잠결 목소리로 나면 모순이라, 갈래는 밤졸림이 가른다. */
+      if (자야함 !== 졸림) { set졸림(자야함); if (자야함) { 목소리('잠결'); 가끔말하기(혼잣말(캐릭터, 밤졸림 ? '밤' : '방치'), '잠결'); } return; }
+      if (졸림 || 표정 !== '기본' || 쓰다듬는중.current) return;
       const r = Math.random();
       if (r < 0.45) 기울이기(Math.random() < 0.5 ? 2 : -2, 900);
       else if (r < 0.6) 기울이기(3, 1100); // 끄덕임꼴
@@ -331,22 +397,34 @@ export default function 마스코트({
       if (연출 && 연출.끝나면) 연출.끝나면();
       return;
     }
-    깨우기();
+    /* 깨어나는 탭 — 잠을 깨운 손가락에 놀람 반응까지 겹치면 몸짓이 둘이다. 그 탭은
+       기지개(깨우기 안)가 전부고, 놀람→뒤 박자·쫀득은 다음 탭부터다. */
+    const 잤었나 = 깨우기();
+    if (잤었나) return;
     /* 탭 반응 = 쫀득 + 반응음 + 표정 (유호 08-25 「반응음 + 귀여운 모션」).
      * 소리는 어댑터 게이트를 지난다 — 녹음 중이면 위에서 이미 걸러졌지만, 게이트가 최종 판정자다.
      * 가끔(1/3)은 쫀득에 살짝 튐도 얹는다 — 매번 같은 반응은 기계 티가 난다(자발성 §2). */
     쫀득하기();
     목소리('기본');
     if (Math.random() < 0.34) 점프(8);
-    set표정('놀람');
-    예약(() => set표정(Math.random() < 0.5 ? '기쁨' : '눈웃음'), 300);
+    /* 표정 순서는 캐릭터의 성격이 정한다(lib/마스코트생명.탭반응고르기 — 몽글 반반·까몽 허세).
+       연타는 1.2초 창으로 센다 — 창이 지나면 첫 탭(1)부터 다시다. */
+    const 탭때 = Date.now();
+    연타.current = 탭때 - 연타.current.마지막 < 1200
+      ? { 수: 연타.current.수 + 1, 마지막: 탭때 } : { 수: 1, 마지막: 탭때 };
+    const 반응 = 탭반응고르기(캐릭터, Math.random(), 연타.current.수);
+    set표정(반응.첫);
+    예약(() => set표정(반응.뒤), 300);
     가끔말하기(혼잣말(캐릭터, '탭'));
     기본복귀();
   };
 
-  const 그릴컷 = 깜빡중 && 표정 === '기본' && !졸림 ? 표정컷.잔잔감음
-    : 졸림 && 표정 === '기본' ? 표정컷.잔잔감음
-      : 표정컷[표정] || 표정컷.기본;
+  /* 컷 한 벌 = 그 캐릭터의 것 — 없는 캐릭터(마린 · 그림 외주 대기)는 몽글로 폴백한다.
+     졸림 «전용 컷»이 있는 캐릭터(까몽)만 그 컷으로 자고, 없으면 잔잔감음이 잠을 댄다. */
+  const 컷 = 표정컷[캐릭터] || 표정컷.몽글;
+  const 그릴컷 = 깜빡중 && 표정 === '기본' && !졸림 ? 컷.잔잔감음
+    : 졸림 && 표정 === '기본' ? (컷.졸림 || 컷.잔잔감음)
+      : 컷[표정] || 컷.기본;
   const 진폭 = 졸림 ? 때.졸림진폭 : 때.부유진폭;
 
   return (
@@ -360,7 +438,7 @@ export default function 마스코트({
         ],
       }]}
     >
-      <Pressable onPress={탭} hitSlop={10} accessibilityLabel="마스코트">
+      <Pressable onPress={탭} hitSlop={10} accessibilityLabel="마스코트" {...쓰다듬.panHandlers}>
         {몸된다 ? (
           /* Skia 가 있는 기기 — 같은 그림 한 장이 «격자»로 산다(숨은 발치부터 · 눌림도 발치부터).
              바깥 어휘(부유·기울기·크기)는 위 Animated.View 에 그대로 얹혀 있다 —
@@ -372,23 +450,29 @@ export default function 마스코트({
             멈춤={멈춤()}
             졸림={졸림}
             탭시각={탭시각}
+            기지개시각={기지개시각}
           />
         ) : (
           <Animated.Image
             source={컷그림[그릴컷]}
+            /* 안드로이드 Image 기본 페이드인(300ms)이 깜빡임 한 컷(140ms)보다 길다 — 켜 두면
+               눈감음이 «번진 깜빡임»이 된다. 상태 교체용 그림이라 끈다(iOS·웹은 무시하는 prop). */
+            fadeDuration={0}
             style={[s.몸, {
-              /* 쫀득은 몸에만 건다 — 말풍선까지 눌리면 라벨이 종이가 아니라 고무가 된다. */
+              /* 쫀득은 몸에만 건다 — 말풍선까지 눌리면 라벨이 종이가 아니라 고무가 된다.
+                 음수 구간 = 기지개(세로 늘림) — 눌림의 역방향이라 한 값으로 두 몸짓이 산다. */
               transform: [
-                { scaleX: 쫀득.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] }) },
-                { scaleY: 쫀득.interpolate({ inputRange: [0, 1], outputRange: [1, 0.88] }) },
+                { scaleX: 쫀득.interpolate({ inputRange: [-1, 0, 1], outputRange: [0.95, 1, 1.1] }) },
+                { scaleY: 쫀득.interpolate({ inputRange: [-1, 0, 1], outputRange: [1.07, 1, 0.88] }) },
               ],
             }]}
             resizeMode="contain"
           />
         )}
       </Pressable>
-      {/* 🔑 key={말} — 문구가 바뀌면 라벨을 새로 세워 등장 박자가 매번 돈다(재사용하면 첫 말만 박자). */}
-      {말 ? <말풍선 key={말} 글={말} 줄임={줄임} /> : null}
+      {/* 🔑 key — 문구가 바뀌면 라벨을 새로 세워 등장 박자가 매번 돈다(재사용하면 첫 말만 박자).
+          말→null 은 key 가 같아 remount 없이 퇴장 prop 만 바뀐다 — 등장 값의 역재생 한 박자. */}
+      {(말 || 퇴장중) ? <말풍선 key={말 ?? 마지막말.current} 글={말 ?? 마지막말.current} 줄임={줄임} 퇴장={!말} /> : null}
     </Animated.View>
   );
 }
@@ -402,12 +486,19 @@ export default function 마스코트({
  *   「붕 떠 있다」로 읽힌 이유다. 화면 배치(오른쪽 위)상 왼쪽이 열린 방향이다.
  * ■ 등장 — 입에서 «뽁» 나오듯: 살짝 작게+아래에서 스프링으로 선다(즉시 팝이면 또 붕 뜬다).
  *   reduce-motion 이면 박자 없이 바로 선다(정지 화면이 곧 진실 — lib/모션.js 와 같은 규율). */
-function 말풍선({ 글, 줄임 }) {
+function 말풍선({ 글, 줄임, 퇴장 = false }) {
   const 등장 = useRef(new Animated.Value(줄임 ? 1 : 0)).current;
   useEffect(() => {
     if (줄임) { 등장.setValue(1); return; }
     Animated.spring(등장, { toValue: 1, friction: 6, tension: 140, useNativeDriver: Platform.OS !== 'web' }).start();
   }, [줄임, 등장]);
+  /* 퇴장 — 등장 값의 «역재생»이다(새 값 0): 같은 축이라 새 어휘 없이 내려가고, 스프링 도중
+     걷혀도 그 자리에서 이어서 내려간다. reduce-motion 이면 즉시 소멸 그대로(정지 화면 원칙). */
+  useEffect(() => {
+    if (!퇴장) return;
+    if (줄임) { 등장.setValue(0); return; }
+    Animated.timing(등장, { toValue: 0, duration: 150, easing: Easing.in(Easing.quad), useNativeDriver: Platform.OS !== 'web' }).start();
+  }, [퇴장, 줄임, 등장]);
   return (
     <Animated.View
       pointerEvents="none"

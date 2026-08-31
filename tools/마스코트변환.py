@@ -1,31 +1,47 @@
-# 마스코트 컷 변환 — 그림 정본(펠트코랄_0815 누끼) → talk 앱 자산(WebP).
+# 마스코트 컷 변환 — 그림 정본(캐릭터별 누끼) → talk 앱 자산(WebP).
 #
-# 정본 = SYNK-appsscript docs/캐릭터/펠트코랄_0815 (유호 확정 08-19 · 주인은 디자인_토큰.json
-#   `재질.펠트.정본사진.평상복` — tools/lib/마스코트자산.js 머리말). 누끼판(투명·알파 수리·놀람 합성
-#   포함)이 이미 완성돼 있으므로 이 도구는 **리사이즈 + WebP + 실측**만 한다.
+# 정본 = SYNK-appsscript docs/캐릭터/ 아래 캐릭터별 누끼 폴더(아래 SRC 지도).
+#   · 몽글 = 펠트코랄_0815/누끼 (유호 확정 08-19 · 주인은 디자인_토큰.json
+#     `재질.펠트.정본사진.평상복` — tools/lib/마스코트자산.js 머리말)
+#   · 까몽 = 친구공방_0825/누끼 (08-30 밤샘 굽기 · 결정 08-31 「다섯을 확정 세트로 승격」)
+#   누끼판(투명·알파 수리 포함)이 이미 완성돼 있으므로 이 도구는 **리사이즈 + WebP + 실측**만 한다.
 #
 # 🔴 옛 판(2026-08-13 「마스코트_렌더」 유리 몸 6컷)의 누끼 로직은 지웠다 — 그 판을 다시 변환할
-#   일은 없다(옛 렌더 복귀는 tests/마스코트생명.test.js 가 `재염색_` 접두로 막는다). 이 파일이
+#   일은 없다(옛 렌더 복귀는 tests/마스코트생명.test.js 가 몽글 `재염색_` 접두로 막는다). 이 파일이
 #   옛 경로를 다시 들면 그게 «옛 몽글 사고»(08-23 유호 지적)의 재발이다.
 #
-# 실행:  python tools/마스코트변환.py        (talk 저장소 루트 어디서든)
-# 산출:  assets/마스코트/재염색_*.webp 4벌 + 마스코트_시트.png(눈검수 대조판) + 실측 로그
+# 실행:  python tools/마스코트변환.py [캐릭터]   (talk 저장소 루트 어디서든 · 캐릭터를 주면 그 벌만)
+# 산출:  assets/마스코트/<컷>.webp + 캐릭터별 눈검수 시트(마스코트_시트*.png) + 실측 로그
 import os
+import sys
 import numpy as np
 from PIL import Image
 
-SRC = r"C:\Users\q1212\Documents\SYNK-appsscript\docs\캐릭터\펠트코랄_0815\누끼"
+_정본뿌리 = r"C:\Users\q1212\Documents\SYNK-appsscript\docs\캐릭터"
+SRC = {
+    "몽글": os.path.join(_정본뿌리, "펠트코랄_0815", "누끼"),
+    "까몽": os.path.join(_정본뿌리, "친구공방_0825", "누끼"),
+}
 DST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "마스코트")
-SHEET = os.path.join(DST, "마스코트_시트.png")
 
 # 앱이 쓰는 컷 = lib/마스코트생명.표정컷 값과 1:1 (tests/마스코트자산.test.js 가 파생 대조)
-컷들 = ["재염색_본체", "재염색_놀람", "재염색_눈웃음", "재염색_눈감음"]
+컷들 = {
+    "몽글": ["재염색_본체", "재염색_놀람", "재염색_눈웃음", "재염색_눈감음"],
+    "까몽": ["까몽_본체", "까몽_놀람", "까몽_눈웃음", "까몽_눈감음",
+           "까몽_윙크", "까몽_졸림", "까몽_으쓱", "까몽_민망"],
+}
 크기 = 336  # 표시 84pt × @4x — 옛 판(512)과 달리 정본이 1024 라 4배 밀도가 그대로 산다
 
-def 변환():
+
+def 시트경로(캐릭터):
+    # 몽글 시트는 08-23 부터 이 이름으로 살았다 — 개명하면 옛 시트가 낡은 채 남는다.
+    return os.path.join(DST, "마스코트_시트.png" if 캐릭터 == "몽글" else f"마스코트_시트_{캐릭터}.png")
+
+
+def 변환(캐릭터):
     낱장들 = []
-    for 이름 in 컷들:
-        원본 = Image.open(os.path.join(SRC, f"{이름}.png")).convert("RGBA")
+    for 이름 in 컷들[캐릭터]:
+        원본 = Image.open(os.path.join(SRC[캐릭터], f"{이름}.png")).convert("RGBA")
         assert 원본.size == (1024, 1024), f"{이름}: 정본 크기가 아니다 {원본.size}"
         작게 = 원본.resize((크기, 크기), Image.LANCZOS)
         나갈길 = os.path.join(DST, f"{이름}.webp")
@@ -46,10 +62,14 @@ def 변환():
     판 = Image.new("RGBA", (크기 * len(낱장들) + 40, 크기 + 40), (8, 6, 5, 255))
     for i, im in enumerate(낱장들):
         판.paste(im, (20 + i * 크기, 20), im)
-    판.convert("RGB").save(SHEET, "PNG")
-    print(f"  · 시트 → {os.path.relpath(SHEET, os.path.join(DST, '..', '..'))}")
+    판.convert("RGB").save(시트경로(캐릭터), "PNG")
+    print(f"  · 시트 → {os.path.relpath(시트경로(캐릭터), os.path.join(DST, '..', '..'))}")
+
 
 if __name__ == "__main__":
-    print(f"[마스코트변환] 정본 {SRC}")
-    변환()
-    print(f"[마스코트변환] {len(컷들)}벌 완료 → {os.path.relpath(DST)}")
+    대상 = sys.argv[1:] or list(컷들)
+    for 캐릭터 in 대상:
+        assert 캐릭터 in 컷들, f"모르는 캐릭터 {캐릭터} — 어휘 = {list(컷들)}"
+        print(f"[마스코트변환] {캐릭터} · 정본 {SRC[캐릭터]}")
+        변환(캐릭터)
+        print(f"[마스코트변환] {캐릭터} {len(컷들[캐릭터])}벌 완료 → {os.path.relpath(DST)}")

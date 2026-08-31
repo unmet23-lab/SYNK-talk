@@ -169,12 +169,15 @@ export default function 반피드백화면({ 토큰, 돌아가기 }) {
   if (항목) {
     const 낸글 = 항목.학생글 ?? 항목.들린대로 ?? null;
     const 전사 = !항목.학생글 && Boolean(항목.들린대로);
+    /* 이 항목은 보내기 성공 전까지 반.항목들에 남아 있다(보내기의 filter 가 성공 뒤) — 자신을 뺀다.
+     * 단위는 «건»이다 — 항목들은 산출물 단위라 같은 학생이 두 건일 수 있다(카드 셈과 같은 자). */
+    const 남은 = Math.max(0, (반?.항목들?.length ?? 1) - 1);
     return (
       <ScrollView style={s.wrap} contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
         <Text style={s.label}>ONE WORD</Text>
         <Text style={s.머리}>{항목.이름 ?? 항목.학생번호 ?? '학생'}</Text>
         <Text style={s.메타}>
-          {종류말[항목.과제종류] ?? 항목.과제종류 ?? ''} · {나이글(항목.낸시각)} 기다렸어요
+          {종류말[항목.과제종류] ?? 항목.과제종류 ?? ''} · {나이글(항목.낸시각)} 기다렸어요{남은 > 0 ? ` · 이 반에 ${남은}건 더 기다려요` : ''}
         </Text>
 
         <View style={s.카드}>
@@ -422,7 +425,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: 색.잉크_희미,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 12,
   },
   칩_고름: { backgroundColor: 색.잉크, borderColor: 색.잉크 },
   칩글: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_서브 },

@@ -25,6 +25,7 @@ import { 흐름id } from '../lib/제출로그.js';
  *   (`contents/문구_동의.js` 가 같은 이유로 먼저 그 길을 냈다). 키는 `l10n` 의 string_id 라
  *   감수가 끝나면 그 파일의 `mn` 만 차면 이 자리가 그대로 병기로 선다. */
 import { 말 } from '../contents/문구_오류.js';
+import { 시한fetch, 조회상한, 제출상한 } from './시한fetch.js';
 
 const URL_ = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -49,12 +50,16 @@ const 헤더 = (토큰, 읽기) => ({
  *   (`계약판` 을 `src/계약판.js` 로 뗀 것이 그 순환 import 를 푼 한 수다.)
  */
 async function 한번(길, 토큰, 몸, 읽기) {
+  /* 🔑 시한 있는 왕복(`src/시한fetch.js` · 08-31 감사 D7-5) — 연결은 됐는데 바이트가 안 오는
+   *   회선에서 OS 기본 시한까지 매달리지 않게. 통로가 하나라 부르기 소비자 전부(과제·교정·
+   *   제출sign·몽글·events)가 자동 상속한다. WAV 업로드는 저장.js 별도 통로라 안 걸린다.
+   *   abort 는 아래 catch 로 떨어져 NETWORK(retryable:true)에 그대로 접힌다 — 재시도 규약 무변경. */
   try {
-    return await fetch(`${URL_}/functions/v1/${길}`, {
+    return await 시한fetch(`${URL_}/functions/v1/${길}`, {
       method: 읽기 ? 'GET' : 'POST',
       headers: 헤더(토큰, 읽기),
       ...(읽기 ? {} : { body: JSON.stringify(몸) }),
-    });
+    }, 읽기 ? 조회상한 : 제출상한);
   } catch {
     throw new 인증오류('NETWORK', 말('err.network'), true);
   }
@@ -150,7 +155,16 @@ async function 한벌쏘기(토큰, 사건) {
     return { 충돌: false, 결과: { 오류: String(e.message || e), 끝: e.retryable === false } };
   }
 
-  const 한건 = 본문.results && 본문.results[0];
+  const 한건 = Array.isArray(본문.results) ? 본문.results[0] : undefined;
+  /* ok:true 인데 results 가 없다 — 서버가 저장했는지 알 수 없어 재시도는 남긴다(멱등키가
+   * 이중을 막는다). 다만 갈래를 글자로 남긴다: 이 괄호가 없으면 형태 표류와 진짜 배달 지연이
+   * 로그에서 같은 얼굴이 된다(감사 G1-11 · 이 파일 머리말 「새는 방향은 언제나 통과」의 자기 사례).
+   * 끝:true 로 접지 않는 까닭: 서버가 이미 저장한 경우 발화를 버리는 쪽이 더 비싸고, 괄호 달린
+   * 오류가 원장·개발 눈에 걸린다(실패 가시성 P0 §4-1 — 사건보내기의 괄호 보존 무늬 그대로).
+   * 학생 문장 자체는 말() 정본 키라 몽골어 병기 규약도 그대로다. */
+  if (한건 === undefined) {
+    return { 충돌: false, 결과: { 오류: `${말('err.delivery_slow')} (응답 형태 어긋남: results 없음)`, 끝: false } };
+  }
   // `duplicate` 는 실패가 아니라 **재전송이 접힌 것**이다 — 이제 서버가 **내용까지 대조하고**
   // 같을 때만 그렇게 부른다(다르면 아래 `IDEMPOTENCY_CONFLICT` · C0 §4-1).
   if (한건 && (한건.status === 'stored' || 한건.status === 'duplicate')) {

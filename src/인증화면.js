@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { 색, 폰트, 모노트래킹, 몽골어폰트 } from './테마';
 import { use등장 } from '../lib/모션.js';
-import { 학생번호맞나, 계정번호맞나 } from '../lib/학생계정.js';
+import { 학생번호맞나, 계정번호맞나, 학생번호접두 } from '../lib/학생계정.js';
 import { 문항, 답검사 } from '../lib/가입문항.js';
 import * as API from './인증API';
 /* 학생이 읽는 글의 정본은 `contents/문구_오류.js` 다 — 화면은 «어느 말을 언제 쓰나»만 정한다.
@@ -130,6 +130,20 @@ export default function 인증화면({ 로그인성공, 시작단계 = 단계.�
     },
   }[지금];
 
+  /* 잠긴 버튼이 눌렸을 때 「왜 안 열리나」 — 화면 순서대로 **첫 빠진 칸 하나만** 짚는다.
+     `쓸수있나` 의 갈래별 조건과 같은 자를 쓴다(둘이 갈리면 안내가 열린 버튼을 설명하게 된다). */
+  function 빠진칸안내() {
+    const 학생전용 = 지금 === 단계.첫등록 || 지금 === 단계.임시;
+    if (!(학생전용 ? 학생번호형식 : 번호형식)) return '학생번호를 확인해 주세요';
+    if (지금 === 단계.첫등록 && 뒷자리.length !== 4) return '전화번호 뒤 4자리를 넣어 주세요';
+    if (지금 === 단계.임시 && 임시번호.length !== 6) return '학원에서 받은 6자리를 넣어 주세요';
+    if ((지금 === 단계.로그인 || 지금 === 단계.변경) && !비번.length) return '비밀번호를 넣어 주세요';
+    if (지금 !== 단계.로그인 && 새비번.length < 최소비번) return 말('err.password_too_short', { 채움: { n: 최소비번 } });
+    const 검사 = 지금 === 단계.첫등록 ? 답검사(가입답) : null;
+    if (검사) return `${문항.find((q) => q.필드 === 검사.필드).라벨}을 골라 주세요`;
+    return '';
+  }
+
   return (
     <KeyboardAvoidingView style={s.wrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
@@ -140,14 +154,14 @@ export default function 인증화면({ 로그인성공, 시작단계 = 단계.�
           id="학생번호"
           라벨="학생번호"
           값={학생번호}
-          바꾸기={set학생번호}
+          바꾸기={(t) => set학생번호(학생번호접두(t))}
           자리표시="SYNK-042"
           모노
           자동대문자="characters"
         />
 
         {지금 === 단계.첫등록 && (
-          <칸 id="뒷자리" 라벨="전화번호 뒤 4자리" 값={뒷자리} 바꾸기={set뒷자리} 자리표시="1234" 숫자 최대={4} 모노 />
+          <칸 id="뒷자리" 라벨="전화번호 뒤 4자리" 값={뒷자리} 바꾸기={set뒷자리} 자리표시="1234" 숫자 최대={4} 모노 도움말="상담 때 알려주신 번호예요" />
         )}
         {지금 === 단계.임시 && (
           <칸 id="임시번호" 라벨="학원에서 받은 6자리" 값={임시번호} 바꾸기={set임시번호} 자리표시="000000" 숫자 최대={6} 모노 />
@@ -195,8 +209,17 @@ export default function 인증화면({ 로그인성공, 시작단계 = 단계.�
 
         <Pressable
           testID="인증-제출"
-          onPress={() => 눌렀다(제출.실행)}
-          disabled={!제출.쓸수있나 || 도는중}
+          onPress={() => {
+            if (!제출.쓸수있나) {
+              /* 같은 안내가 두 번 떠도 등장 박자가 다시 돌게 — 비운 «다음 틱»에 채운다(눌렀다 무늬). */
+              const 안내 = 빠진칸안내();
+              set오류('');
+              Promise.resolve().then(() => set오류(안내));
+              return;
+            }
+            눌렀다(제출.실행);
+          }}
+          disabled={도는중}
           style={({ pressed }) => [
             s.버튼,
             (!제출.쓸수있나 || 도는중) && s.버튼_잠김,
@@ -211,7 +234,7 @@ export default function 인증화면({ 로그인성공, 시작단계 = 단계.�
         <View style={s.갈래}>
           {지금 === 단계.로그인 && (
             <>
-              <곁길 id="첫등록" 글="처음 오셨나요" 누르기={() => 옮기기(단계.첫등록)} />
+              <곁길 id="첫등록" 글="처음 오셨나요" 버튼꼴 누르기={() => 옮기기(단계.첫등록)} />
               <곁길 id="임시" 글="비밀번호를 잊었어요" 누르기={() => 옮기기(단계.임시)} />
             </>
           )}
@@ -236,25 +259,38 @@ function 오류줄({ 글 }) {
 }
 
 function 칸({ id, 라벨, 값, 바꾸기, 자리표시, 비밀, 숫자, 이메일, 모노, 최대, 자동대문자, 도움말 }) {
+  const [보임, set보임] = useState(false);
+  const 입력 = (
+    <TextInput
+      testID={id ? `입력-${id}` : undefined}
+      value={값}
+      onChangeText={(t) => 바꾸기(숫자 ? t.replace(/\D/g, '') : t)}
+      placeholder={자리표시}
+      placeholderTextColor={색.잉크_희미}
+      secureTextEntry={Boolean(비밀) && !보임}
+      keyboardType={숫자 ? 'number-pad' : 이메일 ? 'email-address' : 'default'}
+      maxLength={최대}
+      autoCapitalize={자동대문자 || 'none'}
+      autoCorrect={false}
+      style={[s.입력, 모노 && s.입력_모노, 비밀 && s.입력_비밀]}
+    />
+  );
   return (
     <View style={s.칸}>
       <View style={s.칸머리}>
         <Text style={s.칸라벨}>{라벨}</Text>
         {도움말 ? <Text style={s.칸도움말}>{도움말}</Text> : null}
       </View>
-      <TextInput
-        testID={id ? `입력-${id}` : undefined}
-        value={값}
-        onChangeText={(t) => 바꾸기(숫자 ? t.replace(/\D/g, '') : t)}
-        placeholder={자리표시}
-        placeholderTextColor={색.잉크_희미}
-        secureTextEntry={Boolean(비밀)}
-        keyboardType={숫자 ? 'number-pad' : 이메일 ? 'email-address' : 'default'}
-        maxLength={최대}
-        autoCapitalize={자동대문자 || 'none'}
-        autoCorrect={false}
-        style={[s.입력, 모노 && s.입력_모노]}
-      />
+      {비밀 ? (
+        <View style={s.비밀줄}>
+          {입력}
+          {/* 토글은 입력 행 «안» 오른쪽 패딩 자리 — 신호 1점(오류)이 있는 화면이라 코랄이 아니라
+              3번째 글자 층(칸도움말)과 같은 규격이다(머리말 규율). */}
+          <Pressable onPress={() => set보임((앞) => !앞)} hitSlop={10}>
+            <Text style={s.칸도움말}>{보임 ? '가리기' : '보기'}</Text>
+          </Pressable>
+        </View>
+      ) : 입력}
     </View>
   );
 }
@@ -295,13 +331,22 @@ function 고르기({ 라벨, 라벨_mn, 보기, 값, 고르기: 눌렀다 }) {
   );
 }
 
-function 곁길({ id, 글, 누르기 }) {
+function 곁길({ id, 글, 누르기, 버튼꼴 }) {
   return (
-    <Pressable testID={id ? `곁길-${id}` : undefined} onPress={누르기} hitSlop={10} style={({ pressed }) => pressed && { opacity: 0.6 }}>
-      <Text style={s.곁길글}>{글}</Text>
+    <Pressable testID={id ? `곁길-${id}` : undefined} onPress={누르기} hitSlop={10} style={({ pressed }) => [버튼꼴 && s.곁길버튼, pressed && { opacity: 0.6 }]}>
+      <Text style={버튼꼴 ? s.곁길버튼글 : s.곁길글}>{글}</Text>
     </Pressable>
   );
 }
+
+/* 입력 상자 «면» 한 벌 — 비밀 칸은 토글을 안에 앉히려 상자를 줄(View)로 옮겨 지므로 값은 여기 한 곳. */
+const 입력틀 = {
+  backgroundColor: 색.바탕띄움,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: 색.잉크_희미,
+  height: 52,                       // 손가락이 닿는 최소치보다 넉넉히
+};
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: 색.바탕 },
@@ -315,17 +360,17 @@ const s = StyleSheet.create({
   // 3번째 글자 층 — 밀도로는 더 못 내려가는 자리라 Stone 을 쓴다(바닥이 Ink Deep 이라 허용).
   칸도움말: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조 },
   입력: {
-    backgroundColor: 색.바탕띄움,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 색.잉크_희미,
+    ...입력틀,
     paddingHorizontal: 14,
-    height: 52,                     // 손가락이 닿는 최소치보다 넉넉히
     fontFamily: 폰트.본문,
     fontSize: 16,                   // 16 미만이면 iOS 가 화면을 확대한다
     color: 색.잉크,
   },
   입력_모노: { fontFamily: 폰트.모노, letterSpacing: 1 },
+  /* 비밀 칸 — 상자(입력틀)를 줄(View)이 지고 입력은 그 안에서 흐른다. 토글이 상자 «안»
+     오른쪽 패딩 자리에 앉아 행 높이 52 그대로다(레이아웃 밀림 0). */
+  비밀줄: { ...입력틀, flexDirection: 'row', alignItems: 'center', paddingRight: 14 },
+  입력_비밀: { flex: 1, height: '100%', borderWidth: 0, backgroundColor: 'transparent' },
 
   /* 고른 칩은 **면을 채워** 표시한다 — 테두리만 굵게 하면 22개가 깔린 아이막 줄에서 고른 것을
      눈으로 못 찾는다. 🚫 코랄은 안 쓴다: 이 화면의 신호 1점은 오류 메시지다(위 머리말). */
@@ -361,4 +406,10 @@ const s = StyleSheet.create({
 
   갈래: { gap: 14, alignItems: 'center', paddingTop: 6 },
   곁길글: { fontFamily: 폰트.본문, fontSize: 14, color: 색.잉크_보조 },
+  /* 첫등록 곁길만 테두리 보조버튼으로 — 처음 온 학생이 제 갈 길을 흐린 글자에서 못 찾는다. */
+  곁길버튼: {
+    borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12,
+    paddingVertical: 12, paddingHorizontal: 18, alignItems: 'center', alignSelf: 'stretch',
+  },
+  곁길버튼글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.잉크 },
 });

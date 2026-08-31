@@ -28,6 +28,7 @@
  *     `ALREADY_JUDGED` 로 되돌릴 수 없다. 서버가 준 것만 「판정됐다」로 그린다.
  */
 import { 부르기 } from './사건통로.js';
+import { 인증오류 } from './인증API.js';
 
 /**
  * §3 `GET /v1/teach/gold/queue` — 이번(=지난 완결) 주의 표본.
@@ -46,6 +47,12 @@ import { 부르기 } from './사건통로.js';
  */
 export async function 큐받기(토큰) {
   const 본문 = await 부르기('teach/gold/queue', 토큰);
+  /* 풀크기 0 접힘은 화면의 표본0/풀0 가름(위 머리말 🔴) 자체를 거짓 재료로 만든다(감사 G1-10) */
+  for (const 칸 of ['remaining', 'sample_size', 'pool_size', 'data']) {
+    if (본문[칸] === undefined) {
+      throw new 인증오류('CONTRACT_VIOLATION', `응답에 ${칸} 칸이 없어요 — 서버와 앱의 판이 어긋났어요`, false);
+    }
+  }
   return {
     주: 본문.week ?? '',
     남음: Number(본문.remaining) || 0,

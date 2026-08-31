@@ -84,6 +84,10 @@ function 세우기(파일, fetch가짜, 옵션 = {}) {
     String,
     Number,
     Boolean,
+    // 시한fetch(src/시한fetch.js)가 쓰는 셋 — 없으면 vm 안에서 ReferenceError 다(감사 G1-7).
+    AbortController,
+    setTimeout,
+    clearTimeout,
   });
   // 🔑 자리를 잡아 둔 빈 객체가 아니라 **채워진 exports** 로 덮는다 — `export default` 처럼
   //   객체를 통째로 바꾸는 모듈이 있으면 앞의 자리와 갈라진다.

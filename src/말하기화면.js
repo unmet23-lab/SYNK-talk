@@ -188,6 +188,8 @@ export default function 말하기화면({
   /* 🔑 같은 값을 **ref 로도** 쥔다 — 아래 `AppState` 리스너는 `[date, 토큰]` 으로 등록돼
    *   state 를 낡은 채 보고, 그 자리가 곧 큐를 미는 두 자리 중 하나다(`로그참조` 와 같은 이유). */
   const 막힘참조 = useRef(null);
+  /* 생성 상태도 같은 이유로 ref 에 겹쳐 쥔다 — 복귀 리스너가 「생성중이면 즉시 재조회」를 판정하는 자리다. */
+  const 생성상태참조 = useRef(null);
   /* 오늘 배정의 **서버** task_ref — 죽은 게임 앉음 수거(H2)의 기준값. 서버를 못 받은 날은 null
    * = 안 걷는다(오귀속보다 0건 · 기기 시계로 대신 끊지 않는다 — 배정 task_ref 는 날짜 스코프라
    * 서버 값끼리의 대조가 곧 「그날이 지났다」다 · 발주 §6-6 ⑩). */
@@ -208,8 +210,8 @@ export default function 말하기화면({
   const [로그, set로그] = useState([]);
   const [오류, set오류] = useState(null); // 「모름」을 「정상」으로 바꾸지 않는다 — 실패는 글자로 보인다
   const [저장경고, set저장경고] = useState(!지속저장());
-  /* 되세우기 신호 — **자정을 넘겨 돌아온 복귀에서만** 올린다(아래 `AppState`). 이 값 하나가
-     아래 초기화 효과의 「마운트 때 한 번」을 「새 날에 한 번 더」로 넓힌다. */
+  /* 되세우기 신호 — **자정 복귀 + 생성중 재조회**가 올린다(아래 `AppState` 리스너와 폴링 효과).
+     이 값 하나가 아래 초기화 효과의 「마운트 때 한 번」을 「다시 물을 때 한 번 더」로 넓힌다. */
   const [세대, set세대] = useState(0);
   /* 🔑 로그의 **최신본은 ref 가 쥔다.** 전송은 배경에서 끝나므로, state 클로저로 쓰면
    *   「보내는 동안 학생이 다시 녹음」한 경우 나중에 끝난 쪽이 앞선 항목을 통째로 덮는다. */
@@ -408,8 +410,9 @@ export default function 말하기화면({
          *   화면은 `서버막힘` 으로 막지만 그건 **렌더 층**뿐이고 이 효과는 그대로 이어 돈다.
          * 🔑 ref 는 `살아있음` 과 무관하게 적는다 — 화면이 사라져도 복귀 리스너는 산다. */
         막힘참조.current = 막힘;
+        생성상태참조.current = 항목 ? null : (assignment_status || null);
         if (살아있음) set서버막힘(막힘);
-        if (살아있음) set서버생성상태(항목 ? null : (assignment_status || null));
+        if (살아있음) set서버생성상태(생성상태참조.current);
         /* 🔑 새 날 되세움에서도 **양쪽을 적는다**(아래 `set호흡` 과 같은 이유) — 어제가 게임이고
          * 오늘이 말하기면 비워져야 오늘 화면이 선다. `게임재료` 가 null 이면(게임 아님·못 펴는
          * 시드·미검수 판) 아래 `화면과제` 폴백이 그대로 선다 — 조용한 말하기 폴백이 설계다(H5). */
@@ -431,14 +434,17 @@ export default function 말하기화면({
         if (살아있음) setG2벌(null);
         if (살아있음) setG3재료(null);
         if (살아있음) setG4벌(null);
+        생성상태참조.current = null;
         if (살아있음) set서버생성상태(null); // 서버를 못 받은 날은 생성 상태도 모른다 — 추측으로 그리지 않는다
         게임수거참조.current = null; // 오늘을 모르는 날은 수거도 쉰다(오귀속보다 0건)
         결과 = 화면과제(null, 폴백);
         /* 말투 = 시스템 말투 상시 규칙(유호 확정 08-22 · synk-brand) — 귀책·결핍 대신 진행형·명랑.
-         * 원인(e.message)은 남긴다: 명랑은 말투지 정보 삭제가 아니다. */
-        결과.사유 = 토큰
-          ? `오늘 과제를 다시 받아 볼게요! (${String(e.message || e)})`
-          : '오늘 과제를 다시 받아 볼게요!';
+         * 원인(e.message)은 남긴다: 명랑은 말투지 정보 삭제가 아니다 — 다만 학생 문장의 괄호가
+         * 아니라 `사유원인` 칸으로 갈라 싣는다(렌더가 모노 아래 줄로 세운다). */
+        결과.사유 = '오늘 과제를 다시 받아 볼게요!';
+        결과.사유원인 = 토큰 ? String(e.message || e) : null;
+        // 이 기기 전 생애 로그가 0줄 = 첫 만남 — 그날의 폴백엔 「연습 문장」 메모를 세우지 않는다.
+        결과.첫만남 = 기록.length === 0;
       }
       if (!살아있음) return;
       set과제(결과);
@@ -479,12 +485,23 @@ export default function 말하기화면({
   useEffect(() => {
     const 구독 = AppState.addEventListener('change', (상태) => {
       if (상태 !== 'active') return;
+      /* «생성중»에 두고 나갔다 온 복귀는 즉시 다시 묻는다 — 세대 재초기화가 오늘과제받기
+       * 재호출 + 화면 되세움 + 밀린것보내기까지 한 벌로 돈다(아래 복귀행동 줄은 그대로다). */
+      if (생성상태참조.current === '생성중') { set세대((n) => n + 1); return; }
       const 할일 = 복귀행동(date, 몽골날짜(), 보낼것(로그참조.current, 막힘참조.current).length);
       if (할일 === '재초기화') set세대((n) => n + 1);
       else if (할일 === '밀린것') 밀린것보내기();
     });
     return () => 구독.remove();
   }, [date, 토큰]);
+
+  /* «생성중» 폴링 — 곧 온다는 화면을 학생이 손대지 않아도 과제가 오면 저절로 바뀌게.
+   * 과제가 오면 초기화 효과가 생성 상태를 null 로 접으므로 이 효과는 스스로 멈춘다. */
+  useEffect(() => {
+    if (서버생성상태 !== '생성중') return undefined;
+    const t = setInterval(() => set세대((n) => n + 1), 25000);
+    return () => clearInterval(t);
+  }, [서버생성상태]);
 
   const 편지 = 과제 ? 과제.편지 : 폴백;
 
@@ -642,8 +659,15 @@ export default function 말하기화면({
           정하고 여기는 배치만 — null 이면 안 그린다(«없어도 되는» 꼬리 · 과제 흐름 무접촉). */}
       <목표카드 카드={목표카드값} 토큰={토큰} 답뒤={견줌다시읽기} />
       {/* 🔴 고정 과제로 내려간 사실을 숨기지 않는다 — 조용히 내려가면 배치가 며칠 안 돌아도
-          화면은 늘 멀쩡해 보인다(P0 §4-1 「막힌 것이 통과한 것처럼 보이는 상태」). */}
-      {과제 && 과제.출처 === '고정' && <Text style={s.메모}>{과제.사유} · 오늘은 연습 문장으로 해요</Text>}
+          화면은 늘 멀쩡해 보인다(P0 §4-1 「막힌 것이 통과한 것처럼 보이는 상태」).
+          🔑 첫 만남(전 생애 로그 0줄)엔 메모를 안 세운다 — 폴백 관측은 degraded 행이 진다
+          (`lib/오늘과제.js` 화면과제 머리말). 학생 문장이 앞, 기계 원인은 모노 아래 줄. */}
+      {과제 && 과제.출처 === '고정' && (
+        <View>
+          {!과제.첫만남 && <Text style={s.메모}>오늘은 연습 문장으로 해요 — {과제.사유}</Text>}
+          {과제.사유원인 ? <Text style={s.사유원인}>{과제.사유원인}</Text> : null}
+        </View>
+      )}
 
       {!과제 && <불러오는중 />}
 
@@ -701,7 +725,7 @@ export default function 말하기화면({
       )}
 
       {호흡 === '완료' && (
-        <완료카드 로그={로그} date={date} 견줌={견줌} 견줌다시읽기={견줌다시읽기} />
+        <완료카드 로그={로그} date={date} 견줌={견줌} 견줌다시읽기={견줌다시읽기} 다시보내기={밀린것보내기} />
       )}
 
       {/* 라디오 「오늘의 표현」 — 숙제를 마친 뒤 «선택»으로 한 장 더 읽는다(발전 트랙 ④).
@@ -797,6 +821,7 @@ function 불러오는중() {
 function 듣기카드({ 편지, 라벨 = '편지가 왔어요', 다음, 들었음알리기 }) {
   const [읽는중, set읽는중] = useState(false);
   const [들었다, set들었다] = useState(false);
+  const [읽기실패, set읽기실패] = useState(false); // 소리가 시작조차 못했다 — 「들었다」와 다른 사실이다
 
   const 재생 = async () => {
     set읽는중(true);
@@ -809,6 +834,7 @@ function 듣기카드({ 편지, 라벨 = '편지가 왔어요', 다음, 들었�
       onDone: () => {
         set읽는중(false);
         set들었다(true);
+        set읽기실패(false); // 재시도가 끝까지 갔다 — 실패 안내를 걷는다
         /* 🔴 **여기가 관측이다** — 낭독이 끝까지 간 것만 「귀에 닿았다」로 센다(c9).
          *   아래 `onError` 에는 안 붙인다: 흐름은 안 막지만(본문이 화면에 있다) 귀에 닿은 것은
          *   없어서, 거기서 내면 「들었다」가 「띄웠다」로 조용히 뜻을 갈아탄다. */
@@ -816,7 +842,8 @@ function 듣기카드({ 편지, 라벨 = '편지가 왔어요', 다음, 들었�
       },
       onError: () => {
         set읽는중(false);
-        set들었다(true); // 재생이 안 되는 기기에서도 흐름은 막지 않는다 — 본문이 화면에 있다
+        // 「들었다」는 안 세운다(위 주석의 그 축) — 흐름 문은 아래 「읽었어요」가 연다.
+        set읽기실패(true);
       },
     });
   };
@@ -838,16 +865,36 @@ function 듣기카드({ 편지, 라벨 = '편지가 왔어요', 다음, 들었�
        * 따라·답하기 카드에 반복하면 매일 보는 학생에게 소음이다. ⚠ 문구는 초안 — 카피 확정은 유호님 몫. */}
       <Text style={s.녹음안내}>딱 세 걸음이에요 — 듣고, 따라 말하고, 내 말로 답해요!</Text>
       <Text style={s.편지문}>{편지.본문}</Text>
-      <Pressable onPress={재생} style={({ pressed }) => [s.보조버튼, pressed && s.눌림]}>
-        <Text style={s.보조버튼글}>{읽는중 ? '읽는 중…' : '♪ 들어보기'}</Text>
-      </Pressable>
-      <Pressable
-        testID="말하기-다들었어요"
-        onPress={다음}
-        style={({ pressed }) => [s.주버튼, !들었다 && s.주버튼_대기, pressed && s.눌림]}
-      >
-        <Text style={s.주버튼글}>{들었다 ? '다 들었어요' : '듣지 않고 넘어가기'}</Text>
-      </Pressable>
+      {읽기실패 && !들었다 && (
+        <Text style={s.녹음안내}>소리를 읽지 못했어요 — 글로 읽어 주세요</Text>
+      )}
+      {/* 위계: 이 카드의 본동작은 «듣기»라 재생이 주버튼이다. 들었다(또는 소리가 안 나오는
+          기기라 글로 읽었다)면 그 자리에 전진 주버튼이 선다.
+          🔑 testID '말하기-다들었어요' 는 **지금 전진시키는 컨트롤**에 얹는다 — `.maestro/01_인증`·
+          `02_녹음제출` 이 이 id 로 흐름을 전진시킨다(들었다 게이트로 동시 렌더 없음). */}
+      {!들었다 && !읽기실패 ? (
+        <Pressable onPress={재생} style={({ pressed }) => [s.주버튼, pressed && s.눌림]}>
+          <Text style={s.주버튼글}>{읽는중 ? '읽는 중…' : '♪ 들어보기'}</Text>
+        </Pressable>
+      ) : (
+        <Pressable
+          testID="말하기-다들었어요"
+          onPress={다음}
+          style={({ pressed }) => [s.주버튼, pressed && s.눌림]}
+        >
+          <Text style={s.주버튼글}>{들었다 ? '다 들었어요' : '읽었어요'}</Text>
+        </Pressable>
+      )}
+      {!들었다 && 읽기실패 && (
+        <Pressable onPress={재생} style={({ pressed }) => [s.보조버튼, pressed && s.눌림]}>
+          <Text style={s.보조버튼글}>{읽는중 ? '읽는 중…' : '♪ 들어보기'}</Text>
+        </Pressable>
+      )}
+      {!들었다 && !읽기실패 && (
+        <Pressable testID="말하기-다들었어요" onPress={다음} hitSlop={10}>
+          <Text style={s.건너뛰기글}>듣지 않고 넘어가기</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -946,6 +993,7 @@ function 녹음카드({
    *   있고, state 는 그 순간들 사이에서 낡는다 — 두 번 닫으면 무발화 판정과 조립이 두 벌 돈다. */
   const 녹음열림 = useRef(false);
   const 상한처리 = useRef(false); // 상한초 자동 종료를 한 번만 — 경과 갱신마다 끝()이 겹치지 않게
+  const [상한끊김, set상한끊김] = useState(false); // 이번 판이 상한초에서 저절로 매듭졌다 — 확인 카드가 한 줄로 말한다
   const 자동시작타이머 = useRef(null);
   /* 가산 프롭 판정은 렌더마다 한 곳에서 — 버튼 두 자리(확인·무발화)가 각자 세면 갈라진다. */
   const 다시가능 = 재시도남았나(로그, date, step, 재시도상한);
@@ -1031,6 +1079,7 @@ function 녹음카드({
        *   말하면 게이트가 앱의 모든 소리를 이유 없이 죽인다. */
       녹음열림.current = true;
       상한처리.current = false;
+      set상한끊김(false); // 「다시 말하기」→대기 재진입→자동시작 사슬이 이 리셋을 지난다 — 다음 판에 안 남는다
       녹음시작();
       set단계('녹음중');
     } catch (e) {
@@ -1133,6 +1182,7 @@ function 녹음카드({
     if (!상한초 || 단계 !== '녹음중' || 상한처리.current) return;
     if (경과 >= 상한초 * 1000) {
       상한처리.current = true;
+      set상한끊김(true);
       끝();
     }
   }, [경과, 단계]);
@@ -1255,6 +1305,7 @@ function 녹음카드({
      *   (①듣기 `onDone` 이 `onError` 를 일부러 비워 둔 것과 같은 규칙). */
     플레이어.current.addListener('playbackStatusUpdate', (s) => {
       if (s && s.didJustFinish && !되들은때.current) 되들은때.current = new Date().toISOString();
+      if (s && s.didJustFinish) set듣는중(false); // 실제 종료가 정본 — 아래 타이머는 시작조차 못한 기기의 안전망
     });
     set듣는중(true);
     플레이어.current.play();
@@ -1331,7 +1382,7 @@ function 녹음카드({
           {/* 세 상태의 마지막 «맺음»이 갈 자리는 여기뿐이다 — 실이 끝까지 가고 매듭이 진다.
               단추가 아니라 «다 꿰었다»는 표시라 누를 수 없다(누를 것은 아래 보조 버튼들이다). */}
           <View style={{ alignItems: 'center' }}>
-            <녹음띠 상태="맺음" 폭={248} />
+            <맺음띠 숨={듣는중} />
           </View>
           <Text style={s.확인글}>
             {숫자숨김 ? '목소리가 담겼어요' : `${초표시(녹음.duration_ms)} 담겼어요`}
@@ -1342,6 +1393,10 @@ function 녹음카드({
             <Text style={s.무발화설명}>
               여기까지만 담겼어요 — 앱을 잠깐 나가서 녹음이 멈췄어요. 들어 보고 다시 말해도 돼요.
             </Text>
+          )}
+          {/* 상한 자동 종료도 말한다 — 숫자는 0(G3 숫자숨김 규율) · 배경 끊김 문구와 안 겹치게. */}
+          {!끊김 && 상한끊김 && (
+            <Text style={s.무발화설명}>여기서 매듭을 지었어요 — 들어 보고 그대로 보내도, 다시 말해도 돼요.</Text>
           )}
           <Pressable testID="말하기-내목소리" onPress={내목소리} style={({ pressed }) => [s.보조버튼, pressed && s.눌림]}>
             <Text style={s.보조버튼글}>{듣는중 ? '재생 중…' : '내 목소리 듣기'}</Text>
@@ -1388,6 +1443,13 @@ function 녹음카드({
               ? '앱을 잠깐 나가서 녹음이 멈췄어요. 다시 말해 볼까요?'
               : '괜찮아요 — 말이 안 나오는 날도 있어요. 그것도 선생님께 신호가 돼요.'}
           </Text>
+          {/* 담긴 것이 있으면 들어 볼 문을 연다(조각 0 무발화는 uri 가 없어 원리상 안 뜬다).
+              🚫 「그대로 보내기」는 여기 안 연다 — spoke=false 제출의 데이터 축이라 유호님 판정이 먼저다. */}
+          {녹음 && 녹음.uri ? (
+            <Pressable testID="말하기-무발화-듣기" onPress={내목소리} style={({ pressed }) => [s.보조버튼, pressed && s.눌림]}>
+              <Text style={s.보조버튼글}>{듣는중 ? '재생 중…' : '들어 보기'}</Text>
+            </Pressable>
+          ) : null}
           <View style={s.가로}>
             {/* ⚠ 무발화의 「한 번 더」는 재시도 상한 **밖**이다(현행 그대로) — 발주 §4-3 ⑤의
                 상한은 「제출 직후 자기 목소리 재생」 자리(위 확인 카드)의 재시도다(「여기서만」).
@@ -1415,7 +1477,7 @@ function 녹음카드({
 
 /* named export — G3(알바 변명)가 이 카드를 그대로 쓴다(발주 G3 판정 ① · 새 통로 0).
  * default(말하기화면)는 그대로다. 선언부 export 금지 사유는 카드 머리말 ⚠. */
-export { 녹음카드 };
+export { 녹음카드, 듣기카드 };
 
 /* ── 녹음 버튼 — 화면 전체에서 코랄이 사는 유일한 자리 ── */
 /* 녹음 단추 — **펠트 띠**다 (유호 확정 08-28 「녹음띠는 ㉮로 가자」 · 검수문 ⑦ 세 안 중 ㉮).
@@ -1471,12 +1533,39 @@ function 녹음버튼({ 녹음중, onPress }) {
   );
 }
 
+/* 맺음 띠 — 「내 목소리 듣기」가 도는 동안만 녹음버튼과 같은 숨(1→1.03·900ms)을 쉰다.
+ * 새 어휘가 아니라 위 맥박의 재사용이다 — 재생 중임이 버튼 글자 하나에만 살지 않게. */
+function 맺음띠({ 숨 }) {
+  const 맥박 = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (숨) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(맥박, { toValue: 1.03, duration: 900, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(맥박, { toValue: 1, duration: 900, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+        ])
+      );
+      loop.start();
+      return () => loop.stop();
+    }
+    맥박.setValue(1); // 재생이 끝나면 숨을 멈춘다 — 안 되돌리면 마지막 프레임에 걸려 있다
+    return undefined;
+  }, [숨, 맥박]);
+
+  return (
+    <Animated.View style={{ transform: [{ scale: 맥박 }] }}>
+      <녹음띠 상태="맺음" 폭={248} />
+    </Animated.View>
+  );
+}
+
 function 중앙({ children }) {
   return <View style={s.중앙}>{children}</View>;
 }
 
 /* ── 완료 ── */
-function 완료카드({ 로그, date, 견줌 = null, 견줌다시읽기 = null }) {
+function 완료카드({ 로그, date, 견줌 = null, 견줌다시읽기 = null, 다시보내기 = null }) {
   const 오늘것 = 로그.filter((e) => e.date === date);
   const 시도 = 오늘것.length;
   const 다시한번 = 오늘것.filter((e) => e.status === 'retried').length;
@@ -1484,6 +1573,7 @@ function 완료카드({ 로그, date, 견줌 = null, 견줌다시읽기 = null }
    *   「도착했어요」라고 말하면, 몽골 회선에서 전송이 상시 실패해도 학생도 우리도 그걸 모른다. */
   const 배달 = 배달상태(로그, date);
   const 다닿음 = 배달.보내는중 === 0 && 배달.못보냄 === 0;
+  const [다시보내는중, set다시보내는중] = useState(false);
 
   /* 🔑 「어제의 나」를 **여기서** 한 번 다시 읽는다(유호님 확정 2026-08-09) — 값이 참이 되는
    *   순간이 제출 직후다. 앱을 켤 때 읽은 값은 오늘 낸 것을 아직 모르는 낡은 값이다.
@@ -1511,6 +1601,17 @@ function 완료카드({ 로그, date, 견줌 = null, 견줌다시읽기 = null }
       {배달.못보냄 > 0 && (
         <Text style={s.오류}>목소리 {배달.못보냄}개를 보내지 못했어요. 선생님께 알려 주세요.</Text>
       )}
+      {/* 학생이 그 자리에서 다시 밀어 볼 문 — 배달 수 재계산은 밀린것보내기→보내기→로그갱신이 이미 진다. */}
+      {배달.못보냄 > 0 && 다시보내기 ? (
+        <Pressable
+          testID="완료-다시보내기"
+          disabled={다시보내는중}
+          onPress={async () => { set다시보내는중(true); try { await 다시보내기(); } finally { set다시보내는중(false); } }}
+          style={({ pressed }) => [s.보조버튼, pressed && s.눌림]}
+        >
+          <Text style={s.보조버튼글}>{다시보내는중 ? '보내는 중…' : '다시 보내 볼래요'}</Text>
+        </Pressable>
+      ) : null}
       {/* 🔑 어제를 넘은 그 순간에만 말한다 — 🚫 줄었을 때·같을 때는 아무 말도 하지 않는다
           (`lib/견줌.js` · 평가가 아니라 동기다). 오늘 수를 다시 적지 않고 **차이만** 말하는 것은
           위의 「오늘 N번」이 기기 로그이고 이 값은 서버 것이라, 두 수를 나란히 두면 어긋난 날
@@ -1552,6 +1653,8 @@ const s = StyleSheet.create({
   /* 3번째 글자 층(Stone) — 상태 메모는 본문도 오류도 아니다. 바닥이 Ink Deep 이라 허용 안이다.
      🔴 코랄로 칠하지 않는다: 이 화면의 신호 1점은 녹음 버튼이다(테마 `신호자리`). */
   메모: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조, lineHeight: 18 },
+  /* 기계 원인(raw 오류문)의 자리 — 막힘카드 「모르는 코드 메모」 무늬 그대로(모노·라벨 트래킹). */
+  사유원인: { fontFamily: 폰트.모노, fontSize: 11, letterSpacing: 모노트래킹.라벨, color: 색.잉크_보조 },
 
   카드: { backgroundColor: 색.바탕띄움, borderRadius: 20, padding: 22, gap: 16 },
   카드라벨: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_태그 },
@@ -1605,8 +1708,9 @@ const s = StyleSheet.create({
     paddingVertical: 15,
     alignItems: 'center',
   },
-  주버튼_대기: { backgroundColor: 'rgba(246,241,232,0.85)' },
   주버튼글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.바탕 },
+  /* 「듣지 않고 넘어가기」 — 버튼이 아니라 글자층이다(듣기가 본동작·건너뛰기는 낮은 문). */
+  건너뛰기글: { fontFamily: 폰트.본문, fontSize: 14, color: 색.잉크_보조, textAlign: 'center' },
   보조버튼: {
     borderWidth: 1,
     borderColor: 색.잉크_희미,

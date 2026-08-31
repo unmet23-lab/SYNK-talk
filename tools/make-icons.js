@@ -34,9 +34,8 @@ const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, 'assets');
 const FONT = path.join(OUT, 'fonts', 'DMMono-Medium.ttf');
 
-const NAVY2 = '#080605'; // 바탕 — Ink Deep(「양모 밤」)
-const CREAM = '#FBF7F0'; // 잉크 — Paper
-const CORAL = '#F96859'; // 신호 1점 — Coral(양모 밤 값)
+const { 킷색 } = require('./테마색.js');
+const { 바탕: NAVY2, 잉크: CREAM, 신호: CORAL } = 킷색();
 
 const font = opentype.parse(fs.readFileSync(FONT).buffer);
 

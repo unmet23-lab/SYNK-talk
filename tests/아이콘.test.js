@@ -20,10 +20,8 @@ const ROOT = path.resolve(__dirname, '..');
 const A = (f) => path.join(ROOT, 'assets', f);
 
 // 브랜드 정본 (SYNK-appsscript docs/디자인_토큰.json 「시맨틱 · 다크」축 — 「양모 밤」 · 유호 확정 2026-08-20 · 조항 ⓚ)
-const NAVY2 = '#080605'; // Ink Deep(바탕)
-const CREAM = '#FBF7F0'; // Paper(잉크)
-const CORAL = '#F96859'; // Coral(신호)
-const CORAL_SOFT = '#FBB7A3'; // Coral Soft — 알록판 색실의 코랄 계열(펠트 램프 색)
+const { 킷색, 코랄소프트: CORAL_SOFT } = require('../tools/테마색.js');
+const { 바탕: NAVY2, 잉크: CREAM, 신호: CORAL } = 킷색();
 
 let sharp;
 try {

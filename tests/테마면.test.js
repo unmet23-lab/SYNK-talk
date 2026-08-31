@@ -28,10 +28,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-
-const 테마경로 = path.join(__dirname, '..', 'src', '테마.js');
+const { 킷색 } = require('../tools/테마색.js');
 
 /* ── 색 계산 (WCAG 2.x 상대휘도 · CIE L*) ── */
 const srgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
@@ -58,12 +55,9 @@ function 색풀기(v) {
   return { hex: String(v).toUpperCase(), 알파: 1 };
 }
 
-/** 🔴 못 읽으면 «던진다» — 그 칸만 빼고 초록을 내지 않는다(머리말 「대가」). */
+/** 🔴 못 읽으면 «던진다» — 그 칸만 빼고 초록을 내지 않는다(머리말 「대가」). 파서 = tools/테마색.js 한 벌. */
 function 테마읽기() {
-  const 블록 = fs.readFileSync(테마경로, 'utf8').match(/export const 색 = \{([\s\S]*?)\n\};/);
-  assert.ok(블록, `테마.js 에서 \`export const 색\` 블록을 못 찾았다 — ${테마경로}`);
-  const 값 = {};
-  for (const m of 블록[1].matchAll(/^\s*([가-힣_]+):\s*'([^']+)'/gm)) 값[m[1]] = m[2];
+  const 값 = 킷색();
   const 필수 = ['바탕', '바탕띄움', '잉크', '신호', '잉크_태그', '잉크_서브', '잉크_메타', '잉크_보조'];
   const 빠짐 = 필수.filter((k) => !값[k]);
   assert.equal(빠짐.length, 0, `테마.js 에서 못 읽은 칸: ${빠짐.join(', ')}`);

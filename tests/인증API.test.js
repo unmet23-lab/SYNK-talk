@@ -194,7 +194,9 @@ test('🔴 원장 초기화 — **원장 토큰**을 싣는다 (anon 으로 부�
   const r = await API.초기화요청({ 학생번호: 'SYNK-042', 토큰: 'DIRECTOR' });
   assert.equal(부른것[0].headers.Authorization, 'Bearer DIRECTOR');
   assert.equal(부른것[0].headers.apikey, ANON, 'apikey 는 anon 이어야 게이트웨이를 지난다');
-  assert.deepEqual(r, { 임시번호: '482913', 유효분: 30, 학생번호: 'SYNK-042', 잠금해제: false });
+  assert.deepEqual(r, {
+    임시번호: '482913', 유효분: 30, 학생번호: 'SYNK-042', 잠금해제: false, 이름: null, 미리보기: false,
+  });
 });
 
 test('🔴 초기화 — 아직 계정이 없는 학생은 **잠금 해제**로 돌아온다 (임시번호 자리가 비어야 한다 · ②-19)', async () => {

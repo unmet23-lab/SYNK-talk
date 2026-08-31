@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { 색, 폰트, 모노트래킹 } from './테마';
 import { 짚음제출사건, 무산출사건, 이탈사건 } from '../lib/보고서교정제출.js';
 import { 교정문만들기 } from '../lib/보고서교정.js';
 import { 다음시도번호, 턴항목 } from '../lib/게임로그.js';
 import { 흐름id, 깨진기록안내 } from '../lib/제출로그.js';
 import { 몽골날짜 } from '../lib/오늘과제.js';
+import { use줄임 } from '../lib/모션.js';
 /* 게임 로그의 읽기·쓰기·전송은 **직렬 통로 하나**로만 간다(B3 · `src/게임큐.js`) — 화면이
  * 저장을 직접 잡으면 동시 쓰기가 파일을 덮어 남의 사건을 지운다(오류 없이 「성공」의 모양). */
 import { 게임큐읽기, 게임사건담기, 게임큐밀기, 게임이탈수거 } from './게임큐.js';
@@ -193,6 +194,8 @@ export default function 보고서교정화면({
   };
 
   const 어절짚기 = (option_id) => {
+    const 칸 = 이번 && Array.isArray(이번.보기) ? 이번.보기.find((o) => o.option_id === option_id) : null;
+    입력참조.current = 칸 ? 칸.label : '';
     if (짚은것 === null && 문장뜬때.current !== null) {
       /* 첫 탭까지의 지연만 값이다 — 다시 고르는 탭에서 덮으면 「빨리 알아챘다」가 사라진다. */
       지연참조.current = 경과시계() - 문장뜬때.current;
@@ -297,19 +300,14 @@ export default function 보고서교정화면({
             {/* 🔴 `보기` 순서 그대로 그린다 — 행에 적힌 자리와 학생이 본 자리가 같아야 한다
                 (`options_shown` 이 곧 이 목록이다 · §6-8 규칙 4). */}
             <View style={s.문장줄}>
-              {이번.보기.map((o) => {
-                const 짚힘 = o.option_id === 짚은것;
-                return (
-                  <Pressable
-                    key={o.option_id}
-                    onPress={() => 어절짚기(o.option_id)}
-                    accessibilityRole="button"
-                    style={({ pressed }) => [s.어절, 짚힘 && s.어절_짚힘, pressed && s.눌림]}
-                  >
-                    <Text style={[s.어절글, 짚힘 && s.어절글_짚힘]}>{o.label}</Text>
-                  </Pressable>
-                );
-              })}
+              {이번.보기.map((o) => (
+                <어절단추
+                  key={o.option_id}
+                  짚힘={o.option_id === 짚은것}
+                  누르기={() => 어절짚기(o.option_id)}
+                  글={o.label}
+                />
+              ))}
             </View>
 
             {단계 === '짚기' && (
@@ -327,6 +325,7 @@ export default function 보고서교정화면({
             <View style={s.카드}>
               <Text style={s.카드라벨}>짚은 자리만 고쳐 써요</Text>
               <TextInput
+                key={짚은것}
                 style={s.입력}
                 defaultValue={짚은어절.label}
                 onChangeText={(t) => { 입력참조.current = t; 상태참조.current = { ...상태참조.current, 글: t }; }}
@@ -354,7 +353,7 @@ export default function 보고서교정화면({
               >
                 <Text style={s.제출글}>제출</Text>
               </Pressable>
-              <Pressable onPress={() => { set짚은것(null); set단계('짚기'); set확신도(null); }} accessibilityRole="button">
+              <Pressable onPress={() => { 입력참조.current = ''; 상태참조.current = { ...상태참조.current, 단계: '짚기', 글: '' }; set짚은것(null); set단계('짚기'); set확신도(null); }} accessibilityRole="button">
                 <Text style={s.다시고르기}>다른 데를 짚을래요</Text>
               </Pressable>
             </View>
@@ -383,6 +382,32 @@ export default function 보고서교정화면({
         </>
       )}
     </ScrollView>
+  );
+}
+
+/* 어절 단추 — 짚는 순간 «뽁» 하는 쫀득(마스코트.js 쫀득 계보 그대로 · transform 뿐).
+ * 색·면·신호 1점(코랄 = 짚은 어절)은 기존 스타일이 그대로 진다 — 여기서 안 만진다. */
+function 어절단추({ 짚힘, 누르기, 글 }) {
+  const 쫀득 = useRef(new Animated.Value(0)).current;
+  const 줄임 = use줄임();
+  const 누름 = () => {
+    누르기();
+    if (줄임) return;
+    Animated.sequence([
+      Animated.timing(쫀득, { toValue: 1, duration: 90, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.spring(쫀득, { toValue: 0, friction: 3.6, tension: 160, useNativeDriver: true }),
+    ]).start();
+  };
+  return (
+    <Animated.View style={{ transform: [{ scale: 쫀득.interpolate({ inputRange: [0, 1], outputRange: [1, 0.97] }) }] }}>
+      <Pressable
+        onPress={누름}
+        accessibilityRole="button"
+        style={({ pressed }) => [s.어절, 짚힘 && s.어절_짚힘, pressed && s.눌림]}
+      >
+        <Text style={[s.어절글, 짚힘 && s.어절글_짚힘]}>{글}</Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -443,7 +468,7 @@ const s = StyleSheet.create({
   다시고르기: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_보조, textAlign: 'center' },
   /* Ⅲ⑦ 확신도 토글 — 신호색 0(코랄은 녹음 버튼 하나 — 이 화면 규율 그대로) · 켬은 테두리·글자만. */
   확신줄: { flexDirection: 'row', gap: 8 },
-  확신토글: { flex: 1, borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12, paddingVertical: 8, alignItems: 'center' },
+  확신토글: { flex: 1, borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   확신토글_켬: { borderColor: 색.잉크, backgroundColor: 색.바탕띄움 },
   확신글: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_보조 },
   확신글_켬: { color: 색.잉크 },

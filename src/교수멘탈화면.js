@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { 색, 폰트, 모노트래킹 } from './테마';
 import {
   사과전략, 오늘추천, 보기세우기, 전략선택사건, 메일제출사건, 이탈사건, 이탈닻,
 } from '../lib/게임제출.js';
 import { 판정, 같은판정 } from '../lib/멘탈게이지.js';
+import { use줄임 } from '../lib/모션.js';
 import { 계측시작, 타건, 계측payload } from '../lib/작성과정.js';
 /* 잰 것을 **그 자리에서** 학생에게 돌려준다(철학 Ⅱ-8 셋째 실물). 판정·문구는 전부 저 조립기가
  * 지고 여기는 그릴 자리만 준다 — 화면이 문구를 손으로 적으면 「비교하지 않는다」가 화면마다
@@ -313,6 +314,9 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
       {단계 === '쓰기' && (
         <View style={s.카드}>
           <Text style={s.카드라벨}>받는 사람 · 교수님</Text>
+          {/* 상황문 상주 — 쓰기 중에도 「무슨 상황이었더라」로 안 돌아가게(전략 단계의 헤드층과
+              갈린 캡션 층이라 위계가 안 겹친다). */}
+          {문항.질문 ? <Text style={s.메모}>{문항.질문}</Text> : null}
           {/* «연결» — 방금 고른 방법이 쓰기 화면에도 산다(고른 카드가 사라지면 연결이 끊긴다). */}
           {고른전략라벨 && <Text style={s.메모}>내가 고른 방법 · {고른전략라벨}</Text>}
           <Text style={s.메모}>{문항.지시문}</Text>
@@ -335,7 +339,7 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
                 const 찼다 = !!(게이지 && 게이지.칸별[이름]);
                 return (
                   <View key={이름} style={s.게이지칸}>
-                    <View style={[s.게이지면, 찼다 && s.게이지면_참]} />
+                    <게이지칸면 찼다={찼다} />
                     <Text style={[s.게이지이름, 찼다 && s.게이지이름_참]}>{이름}</Text>
                   </View>
                 );
@@ -420,6 +424,20 @@ function 머리() {
   );
 }
 
+/* 게이지 칸의 면 — 채울 때도 빠질 때도 같은 200ms 로 스며든다(채점 아님 · 안내 설계 유지).
+ * 덮개는 opacity 하나만 만진다 — 바닥(잉크_희미)은 불변이다. 줄임이면 즉시 최종값. */
+function 게이지칸면({ 찼다 }) {
+  const 줄임 = use줄임();
+  const 덮개 = useRef(new Animated.Value(찼다 ? 1 : 0)).current;
+  useEffect(() => {
+    if (줄임) { 덮개.setValue(찼다 ? 1 : 0); return; }
+    Animated.timing(덮개, {
+      toValue: 찼다 ? 1 : 0, duration: 200, easing: Easing.out(Easing.quad), useNativeDriver: true,
+    }).start();
+  }, [찼다, 줄임, 덮개]);
+  return <View style={s.게이지면}><Animated.View style={[s.게이지면_덮개, { opacity: 덮개 }]} /></View>;
+}
+
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: 색.바탕 },
   /* NPC 한 자리 — 고정이다(옮기면 «움직임»이 되어 검사 ① 의 장치가 하나 더 생긴다). */
@@ -455,14 +473,15 @@ const s = StyleSheet.create({
   게이지줄: { flexDirection: 'row', gap: 8 },
   게이지칸: { flex: 1, alignItems: 'center', gap: 5 },
   게이지면: { alignSelf: 'stretch', height: 8, borderRadius: 4, backgroundColor: 색.잉크_희미 },
-  게이지면_참: { backgroundColor: 색.잉크 },
+  게이지면_덮개: { ...StyleSheet.absoluteFillObject, borderRadius: 4, backgroundColor: 색.잉크 },
   게이지이름: { fontFamily: 폰트.캡션, fontSize: 11, color: 색.잉크_메타 },
   게이지이름_참: { fontFamily: 폰트.강조, color: 색.잉크 },
   게이지힌트: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조, lineHeight: 18, marginTop: 8 },
 
   /* 신호 1점 — 코랄 면 위 글자는 Ink Deep(색.바탕)만 쓴다(테마 규칙 그대로). */
   보내기버튼: { backgroundColor: 색.신호, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
-  보내기_대기: { opacity: 0.35 },
+  /* 잠기면 색을 빼고 밝기로 낮춘다 — 검수 확정·강사 저장 버튼과 같은 무늬. */
+  보내기_대기: { backgroundColor: 색.잉크_희미 },
   보내기글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.바탕 },
   눌림: { opacity: 0.75 },
 

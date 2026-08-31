@@ -53,7 +53,7 @@
  *   가장 자주 눌러야 할 것은 폐기가 아니라 확정이다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { 색, 폰트, 모노트래킹, 몽골어 } from './테마';
 import {
@@ -62,6 +62,7 @@ import {
 } from './검수API.js';
 import { 청취문턱, 세그먼트펴기 } from '../lib/검수확정.js';
 import { 새계측, 재기, 들은ms } from '../lib/청취계측.js';
+import { use등장 } from '../lib/모션.js';
 
 /** 기준 3줄 — 원어민의 언어 감각은 있어도 **이 시스템의 라벨 규격**은 없다(발주 §3 UX ①). */
 const 기준3줄 = [
@@ -187,6 +188,16 @@ export function 조묶기(목록) {
     .map(([조, 수]) => ({ 조, 수 }));
 }
 
+/** 서명이 아직 사나 — 만료 30초 전이면 죽은 것으로 본다(기기 시계 여유). 만료 null은 산 것(재검수 갈래·API가 expires_at을 못 받은 날) */
+const 서명살았나 = (s) => Boolean(s && (!s.만료 || Date.parse(s.만료) - Date.now() > 30000));
+
+/** 직전 확정을 다시 열 수 있는 남은 분 — 못 읽는 만료는 null(「몇 분」을 지어내지 않는다). */
+export function 재열기남은분(만료, 지금ms) {
+  const t = Date.parse(만료);
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.ceil((t - 지금ms) / 60000));
+}
+
 export default function 검수화면({ 토큰, 돌아가기 }) {
   const [목록, set목록] = useState([]);
   const [다음커서, set다음커서] = useState(null);
@@ -221,9 +232,11 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
   /* ③ 직전 확정 한 건 — `Z` 가 쓸 재료. 서명 URL 을 **같이 쥔다**(확정분은 §4 가 안 준다). */
   const [직전, set직전] = useState(null);
   const [재검수, set재검수] = useState(null); // { 항목, correction_id, url } · Z 로 연 상태
+  const [지금분, set지금분] = useState(Date.now()); // 재열기 창의 분침 — 직전 카드가 있을 때만 돈다
 
   /* 서명은 제출물마다 하나. Map 을 ref 로 두는 것은 프리로드가 리렌더를 안 부르게 하려는 것이다. */
   const 서명맵 = useRef(new Map()).current;
+  const 말림참조 = useRef(null);
   const [서명, set서명] = useState(null);
 
   /* §4-2 — **이 항목을 열었다고 서버에 알렸나.** 게이트 ②의 증거는 서명이 아니라 이것이다.
@@ -352,7 +365,7 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
     (async () => {
       try {
         const 이미 = 서명맵.get(sid);
-        const 받은 = 이미 || await 오디오서명받기(토큰, sid);
+        const 받은 = 서명살았나(이미) ? 이미 : await 오디오서명받기(토큰, sid);
         서명맵.set(sid, 받은);
         if (살아있음) set서명(받은);
       } catch (e) {
@@ -406,11 +419,24 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
     if (!게이트통과 || 재검수) return;
     /* 조 필터가 켜져 있으면 「다음」도 그 조에서 온다 — 교사가 실제로 다음에 열 항목이다. */
     const 다음 = 보이는목록[1];
-    if (!다음 || 서명맵.has(다음.submission_id)) return;
+    if (!다음 || 서명살았나(서명맵.get(다음.submission_id))) return;
     오디오서명받기(토큰, 다음.submission_id)
       .then((받은) => 서명맵.set(다음.submission_id, 받은))
       .catch(() => { /* 프리로드 실패는 조용하다 — 열 때 다시 부른다 */ });
   }, [게이트통과, 재검수, 보이는목록, 토큰, 서명맵]);
+
+  /* ③ 재열기 창의 분침 — 직전 카드가 서 있는 동안만 30초마다 다시 잰다. */
+  useEffect(() => {
+    if (!직전) return undefined;
+    set지금분(Date.now());
+    const t = setInterval(() => set지금분(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, [직전]);
+
+  /* 다음 항목·반 전환·조 칩 전환은 화면 꼭대기에서 시작한다 — 앞 카드의 스크롤 위치를 안 물려받는다. */
+  useEffect(() => {
+    if (말림참조.current) 말림참조.current.scrollTo({ y: 0, animated: true });
+  }, [sid, 반 && 반.id, 조필터]);
 
   /* ── 조작 ───────────────────────────────────────────────────────── */
 
@@ -457,6 +483,7 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
         correction_id: 결과.correction_id,
         verdict: 결과.verdict,
         url: 서명 && 서명.url,
+        만료: (서명 && 서명.만료) || new Date(Date.now() + 10 * 60 * 1000).toISOString(),
         게이트: 결과.listen_gate,
         /* 🔑 **보낸 값을 그대로 쥔다** — `Z` 가 이 자리에서 이어야 하고, 항목 객체는 그것을
            모른다(서버만 안다). 다시 조회해 채우는 길은 없다: 확정분은 큐 밖이라 §3·§4 가
@@ -494,7 +521,7 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
 
   /* ③ `Z` — 직전 확정을 다시 연다. 큐에 되돌리지 않는다(그 항목은 이미 큐 밖이다). */
   const 재열기 = () => {
-    if (!직전 || !직전.url) return;
+    if (!직전 || !직전.url || 재열기남은분(직전.만료, Date.now()) === 0) return;
     set재검수({
       항목: 직전.항목,
       correction_id: 직전.correction_id,
@@ -512,8 +539,12 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
   const 확정가능 = !!항목 && !!항목.ai_correction_id && !!서명 && 열어봄 && 게이트통과 && !보내는중
     && 검증전사.trim() !== '' && 교정문.trim() !== '';
 
+  const 남은분 = 직전 ? 재열기남은분(직전.만료, 지금분) : null;
+  const 만료됨 = 남은분 === 0;
+
   return (
-    <ScrollView style={s.wrap} contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
+    <View style={s.wrap}>
+    <ScrollView ref={말림참조} style={s.말림} contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
       <Text style={s.label}>REVIEW</Text>
       <Text style={s.머리}>검수</Text>
 
@@ -624,7 +655,7 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
       )}
 
       {항목 && (
-        <View style={s.카드}>
+        <등장카드 key={String(sid)} style={s.카드}>
           {재검수 && <Text style={s.재검수띠}>재검수 — 직전 확정을 대신합니다</Text>}
 
           {/* 반 모드의 매칭 키 — 순회 검수는 눈앞의 학생과 초안을 잇는 일이라 이름·조·좌석이
@@ -649,22 +680,7 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
             <Text style={s.지시문}>{항목.task_instruction}</Text>
           ) : null}
 
-          {/* ② 구간 단위 청취 */}
-          <View style={s.가로}>
-            <Pressable
-              onPress={전체재생}
-              disabled={!서명}
-              style={({ pressed }) => [s.작은버튼, !서명 && s.잠김, pressed && s.눌림]}
-            >
-              <Text style={s.작은버튼글}>
-                {상태 && 상태.playing ? '멈춤' : (서명 ? '전체 재생' : '오디오 없음')}
-              </Text>
-            </Pressable>
-            <Text style={s.타이머}>
-              {초(현재ms)}s · 들은 {초(들은)}s / 필요 {초(문턱.ms)}s
-            </Text>
-          </View>
-
+          {/* ② 구간 단위 청취 — 전체 재생·청취 타이머는 스크롤 밖 재생띠에 산다 */}
           {세그먼트.length > 0 ? (
             <View style={s.칩줄}>
               {세그먼트.map((구간, i) => {
@@ -712,7 +728,8 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
                 hitSlop={6}
                 style={({ pressed }) => [s.작은버튼, pressed && s.눌림]}
               >
-                <Text style={s.작은버튼글}>되돌리기</Text>
+                {/* ⚠ 문구 초안 — 확정은 유호님 몫 */}
+                <Text style={s.작은버튼글}>AI 문장으로</Text>
               </Pressable>
             </View>
           ) : null}
@@ -764,7 +781,7 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
             <Pressable
               onPress={확정}
               disabled={!확정가능}
-              style={({ pressed }) => [s.확정, !확정가능 && s.잠김, pressed && s.눌림]}
+              style={({ pressed }) => [s.확정, !확정가능 && s.확정_잠김, pressed && s.눌림]}
             >
               <Text style={s.확정글}>{보내는중 ? '보내는 중…' : '확정'}</Text>
             </Pressable>
@@ -776,6 +793,8 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
               <Text style={s.작은버튼글}>폐기</Text>
             </Pressable>
           </View>
+
+          {오류 ? <Text style={s.오류}>{오류}</Text> : null}
 
           {!게이트통과 && (
             <Text style={s.메모}>
@@ -814,7 +833,7 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
               <Text style={s.메모}>파일은 남아요 — 노이즈도 학습 재료예요.</Text>
             </View>
           )}
-        </View>
+        </등장카드>
       )}
 
       {/* ③ 직전 확정 재열기 */}
@@ -828,18 +847,22 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
           ) : null}
           <Pressable
             onPress={재열기}
-            disabled={!직전.url || 보내는중}
-            style={({ pressed }) => [s.작은버튼, !직전.url && s.잠김, pressed && s.눌림]}
+            disabled={!직전.url || 만료됨 || 보내는중}
+            style={({ pressed }) => [s.작은버튼, (!직전.url || 만료됨) && s.잠김, pressed && s.눌림]}
           >
             <Text style={s.작은버튼글}>다시 열기 (Z)</Text>
           </Pressable>
           <Text style={s.메모}>
-            오디오 링크가 살아 있는 10분 안에만 다시 열 수 있어요.
+            {만료됨
+              ? '링크가 만료돼 다시 열 수 없어요.'
+              : (남은분 != null
+                ? `${남은분}분 안에 다시 열 수 있어요.`
+                : '오디오 링크가 살아 있는 10분 안에만 다시 열 수 있어요.')}
           </Text>
         </View>
       )}
 
-      {오류 ? <Text style={s.오류}>{오류}</Text> : null}
+      {!항목 && 오류 ? <Text style={s.오류}>{오류}</Text> : null}
 
       {더받기보임({ 다음커서, 재검수있음: Boolean(재검수), 불러오는중 }) ? (
         <Pressable
@@ -854,7 +877,31 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
         <Text style={s.backText}>← 돌아가기</Text>
       </Pressable>
     </ScrollView>
+    {/* 재생띠 — 스크롤 밖 고정(강사화면 마스코트자리 무늬). 긴 카드를 내려도 게이트 진행이 보인다. */}
+    {항목 ? (
+      <View style={s.재생띠}>
+        <Pressable
+          onPress={전체재생}
+          disabled={!서명}
+          style={({ pressed }) => [s.작은버튼, !서명 && s.잠김, pressed && s.눌림]}
+        >
+          <Text style={s.작은버튼글}>
+            {상태 && 상태.playing ? '멈춤' : (서명 ? '전체 재생' : '오디오 없음')}
+          </Text>
+        </Pressable>
+        <Text style={s.타이머}>
+          {초(현재ms)}s · 들은 {초(들은)}s / 필요 {초(문턱.ms)}s
+        </Text>
+      </View>
+    ) : null}
+    </View>
   );
+}
+
+/** 항목 카드의 등장 한 박자 — key 재마운트와 맞물려 항목마다 새로 선다(`lib/모션.js`). */
+function 등장카드({ style, children }) {
+  const 등장 = use등장();
+  return <Animated.View style={[style, 등장]}>{children}</Animated.View>;
 }
 
 /** 오류를 검수자 말로. 코드가 없으면 메시지를 그대로 낸다(지어내지 않는다). */
@@ -874,6 +921,14 @@ const 입력바탕 = {
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: 색.바탕 },
+  말림: { flex: 1 },
+  /* 머리글 위 빈 띠(paddingTop 76) 안 — 첫 화면과 안 겹치고, 스크롤해도 제자리다. */
+  재생띠: {
+    position: 'absolute', top: 10, left: 20, right: 20,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: 색.바탕띄움, borderRadius: 14,
+    paddingHorizontal: 14, paddingVertical: 10,
+  },
   inner: { padding: 20, paddingTop: 76, paddingBottom: 48, gap: 12 },
 
   label: { fontFamily: 폰트.모노, fontSize: 10, letterSpacing: 모노트래킹.라벨, color: 색.잉크_메타 },
@@ -933,12 +988,16 @@ const s = StyleSheet.create({
   },
   작은버튼글: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_서브 },
   잠김: { opacity: 0.35 },
+  /* 잠긴 확정은 색을 빼고 밝기로 낮춘다(강사화면 저장 버튼과 같은 실물). 테두리 작은버튼의
+     잠김(opacity)은 그대로다 — 면을 깔면 투명 바탕 버튼이 채워진 버튼으로 변한다. */
+  확정_잠김: { backgroundColor: 색.잉크_희미 },
   눌림: { opacity: 0.82 },
 
   폐기판: { gap: 8, borderTopWidth: 1, borderTopColor: 색.잉크_희미, paddingTop: 12 },
 
   메모: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_보조 },
-  오류: { fontFamily: 폰트.캡션, fontSize: 14, lineHeight: 22, color: 색.잉크_서브 },
+  /* 코랄 금지(이 화면 신호 1점 = 확정 버튼) — 자리와 밀도로만 세운다. */
+  오류: { fontFamily: 폰트.강조, fontSize: 14, lineHeight: 22, color: 색.잉크 },
 
   back: { paddingTop: 8 },
   /* 08-31 감사 D6-7 — 한글 문장에 모노 폰트(한글 글리프 0) 지정이 걸려 있었다. 나침반 무늬로 통일. */

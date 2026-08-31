@@ -199,7 +199,7 @@ async function 초기화(req: Request, 본문: Record<string, unknown>) {
     }, ver);
   }
 
-  type 대상 = { learner_id: string; auth_user_id: string | null; student_code: string; staff_id: string };
+  type 대상 = { learner_id: string; auth_user_id: string | null; student_code: string; display_name: string | null; staff_id: string };
 
   /* ①원장인가 ②그런 학생이 있나 — 여기서는 **읽기만 한다.** 쓰기는 GoTrue 를 갈아끼운 뒤다
    * (아래 🔴 순서). 권한 판정이 트랜잭션 안에 있어야 하는 이유는 그대로다 — `set_config` 의
@@ -219,7 +219,7 @@ async function 초기화(req: Request, 본문: Record<string, unknown>) {
      *   영원히 등록하지 못한다**(되돌리는 길이 DB 직접 수정뿐이었다). 학생번호는 순번이라
      *   아무나 그 상태를 학생 수만큼 만들 수 있다 — 잠금은 남기고 **출구를 연다**. */
     const [학생] = await tx`
-      select learner_id, auth_user_id, student_code
+      select learner_id, auth_user_id, student_code, display_name
         from engine.learners
        where upper(replace(student_code, '-', '')) = ${정규화(학생번호)}`;
     if (!학생) return null;
@@ -231,6 +231,21 @@ async function 초기화(req: Request, 본문: Record<string, unknown>) {
   //    학생번호의 실재 여부를 훑을 수 있다. 둘 다 403 이다.
   if (!대상) return 거부();
 
+  /* ── 미리보기(`preview: true` 가 **있을 때만**) — 확인 카드용 대상 조회다(08-31 감사 G1-8).
+   *   GoTrue·DB 쓰기 **앞**이라 아무것도 안 바꾼다(플래그 없는 구앱 요청은 현행 실행 그대로 —
+   *   배포 순서 결합 없음). 원장이 누구를 조회했는지는 감사표에 남긴다. */
+  if (본문.preview === true) {
+    await sql`
+      insert into engine.staff_access_log(staff_id, action, target_ids)
+      values (${대상.staff_id}, 'learner.reset_preview', ${[대상.learner_id]}::uuid[])`;
+    return 봉투(200, {
+      ok: true,
+      student_code: 대상.student_code,
+      display_name: 대상.display_name,
+      preview: true,
+    }, ver);
+  }
+
   /* ── 아직 계정이 없는 학생 = 첫 등록 잠금 해제. **임시번호를 내지 않는다** —
    *   줄 계정이 없어서다(비밀번호도 세션도 없으니 GoTrue 도 `revoked_before` 도 할 일이 없다).
    *   학생이 할 일은 첫 로그인을 다시 하는 것이고, 그 게이트(전화 뒤 4자리)는 그대로 서 있다. */
@@ -241,7 +256,7 @@ async function 초기화(req: Request, 본문: Record<string, unknown>) {
         insert into engine.staff_access_log(staff_id, action, target_ids)
         values (${대상.staff_id}, 'learner.signup_unlock', ${[대상.learner_id]}::uuid[])`;
     });
-    return 봉투(200, { ok: true, student_code: 대상.student_code, unlocked: true }, ver);
+    return 봉투(200, { ok: true, student_code: 대상.student_code, display_name: 대상.display_name, unlocked: true }, ver);
   }
 
   const 코드 = 임시번호();
@@ -277,6 +292,7 @@ async function 초기화(req: Request, 본문: Record<string, unknown>) {
   return 봉투(200, {
     ok: true,
     student_code: 대상.student_code,
+    display_name: 대상.display_name,
     temp_password: 코드,            // 🔴 화면이 1회 보여주고 끝. 저장·전달 금지(L0 §4-2-2 ⚠).
     expires_in_minutes: 만료분,
   }, ver);

@@ -485,7 +485,8 @@ export default function 서류관문화면({
                 : null;
             })()}
             {/* 열린 산출은 즉답이 없다 — 검수 큐 몫(§6-1). 즉답처럼 보이게 하지 않는다(G2 문구). */}
-            <Text style={s.본문글}>바꿔 쓴 문장은 선생님이 보고 알려줄게. 알려줄 말이 생기면 「답장」에서 볼 수 있어요.</Text>
+            {/* ⚠ 문구 초안 — 확정은 유호님 몫 */}
+            <Text style={s.본문글}>바꿔 쓴 문장은 선생님이 보고 알려 줄 거예요. 알려줄 말이 생기면 「답장」에서 볼 수 있어요.</Text>
           </결과카드>
         </>
       )}
@@ -572,7 +573,7 @@ const s = StyleSheet.create({
   모름글: { fontFamily: 폰트.강조, fontSize: 14, color: 색.잉크_태그 },
   /* Ⅲ⑦ 확신도 토글 — 신호색 0 · 켬은 테두리·글자만(보고서교정화면과 같은 무늬). */
   확신줄: { flexDirection: 'row', gap: 8 },
-  확신토글: { flex: 1, borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12, paddingVertical: 8, alignItems: 'center' },
+  확신토글: { flex: 1, borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   확신토글_켬: { borderColor: 색.잉크, backgroundColor: 색.바탕띄움 },
   확신글: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_보조 },
   확신글_켬: { color: 색.잉크 },

@@ -18,6 +18,7 @@
  */
 import { 부르기 } from './사건통로.js';
 import { 계약판 } from './계약판.js';
+import { 시한fetch, 조회상한 } from './시한fetch.js';
 
 const URL_ = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -81,14 +82,14 @@ export async function 배치미달받기(토큰) {
 
   let r;
   try {
-    r = await fetch(`${URL_}/functions/v1/deliver?${encodeURIComponent('점검')}`, {
+    r = await 시한fetch(`${URL_}/functions/v1/deliver?${encodeURIComponent('점검')}`, {
       method: 'POST',
       headers: {
         apikey: ANON,
         Authorization: `Bearer ${토큰}`,
         'X-Contract-Ver': 계약판,
       },
-    });
+    }, 조회상한);
   } catch {
     return null; // 회선 없음 — 미달과 구별할 재료가 없으니 아무 말도 하지 않는다
   }

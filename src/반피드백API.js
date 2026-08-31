@@ -27,6 +27,7 @@
  *     `NOTE_BY_OTHER` 로 막힌다(한 반에 강사 둘이 정상 · 설계 §1 ⓐ). 서버가 답한 것만 그린다.
  */
 import { 부르기 } from './사건통로.js';
+import { 인증오류 } from './인증API.js';
 
 /**
  * `GET /v1/teach/feedback/classes` — 내 반 카드 + 반마다 「기다리는 것 n」 + 이번 주 조용한 학생.
@@ -42,16 +43,26 @@ import { 부르기 } from './사건통로.js';
  */
 export async function 반목록(토큰) {
   const 본문 = await 부르기('teach/feedback/classes', 토큰);
+  if (!Array.isArray(본문.classes)) {
+    throw new 인증오류('CONTRACT_VIOLATION', '응답에 classes 칸이 없어요 — 서버와 앱의 판이 어긋났어요', false);
+  }
   return {
     주: { 시작: 본문.week?.starts_at ?? '', 끝: 본문.week?.ends_at ?? '' },
-    반들: (Array.isArray(본문.classes) ? 본문.classes : []).map((c) => ({
-      id: String(c.class_id),
-      열쇠: c.class_key ?? '',
-      이름: c.display_name ?? null,
-      학생수: Number(c.학생수) || 0,
-      기다림: Number(c.기다림) || 0,
-      모양: c.모양 ?? 'empty',
-    })),
+    반들: 본문.classes.map((c) => {
+      for (const 칸 of ['학생수', '기다림', '모양']) {
+        if (c[칸] === undefined) {
+          throw new 인증오류('CONTRACT_VIOLATION', `응답에 ${칸} 칸이 없어요 — 서버와 앱의 판이 어긋났어요`, false);
+        }
+      }
+      return {
+        id: String(c.class_id),
+        열쇠: c.class_key ?? '',
+        이름: c.display_name ?? null,
+        학생수: Number(c.학생수) || 0,
+        기다림: Number(c.기다림) || 0,
+        모양: c.모양 ?? 'empty',
+      };
+    }),
     조용한: (Array.isArray(본문.quiet) ? 본문.quiet : []).map((q) => ({
       반id: String(q.class_id),
       학생id: String(q.learner_id),

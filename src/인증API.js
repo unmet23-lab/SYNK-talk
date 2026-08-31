@@ -18,6 +18,7 @@ import { 이메일, 학생번호표기 } from '../lib/학생계정.js';
 /* 🔑 문장은 여기 안 박는다 — 정본은 `contents/문구_오류.js` 하나다(키 = l10n string_id).
  *   두 벌로 두면 몽골어가 붙는 날 한쪽만 번역되고, 안 된 쪽은 조용히 한국어로 남는다. */
 import { 말 } from '../contents/문구_오류.js';
+import { 시한fetch, 조회상한, 제출상한 } from './시한fetch.js';
 
 const URL_ = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -116,20 +117,31 @@ export async function 토큰되살리기(쓴토큰) {
 }
 
 async function 함수부르기(갈래, 본문, 토큰) {
-  let r;
-  try {
-    r = await fetch(`${URL_}/functions/v1/auth/${갈래}`, {
-      method: 'POST',
-      headers: {
-        apikey: ANON,
-        Authorization: `Bearer ${토큰 || ANON}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(본문),
-    });
-  } catch {
-    // 네트워크가 없다 — 서버 오류와 **다른 사건**이라 다르게 말해야 다시 시도할 수 있다.
-    throw new 인증오류('NETWORK', 말('err.network'), true);
+  const 한판 = async (실을토큰) => {
+    try {
+      return await 시한fetch(`${URL_}/functions/v1/auth/${갈래}`, {
+        method: 'POST',
+        headers: {
+          apikey: ANON,
+          Authorization: `Bearer ${실을토큰 || ANON}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(본문),
+      }, 제출상한);
+    } catch {
+      // 네트워크가 없다 — 서버 오류와 **다른 사건**이라 다르게 말해야 다시 시도할 수 있다.
+      throw new 인증오류('NETWORK', 말('err.network'), true);
+    }
+  };
+  /* auth/reset 이 유일하게 토큰을 싣는 함수부르기 경로 — 통로(사건통로.부르기)의 만료 갱신이
+   * 여기만 없었다(08-31 감사 G1-3). 현재토큰 경유는 부르기와 같은 신선화라 원장 화면의 낡은
+   * prop 토큰도 첫 발사에서 걸러진다. 토큰 없는 갈래(first-login·temp-login)는 ANON Bearer
+   * 그대로라 401 분기를 안 탄다. 🔑 재시도는 1회뿐이다(§7-6 무한 루프 없음). */
+  const 쓸토큰 = 토큰 ? 현재토큰(토큰) : null;
+  let r = await 한판(쓸토큰);
+  if (쓸토큰 && r.status === 401) {
+    const 새토큰 = await 토큰되살리기(쓸토큰);
+    if (새토큰) r = await 한판(새토큰);
   }
   const 몸 = await r.json().catch(() => ({}));
   if (!r.ok || 몸.ok === false) {
@@ -143,11 +155,11 @@ async function 함수부르기(갈래, 본문, 토큰) {
 export async function 로그인(학생번호, 비밀번호) {
   let r;
   try {
-    r = await fetch(`${URL_}/auth/v1/token?grant_type=password`, {
+    r = await 시한fetch(`${URL_}/auth/v1/token?grant_type=password`, {
       method: 'POST',
       headers: { apikey: ANON, 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 이메일(학생번호), password: 비밀번호 }),
-    });
+    }, 조회상한);
   } catch {
     throw new 인증오류('NETWORK', 말('err.network'), true);
   }
@@ -186,11 +198,11 @@ export async function 로그인(학생번호, 비밀번호) {
 export async function 갱신(refresh_token, 학생번호) {
   let r;
   try {
-    r = await fetch(`${URL_}/auth/v1/token?grant_type=refresh_token`, {
+    r = await 시한fetch(`${URL_}/auth/v1/token?grant_type=refresh_token`, {
       method: 'POST',
       headers: { apikey: ANON, 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token }),
-    });
+    }, 조회상한);
   } catch {
     throw new 인증오류('NETWORK', 말('err.network'), true);
   }
@@ -267,7 +279,7 @@ export async function 비밀번호변경({ 학생번호, 현재비밀번호, 새
   const 세션 = await 로그인(학생번호, 현재비밀번호);
   let r;
   try {
-    r = await fetch(`${URL_}/auth/v1/user`, {
+    r = await 시한fetch(`${URL_}/auth/v1/user`, {
       method: 'PUT',
       headers: {
         apikey: ANON,
@@ -275,7 +287,7 @@ export async function 비밀번호변경({ 학생번호, 현재비밀번호, 새
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ password: 새비밀번호 }),
-    });
+    }, 제출상한);
   } catch {
     throw new 인증오류('NETWORK', 말('err.network'), true);
   }
@@ -288,12 +300,19 @@ export async function 비밀번호변경({ 학생번호, 현재비밀번호, 새
  * 🔑 결과가 **두 갈래**다. 아직 앱 계정이 없는 학생이면 줄 임시번호가 없고(비밀번호가 없다),
  *   대신 **첫 등록 잠금이 풀려** 돌아온다(`잠금해제`). 한 갈래로 읽으면 번호 자리가 빈 채로 떠서
  *   원장이 「없는 번호」를 학생에게 불러 준다 — 화면이 두 결과를 갈라 읽어야 하는 이유다. */
-export async function 초기화요청({ 학생번호, 토큰 }) {
-  const 몸 = await 함수부르기('reset', { student_code: 학생번호 }, 토큰);
+export async function 초기화요청({ 학생번호, 토큰, 미리보기 }) {
+  /* 미리보기(preview) — 서버가 **아무것도 안 바꾸고** 대상 확인(학생번호·이름)만 돌려준다.
+   * 플래그가 없으면 서버는 현행 실행 그대로다(후방호환 · 08-31 감사 G1-8). */
+  const 몸 = await 함수부르기('reset', {
+    student_code: 학생번호,
+    ...(미리보기 === true ? { preview: true } : {}),
+  }, 토큰);
   return {
     임시번호: 몸.temp_password ?? null,
     유효분: 몸.expires_in_minutes ?? null,
     학생번호: 몸.student_code,
     잠금해제: 몸.unlocked === true,
+    이름: 몸.display_name ?? null,
+    미리보기: 몸.preview === true,
   };
 }

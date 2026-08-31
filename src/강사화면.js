@@ -34,12 +34,13 @@
  *     「저장됐다」가 돌아온다(`검수확정:262` 의 처방 그대로 — 거절해야 화면이 말할 수 있다).
  *   · `rubric_scores` 를 지어 넣기 — 축 어휘 정본이 0이다(`강사API` 머리말).
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { 색, 폰트, 모노트래킹, 몽골어 } from './테마';
 import { 큐받기, 판정하기 } from './강사API.js';
 import { 오류태그 } from './검수API.js';
 import { VERDICT, 텍스트내는판정, 골든판정요청 } from '../lib/검수확정.js';
+import { use등장 } from '../lib/모션.js';
 import 마스코트 from './마스코트.js';
 import { 강사순간고르기 } from '../lib/마스코트강사말.js';
 import { 마스코트기록읽기, 마스코트기록쓰기 } from './저장.js';
@@ -146,6 +147,7 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
   const [보내는중, set보내는중] = useState(false);
   const [끝낸수, set끝낸수] = useState(0);
   const [캐릭터말, set캐릭터말] = useState(null);
+  const 말림참조 = useRef(null);
 
   /* 마스코트 발화 시도 — 판정(어느 줄·상한)은 lib 이 전부 지고, 여기는 신호 조립과 표시뿐이다
      (말할순간 §1-1 「표 밖 발화 금지」의 기계 자리 — 이 화면에는 문구가 한 글자도 없다).
@@ -191,6 +193,11 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
     return () => { 살아있음 = false; };
   }, [토큰]);
 
+  /* 다음 항목은 화면 꼭대기에서 시작한다 — 앞 카드의 스크롤 위치를 안 물려받는다. */
+  useEffect(() => {
+    if (말림참조.current) 말림참조.current.scrollTo({ y: 0, animated: true });
+  }, [지금id]);
+
   const 항목 = useMemo(
     () => 목록.find((it) => String(it.correction_id) === String(지금id)) ?? null,
     [목록, 지금id],
@@ -234,7 +241,7 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
 
   return (
     <View style={s.wrap}>
-    <ScrollView style={s.말림} contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
+    <ScrollView ref={말림참조} style={s.말림} contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
       <Text style={s.label}>TEACH</Text>
       <Text style={s.머리}>이번 주 AI 교정 채점</Text>
 
@@ -293,7 +300,7 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
       )}
 
       {항목 && (
-        <View style={s.카드}>
+        <등장카드 key={String(지금id)} style={s.카드}>
           {/* 🔑 무엇을 보고 판정했는지가 라벨의 값이라, 전사가 «확정»인지 «기계»인지 먼저 말한다.
               기계 전사는 Whisper 가 오발음을 정타로 고쳐 들었을 수 있다(설계 §5). */}
           <Text style={s.메타}>
@@ -423,10 +430,12 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
           >
             <Text style={s.저장글}>{보내는중 ? '저장하는 중…' : '판정 저장'}</Text>
           </Pressable>
-        </View>
+
+          {오류 ? <Text style={s.오류글}>{오류}</Text> : null}
+        </등장카드>
       )}
 
-      {오류 ? <Text style={s.오류글}>{오류}</Text> : null}
+      {!항목 && 오류 ? <Text style={s.오류글}>{오류}</Text> : null}
 
       <Pressable onPress={돌아가기} style={({ pressed }) => [s.back, pressed && { opacity: 0.7 }]}>
         <Text style={s.backText}>← 돌아가기</Text>
@@ -437,6 +446,12 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
     <마스코트 잡담={false} 말건네기={캐릭터말} 자리={s.마스코트자리} />
     </View>
   );
+}
+
+/** 항목 카드의 등장 한 박자 — key 재마운트와 맞물려 항목마다 새로 선다(`lib/모션.js`). */
+function 등장카드({ style, children }) {
+  const 등장 = use등장();
+  return <Animated.View style={[style, 등장]}>{children}</Animated.View>;
 }
 
 /** 오류를 강사 말로. 코드가 없으면 메시지를 그대로 낸다(지어내지 않는다). */
@@ -505,7 +520,8 @@ const s = StyleSheet.create({
   해설입력: { ...입력바탕, ...몽골어 },
 
   막힘글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_메타 },
-  오류글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_서브 },
+  /* 코랄 금지(이 화면 신호 1점 = 저장 버튼) — 자리와 밀도로만 세운다. */
+  오류글: { fontFamily: 폰트.강조, fontSize: 14, lineHeight: 22, color: 색.잉크 },
 
   /* 이 화면의 신호 1점 = 저장 버튼(`테마.신호자리` 규칙). 잠기면 색을 빼고 밝기로 낮춘다. */
   저장: {

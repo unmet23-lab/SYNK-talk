@@ -75,13 +75,15 @@ test('별눈 우회 차단 — 화면 층(src/마스코트.js)에 별눈 컷이 
   assert.ok(!/별눈/.test(화면), '화면 코드에 별눈이 생겼다 — 생애급 게이트(lib/마스코트생명.별눈판정)를 지나지 않는 별눈은 우회다');
 });
 
-test('컷 지도 — 화면의 정적 require 가 표정 어휘와 1:1 이다', () => {
+test('컷 지도 — 화면의 정적 require 가 표정 어휘(전 캐릭터 평탄)와 1:1 이다', () => {
   const 화면 = 소스('src/마스코트.js');
-  for (const [표정, 컷] of Object.entries(표정컷)) {
-    assert.ok(
-      화면.includes(`require('../assets/마스코트/${컷}.webp')`),
-      `컷 지도에 ${표정}(${컷})가 없다 — 그 표정은 조용히 기본 컷으로 내려간다`,
-    );
+  for (const [캐릭터, 벌] of Object.entries(표정컷)) {
+    for (const [표정, 컷] of Object.entries(벌)) {
+      assert.ok(
+        화면.includes(`require('../assets/마스코트/${컷}.webp')`),
+        `컷 지도에 ${캐릭터}·${표정}(${컷})가 없다 — 그 표정은 조용히 기본 컷으로 내려간다`,
+      );
+    }
   }
 });
 

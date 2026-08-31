@@ -47,11 +47,15 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { 색, 폰트, 몽골어 } from './테마';
+import * as Speech from 'expo-speech';
+import { 색, 폰트, 몽골어, 몽골어폰트 } from './테마';
 import { 교정앉음, 열람사건, 응답사건, 교정사건보내기, 학생응답값 } from './교정API.js';
 import { 항목추가, 응답값, 전송기록, 보낼것 } from '../lib/교정로그.js';
 import { 무오류인가, 무오류표식 } from '../lib/꼬리.js';
 import { 교정로그읽기, 교정로그쓰기 } from './저장.js';
+/* 목소리 고르기는 말하기 화면의 것(캐시 한 벌)을 그대로 빌린다 — 같은 기기에서 화면마다
+   목소리가 갈리면 「어제 듣던 목소리」가 화면 따라 바뀐다(알바변명화면과 같은 무늬 · 순환 0). */
+import { 한국어음성 } from './말하기화면.js';
 import { 효과음 } from './소리.js';
 import { use등장 } from '../lib/모션.js';
 import 막힘카드 from './막힘카드.js';
@@ -100,6 +104,7 @@ export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = nu
   const [로그, set로그] = useState([]);
   const [오류, set오류] = useState(null);
   const [도는중, set도는중] = useState(true);
+  const [읽는중, set읽는중] = useState(false);
   // 마스코트에 넘기는 최신 사건 1건 — 값은 이름뿐이고 연출은 캐릭터 층이 정한다(반응 지도 §2)
   const [캐릭터사건, set캐릭터사건] = useState(null);
 
@@ -173,6 +178,26 @@ export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = nu
     return () => { 살아있음 = false; };
   }, [id]);
 
+  /* 교정문 듣기 — 내일 따라 말할 문장의 «소리»를 오늘 들려준다. 옵션은 말하기 화면의
+     문장듣기와 같은 한 벌(같은 목소리·같은 빠르기) — 갈라 적으면 화면마다 딴 소리가 된다. */
+  const 문장듣기 = async () => {
+    if (!교정 || !교정.corrected_text) return;
+    set읽는중(true);
+    Speech.stop();
+    const voice = await 한국어음성();
+    Speech.speak(교정.corrected_text, {
+      language: 'ko-KR',
+      rate: 0.92,
+      ...(voice ? { voice } : {}),
+      onDone: () => set읽는중(false),
+      onError: () => set읽는중(false),
+      onStopped: () => set읽는중(false),
+    });
+  };
+
+  // 화면을 떠나면 소리도 멈춘다 — 말하기 화면 녹음카드의 무늬 그대로
+  useEffect(() => () => Speech.stop(), []);
+
   const 답하기 = async (값) => {
     set도는중(true);
     // 「다시 말해 볼래요」를 고른 순간 = 재도전(반응 지도 §2) — 서버 왕복을 기다리지 않는다(3초 원칙)
@@ -216,7 +241,18 @@ export default function 답장화면({ 토큰, 교정, 막힘, 학생번호 = nu
           <Text style={s.고친이}>{고친이[교정.actor_kind] || '고쳐 줬어요'}</Text>
 
           {교정.corrected_text ? (
-            <Text style={s.문장} selectable>{교정.corrected_text}</Text>
+            <>
+              <Text style={s.문장} selectable>{교정.corrected_text}</Text>
+              {/* 듣기 — 글자 층뿐이다. 코랄 금지: 이 화면의 신호 1점은 오류 태그다(머리말). */}
+              <Pressable
+                testID="답장-문장듣기"
+                onPress={문장듣기}
+                hitSlop={8}
+                style={({ pressed }) => pressed && { opacity: 0.7 }}
+              >
+                <Text style={s.듣기글}>{읽는중 ? '읽는 중…' : '♪ 이 문장 들어보기'}</Text>
+              </Pressable>
+            </>
           ) : null}
 
           {/* 신호 1점 — 이 화면의 코랄은 여기뿐이다. 태그는 한글이라 모노를 쓰지 않는다
@@ -310,12 +346,14 @@ const s = StyleSheet.create({
   카드: { backgroundColor: 색.바탕띄움, borderRadius: 20, padding: 22, gap: 14 },
   고친이: { fontFamily: 폰트.캡션, fontSize: 14, lineHeight: 22, color: 색.잉크_메타 },
   문장: { fontFamily: 폰트.본문, fontSize: 20, lineHeight: 32, color: 색.잉크 },
+  듣기글: { fontFamily: 폰트.강조, fontSize: 13, lineHeight: 20, color: 색.잉크_서브 },
 
   태그줄: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   태그: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.신호 },
 
-  /* 🔴 `fontFamily` 가 없는 것은 실수가 아니다 — 키릴 자형이 킷에 없어서다(`테마.몽골어`). */
-  해설: { ...몽골어, color: 색.잉크_서브 },
+  /* 킷(한글) 폰트가 아니라 몽골어폰트를 지난다 — 해설은 병기가 아니라 학생이 실제로 이해하는
+     유일한 설명이라 본문급(Medium·16)이다(디자인_토큰 몽골어보정 1.04 · 감사 D6-10). */
+  해설: { fontFamily: 몽골어폰트.본문, fontSize: 16, lineHeight: 26, color: 색.잉크_서브 },
 
   /* 꼬리 — 교정 «내용»이 끝나고 학생 «자신»에 대한 말이 시작되는 자리라 가는 선 하나로 가른다.
      🚫 코랄을 안 쓴다(이 화면의 신호 1점은 태그다) · 🚫 면·배지를 안 만든다 — 성취를 상자에

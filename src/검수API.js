@@ -27,6 +27,7 @@
  *   · `event_id` 를 화면에 주기 — 판이 그 열을 연 것은 서버가 승격에 쓰려는 것이다.
  */
 import { 부르기 } from './사건통로.js';
+import { 인증오류 } from './인증API.js';
 
 /**
  * 폐기 사유 닫힌 어휘 — **정본은 DB CHECK**(`pipeline_jobs_discard_reason_c*` — 접미는
@@ -107,12 +108,20 @@ export async function 큐받기(토큰, 옵션 = {}) {
  */
 export async function 반목록받기(토큰) {
   const 본문 = await 부르기('review/classes', 토큰);
-  return (Array.isArray(본문.classes) ? 본문.classes : []).map((c) => ({
-    id: String(c.class_id),
-    열쇠: c.class_key ?? '',
-    이름: c.display_name ?? null,
-    대기: Number(c.waiting) || 0,
-  }));
+  if (!Array.isArray(본문.classes)) {
+    throw new 인증오류('CONTRACT_VIOLATION', '응답에 classes 칸이 없어요 — 서버와 앱의 판이 어긋났어요', false);
+  }
+  return 본문.classes.map((c) => {
+    if (c.waiting === undefined) {
+      throw new 인증오류('CONTRACT_VIOLATION', '응답에 waiting 칸이 없어요 — 서버와 앱의 판이 어긋났어요', false);
+    }
+    return {
+      id: String(c.class_id),
+      열쇠: c.class_key ?? '',
+      이름: c.display_name ?? null,
+      대기: Number(c.waiting) || 0,
+    };
+  });
 }
 
 /**
