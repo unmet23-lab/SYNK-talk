@@ -64,6 +64,7 @@ import { 청취문턱, 세그먼트펴기 } from '../lib/검수확정.js';
 import { 새계측, 재기, 들은ms } from '../lib/청취계측.js';
 import { use등장 } from '../lib/모션.js';
 import { 화면설정읽기, 화면설정쓰기 } from './저장.js';
+import 부품 from './부품.js';
 
 /** 기준 3줄 — 원어민의 언어 감각은 있어도 **이 시스템의 라벨 규격**은 없다(발주 §3 UX ①). */
 const 기준3줄 = [
@@ -844,6 +845,11 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
 
           {폐기열림 && (
             <View style={s.폐기판}>
+              {/* 🔑 이 판을 위와 가르는 금 — 08-25 Loom 굽기 · 09-01 반입. 여태 1px 실금이었고
+                  요소사전 1-b 가 러닝 스티치를 「실금의 실물판」으로 적어 둔 그 자리다.
+                  🔑 이 조각에 **유채가 0.000%** 다 — 이 화면의 신호 1점은 확정 버튼이라는
+                  R1 규율을 그대로 지킨다(코랄은 이 앱에서 「지금 녹음 중」이라는 낱말이다). */}
+              <부품 이름="구분선" 폭={260} 스타일={s.실금} />
               <Text style={s.칸이름}>폐기 사유</Text>
               <View style={s.칩줄}>
                 {폐기사유.map((사유) => (
@@ -1022,7 +1028,10 @@ const s = StyleSheet.create({
   확정_잠김: { backgroundColor: 색.잉크_희미 },
   눌림: { opacity: 눌림층.버튼 },
 
-  폐기판: { gap: 8, borderTopWidth: 1, borderTopColor: 색.잉크_희미, paddingTop: 12 },
+  /* borderTop 을 걷었다 — 금은 이제 `부품 구분선`(구운 펠트 실땀)이 낸다. 그림이 제 여백을
+     쥐고 있어 paddingTop 도 함께 걷는다(둘을 다 두면 사이가 두 배로 벌어진다). */
+  폐기판: { gap: 8 },
+  실금: { alignSelf: 'center' },
 
   메모: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 20, color: 색.잉크_보조 },
   /* 코랄 금지(이 화면 신호 1점 = 확정 버튼) — 자리와 밀도로만 세운다. */
