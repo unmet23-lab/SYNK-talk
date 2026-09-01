@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # 라디오24 BGM 사전 인코딩 — 음원 폴더 → 송출 규격 .ts 팩 (설계 §7-7 확정: 720p 단일 규격 · 송출은 -c copy)
 #
-# 사용:  bash 인코딩.sh <음원폴더> <출력폴더> [배경이미지.png]
+# 사용:  bash 인코딩.sh <음원폴더> <출력폴더> [배경이미지.png | 배경폴더]
+#   · 배경에 «폴더»를 주면 곡 이름에서 장르를 읽어 그 장르의 배경을 고른다:
+#       synk-radio-01-citypop-air.mp3 → <배경폴더>/citypop.png
+#     🔑 이것이 「장르마다 마스코트가 바뀐다」(유호 확정 09-02)의 실체다 — 화면이 곡에 «박혀» 있어
+#       송출은 -c copy 그대로다(재인코딩 0). 곡이 넘어가면 마스코트도 넘어간다.
 #   · 음원: YouTube 오디오 라이브러리 등 «라이브 허용 명시» 무료 소스만(§7-4 확정 · 월 0원).
 #   · 배경이미지를 안 주면 단색(브랜드 Navy) 정지 화면.
 #
@@ -34,10 +38,16 @@ for f in "$SRC"/*.{mp3,m4a,wav,flac,ogg}; do
   NAME=$(basename "${f%.*}" | tr ' ' '_')
   DEST="$OUT/${NAME}.ts"
   if [ -e "$DEST" ]; then echo "  · $NAME — 이미 있다(건너뜀)"; continue; fi
-  if [ -n "$BG" ]; then
-    VIN=(-loop 1 -i "$BG")
+  # 곡 이름 꼬리에서 장르를 읽는다 — `…-<장르>-air` 꼴(생산 도구가 그렇게 짓는다).
+  GENRE=$(printf %s "$NAME" | sed -n 's/.*-\([a-z][a-z]*\)-air$/\1/p')
+  if [ -d "$BG" ] && [ -n "$GENRE" ] && [ -e "$BG/$GENRE.png" ]; then
+    VIN=(-loop 1 -i "$BG/$GENRE.png")
+  elif [ -d "$BG" ] && [ -e "$BG/기본.png" ]; then
+    VIN=(-loop 1 -i "$BG/기본.png")        # 장르 배경이 없으면 기본으로 — 조용히 단색으로 안 떨어진다
+  elif [ -n "$BG" ] && [ -f "$BG" ]; then
+    VIN=(-loop 1 -i "$BG")                 # 파일 하나를 주면 팩 전체 공통(옛 통로)
   else
-    VIN=(-f lavfi -i "color=c=0x0B1F3A:s=1280x720:r=30")   # 브랜드 Navy 단색
+    VIN=(-f lavfi -i "color=c=0x1A1512:s=1280x720:r=30")   # 킷 Ink Deep 단색(구 Navy 는 킷 퇴역색)
   fi
   # 영상은 정지 화면이라 초저비트레이트로 충분 — 오디오가 본체다.
   #
