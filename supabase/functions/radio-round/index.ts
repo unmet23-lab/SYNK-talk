@@ -54,13 +54,18 @@ import 장부모듈 from './토픽퀴즈검수장부.mjs';
 import 편성모듈 from './라디오편성.mjs';
 import 계약판모듈 from './계약판.mjs';
 
-const { 제안조립, 노출해석, 마감초기본, 제안판 } = 라운드모듈 as {
+const { 제안조립, 노출해석, 마감초기본, 제안판, 제안id읽기, 송출가능문항, 정답줄 } = 라운드모듈 as {
   마감초기본: number;
   제안판: string;
+  /* v2 — `정답문안` 문이 쓰는 셋. 문안을 봇이 조립하지 않게 하는 자리다. */
+  제안id읽기: (값: string) => null | { 문항id: string; 발급ms: number; 부모round_id: number | null; 지문: string };
+  송출가능문항: (문항들: unknown[], 장부: unknown) => { 문항들: { 문항id: string }[]; 분모: unknown };
+  정답줄: (문항: unknown, 응답수: number | null) => string | null;
   제안조립: (재료: Record<string, unknown>) => {
     제안: null | {
       제안id: string; task_ref: string; 부모round_id: number | null;
-      화면: Record<string, unknown>; 스냅샷: Record<string, unknown>;
+      화면: Record<string, unknown>; 채팅: Record<string, unknown>;
+      스냅샷: Record<string, unknown>;
       가중: number; 후보수: number; 총가중: number; 생성판: string;
     };
     분모: Record<string, unknown>;
@@ -210,6 +215,42 @@ Deno.serve(async (req) => {
       추첨: { 가중: 제안.가중, 후보수: 제안.후보수, 총가중: 제안.총가중, 생성판: 제안.생성판 },
       분모, 되돌림분모: 요약.분모,
     });
+  }
+
+  /* ── ㉠-2 정답문안 — 응답수를 실은 정답줄. **DB 를 안 만진다**(읽기만) ─────────
+   * 왜 별도 문인가: 정답줄은 「함께 푼 사람 N」을 실어야 하는데 그 N 은 라운드가 끝나야 안다.
+   * 봇이 제안 때 받은 문안을 **문자열 치환으로 고치면** 문안이 바뀌는 날 조용히 안 먹는다 —
+   * 그래서 문안은 끝까지 이쪽이 만든다(이 파일의 「내용은 팩에서 다시 조립한다」와 같은 축).
+   * 200자 규율·정답 자리 검사도 `정답줄` 이 그대로 진다. */
+  if (문 === '정답문안') {
+    const 표 = 제안id읽기(String(몸.제안id ?? ''));
+    if (!표) return 봉투(400, { error: 'offer_id_malformed' });
+    const { 문항들: 통과 } = 송출가능문항(팩.문항들, 장부);
+    const 문항 = 통과.find((q: { 문항id: string }) => q && q.문항id === 표.문항id);
+    if (!문항) return 봉투(400, { error: 'item_missing_or_unreviewed' });
+
+    /* 🔴 응답수는 **부르는 쪽이 세지 않는다** — 봇이 세면 파서가 두 벌이 되고(회귀
+     *   `라디오수집.test.js` 가 그걸 문다), 갈라진 것은 「원장 판대로 재파싱하면 될 것」처럼
+     *   보여서 아무도 못 본다. 여기서 세는 것은 **원장에 이미 박힌** `command_kind` 다.
+     *   창은 그 라운드의 `shown_at` 부터 `closed_at`(없으면 지금)까지.
+     *   round_id 가 없으면(노출 ack 가 실패한 라운드) 세지 않는다 — 0 이 아니라 «모름»이다. */
+    let 응답수: number | null = null;
+    const rid = Number(몸.round_id);
+    if (Number.isInteger(rid) && rid > 0) {
+      const 센행 = await sql`
+        select count(*)::int as n
+          from radio.chat_message m
+          join radio.quiz_round r on r.round_id = ${rid}::bigint
+         where m.command_kind = '답'
+           and m.sent_at >= r.shown_at
+           and m.sent_at <= coalesce(r.closed_at, now())`;
+      const n = 센행 && 센행[0] ? Number((센행[0] as { n: number }).n) : NaN;
+      if (Number.isInteger(n) && n >= 0) 응답수 = n;
+    }
+
+    const 줄 = 정답줄(문항, 응답수);
+    if (!줄) return 봉투(400, { error: 'answer_line_unbuildable' });
+    return 봉투(200, { ok: true, ver, 정답: 줄, 응답수 });
   }
 
   /* ── ㉡ 노출 ack — **여기서만** 원장 행이 생긴다 ──────────────────────────── */

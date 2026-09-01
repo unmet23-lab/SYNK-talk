@@ -1,10 +1,21 @@
 #!/usr/bin/env node
-/* 라디오24 채팅 수집봇 — VPS 에서 24/7 도는 **읽기 전용** 전달자. (설계 §5-P0 · §4-3)
+/* 라디오24 채팅봇 — VPS 에서 24/7 도는 전달자. (설계 §5-P0 · §4-3 · §8-2-1)
  *
  * ■ 이 파일에 판정이 없다
- *   고를 것·거를 것·얼마나 자주 칠 것인가는 전부 `lib/라디오수집.js`(순수·회귀 있음)에 있다.
+ *   고를 것·거를 것·얼마나 자주 칠 것인가는 전부 순수 lib(회귀 있음)에 있다.
  *   여기 있는 것은 왕복뿐이다 — VPS 코드는 회귀가 원리상 못 닿아서, 판정이 여기 있으면
  *   그것이 틀렸다는 사실이 **송출 첫날 새벽**에야 드러난다.
+ *     · 읽기 리듬·거르기 = `lib/라디오수집.js`   · 출제 리듬·상태 = `lib/라디오출제.js`
+ *     · 문항·문안(200자) = `lib/라디오라운드.js`(Fn `radio-round` 가 들고 판정한다)
+ *
+ * ■ 🔴 v2 (2026-09-01) — 「읽기 전용」이 아니게 됐다
+ *   유호 확정 08-25 ① 로 퀴즈가 화면에서 **채팅으로** 내려갔다(§8-2-1). 그래서 봇이
+ *   `liveChatMessages.insert` 로 «쓴다» — 라운드당 세 줄(출제·마감·정답).
+ *   ⇒ 그 쓰기가 이 봇을 `radio.quiz_round.shown_at` 의 **유일한 증인**으로 만든다:
+ *      출제줄이 실제로 채팅에 오른 시각만이 「나갔다」이고, 그것을 Fn 에 ack 로 보내야
+ *      원장 행이 앉는다. 안 보내면 행이 안 생긴다(안 보여준 것을 적지 않는다).
+ *   ⇒ 쓰기는 **50유닛**으로 읽기(최악 5)의 열 배다. 그래서 여는 판정이 쿼터를 함께 본다.
+ *      🔑 모자라면 **출제부터 줄인다** — 수집이 죽으면 그날 원장이 통째로 비고 소급이 안 된다.
  *
  * ■ 봇이 드는 비밀은 하나뿐이다
  *   `RADIO_INGEST_SECRET` — 인제스트 Fn **한 문**만 연다. `service_role` 은 이 호스트에
@@ -25,6 +36,11 @@
 'use strict';
 
 const 수집 = require('../lib/라디오수집.js');
+const 출제 = require('../lib/라디오출제.js');
+/* 🚫 `라디오채팅파서` 를 여기서 부르지 않는다 — 회귀(`라디오수집.test.js`)가 그걸 문다.
+ *   봇이 파서를 물면 봇의 판과 원장에 박히는 판이 두 벌이 되고, 갈라진 것은
+ *   「원장 판대로 재파싱하면 될 것」처럼 보여서 아무도 못 본다(이 파일 머리말).
+ *   ⇒ 「!답 이 몇 건인가」도 봇이 세지 않는다. 원장에 이미 박힌 값을 **Fn 이 센다**. */
 
 const YT = 'https://www.googleapis.com/youtube/v3';
 const 토큰끝점 = 'https://oauth2.googleapis.com/token';
@@ -46,6 +62,9 @@ const 설정 = {
   supabase: 환경('SUPABASE_URL').replace(/\/+$/, ''),
   anon: 환경('SUPABASE_ANON_KEY'),
   인제스트키: 환경('RADIO_INGEST_SECRET'),
+  /* 라운드 문의 좁은 시크릿. **없으면 출제를 안 한다**(수집은 그대로 돈다) —
+   * 미설정을 「통과」로 읽으면 설정을 빠뜨린 날 문이 열리는 쪽으로 샌다. */
+  라운드키: process.env.RADIO_ROUND_SECRET || null,
 };
 
 const 잠깐 = (밀리) => new Promise((r) => setTimeout(r, 밀리));
@@ -116,6 +135,167 @@ async function 인제스트(짐) {
   return r.json();
 }
 
+/**
+ * 채팅에 한 줄 쓴다 — **이 봇이 「나갔다」를 아는 유일한 자리**(v2 · §8-2-1).
+ * @returns {string|null} 성공 시각(ISO). 실패면 null — 실패한 줄로 ack 를 보내지 않는다.
+ */
+async function 채팅쓰기(liveChatId, 글) {
+  if (!접근토큰 && !(await 토큰갱신())) return null;
+  const url = `${YT}/liveChatMessages?part=snippet`;
+  const 짐 = {
+    snippet: {
+      liveChatId, type: 'textMessageEvent',
+      textMessageDetails: { messageText: 글 },
+    },
+  };
+  const 치기 = () => fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${접근토큰}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(짐),
+  }).catch((e) => ({ ok: false, status: 0, text: async () => String(e) }));
+  let r = await 치기();
+  if (수집.토큰갱신필요(r.status) && (await 토큰갱신())) r = await 치기();
+  if (!r.ok) {
+    console.error(`[라디오봇] 채팅 쓰기 실패 HTTP ${r.status} — ${String(await r.text()).slice(0, 200)}`);
+    return null;
+  }
+  /* 🔑 시각은 **우리 시계**로 적는다 — API 응답의 publishedAt 을 쓰면 그 값이 없거나 모양이
+   *   바뀌는 날 ack 가 통째로 막힌다. 노출해석이 시계 어긋남을 관용으로 이미 흡수한다. */
+  return new Date().toISOString();
+}
+
+/** 라운드 문(`radio-round`). 키가 없으면 아예 안 부른다 — 출제는 «있으면 하는 것»이다. */
+async function 라운드문(문, 짐) {
+  if (!설정.라운드키) return null;
+  const r = await fetch(`${설정.supabase}/functions/v1/radio-round`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${설정.anon}`,
+      apikey: 설정.anon,
+      'x-radio-round-key': 설정.라운드키,
+    },
+    body: JSON.stringify({ 문, ...짐 }),
+  }).catch((e) => ({ ok: false, status: 0, text: async () => String(e) }));
+  if (!r.ok) {
+    console.error(`[라디오봇] 라운드문(${문}) 실패 HTTP ${r.status} — ${String(await r.text()).slice(0, 200)}`);
+    return null;
+  }
+  return r.json();
+}
+
+const 지금 = () => Date.now();
+
+/* 라운드 진행 상태 — 프로세스 안에만 산다.
+ * 🔑 **재시작하면 잊는다.** 그래도 잃는 것은 「진행 중이던 라운드의 마감·정답줄」뿐이고,
+ *   원장은 이미 출제 ack 로 앉아 있다(그 라운드의 `closed_at` 이 null 로 남는다 = 정직한 빈칸).
+ *   상태를 DB 에 두면 「제안됐지만 안 나간 라운드」를 청소할 사람이 필요해진다
+ *   (`라디오라운드.js` 머리말 「제안을 어디에도 저장하지 않는 이유」와 같은 축). */
+const 라운드 = {
+  진행: null,      // { 제안id, round_id, 출제ms, 마감초, 채팅, 마감침, 정답침, 재도전냄, 깊이 }
+  오늘: { 날짜: null, 연수: 0 },
+  마지막출제ms: null,
+};
+
+/** 몽골 날짜가 바뀌면 하루 카운터를 되돌린다 — 날짜 경계는 방송 시각축과 같아야 한다. */
+function 하루경계(지금ms) {
+  const 오늘 = new Date(지금ms + 8 * 60 * 60 * 1000).toISOString().slice(0, 10); // UB = UTC+8
+  if (라운드.오늘.날짜 !== 오늘) 라운드.오늘 = { 날짜: 오늘, 연수: 0 };
+}
+
+/** 제안 → 출제줄 채팅 쓰기 → 노출 ack. 성공하면 진행 상태가 선다. */
+async function 라운드열기(방송, 지금ms, 부모round_id = null, 깊이 = 0) {
+  const 제안 = await 라운드문('제안', {
+    씨앗: `${방송.video_id}:${지금ms}`,
+    부모round_id,
+  });
+  if (!제안 || !제안.ok) return;
+  if (!제안.제안id) {
+    console.log(`[라디오봇] 제안 0 — ${JSON.stringify(제안.분모 || {})}`);
+    return;
+  }
+  const 글 = 제안.채팅 && 제안.채팅.출제;
+  if (!글) {
+    /* Fn 이 200자에 못 드는 문항을 이미 후보에서 뺐으므로 여기 오면 규격이 어긋난 것이다. */
+    console.error('[라디오봇] 🔴 제안에 출제줄이 없다 — 라운드를 열지 않는다');
+    return;
+  }
+
+  const 오른때 = await 채팅쓰기(방송.live_chat_id, 글);
+  if (!오른때) return;   // 못 썼으면 ack 를 안 보낸다 = 원장 행도 안 생긴다
+
+  const ack = await 라운드문('노출', { 제안id: 제안.제안id, at: 오른때 });
+  if (!ack || !ack.ok) {
+    /* 🔴 채팅엔 나갔는데 원장엔 못 앉았다 — 학생은 문제를 봤고 우리는 그 사실을 못 적었다.
+     *   그래도 진행은 세운다(마감·정답줄은 나가야 한다). 승격은 원장 행이 없어 안 되고,
+     *   그 손실은 이 로그가 유일한 증거다. */
+    console.error('[라디오봇] 🔴 출제는 나갔는데 노출 ack 실패 — 이 라운드는 원장에 안 앉는다');
+  }
+
+  라운드.진행 = {
+    제안id: 제안.제안id,
+    round_id: (ack && ack.round_id) || null,
+    출제ms: Date.parse(오른때),
+    마감초: (제안.채팅 && 제안.마감초) || 60,
+    채팅: 제안.채팅,
+    마감침: false, 정답침: false, 재도전냄: false, 깊이,
+  };
+  라운드.마지막출제ms = 지금ms;
+  라운드.오늘.연수 += 1;
+  console.log(`[라디오봇] 라운드 열었다 · ${제안.제안id} · 오늘 ${라운드.오늘.연수}회`);
+}
+
+/** 매 폴링 회차마다 한 번 — 열 때인지, 칠 차례인지 판정층에 묻고 그대로 한다. */
+async function 출제돌리기(방송, 지금ms) {
+  if (!설정.라운드키) return;          // 출제는 «있으면 하는 것»(수집은 그대로 돈다)
+  하루경계(지금ms);
+
+  const 진행 = 라운드.진행;
+  if (!진행) {
+    const 판정 = 출제.열까({
+      동시시청: 방송.concurrent_viewers,
+      오늘연수: 라운드.오늘.연수,
+      마지막출제ms: 라운드.마지막출제ms,
+      지금ms,
+      쿼터상한: 수집.라운드상한(수집.폴링하한밀리),
+    });
+    if (판정.열다) await 라운드열기(방송, 지금ms);
+    return;
+  }
+
+  const { 동작 } = 출제.다음동작({ ...진행, 지금ms });
+  if (동작 === '대기') return;
+
+  if (동작 === '마감') {
+    const 때 = await 채팅쓰기(방송.live_chat_id, 진행.채팅.마감);
+    진행.마감침 = true;                                   // 못 써도 상태는 넘긴다(정답이 막히면 안 된다)
+    if (때 && 진행.round_id) await 라운드문('마감', { 제안id: 진행.제안id, at: 때 });
+    return;
+  }
+
+  if (동작 === '정답') {
+    /* 🔑 정답줄은 **Fn 에 다시 묻는다** — 「함께 푼 사람 N」의 N 은 라운드가 끝나야 알고,
+     *   제안 때 받은 문안을 봇이 문자열 치환으로 고치면 문안이 바뀌는 날 조용히 안 먹는다.
+     *   문안은 끝까지 lib·Fn 이 만든다(200자 규율·정답 자리 검사도 거기 산다). */
+    /* 🔑 응답수를 **안 보낸다** — Fn 이 원장(`radio.chat_message`)에서 «이미 파서판대로 박힌»
+     *   `!답` 을 센다. 봇이 세면 파서가 두 벌이 되고, 갈라진 것은 아무도 못 본다. */
+    const 문안 = await 라운드문('정답문안', { 제안id: 진행.제안id, round_id: 진행.round_id });
+    const 글 = (문안 && 문안.ok && 문안.정답) || 진행.채팅.정답;   // 못 물으면 제안 때 것(응답 0판)
+    if (!문안 || !문안.ok) console.error('[라디오봇] 정답문안 못 받음 — 제안 때 문안으로 나간다(응답수 빠짐)');
+    await 채팅쓰기(방송.live_chat_id, 글);
+    진행.정답침 = true;
+    return;
+  }
+
+  if (동작 === '재도전') {
+    진행.재도전냄 = true;
+    await 라운드열기(방송, 지금ms, 진행.round_id, 진행.깊이 + 1);
+    return;
+  }
+
+  if (동작 === '끝') 라운드.진행 = null;
+}
+
 async function 돌기() {
   const 한번 = process.argv.includes('--한번');
   let 방송 = null;
@@ -171,6 +351,16 @@ async function 돌기() {
     if (결과) {
       console.log(`[라디오봇] 본 ${본수} · 보냄 ${행.length} · 새로 ${결과.새로} · 중복 ${결과.중복}`
         + ` · 거름(유형 ${거른.유형}/결측 ${거른.결측}) · 다음 ${간격 / 1000}초`);
+    }
+
+    /* ── 출제 (v2) — 수집이 끝난 «뒤»에 한다 ────────────────────────────────
+     * 순서가 이 방향인 이유: 출제가 실패해도 그 회차 수집은 이미 원장에 들어가 있다.
+     * 반대로 두면 출제에서 던진 날 그 회차 채팅이 통째로 사라진다(소급 불가). */
+    try {
+      await 출제돌리기(방송, 지금());
+    } catch (e) {
+      /* 출제는 «있으면 하는 것»이다 — 여기서 죽으면 수집까지 멈춘다. */
+      console.error('[라디오봇] 출제 중 오류(수집은 계속) —', e && e.message ? e.message : e);
     }
 
     if (한번) return;
