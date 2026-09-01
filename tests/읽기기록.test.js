@@ -131,11 +131,11 @@ test('🔴 ⑫ 분모는 «시도»다 — 생성이 실패해 행이 없으면 
   assert.equal(r.미착지, 3, '착지 못 한 셋이 분모에서 조용히 빠졌다 — 「좋은 0」의 얼굴이다');
 });
 
-test('계약 c15 — payload_허용필드에 reads·preference 확장 셋이 등재됐다(검증⑧ 원천)', () => {
+test('계약 c16 — payload_허용필드에 reads·preference 확장 셋이 등재됐다(검증⑧ 원천)', () => {
   const fs = require('node:fs');
   const path = require('node:path');
   const 계약 = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '계약', '수집_교정_계약.json'), 'utf8'));
-  assert.equal(계약.버전, 'c15');
+  assert.equal(계약.버전, 'c16');
   for (const k of ['reads', 'evidence_text', 'confirm_status', 'hw_ref']) {
     assert.ok(계약.learning_events.payload_허용필드.includes(k), `payload_허용필드에 ${k} 가 없다`);
   }

@@ -251,8 +251,14 @@ test('슬럼프 — affect_kind 만 싣고 자유 서술은 payload 에 안 올�
   assert.equal(r.계획.length, 1);
   const 행 = r.계획[0];
   assert.equal(행.event_type, 'affect.reported');
-  assert.deepEqual(행.payload, { affect_kind: 'slump', stated_via: 'radio_chat' },
+  /* c16(09-02)이 접기 두 칸을 전 계획에 싣는다 — 그것을 뺀 «나머지»가 정확히 둘이어야 한다.
+   * 🔑 `deepEqual` 을 통째로 느슨하게 풀지 않는다: 이 시험이 지키는 것은 「자유 서술이 payload 로
+   *   새지 않는다」이고, 그 힘은 «남는 칸이 정확히 무엇인가»를 못박는 데서 나온다. */
+  const { fold_date, promote_ver, ...나머지 } = 행.payload;
+  assert.deepEqual(나머지, { affect_kind: 'slump', stated_via: 'radio_chat' },
     '자유 서술이 payload 로 샜다 — 원장 body 가 그 자리다(계약 affect_kind 사유)');
+  assert.equal(fold_date, '2026-08-12', '접힌 현지 날짜가 사건에 안 남았다(c16 ⑧)');
+  assert.equal(promote_ver, r.승격판, '접은 판이 사건에 안 남았다 — Fn 응답에만 있으면 행에서 재현이 안 된다');
   assert.ok(검증(행, 계약, { 주체: 'server' }).ok);
 });
 
@@ -443,4 +449,42 @@ test('인자없음 제외는 명령표의 인자 정책을 실시간으로 읽�
   }
   const r2 = 승격계획({ ...기본재료(), 메시지들: [채팅('m1', '목표', null, '2026-08-12T12:01:00Z')] });
   assert.deepEqual(사유들(r2), ['인자없음'], '되돌린 정책(필수)에서 널 인자가 접수됐다');
+});
+
+/* ══════════ 🔴 c16 — 접기를 재현 가능하게 (심문 전건판정 ⑧ · 2026-09-02) ══════════ */
+
+test('🔴 접기 두 칸이 «전 갈래»에 실린다 — 갈래마다 손으로 넣으면 새 갈래에서 하나가 빠진다', () => {
+  const r = 승격계획({
+    ...기본재료(),
+    메시지들: [
+      채팅('q1', '답', '2', '2026-08-12T12:00:30Z'),
+      채팅('p1', '빗소리', '', '2026-08-12T12:01:00Z'),
+      채팅('a1', '슬럼프', '힘들어요', '2026-08-12T12:02:00Z'),
+    ],
+  });
+  assert.ok(r.계획.length >= 2, '표본이 모자라면 이 회귀가 아무것도 안 지킨다(분모 확인)');
+  for (const c of r.계획) {
+    assert.equal(typeof c.payload.fold_date, 'string', `${c.event_type} 에 fold_date 가 없다`);
+    assert.match(c.payload.fold_date, /^\d{4}-\d{2}-\d{2}$/, '현지 날짜 모양이 아니다');
+    assert.equal(c.payload.promote_ver, r.승격판, `${c.event_type} 에 promote_ver 가 없다`);
+  }
+});
+
+test('🔴 접기 날짜는 «접기에 실제로 쓴 값»으로 센다 — 장부 날짜와 갈리면 이 칸이 거짓말을 한다', () => {
+  /* 몽골(UTC+8)에서 UTC 17:00 은 이미 «다음 날»이다 — 그 경계가 이 칸의 존재 이유다. */
+  const r = 승격계획({
+    ...기본재료(),
+    메시지들: [채팅('m1', '빗소리', '', '2026-08-12T17:30:00Z')],
+  });
+  assert.equal(r.계획.length, 1);
+  assert.equal(r.계획[0].payload.fold_date, '2026-08-13',
+    'UTC 기준으로 접었다 — 현지 날짜 경계를 안 지나면 「하루 첫 선언」이 하루씩 밀린다');
+});
+
+test('c16 어휘 둘이 계약 허용필드에 있다 — 검증기가 목록 밖 이름을 거절한다', () => {
+  const f = 계약.learning_events.payload_허용필드;
+  for (const k of ['fold_date', 'promote_ver']) {
+    assert.ok(f.includes(k), `payload_허용필드에 ${k} 가 없다 — 실으면 검증기가 전 사건을 거절한다`);
+  }
+  assert.equal(계약.버전, 'c16');
 });

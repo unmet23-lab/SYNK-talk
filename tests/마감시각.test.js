@@ -96,13 +96,13 @@ test('확인 카운터 둘이 세기만 하는 게 아니라 판정 조건에도
   }
 });
 
-test('계약이 c15 이고 두 이름을 들고 있다', () => {
+test('계약이 c16 이고 두 이름을 들고 있다', () => {
   /* 판 핀 — c10(due 신설 판) → … → c13(성향 확인 · 08-22) → c14(교실 수집 · 08-31) →
-   * c15(세층합류 reads·preference 확장 · 09-01)로 올렸다. 이 핀의 몫은 「계약 판이
+   * c16(접기 어휘 fold_date·promote_ver · 09-02)으로 올렸다. 이 핀의 몫은 「계약 판이
    * 오르면 이 회귀 파일을 열어 due 회귀가 여전히 유효한지 본 사람이 있다」를 남기는 것이다.
-   * c15 확인: due 는 reads·선호 확장과 무관하고(읽기 기록은 배정 payload, due 는 submissions 물리칸),
-   * 짝 CHECK 는 `submissions_due_paired_c15` 로 값 그대로 이름만 갈았다(20260901120000). */
-  assert.equal(계약.버전, 'c15', `계약 버전이 ${계약.버전} 다 — 물리와 갈리면 「c15 계약 + c14 물리」가 초록으로 보인다`);
+   * c16 확인: due 는 접기 어휘와 무관하고(읽기 기록은 배정 payload, due 는 submissions 물리칸),
+   * 짝 CHECK 는 `submissions_due_paired_c16` 으로 값 그대로 이름만 갈았다(20260902100000). */
+  assert.equal(계약.버전, 'c16', `계약 버전이 ${계약.버전} 다 — 물리와 갈리면 「c16 계약 + c15 물리」가 초록으로 보인다`);
   const 실재 = Object.values(계약.learning_events.필드).flat();
   for (const 이름 of ['due_at', 'due_ver']) {
     assert.ok(실재.includes(이름), `계약 필드에 ${이름} 가 없다 — 물리에만 사는 이름은 계약이 못 지킨다`);
