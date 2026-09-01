@@ -32,10 +32,34 @@
    스트림 키는 `.env`(`YOUTUBE_STREAM_KEY`)에만 — 유닛 파일·스크립트에 박지 않는다.
 4. **systemd 등록** — `radio-stream.service`(송출)·`radio-bot.service`(수집봇) 둘 다
    `Restart=always`. 설치: `sudo cp *.service /etc/systemd/system/ && sudo systemctl enable --now radio-stream radio-bot`.
-5. **수집봇** — `bots/라디오수집봇.js` 를 VPS 에 올리고 `.env` 에 리프레시 토큰(⚠채널 확정 뒤
-   **그 계정으로** 발급 — 지금 발급하면 채널이 갈리는 날 무효)·`RADIO_INGEST_SECRET`(운영 값은
-   `tools/라디오시크릿_착지.js` 가 로컬 `.env` `RADIO_INGEST_SECRET_PROD` 에 남겼다 — P1 에
-   회전해서 옮기는 것을 권장) 착지.
+5. **수집봇** — `bots/라디오수집봇.js` 를 VPS 에 올리고 아래 표대로 환경을 채운다.
+
+### 🔴 `.env` 가 **두 개**다 — 한 곳에 몰면 안 돈다
+
+| 파일 | 누가 읽나 | 든 것 |
+|---|---|---|
+| `/opt/synk-radio/.env` | **봇** (systemd `EnvironmentFile`) | 아래 표 여덟 칸 |
+| `/opt/synk-radio/송출/.env` | **송출.sh** (`$HERE/.env` — 제 폴더 옆만 본다) | `YOUTUBE_STREAM_KEY=…` 한 줄 |
+
+봇은 `.env` 를 **스스로 안 읽는다**(프로세스 env 만) — `EnvironmentFile` 이 없으면 첫 `환경()`에서
+exit 1 이고 systemd 가 그것을 5초마다 반복한다. 둘 다 `chmod 600`.
+
+### 봇 환경 여덟 칸 (2026-09-02 소스 실측 — 옛 README·유닛 주석은 이름이 틀렸었다)
+
+| 칸 | 없으면 | 어디서 오나 |
+|---|---|---|
+| `RADIO_CHANNEL_ID` | exit 1 | ✅ 있다 — `UCmZplYKuNHLPng4iL2AbLLg` |
+| `RADIO_YT_CLIENT_ID` | exit 1 | ⏳ OAuth 프로덕션 게시 |
+| `RADIO_YT_CLIENT_SECRET` | exit 1 | ⏳ 〃 |
+| `RADIO_YT_REFRESH_TOKEN` | exit 1 | ⏳ 〃 ⚠**채널 확정 뒤 그 계정으로** · 앱이 「테스트」면 7일마다 죽는다 |
+| `SUPABASE_URL` | exit 1 | 운영 프로젝트 URL — Fn 주소를 여기서 조립한다 |
+| `SUPABASE_ANON_KEY` | exit 1 | 비밀 아님(verify_jwt 통과용) |
+| `RADIO_INGEST_SECRET` | exit 1 | ✅ 착지 완료 — 로컬 `.env` 의 `RADIO_INGEST_SECRET_PROD` |
+| `RADIO_ROUND_SECRET` | **조용히 수집만** 돈다 | ✅ 착지 완료(09-02) — 로컬 `.env` 의 `RADIO_ROUND_SECRET_PROD` |
+
+🚫 옛 이름 `YOUTUBE_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN`·`RADIO_INGEST_URL` 은 **봇 소스에 없다**
+(`RADIO_INGEST_URL` 은 0회 — URL 은 `SUPABASE_URL` + `/functions/v1/radio-ingest` 로 만든다).
+그 이름으로 채우면 봇이 그 자리에서 죽는다.
 
 ## 왜 「한 파일 루프」가 아니라 「목록 루프」인가
 

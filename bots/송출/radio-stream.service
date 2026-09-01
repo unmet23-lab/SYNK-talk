@@ -1,10 +1,25 @@
 # 라디오24 송출 유닛 — /etc/systemd/system/radio-stream.service (설계 §5-P1 · §6-5)
 # 설치(VPS): sudo cp radio-stream.service /etc/systemd/system/ && sudo systemctl enable --now radio-stream
-# ⛔ enable 은 송출 개시다 — 채널 분리 판정(§7-2) 전에는 설치하지 않는다.
+# ⛔ enable 은 «송출 개시»다 — 눈으로 첫 화면을 확인한 뒤에 켠다(스트림 「자동 시작」도 끔이 확정).
+#
+# 준비물 둘 (없으면 송출.sh 가 exit 2 로 죽는다 — 조용히 안 돈다):
+#   /opt/synk-radio/팩/playlist.txt      ← `재생목록.js` 가 낸다. 팩 .ts 들과 같은 폴더여야 한다
+#   /opt/synk-radio/송출/.env            ← `YOUTUBE_STREAM_KEY=…` 한 줄. chmod 600.
+#     🔑 봇의 EnvironmentFile(/opt/synk-radio/.env)과 **다른 파일**이다 — 송출.sh 는
+#       제 폴더 옆의 .env 만 읽는다(`$HERE/.env`). 한 곳에 몰아 두면 스트림 키를 못 찾는다.
+#
+# 09-02 기준 상태: 채널 ✅(SYNK LAB @synkkorean) · 팩 ✅(8벌·69.0분) · 스트림 키 ⏳ · VPS ⏳.
+# (구 주석 「채널 분리 판정 전에는 설치하지 않는다」는 그 판정이 09-01 에 닫혀 걷었다.)
 [Unit]
 Description=SYNK radio24 stream (ffmpeg -c copy loop)
 After=network-online.target
 Wants=network-online.target
+# 새벽 장애는 아침 복구가 기대치(§6-5) — 무한 재시도로 유튜브에 초당 재접속하는 것만 막는다.
+# 🔴 09-02 자리 옮김: 이 둘은 systemd v229 부터 **[Unit]** 소속이다. [Service] 에 두면
+#    새 systemd 가 안 읽어 «제한이 아예 안 걸린 채» 도는 쪽으로 조용히 기운다
+#    (증상이 「빨간 오류」가 아니라 「무제한 재시도」라 안 보인다).
+StartLimitIntervalSec=600
+StartLimitBurst=60
 
 [Service]
 Type=simple
@@ -12,9 +27,6 @@ WorkingDirectory=/opt/synk-radio/송출
 ExecStart=/usr/bin/bash /opt/synk-radio/송출/송출.sh /opt/synk-radio/팩
 Restart=always
 RestartSec=5
-# 새벽 장애는 아침 복구가 기대치(§6-5) — 무한 재시도로 유튜브에 초당 재접속하는 것만 막는다.
-StartLimitIntervalSec=600
-StartLimitBurst=60
 
 [Install]
 WantedBy=multi-user.target

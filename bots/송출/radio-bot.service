@@ -1,15 +1,39 @@
 # 라디오24 수집봇 유닛 — /etc/systemd/system/radio-bot.service (설계 §5-P0 · 봇=bots/라디오수집봇.js)
 # 설치(VPS): sudo cp radio-bot.service /etc/systemd/system/ && sudo systemctl enable --now radio-bot
-# 봇 .env: YOUTUBE_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN(⚠채널 확정 뒤 그 계정으로 발급),
-#          RADIO_INGEST_URL(운영 Fn), RADIO_INGEST_SECRET(운영 값 — 착지 도구가 회전 관리)
+#
+# 🔴 2026-09-02 수리 — 이 주석이 **실물과 어긋나 있었다**(그대로 따르면 봇이 그 자리에서 죽는다):
+#   · 옛 주석 `YOUTUBE_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN` → 봇이 실제로 읽는 이름은
+#     `RADIO_YT_CLIENT_ID`·`RADIO_YT_CLIENT_SECRET`·`RADIO_YT_REFRESH_TOKEN` 이다.
+#   · 옛 주석 `RADIO_INGEST_URL` → 봇 소스에 **0회**. URL 은 SUPABASE_URL 에서 조립한다
+#     (`${SUPABASE_URL}/functions/v1/radio-ingest`).
+#   · 넷이 아예 빠져 있었다: RADIO_CHANNEL_ID · SUPABASE_URL · SUPABASE_ANON_KEY · RADIO_ROUND_SECRET.
+#   · 봇은 `.env` 를 **안 읽는다**(프로세스 env 만). 그래서 EnvironmentFile 이 없으면
+#     첫 `환경()` 에서 exit 1 이고 systemd 가 그것을 5초마다 반복한다.
+#
+# 봇이 없으면 «안 켜지는» 칸 일곱 (하나라도 비면 exit 1 — 조용히 안 돈다):
+#   RADIO_CHANNEL_ID          채널 ID(UC…) — SYNK LAB @synkkorean
+#   RADIO_YT_CLIENT_ID        OAuth 클라이언트 ⚠**채널 확정 뒤 그 계정으로** 발급
+#   RADIO_YT_CLIENT_SECRET      "     앱이 「테스트」 상태면 7일마다 refresh_token 이 죽는다 → 프로덕션 게시 필수
+#   RADIO_YT_REFRESH_TOKEN      "
+#   SUPABASE_URL              운영 프로젝트 URL(인제스트·라운드 Fn 을 여기서 조립)
+#   SUPABASE_ANON_KEY         비밀 아님 — 플랫폼 verify_jwt 통과용
+#   RADIO_INGEST_SECRET       운영 값(= .env 의 RADIO_INGEST_SECRET_PROD · 착지 도구가 회전 관리)
+# 있으면 좋은 칸 하나 (없으면 «수집만» 돌고 퀴즈를 안 연다 — 안전 기본값):
+#   RADIO_ROUND_SECRET        운영 값(= .env 의 RADIO_ROUND_SECRET_PROD)
+#
+# ⚠ EnvironmentFile 은 비밀을 담는다 — `chmod 600 /opt/synk-radio/.env && chown root:root` 로 두고
+#   리포지터리에 올리지 않는다. 앞에 `-` 를 안 붙인 것은 의도다: 파일이 없으면 **크게 실패**해야 한다
+#   (조용히 빈손으로 도는 것이 더 나쁘다).
 [Unit]
-Description=SYNK radio24 chat collector bot (read-only, 60s polling)
+# 🔴 「read-only」가 아니다 — v2(09-01)부터 라운드당 세 줄을 채팅에 «쓴다»(출제·마감·정답).
+Description=SYNK radio24 chat bot (collect + post quiz, 60s polling)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 WorkingDirectory=/opt/synk-radio
+EnvironmentFile=/opt/synk-radio/.env
 ExecStart=/usr/bin/node /opt/synk-radio/bots/라디오수집봇.js
 Restart=always
 RestartSec=10
