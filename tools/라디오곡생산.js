@@ -77,11 +77,12 @@ const 결들 = {
  *   무엇보다 **마스코트가 곡마다 튀어** 화면이 산만해진다.
  * 🔑 이 배치가 곧 화면 배치다 — 팩을 «곡마다 그 장르의 배경»으로 인코딩하므로(인코딩.sh 의 배경 인자),
  *   블록으로 묶으면 마스코트가 블록 단위로 한 번씩만 바뀐다. 재인코딩 0 을 지키면서 DJ 가 교대한다. */
-const 결차례 = ['시티팝', '시티팝', '시티팝', '차분', '차분', '차분', '전자', '전자'];
+const { 결차례, 결ascii } = require('../lib/라디오곡차례.js');   // 결의 차례·이름은 곡차례가 주인이다(09-02)
 
-/* 파일 이름에 결을 박는다 — `인코딩.sh` 가 **이름에서 장르를 읽어** 그 장르의 배경을 고른다.
- * 🔑 곡↔장르를 이름이 들고 있으면 팩을 만드는 쪽이 장부를 파싱할 일이 없다(한 값을 두 곳이 안 안다). */
-const 결ascii = { 시티팝: 'citypop', 차분: 'calm', 전자: 'house' };
+/* 파일 이름에 결을 박는다 — `인코딩.sh` 가 **이름에서 장르를 읽어** 그 장르의 배경을 고르고,
+ * `bots/송출/재생목록.js` 가 같은 이름에서 결을 읽어 **블록 차례**를 세운다.
+ * 🔑 그래서 이름 규칙(`synk-radio-NN-<결>-air`)이 세 곳의 접점이다 — 주인은 `lib/라디오곡차례.js` 하나.
+ *   (⚠ `lib/라디오편성.js` 와 헷갈리지 않는다 — 그쪽은 퀴즈 문항 추첨 가중이다.) */
 
 function 키() {
   const raw = fs.readFileSync(키경로, 'utf8');
@@ -227,6 +228,30 @@ async function main() {
   const 생성수 = 벌 * 3;
   console.log(`[라디오곡생산] ${벌}벌 × 3생성 = ${생성수}생성 · ≈$${(생성수 * 0.08).toFixed(2)} · ≈${Math.round(생성수 * 35 / 60)}분`);
   console.log(`  규격(lib/곡판규격 방송): ${규격.비트레이트} · ${규격.표본율}Hz · ${규격.라우드니스} LUFS · 최소 ${규격.최소초}s`);
+  /* 🔴 번호를 «이어서» 매긴다 — 09-02 실측 결함: 늘 n=1 부터 시작해서, 곡이 든 폴더에
+   *   한 번 더 돌리면 **말없이 덮어썼다.** 곡 한 벌은 3생성($0.24)+몇 분이라 되살릴 수도 없다.
+   *   ⇒ 폴더(그리고 «보류» 같은 한 칸 아래 방까지) 를 훑어 쓰인 가장 큰 번호 다음에서 시작한다.
+   *     한 칸 아래까지 보는 까닭 = 마린 대기로 뺀 07·08 이 거기 살아 있고, 그 번호를 다시 쓰면
+   *     마린이 오는 날 이름이 부딪힌다. */
+  const 쓰인번호 = (방) => {
+    const 본 = [];
+    const 훑기 = (d) => {
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        if (e.isDirectory()) continue;
+        const m = /^synk-radio-(\d+)-/.exec(e.name);
+        if (m) 본.push(parseInt(m[1], 10));
+      }
+    };
+    훑기(방);
+    for (const e of fs.readdirSync(방, { withFileTypes: true })) {
+      if (e.isDirectory()) 훑기(path.join(방, e.name));
+    }
+    return 본;
+  };
+  const 이미 = fs.existsSync(낼곳) ? 쓰인번호(낼곳) : [];   // 셈만일 때 폴더를 만들지 않는다
+  const 시작 = 이미.length ? Math.max(...이미) + 1 : 1;
+  console.log(`  번호: ${시작} ~ ${시작 + 벌 - 1}`
+    + (시작 > 1 ? ` (이미 ${이미.length}벌 있어 이어서 매긴다 — 덮어쓰지 않는다)` : ''));
   if (argv.includes('--셈만')) return;
 
   fs.mkdirSync(낼곳, { recursive: true });
@@ -236,9 +261,12 @@ async function main() {
    *   (09-02 00:2x 에 구운 8벌이 전부 09-01 로 찍혔다). 장부는 「우리가 언제 만들었나」의
    *   증거라 로컬 날짜여야 한다. `sv-SE` 로케일이 YYYY-MM-DD 를 그대로 준다. */
   const 오늘 = new Date().toLocaleDateString('sv-SE');
-  for (let n = 1; n <= 벌; n++) {
-    const 결 = 한결 || 결차례[(n - 1) % 결차례.length];
-    console.log(`\n[${n}/${벌}] ${결}`);
+  for (let i = 0; i < 벌; i++) {
+    const n = 시작 + i;
+    /* 결차례는 «번호»가 아니라 «이번 실행의 차례»를 탄다 — 이어서 매길 때도 블록이 처음부터 돈다.
+     * (번호로 타면 07 부터 시작할 때 전자 블록 한복판에 떨어진다) */
+    const 결 = 한결 || 결차례[i % 결차례.length];
+    console.log(`\n[${i + 1}/${벌}] ${결} → ${String(n).padStart(2, '0')}번`);
     const r = await 한벌(n, 결, 낼곳, k, 규격);
     결과.push(r);
     console.log(`  → ${r.이름} · ${r.초.toFixed(0)}s · ${r.LUFS} LUFS ${r.규격밖.length ? `🔴 ${r.규격밖.join(' · ')}` : '✅'}`);
