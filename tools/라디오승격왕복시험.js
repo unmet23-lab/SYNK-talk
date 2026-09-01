@@ -98,10 +98,10 @@ async function main() {
     (await sql(`select count(*)::int as n from engine.skills where skill_id = '${문항.skill_ids[0]}'`))[0].n === 1);
 
   const 학생들 = await sql(`
-    insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver)
-    values ('${회차}-A','승격A','Lv2','study','${판}'), ('${회차}-B','승격B','Lv2','study','${판}'),
-           ('${회차}-D','승격D','Lv3','study','${판}'), ('${회차}-E1','승격E1','Lv2','study','${판}'),
-           ('${회차}-E2','승격E2','Lv2','study','${판}')
+    insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver, is_test)
+    values ('${회차}-A','승격A','Lv2','study','${판}', true), ('${회차}-B','승격B','Lv2','study','${판}', true),
+           ('${회차}-D','승격D','Lv3','study','${판}', true), ('${회차}-E1','승격E1','Lv2','study','${판}', true),
+           ('${회차}-E2','승격E2','Lv2','study','${판}', true)
     returning learner_id, student_code`);
   const id = Object.fromEntries(학생들.map((r) => [r.student_code.slice(회차.length + 1), r.learner_id]));
 

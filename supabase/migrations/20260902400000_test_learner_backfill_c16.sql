@@ -1,11 +1,87 @@
+/* 시험 학습자 소급 표식 마무리 — 「개원 전이라 실학생은 한 명도 없다」 (유호 09-02)
+ *
+ * ■ 왜 한 조각 더인가
+ *   앞 조각(20260902300000)의 소급 보정은 «이름 꼴»로 233건을 걸렀고 26건이 남았다 —
+ *    「구제생」 · 「보존A」 · 「smoke전날」 처럼 이름 규약에 안 걸린 시험 학생들이다.
+ *   패턴을 하나씩 더하는 것은 끝이 없다(다음 시험이 또 다른 이름을 쓴다).
+ *
+ * ■ 🔑 더 «참인» 문장이 있다 — **개원 전이라 실학생은 아직 한 명도 없다.**
+ *   개원은 2027-02 이고 오늘은 2026-09-02 다. 운영 학생 수는 실측 0 이고,
+ *   리허설은 정의상 「왕복·실측이 도는 곳」이다(lib/자격증명.js 가 그렇게 적었다).
+ *   ⇒ **이 표식이 서기 «전»에 만들어진 학습자는 전부 시험이다.** 이름이 아니라 «시점»으로 가른다.
+ *
+ * ■ 왜 안전한가
+ *   · 이 조각이 적용된 «뒤»에 만들어지는 학생은 안 건드린다 — 실학생이 오는 날 이 update 는
+ *     이미 적용돼 다시 안 돈다(체크섬 가드가 return 한다).
+ *   · 빈 DB 에 합본을 처음 붓는 경우 학생이 0 이라 0건이다.
+ *   · 운영에서도 0건이다(실측 학생 0).
+ *   · 앞으로의 정본은 «도구가 명시로 박는 것»이고 회귀(tests/시험학습자표식.test.js)가 그것을 지킨다 —
+ *     이 소급 보정은 두 번 쓰일 일이 없다.
+ *
+ * ■ DDL 0 — 표·제약·트리거·권한 무접촉. 데이터 보정 한 줄과 확인 블록뿐이다.
+ *
+ * 되돌림: update engine.learners set is_test=false where is_test=true;  -- 표식 전량 해제
+ *         delete from engine.schema_migrations where version='20260902400000'; */
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260902400000';
+  migration_name constant text := '20260902400000_test_learner_backfill_c16.sql';
+  expected_checksum constant text := '6a1b0460fd7ff3b60c629c01603c1bd103775f2197292c0347b346372898e421'; -- migration-checksum
+  base_version constant text := '20260902300000';
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 합본 위에서만 돈다 — engine.schema_migrations 가 없다(빈 DB 면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      'migration % 는 % 위에서만 돈다 — 체인이 끊겼다',
+      migration_version, base_version;
+  end if;
+end
+$migration$;
+
+-- 🔴 시점으로 가른다 — 앞 조각이 선 시각 이전의 학습자는 전부 시험이다(실학생 0명 · 개원 2027-02).
+update engine.learners
+   set is_test = true
+ where is_test = false
+   and created_at < (select applied_at from engine.schema_migrations
+                      where version = '20260902300000');
+
+do $migration2$
+declare
+  expected_checksum constant text := '6a1b0460fd7ff3b60c629c01603c1bd103775f2197292c0347b346372898e421'; -- migration-checksum
+begin
+  insert into engine.schema_migrations(version, name, checksum)
+  values ('20260902400000', '20260902400000_test_learner_backfill_c16.sql', expected_checksum);
+end
+$migration2$;
+
+commit;
+
 -- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
---
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
 -- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -374,3 +450,42 @@ select case when 테이블수=23 and RLS켜짐=23 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
   from 셈;
+*/
+-- 사후 메모:
+-- ① 이 조각 = 적색 착지 칸 둘(deliver_check_reds·deliver_check_at) + freeze 화이트리스트 +2 — CHECK 변경 0.
+-- ② 아래 기대 목록은 20260831130000 이 세운 현행 그대로다(변경 0 — 마지막 조각이 이 줄을 든다).
+--    ⚠ 이 줄은 마지막 조각이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    ⚠ `season_no_overlap_c11`(EXCLUDE) · `…_once_c11`(UNIQUE) · `companion_qa_*_fkey` 는 여기
+--      없다 — CHECK 가 아니라 이 줄의 대상이 아니고, 이름도 c11 그대로 산다(값목록이 없어
+--      판 판별과 무관하다 · 위 기대제약 목록에는 그 이름 그대로 들어 있다).
+--    기대: attempts_gate_values_c16 · attempts_response_present_c16 · attempts_result_gate_c16
+--         · attempts_ver_nonempty_c16 · batch_runs_counts_order_c16 · batch_runs_counts_pair_c16
+--         · batch_runs_enrolled_nonneg_c16 · batch_runs_finished_cols_c16
+--         · batch_runs_level_dist_ok_c16 · batch_runs_partial_pair_c16
+--         · batch_runs_partial_range_c16 · batch_runs_roster_equation_c16
+--         · batch_runs_skipped_range_c16 · batch_runs_ver_nonempty_c16 · broadcast_segment_kind_c16
+--         · classes_key_nonblank_c16 · companion_qa_answer_paired_c16
+--         · companion_qa_question_nonblank_c16 · corrections_promotion_intent_c16
+--         · corrections_supersedes_not_self_c16 · corrections_verdict_c16 · cron_runs_outcome_c16
+--         · jobs_anchor_present_c16 · jobs_claim_cols_c16 · jobs_deciding_pair_c16
+--         · jobs_deciding_result_matches_c16 · jobs_deciding_scope_c16 · jobs_draft_present_c16
+--         · jobs_idle_cols_c16 · jobs_load_failed_cols_c16 · jobs_nontarget_cols_c16
+--         · jobs_nonterminal_cols_c16 · jobs_skill_ids_present_c16 · jobs_status_outcome_pairs_c16
+--         · jobs_terminal_cols_c16 · jobs_ver_nonempty_c16 · jobs_winner_fence_current_c16
+--         · jobs_winner_fence_pair_c16 · jobs_winner_only_success_c16 · jobs_winner_present_c16
+--         · jobs_winner_result_only_success_c16 · jobs_winner_result_pair_c16
+--         · l10n_reviews_final_paired_c16 · l10n_reviews_supersedes_not_self_c16
+--         · l10n_reviews_verdict_c16 · l10n_strings_id_ascii_c16
+--         · l10n_strings_ko_nonblank_c16 · l10n_strings_max_len_c16
+--         · l10n_strings_status_c16 · learners_gender_c16
+--         · learners_goal_track_c16 · learners_group_no_c16 · learners_home_aimag_c16
+--         · learners_seat_no_c16 · learners_signup_attempts_nonneg_c16
+--         · learners_temp_password_paired_c16 · learning_events_correction_target_c16
+--         · learning_events_event_type_c16 · learning_events_task_type_c16
+--         · pipeline_jobs_discard_reason_c16 · season_compass_answers_c16 · season_dates_c16
+--         · season_review_decided_c16 · season_review_self_c16 · season_review_verdict_c16
+--         · staff_role_c16 · submissions_due_paired_c16 · submissions_task_format_c16
+--         · submissions_translation_source_c16 · teacher_notes_body_nonblank_c16
+--         · teacher_notes_disposition_c16 · teacher_notes_origin_c16

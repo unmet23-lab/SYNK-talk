@@ -66,8 +66,8 @@ async function main() {
   console.log(`\n■ 준비 — 학생 2명 · 표식 ${표} · 판 ${판}`);
 
   const 학생들 = await sql(`
-    insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver)
-    values ('${표}-A','시험A','Lv2','study','${판}'), ('${표}-B','시험B','Lv2','study','${판}')
+    insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver, is_test)
+    values ('${표}-A','시험A','Lv2','study','${판}', true), ('${표}-B','시험B','Lv2','study','${판}', true)
     returning learner_id, student_code`);
   const id = Object.fromEntries(학생들.map((r) => [r.student_code.slice(-1), r.learner_id]));
 

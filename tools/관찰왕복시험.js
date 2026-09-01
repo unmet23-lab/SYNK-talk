@@ -162,8 +162,8 @@ async function main() {
       return 있나.learner_id;
     }
     const [행] = await sql(`
-      insert into engine.learners (student_code, display_name, level_current, class_id, active, schema_ver)
-      values (${따옴(코드)}, ${따옴(코드)}, 'Lv3', ${따옴(반)}::uuid, true, ${따옴(판)})
+      insert into engine.learners (student_code, display_name, level_current, class_id, active, schema_ver, is_test)
+      values (${따옴(코드)}, ${따옴(코드)}, 'Lv3', ${따옴(반)}::uuid, true, ${따옴(판)}, true)
       returning learner_id`);
     return 행.learner_id;
   };

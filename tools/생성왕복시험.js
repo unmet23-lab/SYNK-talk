@@ -415,8 +415,8 @@ async function main() {
     '동시', '원자', '요청보존', '좀비', '펜싱', '회수', '늦적재', '대기유지',
     '마감대기', '마감클레임', '마감성공잔존', '마감격리', '부분실패A', '부분실패B'];
   const 학생행 = await sql(`
-    insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver)
-    values ${물리이름.map((n, i) => `('${표}-${i}', '${n}', 'Lv3', null, '${판}')`).join(',')}
+    insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver, is_test)
+    values ${물리이름.map((n, i) => `('${표}-${i}', '${n}', 'Lv3', null, '${판}', true)`).join(',')}
     returning learner_id, display_name`);
   const 학 = Object.fromEntries(학생행.map((r) => [r.display_name, r.learner_id]));
   await sql(`
@@ -828,8 +828,8 @@ async function main() {
   /* 오늘층 학생 — 대상 3(어제 배정 심기) + 첫날 1. */
   const 오늘이름 = ['대상1', '대상2', '대상3', '첫날생'];
   const 오늘행 = await sql(`
-    insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver)
-    values ${오늘이름.map((n, i) => `('${표}-t${i}', '${n}', 'Lv3', null, '${판}')`).join(',')}
+    insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver, is_test)
+    values ${오늘이름.map((n, i) => `('${표}-t${i}', '${n}', 'Lv3', null, '${판}', true)`).join(',')}
     returning learner_id, display_name`);
   const 오 = Object.fromEntries(오늘행.map((r) => [r.display_name, r.learner_id]));
   await sql(`insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver, recorded_by)
@@ -989,8 +989,8 @@ async function main() {
 
     /* C5 구제(㉨ · §12-11) — 신규(큐 없는 학생)·이미배정·적재실패 소생·남의 일감 보존. */
     const [{ learner_id: 구제생 }] = await sql(`
-      insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver)
-      values ('${표}-r', '구제생', 'Lv3', null, '${판}') returning learner_id`);
+      insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver, is_test)
+      values ('${표}-r', '구제생', 'Lv3', null, '${판}', true) returning learner_id`);
     await sql(`insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver, recorded_by)
       values ('${구제생}'::uuid, 'v18.9', now() - interval '30 days', '${판}', 'tools/생성왕복시험.js')`);
     await 어제심기(구제생);
@@ -1013,8 +1013,8 @@ async function main() {
     {
       /* 적재실패 소생(A9→㉨) — 오늘 날짜에 load_error 를 «구제 실행»으로 심고 HTTP 구제로 되살린다. */
       const [{ learner_id: 소생생 }] = await sql(`
-        insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver)
-        values ('${표}-r2', '소생생', 'Lv3', null, '${판}') returning learner_id`);
+        insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver, is_test)
+        values ('${표}-r2', '소생생', 'Lv3', null, '${판}', true) returning learner_id`);
       await sql(`insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver, recorded_by)
         values ('${소생생}'::uuid, 'v18.9', now() - interval '30 days', '${판}', 'tools/생성왕복시험.js')`);
       await 어제심기(소생생);
@@ -1030,8 +1030,8 @@ async function main() {
     {
       /* 남의 일감 보존(E1) — 두 학생 큐를 세우고 한 명만 구제 → 남의 job 은 무접촉. */
       const 보존 = await sql(`
-        insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver)
-        values ('${표}-p1', '보존A', 'Lv3', null, '${판}'), ('${표}-p2', '보존B', 'Lv3', null, '${판}')
+        insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver, is_test)
+        values ('${표}-p1', '보존A', 'Lv3', null, '${판}', true), ('${표}-p2', '보존B', 'Lv3', null, '${판}', true)
         returning learner_id, display_name`);
       const 보 = Object.fromEntries(보존.map((r) => [r.display_name, r.learner_id]));
       await sql(`insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver, recorded_by)
@@ -1057,8 +1057,8 @@ async function main() {
     /* C6 tasks «없음»·«오류» — 판정 주체는 서버 하나(gen_deadline). */
     {
       const [{ learner_id: 없음생 }] = await sql(`
-        insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver)
-        values ('${표}-n', '없음생', 'Lv3', null, '${판}') returning learner_id`);
+        insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver, is_test)
+        values ('${표}-n', '없음생', 'Lv3', null, '${판}', true) returning learner_id`);
       await sql(`insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver, recorded_by)
         values ('${없음생}'::uuid, 'v18.9', now() - interval '30 days', '${판}', 'tools/생성왕복시험.js')`);
       const t = await 학생조회(없음생);
@@ -1067,8 +1067,8 @@ async function main() {
        * 이 시험은 그 값을 «못 잰다»(정직 표기 — 게임날 회차가 오면 그 자리에서 잰다). */
       확인('C6 tasks — job 도 배정도 없는 재적 학생은 구제가 만들어 착지하므로 «있음»(401 수리 뒤 현행 · «없음» 은 게임날 값 — 이 시험 밖)', t.몸.assignment_status === '있음', t.몸.assignment_status);
       const [{ learner_id: 오류생 }] = await sql(`
-        insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver)
-        values ('${표}-e', '오류생', 'Lv3', null, '${판}') returning learner_id`);
+        insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver, is_test)
+        values ('${표}-e', '오류생', 'Lv3', null, '${판}', true) returning learner_id`);
       await sql(`insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver, recorded_by)
         values ('${오류생}'::uuid, 'v18.9', now() - interval '30 days', '${판}', 'tools/생성왕복시험.js')`);
       const 오류run = (await sql(`select engine.batch_run_start('${그저께}'::date, '구제', ${실행판봉투(그저께)}) as id`))[0].id;
@@ -1093,8 +1093,8 @@ async function main() {
   {
     const DS = await 처녀날짜();
     const [{ learner_id: S }] = await sql(`
-      insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver)
-      values ('${표}-s', '사슬성공', 'Lv3', null, '${판}') returning learner_id`);
+      insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver, is_test)
+      values ('${표}-s', '사슬성공', 'Lv3', null, '${판}', true) returning learner_id`);
     await sql(`insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver, recorded_by)
       values ('${S}'::uuid, 'v18.9', now() - interval '30 days', '${판}', 'tools/생성왕복시험.js')`);
     {

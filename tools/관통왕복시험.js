@@ -140,9 +140,9 @@ async function main() {
    * (마이그 v5.13-a)까지 같은 길을 지난다. */
   console.log('■ 준비 ① — 관통 학생 2명 · ㉠ 급수·목표를 가른다 (A Lv3/study · B Lv5/work)');
   const 학생들 = await sql(`
-    insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver)
-    values ('${표}-관통A','관통A','Lv3','study','${판}'),
-           ('${표}-관통B','관통B','Lv5','work','${판}')
+    insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver, is_test)
+    values ('${표}-관통A','관통A','Lv3','study','${판}', true),
+           ('${표}-관통B','관통B','Lv5','work','${판}', true)
     returning learner_id, student_code`);
   const id = Object.fromEntries(학생들.map((r) => [r.student_code.endsWith('관통A') ? 'A' : 'B', r.learner_id]));
   const 급수 = { A: 'Lv3', B: 'Lv5' };

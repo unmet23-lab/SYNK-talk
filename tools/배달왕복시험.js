@@ -106,10 +106,10 @@ async function main() {
    *    → ⑫-G2 넓힌 H3(챌린지 동봉 · 대조 그늘 차단 · 닻 소등) */
   console.log('■ 준비 — 시험 학생 6명');
   const 학생들 = await sql(`
-    insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver)
-    values ('${표}-A','시험A','Lv2','study','${판}'), ('${표}-B','시험B','Lv2','study','${판}'),
-           ('${표}-C','시험C','Lv2','study','${판}'), ('${표}-D','시험D','Lv2','study','${판}'),
-           ('${표}-E','시험E','Lv2','study','${판}'), ('${표}-F','시험F','Lv1','study','${판}')
+    insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver, is_test)
+    values ('${표}-A','시험A','Lv2','study','${판}', true), ('${표}-B','시험B','Lv2','study','${판}', true),
+           ('${표}-C','시험C','Lv2','study','${판}', true), ('${표}-D','시험D','Lv2','study','${판}', true),
+           ('${표}-E','시험E','Lv2','study','${판}', true), ('${표}-F','시험F','Lv1','study','${판}', true)
     returning learner_id, student_code`);
   const id = Object.fromEntries(학생들.map((r) => [r.student_code.slice(-1), r.learner_id]));
 
@@ -561,8 +561,8 @@ async function main() {
    *   준비 절에서 만들면 배치가 그 학생 것도 세워 버려 이 갈래는 영영 안 탄다. */
   console.log('\n■ ⑧-b 빈 날 구제 — 배정 0 인 날 /tasks 가 그 자리에서 세우는가');
   const [신선] = await sql(`
-    insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver)
-    values ('${표}-G','시험G','Lv2','study','${판}') returning learner_id`);
+    insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver, is_test)
+    values ('${표}-G','시험G','Lv2','study','${판}', true) returning learner_id`);
   await sql(`
     insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver, recorded_by)
     values ('${신선.learner_id}'::uuid,'v18.9', now() - interval '1 day','${판}','tools/배달왕복시험.js')`);
