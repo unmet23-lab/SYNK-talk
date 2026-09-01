@@ -260,25 +260,33 @@ Deno.serve(async (req) => {
     });
     if (!해석.ok) return 봉투(400, { error: 'ack_rejected', 사유: 해석.사유 });
 
-    /* 멱등 — 같은 제안표의 행이 이미 있으면 그것을 돌려준다. `where not exists` 를 insert 와
-     * **한 문장**에 두어 왕복 사이의 창을 없앤다(그래도 유일 인덱스가 아니라 동시 두 건이면
-     * 둘 다 앉는다 — 잔여로 적었다). */
+    /* 멱등 — 같은 제안표의 행이 이미 있으면 그것을 돌려준다.
+     * ✅ **2026-09-02: 그 잔여를 갚았다**(심문 전건판정 ⑤ · 마이그 20260902000000).
+     *   옛 주석이 스스로 적어 뒀다 — 「유일 인덱스가 아니라 **동시 두 건이면 둘 다 앉는다**」.
+     *   이제 `제안id` 가 물리 열 `idempotency_key` 로 서고 부분 유일 인덱스가 그것을 진다.
+     *   `where not exists`(조회 시점 스냅샷)를 `on conflict`(물리)로 바꾼다 — 경합에서도 하나다.
+     *   ⚠ 부분 인덱스라 conflict 절에 **같은 조건자**를 적어야 그 인덱스를 집는다. */
     /* 🔴 `insert … select` 의 매개변수는 **전부 명시 캐스트**다. `values` 절과 달리 대상 열
      * 타입이 추론에 항상 닿는다고 볼 수 없고, 어긋나면 그 실패는 **첫 호출에서만** 난다
      * (배포는 성공한다 — 이 저장소가 반복해 겪은 그 모양). */
+    const video_id = typeof 몸.video_id === 'string' && 몸.video_id ? 몸.video_id : null;
     const 넣기 = await sql`
-      insert into radio.quiz_round (task_ref, task_snapshot, shown_at, retry_of_round_id, schema_ver)
-      select ${해석.task_ref}::text, ${sql.json(해석.스냅샷)}::jsonb, ${해석.shown_at}::timestamptz,
-             ${해석.부모round_id}::bigint, ${ver}::text
-       where not exists (
-         select 1 from radio.quiz_round where task_snapshot->>'제안id' = ${String(몸.제안id)})
+      insert into radio.quiz_round
+        (task_ref, task_snapshot, shown_at, retry_of_round_id, schema_ver, idempotency_key, video_id)
+      values (${해석.task_ref}::text, ${sql.json(해석.스냅샷)}::jsonb, ${해석.shown_at}::timestamptz,
+              ${해석.부모round_id}::bigint, ${ver}::text, ${String(몸.제안id)}::text, ${video_id}::text)
+      on conflict (idempotency_key) where idempotency_key is not null do nothing
       returning round_id, shown_at`;
     if (넣기.length) {
       return 봉투(200, { ok: true, ver, round_id: String(넣기[0].round_id), shown_at: 해석.shown_at, 새로: true });
     }
+    /* 🔑 되찾기도 «물리 열»로 찾는다 — 스냅샷 안(`task_snapshot->>'제안id'`)으로 찾으면
+     * 넣는 자와 찾는 자가 다른 칸을 보게 되고, 그 어긋남의 증상은 「방금 넣었는데 못 찾는다」다.
+     * 옛 행(멱등 열이 서기 전)은 스냅샷 쪽으로 한 번 더 본다. */
     const 이미 = await sql`
       select round_id, shown_at from radio.quiz_round
-       where task_snapshot->>'제안id' = ${String(몸.제안id)} limit 1`;
+       where idempotency_key = ${String(몸.제안id)}
+          or task_snapshot->>'제안id' = ${String(몸.제안id)} limit 1`;
     if (!이미.length) {
       /* 넣지도 못했고 찾지도 못했다 — 「없는 것을 있다고」 하지 않는다. */
       console.error('[radio-round] 노출 ack: insert 0행인데 기존 행도 없다 — ' + String(몸.제안id));

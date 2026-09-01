@@ -228,3 +228,72 @@ test('search.list 단가는 읽기·쓰기와 견줄 수 있게 같은 자리에
   assert.ok(수집.재발견단가 > 수집.출제단가 && 수집.출제단가 > 수집.단가최악,
     '세 단가의 크기 관계가 뒤집히면 「무엇부터 줄이나」의 근거가 바뀐다');
 });
+
+/* ══════════ 🔴 수집 맥박 보강 — 심문 전건판정 ④ (2026-09-02) ══════════
+ * 「조용한 방송」과 「수집 실패」가 같은 얼굴이던 자리. 놓친 채팅은 원장에 복구 재료가 0 이라
+ * 첫 송출 뒤에는 되물을 수 없다 — 채널 개설 «전»인 지금만 공짜다. */
+
+test('🔴 실패 갈래 값록은 정본이 하나다 — DDL 에 CHECK 를 안 걸었으므로 여기가 유일한 자물쇠', () => {
+  assert.ok(Object.isFrozen(수집.수집실패갈래), '값록이 얼지 않았다 — 소비자가 밀어 넣을 수 있다');
+  assert.deepStrictEqual([...수집.수집실패갈래].sort(),
+    ['api_error', 'chat_ended', 'no_broadcast', 'send_failed', 'token_expired']);
+  assert.ok(!수집.실패갈래인가('아무거나'), '모르는 낱말을 통과시킨다');
+  assert.ok(수집.실패갈래인가('api_error'));
+});
+
+test('🔴 HTTP 상태가 갈래로 «갈린다» — 401·403·404 는 서로 다른 처방이다', () => {
+  assert.strictEqual(수집.실패갈래(401), 'token_expired', 'OAuth 7일 만료는 재발견이 아니라 갱신이 답이다');
+  assert.strictEqual(수집.실패갈래(403), 'chat_ended');
+  assert.strictEqual(수집.실패갈래(404), 'chat_ended');
+  assert.strictEqual(수집.실패갈래(500), 'api_error', '모르는 상태는 지어내지 않고 접는다');
+  assert.strictEqual(수집.실패갈래(0), 'api_error', '네트워크 실패(status 0)도 접힌다');
+});
+
+/* 🔑 소스를 읽는 자리는 «코드만» 통로를 쓴다(래칫 `tests/소스검사통로.test.js`).
+ *   주석을 안 걷으면 겨눈 낱말이 코드에서 사라져도 **바로 위 주석이 그 낱말을 갖고 있는 한
+ *   초록**이다 — 이 판의 코드는 주석이 두꺼워 정확히 그 병에 걸린다. */
+
+test('🔴 봇이 «못 걷은 회차»에도 맥박을 남긴다 — 전에는 그냥 continue 라 구멍만 남았다', () => {
+  const 봇소스 = 코드만(봇);
+  assert.match(봇소스, /async function 맥박만\(/, '실패 맥박 통로가 없다');
+  /* 실패 갈래 둘이 전부 맥박을 부른다 — 하나라도 빠지면 그 구간이 「봇이 죽은 것」과 같은 얼굴이 된다. */
+  assert.match(봇소스, /맥박만\(방송, \{/, 'API 실패 갈래가 맥박을 안 남긴다');
+  assert.match(봇소스, /수집\.실패갈래\(c\.status\)/, '상태를 갈래로 안 옮긴다');
+  assert.match(봇소스, /맥박만\(null, \{ error_kind: 'no_broadcast' \}\)/,
+    '「활성 방송 없음」이 맥박을 안 남긴다 — 방송이 없었다는 것도 사실이다');
+  /* 🚫 「맥박 실패를 삼키나」는 여기서 «안» 잰다 — `try`·`catch` 낱말 존재를 소스에서 재는 꼴이라
+   *   래칫(`tests/소스검사통로.test.js`)이 막는 모양이다: 겨눈 낱말이 코드에서 사라져도
+   *   주석이 갖고 있으면 초록이 된다. 그 규율은 `맥박만()` 머리 주석이 지고, 깨지면 봇이
+   *   수집 루프째 서므로 **운영에서 즉시 보인다** — 조용히 새는 축이 아니다. */
+});
+
+test('🔴 커서를 남긴다 — 봇 메모리에만 살면 「어디서부터 놓쳤나」를 못 되묻는다', () => {
+  const 봇소스 = 코드만(봇);
+  assert.match(봇소스, /const 이번쪽 = 다음쪽;/, '이 회차가 «쓴» 커서를 안 붙잡는다');
+  assert.match(봇소스, /page_token: 이번쪽/, '쓴 커서를 안 보낸다');
+  assert.match(봇소스, /next_page_token: 다음쪽/, '다음 커서를 안 보낸다 — 끊긴 구간의 한쪽 끝이 없다');
+});
+
+test('맥박 새 칸이 Fn 의 insert 에 실린다 — 받아 놓고 안 쓰면 열만 서고 값은 영영 빈칸이다', () => {
+  const fn = 코드만(FN);
+  /* ⚠ 정규식을 «문자열»로 짓지 않는다 — heredoc 으로 이 파일을 쓸 때 백슬래시가 먹혀
+   *   `[\s\S]` 가 `[sS]` 가 됐고, 그 자가 「칸이 없다」를 잘못 냈다(09-02 실측 · 자를 먼저 의심한 자리). */
+  const insert문 = fn.slice(fn.indexOf('insert into radio.ingest_heartbeat'));
+  for (const c of ['ok', 'error_kind', 'page_token', 'next_page_token', 'pages_fetched']) {
+    assert.ok(insert문.slice(0, 500).includes(c), `insert 에 ${c} 가 없다`);
+  }
+  assert.match(fn, /실패갈래인가/, '값록 검사를 안 한다 — 아무 문자열이나 들어온다');
+  assert.match(fn, /라디오수집\.mjs/, '값록 정본을 import 하지 않는다(두 곳이 알면 갈린다)');
+});
+
+test('🔴 채팅 원장이 «어느 방송»인지 싣는다 — 같은 채널에서 강사 방송이 함께 돈다', () => {
+  const fn = 코드만(FN);
+  const insert문 = fn.slice(fn.indexOf('insert into radio.chat_message'));
+  assert.ok(insert문.slice(0, 400).includes('video_id'), 'chat_message insert 에 video_id 가 없다');
+  assert.match(fn, /video_id,\s*$/m, '행 조립이 video_id 를 안 넣는다 — 열만 서고 값은 빈칸이 된다');
+});
+
+test('🔴 동봉 표에 라디오수집이 등재됐다 — 안 하면 배포는 성공하고 함수가 import 에서 죽는다', () => {
+  const 동봉 = require('../supabase/functions/radio-ingest/동봉.json');
+  assert.strictEqual(동봉['라디오수집.mjs'], 'lib/라디오수집.js');
+});

@@ -1,11 +1,173 @@
+/* 라디오 송출 «전»에만 공짜인 넷 — radio.* 물리 보강 + 승격 유일 제약 (심문 전건판정 09-02)
+ *
+ * ■ 왜 지금인가 — **첫 송출 뒤에는 못 고친다.**
+ *   과녁 = `SYNK-appsscript docs/_ops/심문결과/라디오24_설계-전건판정.md` §3 의 여섯 중 넷.
+ *   지금 라디오는 채널 개설 «전»이라 radio.* 전 표의 행이 0 이다. 첫 방송이 나가는 순간
+ *   놓친 채팅·중복 승격·어느 방송인지 모르는 행이 **영구히** 굳는다(learning_events 는 append-only).
+ *
+ * ■ 무엇 (계약 면적 «불변» — learning_events 의 열도 payload 허용필드도 안 늘린다)
+ *   ① `radio.ingest_heartbeat` +5 — 「조용한 방송」과 「수집 실패」를 가른다.
+ *      지금 맥박은 `messages_seen` 만 든다. **0 이 두 가지 뜻**이다: ⓐ아무도 말 안 했다
+ *      ⓑ봇이 API 에 못 붙었다. 둘이 같은 얼굴이면 「놓친 채팅」이 원리상 안 보인다
+ *      (「0건이 성공 얼굴」의 교과서 자리). 그리고 **커서가 메모리에만 산다** —
+ *      수집봇은 `pageToken` 을 쓰는데(`bots/라디오수집봇.js:329·347`) 어디에도 안 남겨서
+ *      봇이 죽으면 «어디서부터 놓쳤나»를 되물을 재료가 없다.
+ *   ② `radio.chat_message` +1 · `radio.quiz_round` +1 — `video_id`.
+ *      같은 채널에서 라디오와 강사 방송을 함께 돌리기로 했는데(설계 §5) 두 표에 방송 식별자가
+ *      없다. 잘못된 스트림에 출제하거나 남의 채팅을 걷어도 **사후 분리가 원리상 불가능**하다.
+ *      맥박에는 이미 `video_id` 가 있다 — 원장 둘만 빠져 있었다.
+ *   ③ `radio.quiz_round` +3 — 출제 멱등. 예약 실행 키 · 게시된 세 줄의 메시지 id · 게시 상태.
+ *      봇 재시작이나 「세 줄 중 일부만 게시」 뒤에 중복 출제·정답줄 누락이 나도 지금은
+ *      **판정 기준 자체가 없다**.
+ *   ④ `engine.learning_events` 부분 유일 인덱스 — 「학생×라운드 첫 응답 1건」을 **DB 가** 진다.
+ *      승격기는 이미 앱 층에서 막는다(`lib/라디오승격.js` 의 `이미승격라운드`·`이번라운드응답`).
+ *      그러나 그건 «조회 시점 스냅샷»이라 Fn 두 벌이 겹쳐 돌면 둘 다 통과한다.
+ *      append-only 표에 중복 표본이 굳으면 못 뺀다 — 그래서 물리로 닫는다.
+ *
+ * ■ 값록을 DDL 에 안 만든다(기존 관행 그대로 — `chat_message.command_kind` 선례).
+ *   `error_kind`·`post_status` 는 CHECK 없이 두고 값록은 lib 한 곳이 얼려서 진다.
+ *   계약 밖 어휘를 DDL 에 박으면 값이 늘 때마다 마이그레이션을 부른다.
+ *
+ * ■ 🚫 이번 판에 «안» 넣은 것 (숨기지 않는다)
+ *   · 심문 ⑧ 「날짜 접힘의 판을 사건에 고정」 — payload 에 판 칸을 더해야 하고 그건
+ *     `payload_허용필드` 개정 = **c16** 이다. 계약 판올림은 형제 저장소 동행이 한 벌이라
+ *     이 조각에 섞지 않는다. **다음 판올림 목록에 등재**했다(설계 §4-1 정직 칸).
+ *     지금 위험이 낮은 근거: 날짜 정본이 `lib/몽골날짜.js` 하나이고 IANA 리터럴 재기입이
+ *     금지라 판이 갈릴 통로가 좁다. 그리고 원장(`chat_message.sent_at`)이 남아 재계산이 된다.
+ *   · 심문 ⑩ 「전원 링크 완료가 송출 전 필수」 — 물리가 아니라 **운영 게이트**다(설계 §5).
+ *
+ * 되돌림:
+ *   drop index if exists engine.radio_quiz_answer_once;
+ *   alter table radio.quiz_round drop column if exists video_id, drop column if exists idempotency_key,
+ *     drop column if exists posted_message_ids, drop column if exists post_status;
+ *   drop index if exists radio.quiz_round_idem;
+ *   alter table radio.chat_message drop column if exists video_id;
+ *   drop index if exists radio.chat_message_video_sent;
+ *   alter table radio.ingest_heartbeat drop column if exists ok, drop column if exists error_kind,
+ *     drop column if exists page_token, drop column if exists next_page_token, drop column if exists pages_fetched;
+ *   delete from engine.schema_migrations where version='20260902000000'; */
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260902000000';
+  migration_name constant text := '20260902000000_radio_hardening_c15.sql';
+  expected_checksum constant text := '4f0d91837e82c393969f4d00fcfb09ddd0db06ceba1ae02f0f523369a1b9cf28'; -- migration-checksum
+  base_version constant text := '20260901120000';
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 합본 위에서만 돈다 — engine.schema_migrations 가 없다(빈 DB 면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      'migration % 는 % 위에서만 돈다 — 체인이 끊겼다',
+      migration_version, base_version;
+  end if;
+end
+$migration$;
+
+-- ══════════ ① 수집 맥박 — 「조용한 방송」과 「수집 실패」를 가른다 ══════════
+-- 🔴 `messages_seen = 0` 의 두 뜻을 여기서 끊는다. `ok=true` 이면 조용한 방송이고,
+--    `ok=false` 이면 못 걷은 것이다. 이 칸이 없으면 놓친 채팅이 «정상»의 얼굴로 지나간다.
+alter table radio.ingest_heartbeat
+  add column if not exists ok boolean not null default true;
+-- default 를 곧바로 뗀다 — 앞으로 쓰는 자리가 «명시»하게 만든다(기본값이 판정을 대신하면 안 된다).
+alter table radio.ingest_heartbeat
+  alter column ok drop default;
+
+-- 실패 갈래의 이름. 값록은 lib 이 진다(CHECK 없음 — 계약 밖 어휘를 DDL 에 안 만든다).
+alter table radio.ingest_heartbeat
+  add column if not exists error_kind text;
+
+-- 🔴 커서를 «남긴다» — 지금은 봇 메모리에만 산다. 봇이 죽으면 어디서 놓쳤는지 못 되묻는다.
+alter table radio.ingest_heartbeat
+  add column if not exists page_token text;
+alter table radio.ingest_heartbeat
+  add column if not exists next_page_token text;
+alter table radio.ingest_heartbeat
+  add column if not exists pages_fetched int;
+
+comment on column radio.ingest_heartbeat.ok is
+  '그 폴링이 실제로 걷었나. false = 수집 실패(messages_seen 0 을 「조용한 방송」으로 읽으면 안 된다).';
+comment on column radio.ingest_heartbeat.next_page_token is
+  '다음 폴링이 이어 갈 커서 — 봇 재시작 뒤 「어디서부터 놓쳤나」의 유일한 재료.';
+
+-- ══════════ ② 방송 식별 — 라디오와 강사 방송을 사후에 가른다 ══════════
+-- 🔴 같은 채널에서 둘을 돌린다(설계 §5). 이 칸이 없으면 잘못된 스트림의 채팅·출제를
+--    나중에 갈라낼 방법이 «원리상» 없다. 맥박에는 이미 있었고 원장 둘만 빠져 있었다.
+alter table radio.chat_message
+  add column if not exists video_id text;
+create index if not exists chat_message_video_sent
+  on radio.chat_message (video_id, sent_at desc) where video_id is not null;
+
+alter table radio.quiz_round
+  add column if not exists video_id text;
+
+-- ══════════ ③ 출제 멱등 — 재시작·부분 실패를 판정할 재료 ══════════
+alter table radio.quiz_round
+  add column if not exists idempotency_key text;
+-- 같은 예약이 두 번 돌아도 라운드는 하나다. 널은 여럿 허용(옛 행·수동 출제).
+create unique index if not exists quiz_round_idem
+  on radio.quiz_round (idempotency_key) where idempotency_key is not null;
+
+-- 세 줄을 실제로 게시한 YouTube 메시지 id 들 — 「일부만 나갔다」를 행이 스스로 말한다.
+alter table radio.quiz_round
+  add column if not exists posted_message_ids jsonb;
+-- 게시 상태(값록은 lib · CHECK 없음).
+alter table radio.quiz_round
+  add column if not exists post_status text;
+
+comment on column radio.quiz_round.idempotency_key is
+  '예약 실행 키 — 봇 재시작이 같은 라운드를 두 번 만들지 않게. 유일 인덱스 quiz_round_idem 이 진다.';
+comment on column radio.quiz_round.posted_message_ids is
+  '실제 게시된 줄들의 YouTube message id. 세 줄 중 일부만 나갔는지를 이 칸이 판정한다.';
+
+-- ══════════ ④ 「학생×라운드 첫 응답 1건」을 DB 가 진다 ══════════
+-- 🔴 승격기가 앱 층에서 이미 막지만(`이미승격라운드`·`이번라운드응답`) 그것은 «조회 시점
+--    스냅샷»이다. Fn 두 벌이 겹쳐 돌면 둘 다 통과하고, append-only 표에 굳은 중복 표본은
+--    못 뺀다. 라디오 응답만 겨눈다 — `round_id` 없는 quiz.answered(앱 퀴즈)는 인덱스 밖이다.
+--    재도전은 다른 round_id 라 정상적으로 따로 선다.
+create unique index if not exists radio_quiz_answer_once
+  on engine.learning_events (learner_id, (payload ->> 'round_id'))
+  where event_type = 'quiz.answered' and payload ? 'round_id';
+
+comment on index engine.radio_quiz_answer_once is
+  '라디오 퀴즈: 학생×라운드 첫 응답 1건(설계 §4-3). 앱 층 방어는 동시 실행을 못 막는다.';
+
+do $migration2$
+declare
+  expected_checksum constant text := '4f0d91837e82c393969f4d00fcfb09ddd0db06ceba1ae02f0f523369a1b9cf28'; -- migration-checksum
+begin
+  insert into engine.schema_migrations(version, name, checksum)
+  values ('20260902000000', '20260902000000_radio_hardening_c15.sql', expected_checksum);
+end
+$migration2$;
+
+commit;
+
 -- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
---
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
 -- ============================================================================
+/*
+-- 🔴 20260902000000(라디오 보강) 추가분: 라디오보강열=10 · 라디오보강인덱스=3.
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -365,3 +527,42 @@ select case when 테이블수=23 and RLS켜짐=23 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
   from 셈;
+*/
+-- 사후 메모:
+-- ① 이 조각 = 적색 착지 칸 둘(deliver_check_reds·deliver_check_at) + freeze 화이트리스트 +2 — CHECK 변경 0.
+-- ② 아래 기대 목록은 20260831130000 이 세운 현행 그대로다(변경 0 — 마지막 조각이 이 줄을 든다).
+--    ⚠ 이 줄은 마지막 조각이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    ⚠ `season_no_overlap_c11`(EXCLUDE) · `…_once_c11`(UNIQUE) · `companion_qa_*_fkey` 는 여기
+--      없다 — CHECK 가 아니라 이 줄의 대상이 아니고, 이름도 c11 그대로 산다(값목록이 없어
+--      판 판별과 무관하다 · 위 기대제약 목록에는 그 이름 그대로 들어 있다).
+--    기대: attempts_gate_values_c15 · attempts_response_present_c15 · attempts_result_gate_c15
+--         · attempts_ver_nonempty_c15 · batch_runs_counts_order_c15 · batch_runs_counts_pair_c15
+--         · batch_runs_enrolled_nonneg_c15 · batch_runs_finished_cols_c15
+--         · batch_runs_level_dist_ok_c15 · batch_runs_partial_pair_c15
+--         · batch_runs_partial_range_c15 · batch_runs_roster_equation_c15
+--         · batch_runs_skipped_range_c15 · batch_runs_ver_nonempty_c15 · broadcast_segment_kind_c15
+--         · classes_key_nonblank_c15 · companion_qa_answer_paired_c15
+--         · companion_qa_question_nonblank_c15 · corrections_promotion_intent_c15
+--         · corrections_supersedes_not_self_c15 · corrections_verdict_c15 · cron_runs_outcome_c15
+--         · jobs_anchor_present_c15 · jobs_claim_cols_c15 · jobs_deciding_pair_c15
+--         · jobs_deciding_result_matches_c15 · jobs_deciding_scope_c15 · jobs_draft_present_c15
+--         · jobs_idle_cols_c15 · jobs_load_failed_cols_c15 · jobs_nontarget_cols_c15
+--         · jobs_nonterminal_cols_c15 · jobs_skill_ids_present_c15 · jobs_status_outcome_pairs_c15
+--         · jobs_terminal_cols_c15 · jobs_ver_nonempty_c15 · jobs_winner_fence_current_c15
+--         · jobs_winner_fence_pair_c15 · jobs_winner_only_success_c15 · jobs_winner_present_c15
+--         · jobs_winner_result_only_success_c15 · jobs_winner_result_pair_c15
+--         · l10n_reviews_final_paired_c15 · l10n_reviews_supersedes_not_self_c15
+--         · l10n_reviews_verdict_c15 · l10n_strings_id_ascii_c15
+--         · l10n_strings_ko_nonblank_c15 · l10n_strings_max_len_c15
+--         · l10n_strings_status_c15 · learners_gender_c15
+--         · learners_goal_track_c15 · learners_group_no_c15 · learners_home_aimag_c15
+--         · learners_seat_no_c15 · learners_signup_attempts_nonneg_c15
+--         · learners_temp_password_paired_c15 · learning_events_correction_target_c15
+--         · learning_events_event_type_c15 · learning_events_task_type_c15
+--         · pipeline_jobs_discard_reason_c15 · season_compass_answers_c15 · season_dates_c15
+--         · season_review_decided_c15 · season_review_self_c15 · season_review_verdict_c15
+--         · staff_role_c15 · submissions_due_paired_c15 · submissions_task_format_c15
+--         · submissions_translation_source_c15 · teacher_notes_body_nonblank_c15
+--         · teacher_notes_disposition_c15 · teacher_notes_origin_c15

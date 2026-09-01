@@ -30,6 +30,10 @@
 import postgres from 'npm:postgres@3.4.4';
 import 파서모듈 from './라디오파서.mjs';
 import 계약판모듈 from './계약판.mjs';
+/* 수집 실패 갈래의 값록 — 정본은 `lib/라디오수집.js` «하나»다(값록을 여기 또 적으면 갈린다). */
+import 수집모듈 from './라디오수집.mjs';
+
+const { 실패갈래인가 } = 수집모듈 as { 실패갈래인가: (v: unknown) => boolean };
 
 const { 행들에서판 } = 계약판모듈 as { 행들에서판: (행들: unknown) => string | null };
 
@@ -100,6 +104,20 @@ Deno.serve(async (req) => {
   const polled_at = typeof 몸.polled_at === 'string' && Number.isFinite(Date.parse(몸.polled_at))
     ? 몸.polled_at : new Date().toISOString();
 
+  /* 🔴 맥박 보강(2026-09-02 · 심문 전건판정 ④) — 「조용한 방송」과 「수집 실패」를 가른다.
+   *   ok 는 **보낸 쪽이 명시**한다(기본값으로 접지 않는다): 안 보내면 걷었다는 뜻으로 읽는데,
+   *   그러면 옛 봇이 실패를 성공으로 찍는다. 값이 없을 때만 true 로 두고 그 사실을 갈래에 남긴다.
+   *   그리고 커서를 남긴다 — 지금까지 pageToken 은 봇 메모리에만 살아서, 봇이 죽으면
+   *   «어디서부터 놓쳤나»를 되물을 재료가 0 이었다. */
+  const ok = typeof 몸.ok === 'boolean' ? 몸.ok : true;
+  const error_kind = typeof 몸.error_kind === 'string' && 실패갈래인가(몸.error_kind)
+    ? 몸.error_kind : null;   // 모르는 낱말은 안 싣는다(값록 정본 = lib/라디오수집.js)
+  const page_token = typeof 몸.page_token === 'string' && 몸.page_token ? 몸.page_token : null;
+  const next_page_token = typeof 몸.next_page_token === 'string' && 몸.next_page_token
+    ? 몸.next_page_token : null;
+  const pages_fetched = Number.isFinite(Number(몸.pages_fetched))
+    ? Math.trunc(Number(몸.pages_fetched)) : null;
+
   /* 계약판은 DB 에게 묻는다 — 함수가 DB 보다 앞설 수 없게(`events`·`deliver` 와 같은 근거).
    * 0행 가드(반박 ⑮ 동축)는 `lib/계약판.js` 가 진다 — 빈 이력에서 죽으면 이유가 로그에 안 남는다. */
   const 판행 = await sql`
@@ -120,6 +138,7 @@ Deno.serve(async (req) => {
       message_id: c.message_id, channel_id: c.channel_id, display_name: c.display_name,
       body: c.body, raw: c.raw, sent_at: c.sent_at,
       command_kind, command_arg, parser_ver: 파서판, schema_ver: ver,
+      video_id,   // 🔴 어느 방송의 채팅인가(심문 전건판정 ⑥ · 봇이 안 주면 null)
     });
   }
 
@@ -132,6 +151,9 @@ Deno.serve(async (req) => {
         행들 as unknown as Record<string, never>[],
         'message_id', 'channel_id', 'display_name', 'body', 'raw',
         'sent_at', 'command_kind', 'command_arg', 'parser_ver', 'schema_ver',
+        /* 🔴 어느 «방송»의 채팅인가(심문 전건판정 ⑥) — 같은 채널에서 라디오와 강사 방송을
+         * 함께 돌리므로, 이 칸이 없으면 남의 스트림 채팅을 사후에 갈라낼 방법이 원리상 없다. */
+        'video_id',
       )}
       on conflict (message_id) do nothing
       returning message_id`;
@@ -140,8 +162,11 @@ Deno.serve(async (req) => {
 
   /* 맥박은 **행이 0건이어도 남는다** — 그것이 이 표의 존재 이유다(조용한 구간 ≠ 죽은 구간). */
   await sql`
-    insert into radio.ingest_heartbeat (polled_at, video_id, messages_seen, concurrent_viewers, schema_ver)
-    values (${polled_at}::timestamptz, ${video_id}, ${본수}, ${시청자}, ${ver})`;
+    insert into radio.ingest_heartbeat
+      (polled_at, video_id, messages_seen, concurrent_viewers, schema_ver,
+       ok, error_kind, page_token, next_page_token, pages_fetched)
+    values (${polled_at}::timestamptz, ${video_id}, ${본수}, ${시청자}, ${ver},
+            ${ok}, ${error_kind}, ${page_token}, ${next_page_token}, ${pages_fetched})`;
 
   return 봉투(200, {
     ok: true,

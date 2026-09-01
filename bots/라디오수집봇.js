@@ -136,6 +136,31 @@ async function 인제스트(짐) {
 }
 
 /**
+ * 🔴 «못 걷은 회차»의 맥박 (2026-09-02 · 심문 전건판정 ④).
+ * 메시지 0건 + `ok:false` + 갈래를 보낸다 — 그 행 하나가 「이 순간을 못 걷었다」의 유일한 증거다.
+ * 🔑 실패의 실패는 «삼킨다** — 맥박을 못 보낸다고 수집 루프를 세우면, 잴 수 있는 실패 하나를
+ *   못 잰 실패 여럿으로 바꾸는 것이다(자를 세우다 본체를 죽이지 않는다).
+ * @param {{video_id:string, concurrent_viewers:number|null}|null} 방송  못 찾았으면 null
+ * @param {{error_kind:string, page_token?:string|null}} 왜  갈래 정본 = lib/라디오수집.js
+ */
+async function 맥박만(방송, 왜) {
+  try {
+    await 인제스트({
+      video_id: 방송 ? 방송.video_id : null,
+      polled_at: new Date().toISOString(),
+      messages_seen: 0,
+      concurrent_viewers: 방송 ? 방송.concurrent_viewers : null,
+      messages: [],
+      ok: false,
+      error_kind: 왜.error_kind,
+      page_token: 왜.page_token ?? null,
+    });
+  } catch (e) {
+    console.error('[라디오봇] 실패 맥박도 못 보냈다(넘어간다) —', String(e && e.message ? e.message : e));
+  }
+}
+
+/**
  * 채팅에 한 줄 쓴다 — **이 봇이 「나갔다」를 아는 유일한 자리**(v2 · §8-2-1).
  * @returns {string|null} 성공 시각(ISO). 실패면 null — 실패한 줄로 ack 를 보내지 않는다.
  */
@@ -317,6 +342,9 @@ async function 돌기() {
         const 쉼 = 수집.재발견간격밀리(못찾음);
         console.log(`[라디오봇] 활성 방송 없음(${못찾음}회) — ${Math.round(쉼 / 1000)}초 뒤에 다시 찾는다`
           + ' (search.list 는 100유닛이라 물러선다 · 방송이 없으면 잃을 것도 없다)');
+        /* 방송이 «없었다»도 사실이다 — 이 행이 없으면 그 시간대가 「봇이 죽어 있던 구간」과
+         * 같은 얼굴이 된다(심문 전건판정 ④). */
+        await 맥박만(null, { error_kind: 'no_broadcast' });
         if (한번) return;
         await 잠깐(쉼);
         continue;
@@ -326,10 +354,20 @@ async function 돌기() {
     }
 
     const 질의 = { liveChatId: 방송.live_chat_id, part: 'snippet,authorDetails', maxResults: '2000' };
+    const 이번쪽 = 다음쪽;   // 이 회차가 «쓴» 커서 — 맥박이 양 끝을 다 들어야 구간이 선다
     if (다음쪽) 질의.pageToken = 다음쪽;
     const c = await yt('liveChatMessages', 질의);
 
     if (!c.ok) {
+      /* 🔴 실패한 회차도 «맥박을 남긴다»(2026-09-02 · 심문 전건판정 ④).
+       * 전에는 여기서 그냥 continue 라 실패가 표의 «구멍»으로만 드러났는데, 구멍은
+       * 「폴링 한 번 실패」와 「봇이 죽어 있던 몇 시간」을 못 가른다. 놓친 채팅은 원장에
+       * 복구 재료가 0 이라 첫 송출 뒤에는 되물을 수 없다 — 그래서 실패를 «행»으로 남긴다.
+       * messages_seen=0 이지만 ok=false 라 「조용한 방송」으로 안 읽힌다. */
+      await 맥박만(방송, {
+        error_kind: 수집.실패갈래(c.status),
+        page_token: 다음쪽,
+      });
       if (수집.재발견필요(c.status)) {
         console.log(`[라디오봇] 채팅방이 끝났다(HTTP ${c.status}) — 재발견으로 돌아간다`);
         방송 = null;
@@ -355,6 +393,13 @@ async function 돌기() {
       messages_seen: 본수,
       concurrent_viewers: 방송.concurrent_viewers,
       messages: 행,
+      /* 🔴 커서를 «남긴다»(심문 전건판정 ④) — 전에는 `다음쪽` 이 이 프로세스 메모리에만 살아서
+       * 봇이 죽으면 「어디서부터 놓쳤나」를 되물을 재료가 0 이었다. 이 회차가 «쓴» 토큰과
+       * 다음 회차가 «쓸» 토큰을 둘 다 남겨야 끊긴 구간의 양 끝이 선다. */
+      ok: true,
+      page_token: 이번쪽,
+      next_page_token: 다음쪽,
+      pages_fetched: 1,
     });
     if (결과) {
       console.log(`[라디오봇] 본 ${본수} · 보냄 ${행.length} · 새로 ${결과.새로} · 중복 ${결과.중복}`
