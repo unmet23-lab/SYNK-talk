@@ -91,12 +91,19 @@ async function main() {
     select to_regclass('engine.classes')::text        as 반표,
            to_regclass('engine.staff_classes')::text  as 배정표,
            to_regclass('engine.teacher_notes')::text  as 한마디표,
+           /* 🔴 제약 이름의 «판 접미»를 박지 않는다(09-02 수리) — 판올림마다 CHECK 는
+            *   drop+add 로 이름이 옮겨진다(c11→c12→…→c16, 여섯 번). 접미를 박아 두면
+            *   그 다음 판올림부터 **영영 빈 문자열**을 읽고, 이 검사는 「DB 어휘가 비었다」로
+            *   조용히 죽는다 — 실제로 c12 이후 오늘까지 그랬다.
+            *   ⚠ 옛 이름은 판올림이 drop 하므로 like 로 잡히는 것은 «현행» 하나다. */
            (select pg_get_constraintdef(oid) from pg_constraint
              where connamespace=to_regnamespace('engine')
-               and conname='teacher_notes_origin_c11')       as 갈래CHECK,
+               and conname like 'teacher_notes_origin_c%'
+             order by conname desc limit 1)                  as 갈래CHECK,
            (select pg_get_constraintdef(oid) from pg_constraint
              where connamespace=to_regnamespace('engine')
-               and conname='teacher_notes_disposition_c11')  as 처분CHECK`);
+               and conname like 'teacher_notes_disposition_c%'
+             order by conname desc limit 1)                  as 처분CHECK`);
   치명확인('표 셋이 서 있다 (classes · staff_classes · teacher_notes)',
     물리.반표 && 물리.배정표 && 물리.한마디표);
 

@@ -226,9 +226,14 @@ async function main() {
     선호 && 선호.event_type === 'preference.stated' && 선호.payload.stated_option === '빗소리'
     && 선호.payload.selection_reason === '집중이 잘돼서' && 선호.payload.stated_via === 'radio_chat'
     && !('options_shown' in 선호.payload), 선호 && 선호.payload);
+  /* c16(09-02)이 접기 두 칸(fold_date·promote_ver)을 전 계획에 싣는다 — 그것을 뺀 «나머지»가
+   * 정확히 둘이어야 한다. 🔑 키 집합 대조를 통째로 느슨하게 풀지 않는다: 이 검사가 지키는 것은
+   * 「자유 서술이 payload 로 새지 않는다」이고, 그 힘은 «남는 키가 정확히 무엇인가»에서 나온다. */
+  const 접기키 = ['fold_date', 'promote_ver'];
   확인('정서 — affect.reported 신설 사건(c11 ④) · 자유 서술은 payload 에 없다(원장 body 가 원문)',
     정서 && 정서.event_type === 'affect.reported' && 정서.payload.affect_kind === 'slump'
-    && Object.keys(정서.payload).sort().join(',') === 'affect_kind,stated_via', 정서 && 정서.payload);
+    && Object.keys(정서.payload).filter((k) => !접기키.includes(k)).sort().join(',') === 'affect_kind,stated_via'
+    && 접기키.every((k) => 정서.payload[k]), 정서 && 정서.payload);
 
   const 출석 = 찾기('m11'); const 목표 = 찾기('m12');
   확인('자습체크인 — task_type 신값 · 제시문 = 그날 자막 카드(task_ref)',
