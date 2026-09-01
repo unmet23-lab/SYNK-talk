@@ -33,8 +33,10 @@
  *   그리고 「OAuth 동의 화면」에서 **게시 상태 = 프로덕션**(위 ③).
  *
  * 쓰기:
- *   node tools/유튜브토큰발급.js            무엇이 준비됐나만 본다(네트워크 0)
+ *   node tools/유튜브토큰발급.js            무엇이 준비됐나만 본다(네트워크 0 · 값 안 찍음)
  *   node tools/유튜브토큰발급.js --발급     브라우저를 열고 토큰을 받아 .env 에 앉힌다
+ *   node tools/유튜브토큰발급.js --점검     그 토큰으로 **실제로 유튜브가 열리나** 왕복해 본다
+ *                                          (⚠ search.list 한 번 = 100유닛 · 반복해 돌리지 않는다)
  */
 'use strict';
 const fs = require('fs');
@@ -49,7 +51,7 @@ const { 인자게이트 } = require('../lib/플래그.js');
 /* 🔴 `공용플래그`(=`--운영`)를 **안 편다** — 이 도구엔 조준 축이 없다.
  *   토큰은 프로젝트가 아니라 «유튜브 채널»에 매이고, 그 채널은 `.env RADIO_CHANNEL_ID` 하나다.
  *   받아 주고 아무것도 안 갈아타면 「받은 척」이 초록으로 나간다(F592 · 회귀가 09-02 에 잡았다). */
-const 아는플래그 = ['--발급'];
+const 아는플래그 = ['--발급', '--점검'];
 
 /* 봇이 실제로 부르는 것 = search.list · liveChatMessages.list · liveChatMessages.insert.
  * 셋을 다 덮는 최소 스코프는 force-ssl 하나다(readonly 로는 insert 가 401). */
@@ -82,10 +84,18 @@ function env쓰기(칸, 값) {
 
 function 브라우저열기(url) {
   /* 윈도우에서 `start` 는 셸 내장이라 cmd 를 거쳐야 한다. 못 열려도 죽지 않는다 —
-   * URL 을 찍어 두니 사람이 붙여넣으면 된다(도구가 브라우저 때문에 멈추면 안 된다). */
+   * URL 을 찍어 두니 사람이 붙여넣으면 된다(도구가 브라우저 때문에 멈추면 안 된다).
+   *
+   * 🔴 2026-09-02 실측 — **cmd 는 URL 의 `&` 를 명령 구분자로 자른다.**
+   *   따옴표 없이 넘겼더니 `client_id=…` 까지만 열리고 뒤가 통째로 날아가
+   *   구글이 「Required parameter is missing: response_type · 400 invalid_request」를 냈다.
+   *   증상이 «우리 코드 오류»가 아니라 «구글이 거절»로 보여서 한참 엉뚱한 데를 본다.
+   *   ⇒ 큰따옴표로 감싼다(따옴표 «안»의 `&` 는 cmd 가 안 자른다). `start` 의 첫 `""` 는 창 제목 자리라
+   *     그것까지 있어야 URL 이 제목으로 먹히지 않는다. */
   try {
-    if (process.platform === 'win32') spawn('cmd', ['/c', 'start', '""', url], { detached: true, stdio: 'ignore' }).unref();
-    else if (process.platform === 'darwin') spawn('open', [url], { detached: true, stdio: 'ignore' }).unref();
+    if (process.platform === 'win32') {
+      spawn(`start "" "${url}"`, { shell: true, detached: true, stdio: 'ignore' }).unref();
+    } else if (process.platform === 'darwin') spawn('open', [url], { detached: true, stdio: 'ignore' }).unref();
     else spawn('xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
   } catch { /* 못 열면 사람이 붙여넣는다 */ }
 }
@@ -197,6 +207,53 @@ async function 발급() {
   console.log('   ingest_heartbeat 의 «구멍»뿐이라 며칠 지나서야 압니다(§6-3).');
 }
 
+/**
+ * 🔴 «있다»와 «돈다»는 다른 사실이다 — `.env` 에 값이 있는 것과 그 값으로 유튜브가 열리는 것은 다르다.
+ * 이 갈래가 실제로 왕복한다: 갱신토큰 → 액세스토큰 → `channels?mine=true` → 채널 대조 → `search.list`.
+ * 쓰는 자리 = VPS 를 세우는 날 「봇을 켜기 전에」 · 오래 안 쓴 토큰이 아직 사나 볼 때.
+ */
+async function 점검() {
+  const 칸 = { id: env('RADIO_YT_CLIENT_ID'), secret: env('RADIO_YT_CLIENT_SECRET'), 갱신: env('RADIO_YT_REFRESH_TOKEN'), 채널: env('RADIO_CHANNEL_ID') };
+  for (const [k, v] of Object.entries(칸)) if (!v) die(`.env 에 ${k} 가 없다 — 먼저 --발급`);
+
+  const tr = await fetch(토큰끝점, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: 칸.id, client_secret: 칸.secret, refresh_token: 칸.갱신, grant_type: 'refresh_token' }),
+  });
+  if (!tr.ok) {
+    const 몸 = (await tr.text()).slice(0, 300);
+    console.error(`❌ 갱신 실패 HTTP ${tr.status} — ${몸}`);
+    if (/invalid_grant/.test(몸)) {
+      console.error('   `invalid_grant` = 갱신토큰이 죽었다. 흔한 까닭 둘:');
+      console.error('     ㉠ OAuth 동의 화면이 「테스트」 상태다 → 7일마다 죽는다. 프로덕션으로 게시한다.');
+      console.error('     ㉡ 계정에서 이 앱의 액세스를 해제했다 → --발급 으로 다시 받는다.');
+    }
+    process.exit(1);
+  }
+  const t = await tr.json();
+  console.log(`✅ 액세스 토큰 갱신됨 (만료 ${t.expires_in}초)`);
+
+  const cr = await fetch(`${YT}/channels?part=id,snippet&mine=true`, { headers: { authorization: `Bearer ${t.access_token}` } });
+  if (!cr.ok) die(`channels 조회 HTTP ${cr.status} — ${(await cr.text()).slice(0, 200)}`);
+  const it = ((await cr.json()).items || [])[0];
+  const 이름 = (it && it.snippet && it.snippet.title) || '?';
+  console.log(`✅ 이 토큰이 보는 채널 = ${it ? it.id : '(없음)'} 「${이름}」`);
+  if (!it || it.id !== 칸.채널) {
+    console.error(`❌ .env RADIO_CHANNEL_ID(${칸.채널})와 **다르다** — 봇이 남의 채널을 뒤진다(오류 0줄로).`);
+    process.exit(1);
+  }
+  console.log('   ✅ .env RADIO_CHANNEL_ID 와 같다');
+
+  /* 봇이 실제로 첫 번째로 치는 호출을 그대로 한 번 — 권한·스코프가 진짜 열렸는지 본다.
+   * ⚠ 이 한 번이 **100유닛**이다(하루 10,000 중). 점검을 반복해서 돌리지 않는다. */
+  const s = await fetch(`${YT}/search?part=id&channelId=${칸.채널}&eventType=live&type=video&maxResults=5`, { headers: { authorization: `Bearer ${t.access_token}` } });
+  if (!s.ok) die(`search.list HTTP ${s.status} — ${(await s.text()).slice(0, 200)}`);
+  const n = ((await s.json()).items || []).length;
+  console.log(`✅ search.list(활성 방송) HTTP 200 — 지금 방송 ${n}건${n === 0 ? ' (송출 전이면 0이 맞다)' : ''}`);
+  console.log('   ⚠ 이 호출 하나가 100유닛이다 — 점검을 반복해 돌리지 않는다.');
+}
+
 function 상태() {
   const 칸 = ['RADIO_CHANNEL_ID', 'RADIO_YT_CLIENT_ID', 'RADIO_YT_CLIENT_SECRET', 'RADIO_YT_REFRESH_TOKEN'];
   console.log('[토큰발급] 지금 .env 상태 (값은 안 찍는다 · 네트워크 안 씀)');
@@ -221,6 +278,7 @@ function main() {
   const 오류 = 인자게이트('유튜브토큰발급', argv, 아는플래그);
   if (오류) { console.error(`[유튜브토큰발급] ${오류}`); process.exit(1); }
   if (argv.indexOf('--발급') >= 0) return 발급();
+  if (argv.indexOf('--점검') >= 0) return 점검();
   상태();
   return undefined;
 }
