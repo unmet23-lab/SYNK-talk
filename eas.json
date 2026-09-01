@@ -21,8 +21,7 @@
       },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://baasvefzinrxaryksayl.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_UalaCpFtV6weCR1IvZkTLQ_NW5-dcFK",
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_UalaCpFtV6weCR1IvZkTLQ_NW5-dcFK"
       }
     },
     "합성밟기": {
@@ -44,8 +43,7 @@
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://qiwxeddwwnzkwalpsuty.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_g_T9VApp7f7L3girlJW8hA_j__pZjED",
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_g_T9VApp7f7L3girlJW8hA_j__pZjED"
       }
     }
   },
