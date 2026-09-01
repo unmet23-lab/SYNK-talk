@@ -9,7 +9,8 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://baasvefzinrxaryksayl.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_UalaCpFtV6weCR1IvZkTLQ_NW5-dcFK"
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_UalaCpFtV6weCR1IvZkTLQ_NW5-dcFK",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
     "preview": {
@@ -20,7 +21,8 @@
       },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://baasvefzinrxaryksayl.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_UalaCpFtV6weCR1IvZkTLQ_NW5-dcFK"
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_UalaCpFtV6weCR1IvZkTLQ_NW5-dcFK",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
     "합성밟기": {
@@ -33,7 +35,8 @@
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://baasvefzinrxaryksayl.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_UalaCpFtV6weCR1IvZkTLQ_NW5-dcFK",
-        "EXPO_PUBLIC_SYNTHETIC_RUN": "1"
+        "EXPO_PUBLIC_SYNTHETIC_RUN": "1",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
     "production": {
@@ -41,7 +44,8 @@
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://qiwxeddwwnzkwalpsuty.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_g_T9VApp7f7L3girlJW8hA_j__pZjED"
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_g_T9VApp7f7L3girlJW8hA_j__pZjED",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     }
   },
