@@ -220,13 +220,33 @@ Deno.serve(async (req: Request) => {
            and e.event_type = 'estimate.responded'`;
       const 부정키들 = ((답이력.부정쌍들 ?? []) as Array<{ 축: string; 키: string }>)
         .map((p) => 부정키(String(p.축), String(p.키)));
+      /* 🔴 기아 방지(심문 전건판정 2026-09-02 ㉮) — 축별 「마지막으로 답한 날」.
+       * 없으면 lib 이 고정 우선순위로 내려앉으므로 **질의를 따로 세우고 따로 삼킨다** —
+       * 위 답이력에 합치면 이 SQL 하나가 실패할 때 카드가 통째로 null 이 된다(있던 기능을
+       * 새 기능이 데려가는 자리). 실패의 값은 「옛 행동」이지 「기능 없음」이 아니다. */
+      let 축별마지막날: Record<string, string> = {};
+      try {
+        const 날들 = await sql`
+          select e.payload->>'trait_axis' as 축,
+                 max((e.ingested_at at time zone ${시간대})::date)::text as 날
+            from engine.learning_events e
+           where e.learner_id = ${행.learner_id}::uuid
+             and e.event_type = 'estimate.responded'
+             and e.payload->>'trait_axis' is not null
+           group by 1`;
+        축별마지막날 = Object.fromEntries(
+          (날들 as Array<{ 축: string; 날: string }>).map((r) => [String(r.축), String(r.날)]));
+      } catch (e) {
+        console.error('[progress] 축별 마지막날 조회 실패(고정 우선순위로 내려앉는다)',
+          String((e as Error)?.message ?? e));
+      }
       const 기준 = new Date().toISOString();
       const 상태 = 학습자상태(원행들 as unknown[], { as_of: 기준, 시간대 });
       /* v2 — 후보 축 셋(리듬·작성과정·집중띠 · 세층합류 §5). 산출은 학습자상태() 그대로 넘긴다 —
        * 여기서 골라 다듬으면 서버가 보여준 추정과 상태가 배운 추정이 갈린다(두 벌 금지 그대로). */
       오늘의확인 = 확인카드(
         { 리듬: 상태.축.리듬, 작성과정: 상태.축.작성과정, 집중띠: 상태.축.집중띠 },
-        { 오늘답함: Number(답이력.오늘답수) > 0, 부정키들 },
+        { 오늘답함: Number(답이력.오늘답수) > 0, 부정키들, 축별마지막날 },
         기준, 상태.estimator_version);
     } catch (e) {
       console.error('[progress] 오늘의확인 판정 실패(null 로 낸다)', String((e as Error)?.message ?? e));
