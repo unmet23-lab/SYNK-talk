@@ -51,6 +51,20 @@ const 키경로 = process.env.GEMINI_KEY_PATH || 'C:/Users/q1212/SYNK_보안/제
 const 모델 = 'lyria-3-pro-preview';
 const 엔드포인트 = 'https://generativelanguage.googleapis.com/v1beta/interactions';
 const 크레딧경로 = path.join(ROOT, 'bots/송출/크레딧.md');
+/* 🔴 **생산 장부** — 「몇 번 불렀고 몇 번 막혔고 얼마 썼나」 (유호 지시 2026-09-03 「대책이 필요한데?」).
+ *
+ * 왜 생겼나: 09-02 새벽에 45번을 불러 ₩4,980 이 나갔는데, **그 내역이 아무 데도 안 남았다.**
+ *   화면에 `↻ 1/3` 만 찍히고 사라져서, 다음 날 「왜 이렇게 썼지」를 AI Studio 로그를 뒤져서야
+ *   알아냈다(성공 39 · 차단 6). 🔑 **끝나고 나면 못 세는 것은 그때 세어 적어야 한다.**
+ * 🚫 `lib/곡장부.js` 와 겹치지 않는다 — 그쪽은 «곡 하나»가 자기에 대해 답하는 칸(재현·판정)이고,
+ *   여기는 «실행 한 번»의 비용과 차단이다. 한 줄 = 한 번 돌린 것. */
+const 생산장부경로 = path.join(ROOT, 'docs/_ops/곡생산.jsonl');
+const 곡값달러 = 0.08;   // Lyria 3 Pro 한 생성(구글 공식 가격표 2026-09-03 조회 · $0.08/song)
+
+/* 이 실행에서 실제로 무슨 일이 있었나 — 예상이 아니라 «센 값»이다.
+ * 🔑 차단도 과금되는 것으로 보인다(09-02 실측: 요청 45회분 금액 ≈ 실제 청구 ₩4,980 · 성공은 39회였다).
+ *   그래서 «성공»이 아니라 «호출»로 값을 센다 — 적게 세면 다음 판단이 헐거워진다. */
+const 셈 = { 호출: 0, 차단: 0, 실패벌: 0, 결별차단: {} };
 
 /* ── 결 셋 — 09-01 시험에서 유호님 귀 판정을 통과한 세 갈래 ────────────────
  * 🔑 앞머리 두 줄은 **모든 결에 공통**이다(실측: 3곡 전부 보컬 0으로 나왔다).
@@ -102,7 +116,8 @@ function 오디오찾기(x) {
 }
 
 /** 한 생성. 차단은 던지고, 부르는 쪽이 **문면 그대로** 재시도한다(낱말 수술은 마지막 수단). */
-async function 한생성(프롬프트, k) {
+async function 한생성(프롬프트, k, 결) {
+  셈.호출 += 1;   // 성공·차단을 가리지 않고 «부른 것»을 센다(차단도 과금되는 것으로 보인다)
   const res = await fetch(엔드포인트, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': k },
@@ -111,6 +126,10 @@ async function 한생성(프롬프트, k) {
   const 본문 = await res.text();
   if (!res.ok) {
     const 차단 = /content_blocked/i.test(본문);
+    if (차단) {
+      셈.차단 += 1;
+      if (결) 셈.결별차단[결] = (셈.결별차단[결] || 0) + 1;
+    }
     const e = new Error(`${res.status} ${차단 ? 'content_blocked' : 본문.slice(0, 160)}`);
     e.차단 = 차단;
     throw e;
@@ -120,16 +139,20 @@ async function 한생성(프롬프트, k) {
   return Buffer.from(b64, 'base64');
 }
 
-async function 생성재시도(프롬프트, k, 회 = 3) {
+async function 생성재시도(프롬프트, k, 회 = 3, 결) {
   let 마지막;
   for (let i = 1; i <= 회; i++) {
-    try { return await 한생성(프롬프트, k); } catch (e) {
+    try { return await 한생성(프롬프트, k, 결); } catch (e) {
       마지막 = e;
-      if (!e.차단 && i === 회) throw e;
+      /* 🔴 차단이 «아닌» 오류(키 죽음·네트워크·크레딧 0)는 재시도해도 같은 답이다 —
+       *   그 자리에서 던져 전체를 멈춘다. 계속 돌면 같은 실패를 벌 수만큼 반복하며 돈만 센다. */
+      if (!e.차단) throw e;
+      if (i === 회) break;
       process.stdout.write(`  ↻ ${i}/${회} (${e.message.slice(0, 40)})\n`);
       await new Promise((r) => setTimeout(r, 1500 * i));
     }
   }
+  마지막.차단소진 = true;   // 3회를 차단으로 다 쓴 것 — 부르는 쪽이 «이 벌만» 접는다
   throw 마지막;
 }
 
@@ -157,11 +180,39 @@ function 초(파일) {
   return parseFloat(out.trim());
 }
 
+/** 생산 장부에 한 줄(append). @returns {string|null} 실패 사유 — **삼키지 않는다**(조용히 실패하면 「셈에 안 잡힌 실행」이 생긴다). */
+function 생산장부적기(줄) {
+  try {
+    fs.mkdirSync(path.dirname(생산장부경로), { recursive: true });
+    fs.appendFileSync(생산장부경로, JSON.stringify(줄) + '\n', 'utf8');
+    return null;
+  } catch (e) { return String((e && e.message) || e); }
+}
+
 /** 크레딧 장부에 한 줄 — 인코딩.sh 게이트가 이 표를 읽는다. */
 function 크레딧적기(줄들) {
   if (!fs.existsSync(크레딧경로)) return;
   const 원 = fs.readFileSync(크레딧경로, 'utf8');
   fs.writeFileSync(크레딧경로, 원.replace(/\s*$/, '\n') + 줄들.join('\n') + '\n', 'utf8');
+}
+
+/* 🔴 **이미 산 조각을 버리지 않는다** (유호 지시 09-03).
+ *   한 벌은 조각 셋인데, 셋째에서 차단이 소진되면 앞의 둘은 «이미 돈을 낸 것»이다.
+ *   옛 판은 그것을 임시 폴더에 둔 채 죽어서 통째로 사라졌다 — 한 벌이 3생성이니 최대 ₩220 이
+ *   말없이 없어진다. ⇒ 낼곳 밑 `_남은조각/` 으로 옮겨 두고, 사람이 다음에 이어 쓸 수 있게 한다. */
+function 조각살리기(조각, 낼곳, n, 결) {
+  if (!조각.length) return null;
+  const 방 = path.join(낼곳, '_남은조각');
+  try {
+    fs.mkdirSync(방, { recursive: true });
+    const 때 = new Date().toLocaleDateString('sv-SE');
+    const 낸것 = 조각.map((p, i) => {
+      const 새길 = path.join(방, `${때}-${String(n).padStart(2, '0')}-${결ascii[결] || 'mix'}-${i + 1}.mp3`);
+      fs.copyFileSync(p, 새길);
+      return path.basename(새길);
+    });
+    return { 방, 파일: 낸것 };
+  } catch (_) { return null; }   // 살리기 실패가 생산 전체를 죽이지는 않는다
 }
 
 async function 한벌(n, 결, 낼곳, k, 규격) {
@@ -170,7 +221,23 @@ async function 한벌(n, 결, 낼곳, k, 규격) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'synk-radio-'));
   for (let i = 0; i < 3; i++) {
     process.stdout.write(`  · ${결} 생성 ${i + 1}/3 … `);
-    const buf = await 생성재시도(프롬프트, k);
+    let buf;
+    try {
+      buf = await 생성재시도(프롬프트, k, 3, 결);
+    } catch (e) {
+      /* 차단이 «아닌» 오류(키·네트워크·크레딧 0)는 다음 벌도 똑같이 죽는다 — 그대로 던져 전체를 멈춘다. */
+      if (!e.차단소진) {
+        조각.forEach((p) => { try { fs.unlinkSync(p); } catch {} });
+        try { fs.rmdirSync(tmp); } catch {}
+        throw e;
+      }
+      const 살린것 = 조각살리기(조각, 낼곳, n, 결);
+      조각.forEach((p) => { try { fs.unlinkSync(p); } catch {} });
+      try { fs.rmdirSync(tmp); } catch {}
+      셈.실패벌 += 1;
+      process.stdout.write('\n');
+      return { 실패: `차단 3회 소진 (${i + 1}번째 조각에서)`, 결, 산조각: 조각.length, 살린것 };
+    }
     const p = path.join(tmp, `${i}.mp3`);
     fs.writeFileSync(p, buf);
     조각.push(p);
@@ -256,7 +323,7 @@ async function main() {
 
   fs.mkdirSync(낼곳, { recursive: true });
   const k = 키();
-  const 결과 = []; const 크레딧줄 = [];
+  const 결과 = []; const 크레딧줄 = []; const 실패들 = [];
   /* 🔴 `toISOString()` 은 **UTC** 다 — KST 자정 직후에 구우면 장부에 «어제»가 박힌다
    *   (09-02 00:2x 에 구운 8벌이 전부 09-01 로 찍혔다). 장부는 「우리가 언제 만들었나」의
    *   증거라 로컬 날짜여야 한다. `sv-SE` 로케일이 YYYY-MM-DD 를 그대로 준다. */
@@ -268,6 +335,14 @@ async function main() {
     const 결 = 한결 || 결차례[i % 결차례.length];
     console.log(`\n[${i + 1}/${벌}] ${결} → ${String(n).padStart(2, '0')}번`);
     const r = await 한벌(n, 결, 낼곳, k, 규격);
+    /* 🔴 차단으로 접힌 벌은 «건너뛰고 계속»한다 — 전체를 멈추면 이미 성공한 벌까지 크레딧 장부에
+     *   안 적히고, 다음 실행이 또 1번부터 시작한다. 다만 **조용히 넘어가지 않는다**(아래 요약이 센다). */
+    if (r.실패) {
+      console.log(`  🔴 이 벌은 접었다 — ${r.실패} · 산 조각 ${r.산조각}개`
+        + (r.살린것 ? ` → 살려 둠: ${r.살린것.파일.join(' · ')}` : ' → 살리기 실패'));
+      실패들.push({ 번호: n, 결, 사유: r.실패, 산조각: r.산조각 });
+      continue;
+    }
     결과.push(r);
     console.log(`  → ${r.이름} · ${r.초.toFixed(0)}s · ${r.LUFS} LUFS ${r.규격밖.length ? `🔴 ${r.규격밖.join(' · ')}` : '✅'}`);
     크레딧줄.push(`| \`${r.이름}\` | ${결} 결 | **SYNK 자체 생성**(${모델}) | Lyria 3 Pro · SynthID 워터마크 | 표시 의무 없음 | ${오늘} |`);
@@ -276,9 +351,41 @@ async function main() {
   const 총초 = 결과.reduce((a, b) => a + b.초, 0);
   const 밖 = 결과.filter((r) => r.규격밖.length);
   console.log(`\n[라디오곡생산] ${결과.length}벌 · 총 ${(총초 / 60).toFixed(1)}분 · 규격밖 ${밖.length}벌`);
+
+  /* 🔴 **쓴 돈은 «예상»이 아니라 «센 값»으로 적는다** (유호 지시 09-03).
+   *   맨 위 줄의 `≈$…` 는 차단·재시도를 모르는 예상치다. 09-02 에 그 예상(8벌=24생성=$1.92)과
+   *   실제(45호출)가 갈렸는데 아무도 몰랐다 — 다음 날 AI Studio 로그를 뒤져서야 알았다.
+   *   ⇒ 분모를 함께 적는다: 호출 = 성공 + 차단. */
+  const 성공호출 = 셈.호출 - 셈.차단;
+  const 달러 = 셈.호출 * 곡값달러;
+  console.log(`  호출 ${셈.호출}회 = 성공 ${성공호출} + 차단 ${셈.차단}`
+    + ` · ≈$${달러.toFixed(2)}${셈.차단 ? ` (그중 차단에 ≈$${(셈.차단 * 곡값달러).toFixed(2)} — 결과물 0)` : ''}`);
+  if (셈.차단) {
+    const 결별 = Object.entries(셈.결별차단).map(([g, c]) => `${g} ${c}`).join(' · ');
+    console.log(`  차단이 난 결: ${결별} — 같은 결이 되풀이 막히면 그 결의 문면을 손볼 자리다`);
+  }
+  if (실패들.length) {
+    console.log(`  🔴 접힌 벌 ${실패들.length} — ${실패들.map((f) => `${f.번호}번(${f.결})`).join(' · ')}`
+      + ` · 산 조각은 ${path.join(낼곳, '_남은조각')} 에 있다`);
+  }
   console.log(`  낼곳 = ${낼곳}`);
   console.log(`  크레딧 장부 = ${path.relative(ROOT, 크레딧경로)} (인코딩.sh 게이트가 읽는다)`);
-  if (밖.length) process.exitCode = 1;
+  const 장부실패 = 생산장부적기({
+    때: new Date().toISOString(), 날: 오늘, 벌요청: 벌, 벌완성: 결과.length,
+    호출: 셈.호출, 성공: 성공호출, 차단: 셈.차단, 결별차단: 셈.결별차단,
+    실패벌: 실패들, 달러: Number(달러.toFixed(2)), 모델,
+    곡: 결과.map((r) => r.이름), 규격밖: 밖.length, 낼곳,
+  });
+  console.log(장부실패
+    ? `  ⚠ 생산 장부를 못 남겼다(${장부실패}) — 이 실행은 «셈에 안 잡힌다»: ${path.relative(ROOT, 생산장부경로)}`
+    : `  생산 장부 = ${path.relative(ROOT, 생산장부경로)} (몇 번 불렀고 얼마 썼나)`);
+  if (밖.length || 실패들.length) process.exitCode = 1;
 }
 
-main().catch((e) => { console.error('🔴', e.message); process.exit(1); });
+/* 🔑 조각을 밖으로 낸다 — 회귀가 «차단 대책»을 픽스처로 재기 위해서다(09-03).
+ *   CLI 동작은 그대로다: 직접 부르면 main 이 돈다, require 로 실어도 안 돈다. */
+module.exports = { 조각살리기, 생산장부적기, 생성재시도, 셈, 곡값달러, 생산장부경로, 결들, 공통머리 };
+
+if (require.main === module) {
+  main().catch((e) => { console.error('🔴', e.message); process.exit(1); });
+}
