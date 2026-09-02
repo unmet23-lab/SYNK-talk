@@ -1562,7 +1562,11 @@ async function 관찰초안내기(본문: unknown, ver: string) {
       body: JSON.stringify({
         model: 모델,
         max_tokens: 관찰최대토큰,
-        system: 관찰지시문(),
+        /* 🔑 지시문은 `system` 블록 **하나**에 `cache_control` 로(교정엔진.요청몸통 과 같은 무늬 · 트랙 §1
+         *   캐싱) — 맨 문자열 system 엔 끊는 자리를 못 둔다. 변하는 것(메모 원문)은 전부 user 라 접두가
+         *   매번 같다. ⚠ 이 지시문은 짧아(≈700자) 이 모델의 캐시 문턱(1,024토큰) 아래일 수 있다 — 그러면
+         *   오류 없이 그냥 안 걸린다(정가 그대로 · 손해 0). 걸렸는지는 응답 usage 가 말한다(아직 안 재봤다). */
+        system: [{ type: 'text', text: 관찰지시문(), cache_control: { type: 'ephemeral' } }],
         messages: [{ role: 'user', content: 관찰사용자글(원문) }],
       }),
       signal: AbortSignal.timeout(왕복제한밀리),

@@ -21,6 +21,7 @@
   "갈래판정.mjs": "lib/갈래판정.js",
   "sha256.mjs": "lib/sha256.js",
   "교정엔진.mjs": "lib/교정엔진.js",
+  "캐시성적.mjs": "lib/캐시성적.js",
   "벤더사유.mjs": "lib/벤더사유.js",
   "옛글자.mjs": "lib/옛글자.js",
   "과제생성.mjs": "lib/과제생성.js",

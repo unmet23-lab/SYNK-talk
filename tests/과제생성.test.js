@@ -9,8 +9,12 @@ const path = require('path');
 
 const {
   생성요청몸통, 생성응답읽기, 입력초과인가, 응답초과인가,
-  응답스키마, 상한_코드포인트, 프롬프트지문, 본문템플릿, 렌더, 호출옵션,
+  응답스키마, 상한_코드포인트, 프롬프트지문, 본문템플릿, 렌더, 호출옵션, 학생표식, 조각가르기,
 } = require('../lib/과제생성.js');
+
+/* 시험 템플릿 — 실물의 뼈대만(머리말 판 · 펜스 · 규칙 한 줄 · 학생 표식 · 자리 둘). */
+const 시험전문 = '# 과제 생성 프롬프트\n\n> **현재 v1** (이력)\n\n## 본문 템플릿\n\n```\n머리\n[규칙]\n- 규칙 한 줄\n---학생---\n이 학생이다.\n\n[학생 상태]\n{{요약}}\n\n[겨냥]\n{{기술들}}\n꼬리\n```\n';
+const 실물전문 = () => fs.readFileSync(path.join(__dirname, '..', 'prompts', '과제생성.md'), 'utf8');
 
 const 봉투 = (글) => ({ content: [{ type: 'text', text: 글 }], usage: { output_tokens: 1 } });
 const 정상글 = '{"sentence":"주말에 등산을 갔어요.","question":"주말에 뭐 했어요?"}';
@@ -51,8 +55,9 @@ test('상한 경계 — 정확히 8000 은 통과, 8001 은 초과(입력·응�
 });
 
 test('요청 몸통 — model 필수(리터럴 0 · 유호님 몫) · thinking adaptive · 구조화 출력 새 이름', () => {
-  assert.throws(() => 생성요청몸통({ 본문: 'x' }), /model/);
-  const b = 생성요청몸통({ 본문: '[학생 맥락] …', model: 'claude-test-1' });
+  const 본문 = 렌더(시험전문, { 요약: '급수: Lv2', 기술들: ['은/는 (주제)'] });
+  assert.throws(() => 생성요청몸통({ 본문 }), /model/);
+  const b = 생성요청몸통({ 본문, model: 'claude-test-1' });
   assert.equal(b.model, 'claude-test-1');
   assert.deepEqual(b.thinking, { type: 'adaptive' },
     '🔴 유호 픽 08-25 「생각 켜기」 — 08-12 의 off 는 예산 300 이 낳은 처방이었고, 예산을 4000 으로 넓혀 원인을 없앴다. Opus 5 에서 사고 끄기는 API 정본이 권하지 않는 자리다');
@@ -64,7 +69,7 @@ test('요청 몸통 — model 필수(리터럴 0 · 유호님 몫) · thinking a
   assert.equal(b.output_config.format.type, 'json_schema',
     '⓪ 정찰(08-21)의 새 이름 output_config.format 이다 — 전환기 옛 이름에 안 기댄다');
   assert.equal(b.output_config.format.schema, 응답스키마);
-  assert.equal(b.messages.length, 1, '렌더된 본문 1개가 계약이다(§5-3)');
+  assert.equal(b.messages.length, 1, '학생 조각 = user 메시지 1개가 계약이다(§5-3)');
   const 소스 = fs.readFileSync(path.join(__dirname, '..', 'lib', '과제생성.js'), 'utf8');
   assert.ok(!/claude-[a-z0-9-]+/.test(소스.replace(/claude-test-1/g, '')),
     '파일에 모델 리터럴이 있다 — 모델은 유호님이 고른다');
@@ -96,8 +101,6 @@ test('SQL 파서가 §8 정규화를 진다(v5.13-b ③) — JS 검문과 같은
 });
 
 /* ── 프롬프트지문(v5.13-b ①) — 형식·재료 민감성 ── */
-const 시험전문 = '# 과제 생성 프롬프트\n\n> **현재 v1** (이력)\n\n## 본문 템플릿\n\n```\n머리\n[학생 상태]\n{{요약}}\n\n[겨냥]\n{{기술들}}\n꼬리\n```\n';
-
 test('프롬프트지문 — 형식 `과제생성.v<N>+<hex12>` · 재료 하나만 바뀌어도 지문이 다르다', () => {
   const a = 프롬프트지문({ 전문: 시험전문, 파서해시: 'a'.repeat(64) });
   assert.match(a, /^과제생성\.v1\+[0-9a-f]{12}$/);
@@ -124,6 +127,56 @@ test('렌더 — 자리 둘 치환 · $ 가 든 요약도 그대로 · 실물 �
   /* §12-22 축 — 상태(요약)·기술 하나만 바꿔도 input 이 다르다(호출 0 · 우리 입력을 잰다). */
   assert.notEqual(실렌더, 렌더(실물, { 요약: '급수: Lv4', 기술들: ['은/는 (주제)'] }));
   assert.notEqual(실렌더, 렌더(실물, { 요약: '급수: Lv3', 기술들: ['-았/었-'] }));
+});
+
+/* ── 프롬프트 캐싱(트랙 §1 캐싱 · 09-02) — 끊는 자리 · 학생 조각 · 표식 ── */
+test('🔴 캐시 끊는 자리가 규칙 끝이다 — system 블록 하나에 cache_control · 변하는 것(학생 조각)은 전부 그 뒤(user 하나)', () => {
+  /* 캐싱은 **접두 일치**라 끊는 자리 앞이 한 바이트라도 다르면 그 뒤가 통째로 무효다. v5 판 실측 80회가
+   * 전부 캐시 0 이었던 자리 — 학생 조각이 머리 110자 안에 있었고 system 도 표식도 없었다. 이 검사가 지키는
+   * 것: 나중에 누가 급수·요약을 규칙 쪽으로 올리면 **캐시가 조용히 죽는다**(오류가 아니라 요금으로만 보인다). */
+  const 실물 = 실물전문();
+  /* 학생 값은 규칙 문안에 «없는» 낱말로 — 규칙이 「케이팝·드라마」를 예로 들고 있어 그 낱말로 재면 거짓 적색이다. */
+  const 갑요약 = '급수: Lv2\n목표: 바트볼드 유학 준비\n리듬: 제출률=0.5';
+  const 갑 = 생성요청몸통({ 본문: 렌더(실물, { 요약: 갑요약, 기술들: ['은/는 (주제)'] }), model: 'claude-test-1' });
+  const 을 = 생성요청몸통({ 본문: 렌더(실물, { 요약: '급수: Lv5\n목표: 대학 진학', 기술들: ['-았/었-', '-(으)ㄹ 거예요'] }), model: 'claude-test-1' });
+  assert.equal(갑.system.length, 1, '지시문은 블록 하나다 — 둘이면 끊는 자리가 갈린다');
+  assert.equal(갑.system[0].type, 'text');
+  assert.deepEqual(갑.system[0].cache_control, { type: 'ephemeral' });
+  assert.deepEqual(을.system, 갑.system, '학생이 바뀌었는데 system 이 바뀐다 — 캐시 접두가 매번 새로 써진다(읽기 0)');
+  const 접두 = JSON.stringify(갑.system) + JSON.stringify(을.system);
+  for (const 학생글자 of ['Lv2', 'Lv5', '바트볼드', '유학', '제출률', '은/는 (주제)', '대학 진학', '-았/었-']) {
+    assert.ok(!접두.includes(학생글자), `학생 조각 «${학생글자}» 이 캐시 접두(system) 안에 있다`);
+  }
+  assert.equal(갑.messages.length, 1, '학생 조각은 user 메시지 하나다(§5-3)');
+  assert.equal(갑.messages[0].role, 'user');
+  for (const 학생글자 of ['[학생 상태]', '급수: Lv2', '바트볼드 유학 준비', '[겨냥 문법·표현', '- 은/는 (주제)']) {
+    assert.ok(갑.messages[0].content.includes(학생글자), `학생 조각 «${학생글자}» 이 user 에 없다`);
+  }
+  assert.ok(!갑.messages[0].content.includes('[규칙]'), '규칙이 user 로 새면 학생마다 정가로 다시 청구된다');
+  assert.ok(!JSON.stringify(갑).includes(학생표식), '표식 줄이 모델에게 갔다 — 자르는 자리지 본문이 아니다');
+  /* 접두가 «충분히 길다» — 규칙이 학생 조각보다 압도적으로 커야 절감이 서고, Opus 5 문턱(512토큰)도 넘는다. */
+  assert.ok(갑.system[0].text.length > 5000, `system 이 ${갑.system[0].text.length}자 — 규칙 본문이 통째로 실려 있지 않다`);
+  assert.ok(갑.system[0].text.length > 갑.messages[0].content.length * 5, '학생 조각이 규칙보다 크게 실렸다 — 캐시가 걸려도 절감이 없다');
+  /* 렌더 «전체»(generation_input_text)는 두 조각 + 표식이다 — 저장되는 본문과 보내는 것이 같은 바이트다. */
+  const 본문 = 렌더(실물, { 요약: 갑요약, 기술들: ['은/는 (주제)'] });
+  assert.ok(본문.startsWith(갑.system[0].text) && 본문.endsWith(갑.messages[0].content), '저장 본문과 보내는 두 조각이 다른 바이트다');
+});
+
+test('조각가르기 — 표식은 «줄 전체»여야 하고 첫 표식에서 자른다 · 없으면 null · 렌더도 null(내부오류 갈래)', () => {
+  assert.deepEqual(조각가르기('위\n---학생---\n아래'), { 지시문: '위', 학생: '아래' });
+  assert.deepEqual(조각가르기('위\r\n---학생---\r\n아래'), { 지시문: '위', 학생: '아래' }, 'CRLF 도 같은 표식이다');
+  assert.equal(조각가르기('머리 ---학생--- 꼬리'), null, '줄 속 글자는 표식이 아니다 — 요약 속 글자가 자르는 자리가 되면 안 된다');
+  assert.equal(조각가르기('표식이 없다'), null);
+  const 두번 = 조각가르기('위\n---학생---\n요약: ---학생--- 라는 글자\n---학생---\n끝');
+  assert.equal(두번.지시문, '위', '첫 표식에서 자른다 — 학생 조각 안의 같은 줄은 어차피 뒤다');
+  assert.ok(두번.학생.startsWith('요약: ---학생--- 라는 글자'));
+  /* 표식 없는 템플릿은 본문을 안 만든다 — 지나가면 user 한 덩이로 나가 캐시가 조용히 죽는다(v5 판의 모양). */
+  assert.equal(렌더(시험전문.replace('---학생---\n', ''), { 요약: 'x', 기술들: [] }), null);
+  assert.throws(() => 생성요청몸통({ 본문: '표식 없는 본문', model: 'claude-test-1' }), /학생 표식/);
+  /* 학생 조각의 «자리»를 옮기는 것도 전문 바이트 변화라 prompt_ver 가 스스로 오른다(손 편집 0). */
+  const 옮긴전문 = 시험전문.replace('---학생---\n이 학생이다.\n\n', '').replace('머리\n', '머리\n---학생---\n');
+  assert.ok(렌더(옮긴전문, { 요약: 'x', 기술들: [] }), '옮긴 시험 템플릿이 렌더돼야 아래 비교가 판을 잰다');
+  assert.notEqual(프롬프트지문({ 전문: 시험전문, 파서해시: 'a'.repeat(64) }), 프롬프트지문({ 전문: 옮긴전문, 파서해시: 'a'.repeat(64) }));
 });
 
 /* §12-22 본체 — «상태 축 하나만 바꾼 두 요청»을 전체 사슬(상태 → 과제요약 → 렌더)로 잰다.

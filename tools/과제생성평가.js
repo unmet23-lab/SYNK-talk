@@ -29,8 +29,23 @@ const { 경로, 파일해시, 활성인가, 현행판 } = require('../lib/과제
 const { 검문 } = require('../lib/과제검문.js');
 const { 생성응답읽기 } = require('../lib/과제생성.js');
 const { 워커예산_MS, 생성타임아웃_MS, 폴백여유_MS, 크론표 } = require('../lib/생성상수.js');
+const { 캐시장부, 캐시기록, 캐시줄 } = require('../lib/캐시성적.js');   // 캐싱 눈금 한 원천(워커와 같은 자 · 트랙 §1 캐싱)
 
 const ROOT = path.resolve(__dirname, '..');
+
+/* 캐시 계측 요약(트랙 §1 캐싱) — 행의 raw_response(벤더 봉투 원문)에서 usage 를 읽어 한 줄로. 세 얼굴을
+ * 안 섞는다: 응답 0건 / usage 없음(무계측 — 파싱 불가 행 포함) / 읽음이 정말 0. 벤더 응답이 없던 행
+ * (사유 행 · raw '')은 분모 밖이다. 행에 새 칸을 만들지 않는다(행키들은 여덟으로 얼어 있다 · E2). */
+function 캐시요약줄(행들) {
+  const 장부 = 캐시장부();
+  for (const r of 행들 || []) {
+    if (typeof r.raw_response !== 'string' || !r.raw_response) continue;
+    let 봉투 = null;
+    try { 봉투 = JSON.parse(r.raw_response); } catch { /* 응답파손 행 — usage 를 못 읽는다 = 무계측 */ }
+    캐시기록(장부, 봉투 && 봉투.usage);
+  }
+  return `캐시 계측(raw_response 의 usage) — ${캐시줄(장부)}`;
+}
 /* 배포판 게이트 스코프 — 이 도구가 부르는 Edge Fn 은 deliver-one 하나(tests/왕복골격.test.js 가 「소스가 부르는
  * 함수 ⊆ 선언」을 잰다). 평가 갈래는 운영 큐 무접촉이라 다른 함수를 안 부른다. */
 const 게이트함수들 = ['deliver-one'];
@@ -246,8 +261,10 @@ if (argv.includes('--원격')) {
       console.log(`  → ${path.relative(ROOT, 지연경로)}`);
     }
 
-    const 사유 = 평가.결과검증(읽기(출력), 시험지, 전문);
+    const 저장본 = 읽기(출력);
+    const 사유 = 평가.결과검증(저장본, 시험지, 전문);
     console.log(`[과제생성평가] 저장 → ${path.relative(ROOT, 출력)} · 기계 계약 ${사유.length ? '❌ ' + 사유.slice(0, 3).join(' / ') : '✅'} · 다음 = --채점 ${path.relative(ROOT, 출력)} --채점자 <이름>`);
+    console.log(`  ${캐시요약줄(저장본.행)}`);
   })().catch((e) => { console.error('[과제생성평가] 원격 실패:', e && e.message ? e.message : e); process.exit(1); });
 }
 
@@ -368,6 +385,7 @@ if (값('--판정')) {
   console.log(`  ⑥ 셀(급수별 accuracy): ${평가.급수들.map((l) => `${l} ${집.셀.accuracy[l].합}/${집.셀.accuracy[l].분모}`).join(' · ')}${집.셀미달.length ? ' — ❌ 미달 ' + 집.셀미달.join(',') + '(V6-26 전체 미통과)' : ''}`);
   console.log(`  커버리지 ${시험지.커버리지.선조합}/${시험지.커버리지.전체} · 안 선 조합 ${시험지.커버리지.안선목록.length}`);
   console.log(`  비교축 7 ↔ 현행: ${판.다름.length ? '❌ 다른 칸 ' + 판.다름.join(',') + ' — 이 결과는 «옛 실행판»의 것이라 지금 초록의 근거가 아니다(V6-23)' : '✅ 같은 실행판'}`);
+  console.log(`  ${캐시요약줄(결과.행)}`);
   console.log(`  ⇒ ${판.한벌 ? '✅ §8-B 통과 — 첫 생성 행 «전» 필수 #6 의 결과 1벌이 섰다' : `❌ §8-B 미통과 — ${판.사유}`}`);
   process.exit(판.한벌 ? 0 : 1);
 }

@@ -47,6 +47,7 @@
 import postgres from 'npm:postgres@3.4.4';
 import 토큰모듈 from './토큰.mjs';
 import 교정모듈 from './교정엔진.mjs';
+import 캐시모듈 from './캐시성적.mjs';
 import 과제생성모듈 from './과제생성.mjs';
 import 과제검문모듈 from './과제검문.mjs';
 import 실행판모듈 from './실행판.mjs';
@@ -60,6 +61,15 @@ import 프롬프트전문 from './과제생성프롬프트.mjs';
 const { 서비스역할 } = 토큰모듈 as { 서비스역할: (req: Request) => boolean };
 const { 메시지경로, 벤더헤더 } = 교정모듈 as {
   메시지경로: string; 벤더헤더: (키: string) => Record<string, string>;
+};
+/* 캐시 계측(트랙 §1 캐싱) — 자는 lib/캐시성적 하나(교정 통로와 같은 눈금). 세 얼굴을 안 섞는다:
+ * 호출 0(안 부름) · 무계측(200 인데 usage 없음 = 모름) · 읽음 0(정말 안 걸림). */
+type 캐시장부꼴 = { 호출: number; 무계측: number; 입력: number; 캐시생성: number; 캐시읽음: number };
+type 캐시얼굴꼴 = { 입력: number; 캐시생성: number; 캐시읽음: number } | '무계측';
+const { 캐시장부, 캐시기록, 캐시줄 } = 캐시모듈 as {
+  캐시장부: () => 캐시장부꼴;
+  캐시기록: (장부: 캐시장부꼴, usage: unknown) => 캐시얼굴꼴;
+  캐시줄: (장부: 캐시장부꼴) => string;
 };
 const {
   생성요청몸통, 생성응답읽기, 입력초과인가, 응답초과인가, 렌더, 재시도가능, 벤더사유,
@@ -214,13 +224,16 @@ Deno.serve(async (req: Request) => {
   첫요청 = false;
   /* 요약 — ops.수확이 응답 본문을 left(2000) 로 끊어 장부에 싣는다(cron_ledger_c11). 계측은 마지막
    * 키라 그 절단에 먼저 잘리므로, 핵심 넷은 «날짜 바로 뒤» 이른 키로 실어 2000자 안에 살린다
-   * (JSON 직렬화는 삽입 순서를 지킨다). 캐시성적을 켜는 날 그 칸도 이 자리에 든다. */
+   * (JSON 직렬화는 삽입 순서를 지킨다). 캐시 장부(호출·무계측·읽음)도 같은 자리에 든다 — v5 판 80회가
+   * 전부 캐시 0 이었는데 어느 응답에도 안 실려 있어 며칠을 몰랐다(트랙 §1 캐싱). */
+  const 캐시 = 캐시장부();   // 이 호출의 벤더 200 응답 전량(평가 갈래·워커 갈래 공용)
   const 요약 = () => {
     const 벤더들 = 계측.학생.map((s) => s.벤더_ms)
       .filter((v): v is number => typeof v === 'number').sort((a, b) => a - b);
     return {
       콜드스타트_ms: 계측.콜드스타트_ms, claim_ms: 계측.claim_ms, 학생수: 계측.학생.length,
       벤더중앙_ms: 벤더들.length ? 벤더들[Math.floor(벤더들.length / 2)] : null,
+      캐시,
     };
   };
   const 키 = Deno.env.get('ANTHROPIC_API_KEY') ?? '';
@@ -231,7 +244,7 @@ Deno.serve(async (req: Request) => {
   /* ── 평가 통로 (`?평가=1`) — **운영 큐 무접촉**(§8-B E5 — 평가가 generation_jobs·attempts 에 행을 만들면
    * 운영 장부가 평가로 오염된다 · `attempt_id` 금지의 그 논거) · `correct?평가=1` 선례 그대로:
    * 렌더된 요청 본문(= generation_input_text · tools/과제생성평가.js 가 같은 lib 로 조립)을 받아 **같은 동봉·같은
-   * 요청 몸통·같은 타임아웃**으로 벤더만 왕복하고 원자재(원문·model·usage)를 돌려준다. 해석·검문·채점은
+   * 요청 몸통·같은 타임아웃**으로 벤더만 왕복하고 원자재(원문·model·usage·캐시 얼굴)를 돌려준다. 해석·검문·채점은
    * 부르는 쪽(같은 lib)이 한다. DB 는 «읽기»(자기 실행판 — rpc 전문·schema_ver)만 닿는다.
    * 🔑 실행판은 워커와 «같은 함수 하나»(자기실행판)로 낸다 — 실행기가 응답 `prompt_ver` 를 로컬 파일 판과 대조하는
    *    이중 자물쇠가 여기 걸린다(배포판 ≠ HEAD 면 평가 전체 무효). 설정 실패는 5xx+error(200+`이유` 가 아니다 —
@@ -270,13 +283,14 @@ Deno.serve(async (req: Request) => {
         if (응답초과인가(원문)) { 결과.push({ case_id: 사.case_id, 사유: '응답초과' }); continue; }
         let 본문: { model?: string; usage?: unknown } = {};
         try { 본문 = JSON.parse(원문); } catch { /* 원문은 그대로 싣는다 — 파서(응답파손)는 부르는 쪽 */ }
-        결과.push({ case_id: 사.case_id, raw: 원문, model: 본문.model ?? null, usage: 본문.usage ?? null });
+        /* 캐시 얼굴은 사례마다(성적 | '무계측') · 장부는 응답에 한 번 — 평가 회전이 곧 캐싱의 첫 실측이다. */
+        결과.push({ case_id: 사.case_id, raw: 원문, model: 본문.model ?? null, usage: 본문.usage ?? null, 캐시: 캐시기록(캐시, 본문.usage) });
       } catch (e) {
         const 이름 = String((e as Error)?.name ?? e);
         결과.push({ case_id: 사.case_id, 사유: 이름 === 'TimeoutError' || 이름 === 'AbortError' ? '타임아웃' : `예외:${이름.slice(0, 40)}` });
       }
     }
-    return 봉투(200, { 평가: true, 실행판, 결과 });
+    return 봉투(200, { 평가: true, 실행판, 캐시, 결과 });
   }
 
   /* T8(유호 픽 C · 08-24 결정.md) — **조준 모드**: /tasks 가 창 안 «대기» 잡의 학생 하나를
@@ -365,6 +379,7 @@ Deno.serve(async (req: Request) => {
     const 학생시작 = Date.now();
     let 벤더전: number | null = null;
     let 벤더후: number | null = null;
+    let 학생캐시: 캐시얼굴꼴 | null = null;   // 벤더 200 의 얼굴 — 안 부른·실패 갈래는 null(0 이 아니다)
     try {
       const draft = j.event_draft ?? {};
 
@@ -399,7 +414,7 @@ Deno.serve(async (req: Request) => {
       const 기술들 = j.skill_ids.map((id) => 라벨.get(id)).filter((x): x is string => !!x);
       if (기술들.length !== j.skill_ids.length) throw new Error('겨냥 기술의 label_ko 를 못 읽었다(적재 대조 ⑦ 를 지난 ID 다 — 시드 사고)');
       const 본문 = 렌더(프롬프트전문 as unknown as string, { 요약, 기술들 });
-      if (본문 == null) throw new Error('프롬프트 본문 템플릿을 못 찾았다(prompts/과제생성.md 펜스)');
+      if (본문 == null) throw new Error('프롬프트 본문 템플릿(펜스) 또는 학생 표식(---학생---)을 못 찾았다 — prompts/과제생성.md');
 
       /* ②' 중복 이력 + 식별자(검문 입력) — as_of 경계는 job 에 굳힌 값 하나(D1). */
       const 이력 = await 중복이력(j.learner_id, j.snapshot_as_of);
@@ -435,6 +450,7 @@ Deno.serve(async (req: Request) => {
 
       /* ④ 벤더 왕복 — 타임아웃은 학생 예산 하나(§3-2). model 은 job 실행판(적용하려던 판). */
       let 원문: string | null = null;
+      let 벤더봉투: unknown = null;   // 200 의 JSON — usage 계측과 파서가 «같은 한 번의 파싱»을 읽는다
       let 결과: string | null = null;   // attempts.result (부분집합 7)
       let 벤더상태: number | null = null;   // 일과성 판정 재료(§4-2 — 재시도가능 은 status 를 받는다)
       벤더전 = Date.now();
@@ -447,6 +463,12 @@ Deno.serve(async (req: Request) => {
         });
         원문 = await r.text();
         if (!r.ok) { 결과 = '벤더오류'; 벤더상태 = r.status; }
+        else {
+          try { 벤더봉투 = JSON.parse(원문); } catch { /* 아래 파서가 응답파손으로 접는다 */ }
+          /* 캐시 계측(트랙 §1 캐싱) — 200 인데 usage 가 없으면 «무계측»(0 이 아니라 모름). 장부는 요약에,
+           * 얼굴은 학생별 계측에 실린다 — 캐시는 안 걸려도 오류가 없어 이 숫자가 유일한 증거다. */
+          학생캐시 = 캐시기록(캐시, (벤더봉투 as { usage?: unknown } | null)?.usage);
+        }
       } catch (e) {
         결과 = (e as Error)?.name === 'TimeoutError' || (e as Error)?.name === 'AbortError'
           ? '타임아웃' : '벤더오류';
@@ -458,8 +480,6 @@ Deno.serve(async (req: Request) => {
       let 성공값: { sentence: string; question: string } | null = null;
       let 사유들: string[] | null = null;
       if (결과 == null && 원문 != null) {
-        let 벤더봉투: unknown = null;
-        try { 벤더봉투 = JSON.parse(원문); } catch { /* 아래 파서가 응답파손으로 접는다 */ }
         const 읽음 = 생성응답읽기(벤더봉투);
         if (읽음.값) 성공값 = 읽음.값; else 결과 = '응답파손';
       }
@@ -532,10 +552,11 @@ Deno.serve(async (req: Request) => {
         전처리_ms: (벤더전 ?? 끝) - 학생시작,                                   // 이력·렌더·attempt_open (벤더 전 폴백 갈래는 전부 여기)
         벤더_ms: 벤더전 != null && 벤더후 != null ? 벤더후 - 벤더전 : null,   // 안 부른 갈래는 null(0 이 아니다)
         착지_ms: 벤더후 != null ? 끝 - 벤더후 : null,                           // attempt_close + jobs_finalize(성공·폴백)
+        캐시: 학생캐시,                                                           // 성적 | '무계측'(200 인데 usage 없음) | null(안 부름·실패)
       });
     }
   }
 
-  console.log(`[deliver-one] 계측 — 콜드스타트 ${계측.콜드스타트_ms ?? 'warm'}ms · claim ${계측.claim_ms}ms · 학생 ${계측.학생.length}명`);
+  console.log(`[deliver-one] 계측 — 콜드스타트 ${계측.콜드스타트_ms ?? 'warm'}ms · claim ${계측.claim_ms}ms · 학생 ${계측.학생.length}명 · 캐시 ${캐시줄(캐시)}`);
   return 봉투(200, { 날짜: 오늘, 요약: 요약(), 회수, 집음: jobs.length, 계수, 오류: 오류들, 계측 });
 });
