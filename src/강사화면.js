@@ -43,6 +43,9 @@ import { VERDICT, 텍스트내는판정, 골든판정요청 } from '../lib/검�
 import { use등장 } from '../lib/모션.js';
 import 마스코트 from './마스코트.js';
 import { 강사순간고르기 } from '../lib/마스코트강사말.js';
+/* 「오늘」은 마스코트기록 지도에 날짜를 쓰는 두 곳(여기·재회 판정)이 **같은 자**를 써야 한다 —
+   지역 함수로 두었더니 09-02 에 임자가 둘이 될 뻔했다(lib 로 올렸다). */
+import { 오늘줄 } from '../lib/마스코트생명.js';
 import { 마스코트기록읽기, 마스코트기록쓰기, 화면설정읽기, 화면설정쓰기 } from './저장.js';
 
 /**
@@ -125,12 +128,6 @@ export function 진행(목록) {
   };
 }
 
-/** 기기 시계의 오늘 — UTC 가 아니라 현지 날짜다(몽골 UTC+8 · toISOString 은 하루가 밀린다). */
-function 날짜줄(d) {
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-
 export default function 강사화면({ 토큰, 돌아가기 }) {
   const [주, set주] = useState('');
   const [표본크기, set표본크기] = useState(0);
@@ -168,13 +165,13 @@ export default function 강사화면({ 토큰, 돌아가기 }) {
         셈: 셈값,
         주: 주값,
         요일: ((지금.getDay() + 6) % 7) + 1,
-        오늘: 날짜줄(지금),
+        오늘: 오늘줄(지금),
         막힌카드: (목록값 || [])
           .filter((it) => it && it.status === 큐상태.막힘)
           .map((it) => String(it.correction_id)),
       }, 기록);
       if (!고른) return;
-      await 마스코트기록쓰기({ ...기록, [고른.키]: 날짜줄(지금) });
+      await 마스코트기록쓰기({ ...기록, [고른.키]: 오늘줄(지금) });
       set캐릭터말({ 글: 고른.풀[Math.floor(Math.random() * 고른.풀.length)], 때: Date.now() });
     } catch { /* 침묵 — 틀린 말도 오류 화면도 아니고 그날 말이 없는 것이다 */ }
   }, []);
