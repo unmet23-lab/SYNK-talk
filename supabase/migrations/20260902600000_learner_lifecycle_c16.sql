@@ -1,11 +1,115 @@
+/* 학습자 생애 다섯 — engine.learners.enrolled_at · observed_at · effective_at · exit_reason · lifecycle_status
+ * (학생ID 종단 설계 v2 §5 ㉣ · 전건 판정 Ⅱ-2·Ⅲ-2·Ⅲ-3 — 정본 = appsscript docs/학생ID_종단_설계.md ·
+ *  docs/_ops/심문결과/학생ID_종단_설계_v1-전건판정.md · 2026-09-02)
+ *
+ * ■ 무엇이 비어 있었나 — `learners` 에 시간이 `created_at` 하나다
+ *   「언제 들어와서 언제 나갔나」가 없다. 첫 기수 졸업은 2028-02 이고 그날의 값(왜·언제 나갔나)은 그날
+ *   사람만 안다 — 표의 모양은 나중에 바꿔도 되지만 값은 못 되돌린다. 그래서 자리만 «지금» 세운다.
+ *
+ * ■ 칸 다섯 — 이 칸들은 «원본»이 아니라 사건(exit_log → 퇴소 인제스트 · 개원 전)에서 «파생»된다
+ *   enrolled_at       상담시트 «등록일» 하나(Ⅲ-3 — 「첫 반배정일」이 따로 필요해지면 그날 칸을 하나 더 만든다)
+ *   observed_at       기계가 알아챈 날 = 퇴소감지일(배치 자동)              — 관측 시각
+ *   effective_at      실제로 끝난 날 = 원장이 적는다(자동으로 알 수 없다)   — 효력 시각 (둘을 한 칸에 담지 않는다 · Ⅲ-2)
+ *   exit_reason       졸업 · 중도이탈 · 휴학 · 이사 · 미정 · 기타 (결정 08-30 · 목록은 «늘기만» 한다)
+ *   lifecycle_status  재학 · 종료 · 미상 — 기본 «미상»
+ *
+ * ■ 🔴 `미상` 은 정상값이 아니라 「아직 안 왔다」다 (Ⅱ-2)
+ *   `left_at is null` 을 상태로 쓰면 재학 중 · 미입력 · 인제스트 실패 · 레거시가 전부 같은 모양이 된다 —
+ *   이 저장소가 가장 여러 번 데인 「0건이 성공 얼굴」 무늬다. 상태는 명시값으로 적고, 사건이 없으면
+ *   추측해서 채우지 않는다(승자 규칙 — 사건이 있으면 사건이 이긴다). 인제스트가 성공했는지는 이 칸이
+ *   아니라 처리 워터마크(`observed_at`)가 따로 센다 — 섞으면 또 뭉친다.
+ *
+ * ■ 값목록에 CHECK 를 안 건다 — 일부러다
+ *   `exit_reason` 은 사람이 적는 칸이고 목록은 늘기만 한다(Ⅱ-3 — 「미정」이 그렇게 들어왔다). CHECK 로
+ *   박으면 낱말 하나 더할 때마다 소급 마이그레이션(제약 갈아끼우기 사슬)이 된다. 정본은 이 조각의
+ *   comment 와 L0 §15 — 값을 더할 때는 둘을 함께 고친다. `lifecycle_status` 도 같은 축에 둔다
+ *   (휴학→복학 에피소드가 서는 날 값이 늘 수 있다 · Ⅲ-1). 값은 한글 낱말 그대로다 — c12 부터 이 저장소의
+ *   상태값은 한글이 관례다(generation_jobs.status · cron_runs.outcome · corrections.verdict).
+ *
+ * ■ 🔴 `learners` 행을 지우는 통로는 앞으로도 만들지 않는다 — 나감은 행 삭제가 아니라 사건 기입이다.
+ *   (`on delete restrict` 를 그 «보장»으로 읽지 않는다 — 그건 다른 표의 고리일 뿐이다 · 설계 §4)
+ *
+ * ■ 소급 0 · default 는 `lifecycle_status` 하나(미상). DDL = 열 다섯 · CHECK 0 · 트리거 0 · 뷰 0 ·
+ *   계약판 그대로(c16). 같은 커밋에서 함수 층이 함께 섰다 — `roster-ingest` 의 «삼킴 가르기»(㉣-2 ·
+ *   번호가 겹친 «다른 사람»을 재전송과 갈라 센다) — DB 가 아니라서 여기엔 없다.
+ *
+ * 되돌림: alter table engine.learners drop column if exists enrolled_at, drop column if exists observed_at,
+ *           drop column if exists effective_at, drop column if exists exit_reason, drop column if exists lifecycle_status;
+ *         delete from engine.schema_migrations where version='20260902600000'; */
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260902600000';
+  migration_name constant text := '20260902600000_learner_lifecycle_c16.sql';
+  expected_checksum constant text := 'f3f981c2b64aba2183c377961f3c348363edd7317e1e6bf79ef21f94ec28d69a'; -- migration-checksum
+  base_version constant text := '20260902500000';
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 합본 위에서만 돈다 — engine.schema_migrations 가 없다(빈 DB 면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      'migration % 는 % 위에서만 돈다 — 체인이 끊겼다',
+      migration_version, base_version;
+  end if;
+end
+$migration$;
+
+-- ══════════ 칸 다섯 — 소급 0 · CHECK 0 ══════════
+-- 🔑 `lifecycle_status` 만 not null default '미상' 이다 — null 을 두면 「빈 값과 정상이 같은 모양」이
+--    그대로 되살아난다(Ⅱ-2). 나머지 넷은 «사건이 오기 전»이 곧 null 이라 default 를 두지 않는다.
+alter table engine.learners
+  add column if not exists enrolled_at      timestamptz,
+  add column if not exists observed_at      timestamptz,
+  add column if not exists effective_at     timestamptz,
+  add column if not exists exit_reason      text,
+  add column if not exists lifecycle_status text not null default '미상';
+
+comment on column engine.learners.enrolled_at is
+  '상담시트 «등록일» 하나(첫 반배정일이 아니다 — 그건 필요해지는 날 다른 칸). null = 아직 안 왔다.';
+comment on column engine.learners.observed_at is
+  '기계가 나감을 알아챈 날(= exit_log 퇴소감지일 · 배치가 도는 날 · 인제스트 워터마크). 학생이 마지막으로 온 날이 아니다.';
+comment on column engine.learners.effective_at is
+  '실제로 끝난 날 — 원장이 손으로 적는다(자동으로 알 수 없다). observed_at 과 한 칸에 담지 않는다(관측 시각 대 효력 시각).';
+comment on column engine.learners.exit_reason is
+  '나간 까닭 — 졸업 · 중도이탈 · 휴학 · 이사 · 미정 · 기타 (결정 2026-08-30). 목록은 늘기만 한다 — 그래서 CHECK 가 아니라 이 주석과 L0 §15 가 정본이다. 원본은 사건(exit_log)이고 이 칸은 파생이다.';
+comment on column engine.learners.lifecycle_status is
+  '재학 · 종료 · 미상. 기본 «미상» — `미상` 은 정상값이 아니라 「아직 안 왔다」다(사건이 없으면 추측해서 채우지 않는다). left_at is null 을 상태로 쓰지 않는다. 나감은 행 삭제가 아니라 사건 기입이다 — learners 행을 지우는 통로는 만들지 않는다.';
+
+do $migration2$
+declare
+  expected_checksum constant text := 'f3f981c2b64aba2183c377961f3c348363edd7317e1e6bf79ef21f94ec28d69a'; -- migration-checksum
+begin
+  insert into engine.schema_migrations(version, name, checksum)
+  values ('20260902600000', '20260902600000_learner_lifecycle_c16.sql', expected_checksum);
+end
+$migration2$;
+
+commit;
+
 -- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
---
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
 -- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -379,3 +483,42 @@ select case when 테이블수=23 and RLS켜짐=23 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
   from 셈;
+*/
+-- 사후 메모:
+-- ① 이 조각 = engine.learners 생애 칸 다섯(enrolled_at·observed_at·effective_at·exit_reason·lifecycle_status) — CHECK 변경 0 · default 는 lifecycle_status '미상' 하나.
+-- ② 아래 기대 목록은 20260831130000 이 세운 현행 그대로다(변경 0 — 마지막 조각이 이 줄을 든다).
+--    ⚠ 이 줄은 마지막 조각이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    ⚠ `season_no_overlap_c11`(EXCLUDE) · `…_once_c11`(UNIQUE) · `companion_qa_*_fkey` 는 여기
+--      없다 — CHECK 가 아니라 이 줄의 대상이 아니고, 이름도 c11 그대로 산다(값목록이 없어
+--      판 판별과 무관하다 · 위 기대제약 목록에는 그 이름 그대로 들어 있다).
+--    기대: attempts_gate_values_c16 · attempts_response_present_c16 · attempts_result_gate_c16
+--         · attempts_ver_nonempty_c16 · batch_runs_counts_order_c16 · batch_runs_counts_pair_c16
+--         · batch_runs_enrolled_nonneg_c16 · batch_runs_finished_cols_c16
+--         · batch_runs_level_dist_ok_c16 · batch_runs_partial_pair_c16
+--         · batch_runs_partial_range_c16 · batch_runs_roster_equation_c16
+--         · batch_runs_skipped_range_c16 · batch_runs_ver_nonempty_c16 · broadcast_segment_kind_c16
+--         · classes_key_nonblank_c16 · companion_qa_answer_paired_c16
+--         · companion_qa_question_nonblank_c16 · corrections_promotion_intent_c16
+--         · corrections_supersedes_not_self_c16 · corrections_verdict_c16 · cron_runs_outcome_c16
+--         · jobs_anchor_present_c16 · jobs_claim_cols_c16 · jobs_deciding_pair_c16
+--         · jobs_deciding_result_matches_c16 · jobs_deciding_scope_c16 · jobs_draft_present_c16
+--         · jobs_idle_cols_c16 · jobs_load_failed_cols_c16 · jobs_nontarget_cols_c16
+--         · jobs_nonterminal_cols_c16 · jobs_skill_ids_present_c16 · jobs_status_outcome_pairs_c16
+--         · jobs_terminal_cols_c16 · jobs_ver_nonempty_c16 · jobs_winner_fence_current_c16
+--         · jobs_winner_fence_pair_c16 · jobs_winner_only_success_c16 · jobs_winner_present_c16
+--         · jobs_winner_result_only_success_c16 · jobs_winner_result_pair_c16
+--         · l10n_reviews_final_paired_c16 · l10n_reviews_supersedes_not_self_c16
+--         · l10n_reviews_verdict_c16 · l10n_strings_id_ascii_c16
+--         · l10n_strings_ko_nonblank_c16 · l10n_strings_max_len_c16
+--         · l10n_strings_status_c16 · learners_gender_c16
+--         · learners_goal_track_c16 · learners_group_no_c16 · learners_home_aimag_c16
+--         · learners_seat_no_c16 · learners_signup_attempts_nonneg_c16
+--         · learners_temp_password_paired_c16 · learning_events_correction_target_c16
+--         · learning_events_event_type_c16 · learning_events_task_type_c16
+--         · pipeline_jobs_discard_reason_c16 · season_compass_answers_c16 · season_dates_c16
+--         · season_review_decided_c16 · season_review_self_c16 · season_review_verdict_c16
+--         · staff_role_c16 · submissions_due_paired_c16 · submissions_task_format_c16
+--         · submissions_translation_source_c16 · teacher_notes_body_nonblank_c16
+--         · teacher_notes_disposition_c16 · teacher_notes_origin_c16

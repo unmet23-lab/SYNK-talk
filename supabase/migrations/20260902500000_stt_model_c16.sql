@@ -1,11 +1,96 @@
+/* STT 요청판·벤더 보고 언어 — engine.submissions.stt_model · stt_lang (트랙 「STT 모델버전 열 앱 부재 · 소급 불가 · 스키마 열 때」 · 2026-09-02)
+ *
+ * ■ 무엇이 비어 있었나 — `functions/transcribe` 가 제 머리말에 적어 둔 빚이다
+ *   「모델 버전을 남기는 열이 아직 없다 — 벤더가 둘째로 늘어나기 전에 추가한다(하나뿐인 지금은 손실 0이고,
+ *   그날부터는 옛 전사와 새 전사가 영영 안 갈린다)」. 전사는 모델 하나(그 파일의 상수 하나)로만 돌고
+ *   그 이름은 행 어디에도 안 남는다. 모델을 바꾸는 날 「발음이 좋아졌다」와 「모델이 바뀌었다」를 가를
+ *   칸이 없다 — 그 값은 그날 안 적으면 안 돌아온다. 선례 = `corrections.model`·`prompt_ver` ·
+ *   `learning_events.model`(c6) — 교정 쪽은 처음부터 적었고 전사 쪽만 비어 있었다.
+ *
+ * ■ 칸 둘 — 「우리가 무엇을 요청했나」와 「벤더가 무엇을 들었다 했나」
+ *   `stt_model` = 요청판 한 줄 `벤더:모델:요청언어`(형제 appsscript `교재연동.js` 의 `voice_log.전사엔진판`
+ *     과 같은 꼴 — 요청과 장부가 «같은 상수»에서 나오게 함수 쪽도 함께 고쳤다).
+ *     ⚠ «서빙된» 판이 아니다. 벤더는 실제로 돌린 모델 판을 응답에 안 싣는다 — 우리가 모델을 바꾼 것은
+ *       잡지만 벤더가 같은 이름 뒤에서 조용히 갱신한 것은 못 잡는다. 이 칸이 말할 수 있는 것은
+ *       「우리 쪽 조건은 안 바뀌었다」까지다(형제 규격 ㉡ 그대로 · L0 §15).
+ *   `stt_lang` = 벤더가 응답에 적은 언어(`verbose_json.language`). 요청은 한국어로 못박지만 벤더가
+ *     다르게 들었다고 말한 날은 그 사실이 관측이다 — `lib/전사.js 전사값` 이 이미 꺼내던 값을 여태 버렸다.
+ *
+ * ■ 🔴 소급하지 않는다 — null = 「장부 이전」
+ *   default 0 · backfill 0. 이 조각 전의 행은 모델 하나로 돌던 시절이라 값을 «짐작할 수는» 있지만,
+ *   그 시절 값을 지금 적으면 「그때 기록한 것」과 「나중에 짐작한 것」이 같은 모양이 된다.
+ *   null 은 빈칸이 아니라 「이 장부가 서기 전」이다 — 읽는 쪽은 null 을 그렇게 읽는다.
+ *   쓰는 자리는 하나 — `transcribe` 의 UPDATE 한 문장(전사·구간과 «같은» 문장 · 반쪽 행 금지).
+ *
+ * ■ DDL = 열 둘(둘 다 text · nullable). CHECK 0 · 트리거 0 · 뷰 0 · 계약판 그대로(c16 —
+ *   저장 열을 늘리는 것은 판올림이 아니다 · C0 §버저닝 「응답 필드를 늘리는 것은 판올림이 아니다」와 같은 축).
+ *   `submissions_original_immutable` 은 이 두 칸을 안 본다 — null → 값 첫 채움만 일어난다.
+ *
+ * 되돌림: alter table engine.submissions drop column if exists stt_model, drop column if exists stt_lang;
+ *         delete from engine.schema_migrations where version='20260902500000'; */
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260902500000';
+  migration_name constant text := '20260902500000_stt_model_c16.sql';
+  expected_checksum constant text := '83ea3e1ded5c69ce1018d0ee98bc43575638931710c5e21b88ebfc54e156a32c'; -- migration-checksum
+  base_version constant text := '20260902400000';
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 합본 위에서만 돈다 — engine.schema_migrations 가 없다(빈 DB 면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      'migration % 는 % 위에서만 돈다 — 체인이 끊겼다',
+      migration_version, base_version;
+  end if;
+end
+$migration$;
+
+-- ══════════ 칸 둘 — 소급 0 · default 0 ══════════
+alter table engine.submissions
+  add column if not exists stt_model text,
+  add column if not exists stt_lang  text;
+
+comment on column engine.submissions.stt_model is
+  '전사를 «요청한» 판 — 벤더:모델:요청언어(예 openai:<모델>:ko). 서빙된 판이 아니라 우리 쪽 조건의 기록이다. null = 이 장부(20260902500000) 이전 행.';
+comment on column engine.submissions.stt_lang is
+  '벤더가 응답에 적은 언어(verbose_json.language). 요청 언어와 다르면 그 자체가 관측이다. null = 이 장부 이전 행 또는 벤더가 언어를 안 적은 응답.';
+
+do $migration2$
+declare
+  expected_checksum constant text := '83ea3e1ded5c69ce1018d0ee98bc43575638931710c5e21b88ebfc54e156a32c'; -- migration-checksum
+begin
+  insert into engine.schema_migrations(version, name, checksum)
+  values ('20260902500000', '20260902500000_stt_model_c16.sql', expected_checksum);
+end
+$migration2$;
+
+commit;
+
 -- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
---
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
 -- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -85,10 +170,7 @@ with 기대열(t, c) as (values
   ('l10n_reviews','verdict'), ('l10n_reviews','final_mn'), ('l10n_reviews','note'),
   ('l10n_reviews','supersedes'), ('l10n_reviews','created_at'),
   -- STT 요청판·벤더 보고 언어(20260902500000 · 소급 불가 — 둘째 벤더 전에 선다 · null = 장부 이전)
-  ('submissions','stt_model'), ('submissions','stt_lang'),
-  -- 학습자 생애 다섯(20260902600000 · 학생ID 종단 설계 v2 §5 ㉣ · 소급 불가 — 나간 날의 값은 그날 사람만 안다)
-  ('learners','enrolled_at'), ('learners','observed_at'), ('learners','effective_at'),
-  ('learners','exit_reason'), ('learners','lifecycle_status')
+  ('submissions','stt_model'), ('submissions','stt_lang')
 ), 기대제약(n) as (values
   -- ── c12: CHECK 는 전부 _c13 접미 — 이 조각이 _c11 서른하나를 이름째 교체했다.
   --    UNIQUE·EXCLUDE·FK·PK 는 값목록이 없어 판 판별과 무관하니 c11 이름 그대로다.
@@ -365,8 +447,8 @@ select case when 테이블수=23 and RLS켜짐=23 and 정책수=7
               and (select v from 빠진제약) is null
               and (select v from 빠진트리거) is null
               and 라디오보강열=10 and 라디오보강인덱스=3
-              and (select version from 현재이력)='20260902600000'
-              and (select checksum from 현재이력)='f3f981c2b64aba2183c377961f3c348363edd7317e1e6bf79ef21f94ec28d69a' -- migration-checksum
+              and (select version from 현재이력)='20260902500000'
+              and (select checksum from 현재이력)='83ea3e1ded5c69ce1018d0ee98bc43575638931710c5e21b88ebfc54e156a32c' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 23·23·7·0·0·5·1·0·0·1·0·0·0·0·22·0·0·0·0·2·6·6·0·0·0·1·1·1·30·0·1·26·0·11·0·1·1·1·10·3 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
@@ -379,3 +461,42 @@ select case when 테이블수=23 and RLS켜짐=23 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
   from 셈;
+*/
+-- 사후 메모:
+-- ① 이 조각 = engine.submissions 열 둘(stt_model·stt_lang · 둘 다 nullable · default 0 · backfill 0) — CHECK 변경 0.
+-- ② 아래 기대 목록은 20260831130000 이 세운 현행 그대로다(변경 0 — 마지막 조각이 이 줄을 든다).
+--    ⚠ 이 줄은 마지막 조각이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    ⚠ `season_no_overlap_c11`(EXCLUDE) · `…_once_c11`(UNIQUE) · `companion_qa_*_fkey` 는 여기
+--      없다 — CHECK 가 아니라 이 줄의 대상이 아니고, 이름도 c11 그대로 산다(값목록이 없어
+--      판 판별과 무관하다 · 위 기대제약 목록에는 그 이름 그대로 들어 있다).
+--    기대: attempts_gate_values_c16 · attempts_response_present_c16 · attempts_result_gate_c16
+--         · attempts_ver_nonempty_c16 · batch_runs_counts_order_c16 · batch_runs_counts_pair_c16
+--         · batch_runs_enrolled_nonneg_c16 · batch_runs_finished_cols_c16
+--         · batch_runs_level_dist_ok_c16 · batch_runs_partial_pair_c16
+--         · batch_runs_partial_range_c16 · batch_runs_roster_equation_c16
+--         · batch_runs_skipped_range_c16 · batch_runs_ver_nonempty_c16 · broadcast_segment_kind_c16
+--         · classes_key_nonblank_c16 · companion_qa_answer_paired_c16
+--         · companion_qa_question_nonblank_c16 · corrections_promotion_intent_c16
+--         · corrections_supersedes_not_self_c16 · corrections_verdict_c16 · cron_runs_outcome_c16
+--         · jobs_anchor_present_c16 · jobs_claim_cols_c16 · jobs_deciding_pair_c16
+--         · jobs_deciding_result_matches_c16 · jobs_deciding_scope_c16 · jobs_draft_present_c16
+--         · jobs_idle_cols_c16 · jobs_load_failed_cols_c16 · jobs_nontarget_cols_c16
+--         · jobs_nonterminal_cols_c16 · jobs_skill_ids_present_c16 · jobs_status_outcome_pairs_c16
+--         · jobs_terminal_cols_c16 · jobs_ver_nonempty_c16 · jobs_winner_fence_current_c16
+--         · jobs_winner_fence_pair_c16 · jobs_winner_only_success_c16 · jobs_winner_present_c16
+--         · jobs_winner_result_only_success_c16 · jobs_winner_result_pair_c16
+--         · l10n_reviews_final_paired_c16 · l10n_reviews_supersedes_not_self_c16
+--         · l10n_reviews_verdict_c16 · l10n_strings_id_ascii_c16
+--         · l10n_strings_ko_nonblank_c16 · l10n_strings_max_len_c16
+--         · l10n_strings_status_c16 · learners_gender_c16
+--         · learners_goal_track_c16 · learners_group_no_c16 · learners_home_aimag_c16
+--         · learners_seat_no_c16 · learners_signup_attempts_nonneg_c16
+--         · learners_temp_password_paired_c16 · learning_events_correction_target_c16
+--         · learning_events_event_type_c16 · learning_events_task_type_c16
+--         · pipeline_jobs_discard_reason_c16 · season_compass_answers_c16 · season_dates_c16
+--         · season_review_decided_c16 · season_review_self_c16 · season_review_verdict_c16
+--         · staff_role_c16 · submissions_due_paired_c16 · submissions_task_format_c16
+--         · submissions_translation_source_c16 · teacher_notes_body_nonblank_c16
+--         · teacher_notes_disposition_c16 · teacher_notes_origin_c16

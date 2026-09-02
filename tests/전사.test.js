@@ -153,6 +153,24 @@ test('🔴 구간이 전사와 **같은 UPDATE** 로 나간다 — 나누면 반
   assert.match(m[0], /transcript is null/, '자물쇠와 같은 방향이어야 트리거 예외로 안 죽는다');
 });
 
+/* ── 전사판 장부 — 「무엇으로 받아썼나」가 행에 남는가 (2026-09-02) ─────────
+ * 왜 회귀인가: 이 칸이 비면 모델을 바꾼 날 「학생 발음이 좋아졌다」와 「모델이 바뀌었다」를
+ *   가를 자가 영영 없다(그 값은 그날 안 적으면 안 돌아온다). 그리고 빈 채로도 배치는 초록이다. */
+
+test('🔴 전사판·언어가 전사와 **같은 UPDATE** 로 나간다 — 나중에 소급해 채울 수 없는 칸이다', () => {
+  const m = /update engine\.submissions[\s\S]*?returning event_id/.exec(배치);
+  assert.ok(m, 'UPDATE 문을 못 찾았다');
+  assert.match(m[0], /stt_model = /, '전사판을 안 적으면 벤더가 둘로 늘어난 뒤 옛 행과 새 행이 안 갈린다');
+  assert.match(m[0], /stt_lang = /, '벤더가 «다르게 들었다»고 말한 날 그 사실이 관측이다');
+});
+
+test('🔑 모델 이름은 한 곳에서만 — 요청과 장부가 갈리면 장부가 거짓말을 한다', () => {
+  const 리터럴 = (배치.match(/'whisper-1'/g) || []).length;
+  assert.equal(리터럴, 1, `'whisper-1' 이 ${리터럴}곳이다 — 요청과 장부는 같은 상수에서 나와야 한다`);
+  assert.match(배치, /const 전사판 = `openai:\$\{모델\}:\$\{언어\}`/,
+    '전사판이 상수에서 파생되지 않으면 모델을 바꾼 날 한쪽만 따라간다');
+});
+
 test('세그먼트 형식 밖이면 그 칸을 안 건드린다 — `[]` 로 적으면 무발화와 같은 모양이 된다', () => {
   assert.match(배치, /세그먼트값\(/, '배치가 판정을 안 부르면 이 칸은 영원히 null 이다');
   assert.match(배치, /구간\s*\n?\s*\?\s*sql`, stt_segments/,
@@ -204,7 +222,13 @@ test('동봉 표가 정본을 가리킨다 — 없으면 배포는 ✅ 로 끝�
 });
 
 test('🔴 배치가 기존 전사를 덮지 않는다 — DB 자물쇠와 같은 방향이어야 예외로 안 죽는다', () => {
-  assert.match(배치, /update engine\.submissions[\s\S]{0,300}transcript is null/,
+  /* ⚠ 자를 «글자 수»에서 «문장 경계»로 옮겼다(09-02). 옛 판은 `[\s\S]{0,300}` 이라
+   *   UPDATE 에 칸을 «정당하게» 더한 날(stt_model·stt_lang) 조건이 창 밖으로 밀려 빨개졌다 —
+   *   재는 것은 「가까이 있나」가 아니라 「**같은 UPDATE 안에** 있나」이므로 그렇게 다시 건다.
+   *   느슨해지지 않는다: 상한을 늘린 게 아니라 `returning` 까지로 경계를 «좁혔다». */
+  const m = /update engine\.submissions[\s\S]*?returning event_id/.exec(배치);
+  assert.ok(m, 'UPDATE 문을 못 찾았다');
+  assert.match(m[0], /transcript is null/,
     'UPDATE 에 `transcript is null` 이 없으면 겹친 배치가 트리거 예외로 배치를 통째로 세운다');
 });
 

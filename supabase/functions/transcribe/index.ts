@@ -39,14 +39,22 @@ const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
 
 /* 계약이 지목한 모델(`검수의뢰_엔진수집설계` §224 · `L0_데이터계약` §698 「Whisper 가 고쳐 듣는다」).
  * 🔑 두 칸 설계(`transcript` / `transcript_verified`)가 **이 모델의 「고쳐 듣기」를 전제로** 서 있다.
- * ponytail: 모델 버전을 남기는 열이 아직 없다 — 벤더가 **둘째**로 늘어나기 전에 추가한다
- *   (하나뿐인 지금은 손실 0이고, 그날부터는 옛 전사와 새 전사가 영영 안 갈린다). */
+ * ✅ 2026-09-02 — 위 빚(「모델 버전을 남기는 열이 없다」)을 갚았다: `stt_model` 열과 아래 `전사판`.
+ *   벤더가 둘째로 늘기 전에 넣었으므로 옛 전사와 새 전사가 갈린다. */
 const 모델 = 'whisper-1';
 
 /* 한국어로 못박는다 — 한국어 학원의 과제 발화다. 자동 감지에 맡기면 **짧고 발음이 서툰**
  * 초급 발화가 다른 언어로 넘어가고, 그 행의 전사는 통째로 쓰레기가 된다.
  * ⚠ 코드스위칭(몽골어 섞임)은 그대로 나온다 — 그것도 우리가 모으려는 관측이다. */
 const 언어 = 'ko';
+
+/* 행에 남기는 «요청판» 한 줄 — 요청(`fd.append`)과 장부(`stt_model`)가 **같은 상수**에서 나온다.
+ * 두 곳이 각자 알면 모델을 바꾼 날 요청만 바뀌고 장부는 옛 이름을 계속 적는다 — 그때 장부는
+ * 거짓말을 하고, 거짓말인 줄 아무도 모른다(형제 appsscript `교재연동.js` 가 같은 이유로 상수를 올렸다).
+ * 꼴은 형제의 `voice_log.전사엔진판`(`gcp-stt:default:ko-KR`)과 나란히 읽히게 맞췄다.
+ * ⚠ «서빙된» 판이 아니다 — 벤더는 실제로 돌린 판을 응답에 안 싣는다. 이 칸이 말할 수 있는 것은
+ *   「우리 쪽 조건은 안 바뀌었다」까지다(형제 규격 ㉡ · L0 §15). */
+const 전사판 = `openai:${모델}:${언어}`;
 
 /* 한 번에 집는 수. Edge Function 벽시계 안에서 다운로드+왕복이 끝나야 한다 —
  * 크게 잡으면 마지막 몇 건이 매번 잘리고, 그 잘림은 「pending 이 안 줄어든다」로만 보인다. */
@@ -187,7 +195,8 @@ Deno.serve(async (req) => {
        *   DB 트리거가 예외를 던지고 그 예외가 배치를 통째로 세운다. */
       const 쓴것 = await sql`
         update engine.submissions
-           set transcript = ${값.transcript}, transcript_state = ${상태.기계}${구간
+           set transcript = ${값.transcript}, transcript_state = ${상태.기계},
+               stt_model = ${전사판}, stt_lang = ${값.언어}${구간
              ? sql`, stt_segments = ${sql.json(구간.stt_segments as never)}, stt_confidence = ${구간.stt_confidence}`
              : sql``}
          where event_id = ${행.event_id}::uuid and transcript is null
