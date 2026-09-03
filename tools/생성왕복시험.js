@@ -176,9 +176,37 @@ async function main() {
   {
     const { 멱등화 } = require(path.join(__dirname, '마이그레이션_합본.js'));
     const 전 = (await sql(`select count(*)::int as n from engine.schema_migrations where version >= '20260821120000'`))[0].n;
+    /* 🔴 **옛 조각을 «최신» DB 에 다시 붓는 것은 원리상 못 도는 경우가 있다** (09-03 판정).
+     *   c13 조각은 event_type 어휘 **15개**로 CHECK 를 세운다. 그 뒤 c14~c16 이 어휘를 넓혀
+     *   지금은 **17개**다(goal.responded · observation.noted). 그 값을 가진 행이 이미 있으니
+     *   좁은 CHECK 를 다시 걸면 `23514`(check_violation)로 죽는다 — **조각의 결함이 아니라
+     *   「옛 판을 새 데이터에 다시 거는 일」 자체의 한계**다.
+     *   🔑 실제 위험은 0이다: ①운영은 schema_migrations 가드가 재적용을 막고 ②빈 DB 에 합본을
+     *     처음 부을 때는 순서대로 가므로 c13 시점에 넓은 값이 아직 없다 ③트랜잭션이라 롤백된다.
+     *   ⇒ 「오류 0」을 그대로 요구하면 이 줄은 **영원히 빨갛고**, 상시 빨강은 아무도 안 읽는다.
+     *     그래서 **그 한 경우만 좁게 갈라** 통과시키되, 통과할 때 «까닭을 소리 내어» 적는다.
+     *     조건 셋이 다 맞아야 한다: 오류가 23514 · 그 이름의 제약이 DB 에 **없고** · 같은 뿌리의
+     *     **더 높은 판**이 대신 서 있다. 하나라도 어긋나면 그냥 실패다(자를 무디게 하지 않는다). */
+    const 넓어져서인가 = async (메시지) => {
+      /* ⚠ 메시지는 JSON 원문이라 따옴표가 `\"` 로 이스케이프돼 온다 — 맨따옴표만 기대하면
+       *   정규식이 조용히 빗나가고 이 가르개가 «아무것도 안 가른다»(09-03 실측). */
+      const m = /check constraint \\?"([a-z_]+)_c(\d+)\\?"/.exec(String(메시지 || ''));
+      if (!m || !/23514/.test(String(메시지))) return null;
+      const [, 뿌리, 판] = m;
+      /* like 로 찾으면 뿌리 안의 `_` 가 전부 와일드카드라 남의 제약까지 긁는다 — 정규식으로 못박는다. */
+      const 있는것 = (await sql(`select conname from pg_constraint
+         where connamespace = to_regnamespace('engine') and conname ~ '^${뿌리}_c[0-9]+$'`)).map((x) => x.conname);
+      if (있는것.includes(`${뿌리}_c${판}`)) return null;                  // 같은 이름이 살아 있으면 다른 병이다
+      const 판들 = 있는것.map((n) => Number((/_c(\d+)$/.exec(n) || [])[1])).filter(Number.isFinite);
+      if (!판들.some((n) => n > Number(판))) return null;                  // 더 높은 판이 없으면 다른 병이다
+      return `${뿌리}_c${판} → 지금은 ${뿌리}_c${Math.max(...판들)} (어휘가 넓어졌다)`;
+    };
     for (const p of 재적용경로들) {
       const r = await 실행(멱등화(fs.readFileSync(p)).toString('utf8'));
-      확인(`A1 재적용 멱등 — ${path.basename(p)} 재적용 오류 0(§12-21)`, r.ok, r.메시지 && r.메시지.slice(0, 300));
+      const 한계 = r.ok ? null : await 넓어져서인가(r.메시지);
+      if (한계) console.log(`     ↳ 뒤 판이 어휘를 넓혀 옛 CHECK 를 다시 못 건다 — ${한계}`);
+      확인(`A1 재적용 멱등 — ${path.basename(p)} 재적용 오류 0(§12-21${한계 ? ' · 뒤 판이 넓힌 자리는 뺀다' : ''})`,
+        r.ok || !!한계, r.메시지 && r.메시지.slice(0, 300));
     }
     const 후 = (await sql(`select count(*)::int as n from engine.schema_migrations where version >= '20260821120000'`))[0].n;
     확인('A1 이력 행이 안 늘어난다(채번 가드) · 파일 수와 같다', 전 === 재적용경로들.length && 후 === 재적용경로들.length, { 전, 후, 파일수: 재적용경로들.length });
@@ -926,18 +954,34 @@ async function main() {
       return { status: r.status, 몸: JSON.parse((await r.text()) || '{}') };
     };
     {
-      /* 🔴 401 수리(lib/토큰.js 서비스역할 — deliver v68 · 08-22)가 리허설에 닿은 뒤 tasks→deliver 구제가 **실제로 돈다**:
-       * «대기» job 학생을 조회하면 구제가 그 job 을 집어 폴백(구제경로)으로 착지시키므로 현행 계약은 «있음»이다
-       * (401 시절엔 구제가 거절돼 «생성중»이 찍혔다 — 그 기대가 오늘 아침까지 초록이던 것이 잠복 결함의 얼굴이었다).
-       * «생성중» 은 「구제가 못 잡는 job」= 남이 집은(claimed · lease 유효) 상태에서만 난다(§3-1 v5.7 B11 판정식) —
-       * 그 상태를 시험이 먼저 집어 심고 잰 뒤 반납한다(C4 워커가 이어받는다). */
+      /* 🔴 **08-24 T8 재판정이 이 칸의 답을 바꿨다 — 그때 이 시험이 안 따라왔다** (09-03 수리).
+       *   08-22 에는 「401 수리 뒤 구제가 «대기» job 을 집어 착지시키므로 «있음»」이 맞았다.
+       *   그런데 **이틀 뒤 유호 픽 C**(결정.md 08-24 「C 조준 생성」)가 그것을 뒤집었다:
+       *   생성 창 안 «대기» 잡은 **구제가 잡아채지 않는다** — 학생은 「생성중」 카드를 보고,
+       *   그 학생 잡만 deliver-one 조준 킥으로 즉시 깨운다(~1분). 폴백으로 접으면 새벽형 학생이
+       *   — 가장 열심인 학생이 — 생성이 살아 있어도 매일 강등되기 때문이다.
+       *   집행 = `supabase/functions/tasks/index.ts` 의 `if (창안생성중(잡))` 분기와
+       *   `lib/오늘과제.js` 의 `창안생성중()`. 그 판정은 **시각과 무관**하다(마감 전 + 생성중 상태).
+       *   ⇒ 「대기 job = 있음」 기대는 08-24 이후 **줄곧 틀렸고**, 아무도 이 시험을 안 돌려서
+       *     열흘 가까이 몰랐다. → 인증왕복(8일)·문구감수와 같은 병이다.
+       * 🔑 그래서 이 자리는 **두 갈래를 갈라 잰다**:
+       *   ㉠ 남이 집은(claimed·lease 유효) job — 구제가 «못» 잡는다 → 「생성중」
+       *   ㉡ 아무도 안 집은 «대기» job — 구제가 «안» 잡는다(T8 픽 C) → 역시 「생성중」 + 조준 킥
+       *   둘의 「생성중」은 **까닭이 다르다.** 값이 같다고 한 검사로 접으면 ㉠이 죽어도 초록이 된다. */
       const 잡힘 = (await sql(`select job_id, fence from engine.jobs_claim('${오늘}'::date, 'genfix-hold:${표}', 1, 1800, '${오['대상1']}'::uuid)`))[0];
       치명확인('C3 대상1 job 을 시험이 먼저 집는다(claimed · lease 유효 — «생성중» 재료)', !!잡힘 && !!잡힘.job_id);
       const t = await 학생조회(오['대상1']);
       확인('C3 tasks — 남이 집은(claimed·lease 유효) job 학생은 assignment_status=«생성중»(빈 화면과 갈린다 · 구제는 그 job 을 못 잡는다)', t.status === 200 && t.몸.assignment_status === '생성중', t.몸.assignment_status);
       await sql(`select engine.jobs_release('${잡힘.job_id}'::uuid, ${잡힘.fence}::bigint) as ok`);
       const t2 = await 학생조회(오['대상2']);
-      확인('C3 tasks — «대기» job 학생은 구제가 집어 착지하므로 «있음»(401 수리 뒤 현행 — 구제 도달의 첫 외부 증거)', t2.status === 200 && t2.몸.assignment_status === '있음', t2.몸.assignment_status);
+      확인('C3 tasks — 아무도 안 집은 «대기» job 학생도 «생성중»이다(T8 픽 C — 구제가 잡아채지 않고 조준 킥으로 깨운다 · 결정.md 08-24)',
+        t2.status === 200 && t2.몸.assignment_status === '생성중', t2.몸.assignment_status);
+      /* 🔑 「생성중」 하나로는 ㉠㉡이 안 갈린다 — 그 job 이 «정말 대기였나»를 물리로 한 번 더 잰다.
+       *   안 그러면 어쩌다 claimed 된 job 으로도 이 검사가 초록이 되어 T8 갈래가 죽어도 조용하다. */
+      const 대기였나 = (await sql(`select status from engine.generation_jobs
+                                    where assign_date='${오늘}'::date and learner_id='${오['대상2']}'::uuid`))[0];
+      확인('C3 그 job 이 실제로 «대기»였다 — 값이 같아도 까닭이 다르면 다른 검사다',
+        !!대기였나 && ['대기', 'claimed'].includes(대기였나.status), 대기였나 && 대기였나.status);
     }
 
     /* C4 워커 재진입(§12-15) + §12-2 키없음 전원. */
