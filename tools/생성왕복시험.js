@@ -188,11 +188,22 @@ async function main() {
 
   /* A2 스키마 동일성 — 「재적용의 성공은 동일성의 증거가 아니다」(가드가 불일치를 삼킨다). */
   {
+    /* 🔴 **열의 «근거»는 c12 한 파일이 아니라 마이그 폴더 전량이다** (2026-09-03 수리).
+     *   전에는 표를 «만든» 파일 하나에서만 add column 을 긁었다. 그래서 뒤에 온 판이 열을 더할
+     *   때마다 이 검사가 그 열을 「넘침」이라 부르며 빨개졌다 — 실측 09-03: acked_at
+     *   (20260901000000_attempt_ack_c14.sql) · deliver_check_reds·deliver_check_at
+     *   (20260901010000_check_reds_c14.sql). **셋 다 정식 마이그에 근거가 있는데 시험만 몰랐다.**
+     *   재는 것은 「c12 가 아는 열인가」가 아니라 **「파일 어딘가에 근거가 있는 열인가」**다.
+     *   ⚠ `alter table` 과 `add column` 사이는 줄바꿈일 수 있어 공백 하나로 못 잡는다(\s+).
+     *   ⚠ create table 블록은 그대로 c12 를 본다 — 표를 만든 파일은 하나뿐이다. */
+    const 마이그전량 = fs.readdirSync(마이그폴더).filter((f) => f.endsWith('.sql')).sort()
+      .map((f) => fs.readFileSync(path.join(마이그폴더, f), 'utf8')).join('\n');
     const 파일칼럼 = (표이름) => {
       const 블록 = 마이그.split(`create table if not exists engine.${표이름} (`)[1].split('\n  );')[0];
       const 이름들 = [...블록.matchAll(/^\s{4}([a-z_][a-z0-9_]*)\s+(uuid|text|int|bigint|date|jsonb|boolean|timestamptz)/gm)]
         .map((m) => m[1]).filter((c) => c !== 'constraint');
-      for (const m of 마이그.matchAll(new RegExp(`alter table engine\\.${표이름} add column if not exists ([a-z_]+)`, 'g'))) 이름들.push(m[1]);
+      for (const m of 마이그전량.matchAll(
+        new RegExp(`alter table engine\\.${표이름}\\s+add column if not exists ([a-z_]+)`, 'g'))) 이름들.push(m[1]);
       return new Set(이름들);
     };
     for (const 표이름 of ['generation_jobs', 'generation_attempts', 'generation_batch_runs']) {

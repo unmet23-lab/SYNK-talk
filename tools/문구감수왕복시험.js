@@ -45,17 +45,33 @@ async function main() {
    * 안 서 있으면 아래 거절들이 「계약대로 막혔다」가 아니라 「표가 없어 깨졌다」로 나오고,
    * 그 둘은 로그에서 같은 모양이다. */
   console.log('■ ⓪ 물리 — 표 둘 · 판 하나 · 역할 어휘');
+  /* 🔴 역할 CHECK 를 **이름으로 찾지 않는다** (2026-09-03 수리).
+   *   전에는 conname='staff_role_c13' 으로 박혀 있었다. 09-02 에 c16 이 그 제약을
+   *   staff_role_c16 으로 옮기자 **빈손이 돌아왔고**, 이 시험은 「어휘에 l10n_reviewer 가
+   *   없다」고 «거짓 빨강»을 냈다 — DB 는 그 내내 멀쩡했다(실측: teacher·inspector·
+   *   director·l10n_reviewer 넷 다 있었다). 판 접미가 붙은 이름은 **판이 오를 때마다 바뀐다.**
+   *   그래서 「무엇이라 불리나」가 아니라 **「무엇을 지키나」**로 찾는다 — engine.staff 의
+   *   CHECK 중 role 을 재는 것. → 기억 contract-version-bump-drag 「제약 이름에 판 접미 금지」.
+   *   ⚠ 이 설명을 아래 SQL «안»에 두면 안 된다 — 템플릿 문자열이라 백틱 한 글자에 끊긴다
+   *     (그 자리를 09-03 에 한 번 밟았다). */
   const [물리] = await sql(`
     select (select count(*) from pg_tables where schemaname='engine' and tablename like 'l10n%')            as 표수,
            (select count(*) from pg_tables where schemaname='engine' and tablename like 'l10n%'
              and rowsecurity)                                                                              as rls,
            (select count(*) from pg_views where schemaname='engine' and viewname='l10n_queue')             as 판,
-           (select pg_get_constraintdef(oid) from pg_constraint where conname='staff_role_c13')            as 역할check,
+           (select pg_get_constraintdef(con.oid) from pg_constraint con
+              join pg_class cl on cl.oid = con.conrelid
+              join pg_namespace ns on ns.oid = cl.relnamespace
+             where ns.nspname='engine' and cl.relname='staff' and con.contype='c'
+               and pg_get_constraintdef(con.oid) like '%role%'
+             limit 1)                                                                                      as 역할check,
            (select count(*) from engine.l10n_strings)                                                      as 문장수`);
   치명확인('표 2 · RLS 2 · 판 1 이 서 있다',
     Number(물리.표수) === 2 && Number(물리.rls) === 2 && Number(물리.판) === 1);
   /* 🔑 역할 어휘를 **DB 에서 뽑는다** — 코드에 목록을 박으면 사본끼리 대조해 놓고 「맞다」고 한다. */
   const 역할어휘 = [...String(물리.역할check || '').matchAll(/'([^']+)'::text/g)].map((m) => m[1]);
+  /* 🔑 «못 찾음»과 «찾았는데 없음»을 가른다 — 둘을 한 줄로 내면 위와 같은 사고가 또 조용해진다. */
+  치명확인('staff.role 을 지키는 CHECK 를 찾았다(이름이 아니라 몸으로)', 역할어휘.length > 0);
   치명확인(`역할 어휘에 l10n_reviewer 가 있다 (${역할어휘.join(' · ')})`,
     역할어휘.includes('l10n_reviewer'));
   확인(`감수 대상 문장이 실제로 있다 (${물리.문장수}줄)`, Number(물리.문장수) > 0, 물리.문장수);

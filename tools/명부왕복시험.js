@@ -51,8 +51,20 @@ async function main() {
   }).then(async (r) => ({ status: r.status, 몸: await r.json().catch(() => null) }));
 
   /* 시작 청소 — **내 프로브 코드만.** 지워지는 것이 무엇인지 코드가 그대로 말한다.
-   * (프로브는 새 코드라 동의·사건 FK 가 붙은 적 없다 — 붙어 있으면 여기서 시끄럽게 죽는 것이 맞다.) */
-  await sql(`delete from engine.learners where student_code in (${프로브.map((c) => `'${c}'`).join(', ')})`);
+   * (프로브는 새 코드라 동의·사건 FK 가 붙은 적 없다 — 붙어 있으면 여기서 시끄럽게 죽는 것이 맞다.)
+   *
+   * 🔴 **그 전제가 2026-09-03 에 깨졌다.** 생성 배치(`deliver`)는 리허설의 **모든** 학생을 훑어
+   *   `generation_jobs` 를 만든다 — is_test 표식은 그 배치의 대상 판정에 안 쓰인다(실측: 프로브
+   *   SYNK-941·942 가 is_test=true 인데 job 4건씩 달려 있었다). 그래서 생성왕복시험이 한 번이라도
+   *   돌고 나면 이 청소가 `generation_jobs_learner_id_fkey` 위반으로 죽고, **이 시험은 시작조차
+   *   못 한다.** 인증왕복시험이 08-26~09-03 에 같은 이유로 여덟 날 멈춰 있던 것과 같은 무늬다.
+   *   ⇒ **내 프로브에 «내가 아닌 것이» 붙인 job 도 내가 치운다.** 남의 학생은 그대로 둔다
+   *     (where 가 프로브 코드에 잠겨 있다). 이것으로 순서 의존이 사라진다. */
+  const 프로브목록 = 프로브.map((c) => `'${c}'`).join(', ');
+  await sql(`delete from engine.generation_jobs
+              where learner_id in (select learner_id from engine.learners
+                                    where student_code in (${프로브목록}))`);
+  await sql(`delete from engine.learners where student_code in (${프로브목록})`);
 
   /* ── ① 자물쇠 ─────────────────────────────────────────────────────── */
   console.log('\n■ ① 좁은 시크릿');
