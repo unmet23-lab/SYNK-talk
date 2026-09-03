@@ -1,11 +1,355 @@
+/* jobs_load 활성일 가드 «복원» — 09-01 이 덮어 지운 것을 되살린다 (2026-09-03)
+ *
+ * ■ 무슨 일이 있었나 (실측 09-03 · 왕복시험 16벌 전량 실행에서 잡았다)
+ *   08-22 `gen_active_guard_c12` 가 jobs_load 에 활성일 가드를 넣었다(표식 skipped_inactive 2군데).
+ *   09-01 `confluence_reads_c15` 가 «세층합류 읽기»를 더하려고 같은 함수를 create or replace 하면서
+ *   그 가드를 데려오지 않았다 — 파일 실측 2군데 → 0군데. 리허설·운영 «양쪽» 모두 가드가 없었다
+ *   (DB 실측: position('skipped_inactive' in pg_get_functiondef(...)) = 0).
+ *
+ * ■ 무엇이 깨져 있었나
+ *   활성 시작일 «이전» 날짜로 배치를 부르면 job 이 선다(생성왕복 B6 실측 created:1).
+ *   설계가 막으려던 것은 「큐가 과거를 되짚어 이미 착지한 배정 위에 두 번째 판이 앉는 일」이다.
+ *   지금은 실학생 0이라 값이 밖으로 나가지 않았다.
+ *
+ * ■ 무엇 — jobs_load 재정의 «하나». 09-01 판의 몸을 그대로 두고 잃어버린 둘만 되돌린다:
+ *   ㉠ declare 의 `활성일 date;`  ㉡ _targets 검증 뒤의 활성일 가드 블록.
+ *   두 조각 다 원본 파일에서 그대로 떠 왔다(옮겨 적기 오타 0).
+ *
+ * ■ 되돌림: 09-01 판 그대로의 jobs_load 를 create or replace 로 다시 부으면 된다.
+ *   delete from engine.schema_migrations where version='20260903000000';
+ *
+ * 🔑 이 결함을 잡은 검사의 이름이 「덮임 탐지」였다(생성왕복 A1). 잡는 자는 이미 있었는데
+ *    그 자가 «안 돌아서» 두 판이 지나도록 몰랐다. 함수를 재정의하는 조각을 쓸 때는
+ *    그 함수의 앞선 판 전량을 먼저 훑는다 — grep -c '<표식>' 이 한 줄로 답한다.
+ */
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260903000000';
+  migration_name constant text := '20260903000000_jobs_load_guard_restore_c16.sql';
+  expected_checksum constant text := 'cc31d9270f26708adc6aeb5fa079ac953182fee7d98a57d8d75e903d784a5baf'; -- migration-checksum
+  base_version constant text := '20260902600000';   -- 체인은 «바로 앞 조각»을 가리킨다(고치려는 판이 아니라)
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 c12 위에서만 돈다 — engine.schema_migrations 가 없다(빈 DB 면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      '이 조각은 % 위에서만 돈다 — 이력에 그 판이 없다(부분·혼합·불명이라 중단한다)',
+      base_version;
+  end if;
+end
+$migration$;
+
+-- ══════════ ① jobs_load 재정의 — 09-01 판의 몸 + 되살린 활성일 가드 ══════════
+-- 🔑 create or replace 라 재적용 멱등이다(생성왕복 A층 §12-21 이 재는 그 성질).
+create or replace function engine.jobs_load(
+  _assign_date date, _run_id uuid, _targets jsonb, _skipped_game uuid[] default '{}')
+  returns jsonb
+  language plpgsql security definer set search_path = engine, public as $function$
+declare
+  run engine.generation_batch_runs%rowtype;
+  t jsonb;
+  bs jsonb;
+  draft jsonb;
+  lvl text;
+  실패 boolean;
+  실패사유 text;
+  새행 engine.generation_jobs%rowtype;
+  기존 engine.generation_jobs%rowtype;
+  created int := 0; existing int := 0; partial int := 0;
+  대상수 int; 만든수 int;
+  명단 text[];
+  해시 text;
+  기존사건 record;
+  결손 boolean;
+  게임행 boolean;
+  fin record;
+  draft키들 constant text[] := array['task_ref','task_snapshot','estimator_version','estimator_confidence','evidence_refs'];
+  draft허용 constant text[] := array['task_ref','task_snapshot','estimator_version','estimator_confidence','evidence_refs','요약','reads'];  -- reads = c15(세층합류 §3 · 널허용 — 옛 draft·재적재 경로 호환)
+  dk text;
+  활성일 date;                                    -- 활성일 가드(아래) 전용 — 09-01 판이 이 줄을 잃었다
+begin
+  select * into run from engine.generation_batch_runs where run_id = _run_id;
+  if not found or run.assign_date <> _assign_date then
+    raise exception 'jobs_load: _run_id 가 그 날짜의 시작 행이 아니다(A1 — 날짜 결속)';
+  end if;
+  if _targets is null or jsonb_typeof(_targets) <> 'array' then
+    raise exception 'jobs_load: _targets 는 배열이어야 한다';
+  end if;
+
+  -- 활성일 가드(§3-2-a C5 · §12-28 «전환» · v5.13-d) — 활성 시작일 «이전» 날짜로 부르면
+  -- job 을 하나도 안 만든다(0건 적재): 큐가 과거를 되짚으면 이미 착지한 배정 위에 두 번째
+  -- 판이 앉는다. 활성 함수(engine.gen_active_from · 활성 조각 대기 파일이 세운다)가 아직
+  -- 없으면 무동작이다 — 동적 execute 라 파스 시점에도 안 죽는다(왕복시험 B층이 함수 없이
+  -- 이 RPC 를 직접 잰다 · 행동 불변). 발동은 반환 봉투의 skipped_inactive 하나로 관측한다.
+  if to_regprocedure('engine.gen_active_from()') is not null then
+    execute 'select engine.gen_active_from()' into 활성일;
+    if 활성일 is not null and _assign_date < 활성일 then
+      return jsonb_build_object('created', 0, 'existing', 0, 'partial', 0,
+                                'skipped_game', 0, 'skipped_inactive', true);
+    end if;
+  end if;
+
+  for t in select * from jsonb_array_elements(_targets) loop
+    실패 := false; 실패사유 := null;
+    bs := t -> 'branch_snapshot';
+    draft := t -> 'event_draft';
+
+    if t ->> 'load_error' is not null then
+      실패 := true; 실패사유 := left(t ->> 'load_error', 200);
+    else
+      -- A8 — branch_snapshot 스키마·의미 검사(적재가 유일한 검사 기회다).
+      if bs is null or jsonb_typeof(bs) <> 'object'
+         or (bs ->> 'ver') is null or jsonb_typeof(bs -> 'ver') <> 'number'
+         or jsonb_typeof(bs -> 'is_first_day') <> 'boolean'
+         or jsonb_typeof(bs -> 'is_game_day') <> 'boolean' then
+        raise exception 'jobs_load: branch_snapshot 스키마 위반(A8) — learner %', t ->> 'learner_id';
+      end if;
+      if exists (select 1 from jsonb_object_keys(bs) k
+                  where k not in ('ver','is_first_day','correction_ref','is_game_day','level','goal')) then
+        raise exception 'jobs_load: branch_snapshot 에 모르는 키(A8 — 임의 jsonb 로 되돌아간다) — learner %', t ->> 'learner_id';
+      end if;
+      if (bs ->> 'is_game_day')::boolean then
+        raise exception 'jobs_load: is_game_day=true 원소(A11 ① — 게임날은 job 자체를 안 만든다) — learner %', t ->> 'learner_id';
+      end if;
+      -- ② 교정문 사유 ↔ correction_ref 는 «쌍»이다(xor 면 어긋남). 대상 원소(사유 null)에
+      --    ref 가 남는 것도 어긋남이다 — 갈래판정 우선순위상 교정문이 있으면 ②갈래로 빠졌어야 한다.
+      if ((t ->> 'not_target_reason') = '교정문') <> ((bs ->> 'correction_ref') is not null) then
+        raise exception 'jobs_load: 교정문 사유 ↔ correction_ref 어긋남(A11 ②) — learner %', t ->> 'learner_id';
+      end if;
+      if (bs ->> 'is_first_day')::boolean and coalesce(t ->> 'not_target_reason', '') <> '첫날' then
+        raise exception 'jobs_load: is_first_day=true 인데 사유가 첫날이 아니다(A11 ③) — learner %', t ->> 'learner_id';
+      end if;
+      if (t ->> 'not_target_reason') = '첫날' and not (bs ->> 'is_first_day')::boolean then
+        raise exception 'jobs_load: 사유는 첫날인데 스냅샷은 아니다(A11 ④ 거울) — learner %', t ->> 'learner_id';
+      end if;
+      lvl := bs ->> 'level';
+      if lvl is not null and lvl not in ('Lv1','Lv2','Lv3','Lv4','Lv5','Lv6') then
+        raise exception 'jobs_load: level 값목록 밖(A11 ⑤ — 실물 값은 Lv3 이지 3급이 아니다) — %', lvl;
+      end if;
+      if (t ->> 'not_target_reason') = '초급' and (lvl is null or lvl not in ('Lv1','Lv2'))
+         or (t ->> 'not_target_reason') = '미정' and lvl is not null then
+        raise exception 'jobs_load: 초급·미정 사유 ↔ level 정합 위반(A11 ⑥) — learner %', t ->> 'learner_id';
+      end if;
+      -- ⑦ skill_ids 존재 대조(§6-0 — 없는 ID 는 적재에서 거절 · 빈 배열 면제).
+      if exists (
+        select 1 from jsonb_array_elements_text(coalesce(t -> 'skill_ids', '[]'::jsonb)) s(id)
+        where not exists (select 1 from engine.skills sk where sk.skill_id = s.id)
+      ) then
+        raise exception 'jobs_load: skill_ids 에 engine.skills 에 없는 ID(A11 ⑦) — learner %', t ->> 'learner_id';
+      end if;
+      -- 갈래 20 — 대상인데 기술선택이 빈 배열이면 그 원소만 적재실패(전량 롤백이 아니다).
+      if (t ->> 'not_target_reason') is null
+         and jsonb_array_length(coalesce(t -> 'skill_ids', '[]'::jsonb)) = 0 then
+        실패 := true; 실패사유 := '기술선택 0건 — 시드 확인';
+      end if;
+      -- ⓒ-13 — event_draft 독립 스키마(다섯 키 필수 · 미지 키 거절 · 결속).
+      if not 실패 then
+        if draft is null or jsonb_typeof(draft) <> 'object' then
+          실패 := true; 실패사유 := 'event_draft 없음(C1 전량)';
+        else
+          foreach dk in array draft키들 loop
+            if not draft ? dk then
+              실패 := true; 실패사유 := 'event_draft 필수 키 누락: ' || dk;
+            end if;
+          end loop;
+          if not 실패 and exists (
+            select 1 from jsonb_object_keys(draft) k where k <> all(draft허용)) then
+            실패 := true; 실패사유 := 'event_draft 미지 키(ⓒ-13 — degraded 가 이 문으로 되돌아온다)';
+          end if;
+          -- v5.13-a — 생성 «대상» 원소는 §6-2 요약 문자열까지 여섯(D2 수거 · 워커는 렌더만).
+          if not 실패 and (t ->> 'not_target_reason') is null
+             and nullif(btrim(coalesce(draft ->> '요약', '')), '') is null then
+            실패 := true; 실패사유 := 'event_draft 요약 누락 — 생성 대상은 §6-2 요약이 필수다(v5.13-a)';
+          end if;
+          if not 실패 and (draft ->> 'task_ref') is distinct from ('task-' || _assign_date) then
+            실패 := true; 실패사유 := 'event_draft 결속 위반 — task_ref 날짜(A7 ②)';
+          end if;
+          if not 실패 and not exists (
+            select 1 from jsonb_array_elements(draft -> 'task_snapshot' -> '호흡') h
+             where (h ->> '차례')::int = 3) then
+            실패 := true; 실패사유 := 'event_draft 호흡에 ③답하기 행이 없다(ⓒ-13)';
+          end if;
+        end if;
+      end if;
+    end if;
+
+    -- 기존 사건 경합 + C5 결손 검사(v5.5 B4 · v5.7 B5 ⓐⓑⓒ).
+    select e.event_id, e.task_type, e.intervention_id into 기존사건
+      from engine.learning_events e
+     where e.learner_id = (t ->> 'learner_id')::uuid
+       and e.event_type = 'task.assigned'
+       and e.idempotency_key = 'task:' || (t ->> 'learner_id') || ':' || _assign_date
+     order by e.occurred_at limit 1;
+    if found then
+      /* C5 결손을 두 축으로 가른다 — 게임날(ⓐ∧ⓑ∧ⓒ)의 정상 모양은 「개입 없음 + submissions
+       * 있음」(§3-6 ⓪)이라, 개입 부재만 게임이 면제하고 제출 보조행 부재는 어느 날이든 결손이다. */
+      게임행 := run.calendar_game_day
+        and not exists (select 1 from engine.generation_jobs g
+                         where g.learner_id = (t ->> 'learner_id')::uuid and g.assign_date = _assign_date)
+        and 기존사건.task_type = '숙제제출';
+      결손 := not exists (select 1 from engine.submissions s where s.event_id = 기존사건.event_id)
+        or (not 게임행
+            and (기존사건.intervention_id is null or not exists (
+              select 1 from engine.learning_events e2
+               where e2.intervention_id = 기존사건.intervention_id
+                 and e2.event_type = 'intervention.delivered')));
+      if 결손 then
+        partial := partial + 1;
+      else
+        existing := existing + 1;
+      end if;
+      continue;   -- 기존 사건이 있으면 job 을 새로 안 만든다(C5).
+    end if;
+
+    -- 유일키 충돌 — 기존 행 무변경(A6 · 첫 적재가 정본) · 적재실패+draft 면 되살린다(B4).
+    select * into 기존 from engine.generation_jobs g
+     where g.learner_id = (t ->> 'learner_id')::uuid and g.assign_date = _assign_date;
+    if found then
+      if 기존.status = '적재실패' and not 실패 and draft is not null then
+        update engine.generation_jobs
+           set status = '대기', outcome = null, closed_at = null,
+               branch_snapshot = bs, event_draft = draft,
+               snapshot_as_of = run.snapshot_as_of,
+               skill_ids = coalesce((select array_agg(x) from jsonb_array_elements_text(t -> 'skill_ids') x), '{}'),
+               skill_taxonomy_ver = run.skill_taxonomy_ver,
+               model = run.model, prompt_ver = run.prompt_ver, policy_ver = run.policy_ver,
+               estimator_version = run.estimator_version, schema_ver = run.schema_ver,
+               batch_run_id = _run_id,
+               load_retry_count = 기존.load_retry_count + 1
+         where generation_jobs.job_id = 기존.job_id;
+        created := created + 1;   -- 되돌린 건은 created 로 센다(B4 — 재실행이 실제로 큐를 세웠다).
+      else
+        existing := existing + 1;
+      end if;
+      continue;
+    end if;
+
+    insert into engine.generation_jobs (
+      learner_id, assign_date, batch_run_id, status, snapshot_as_of,
+      branch_snapshot, skill_ids, skill_taxonomy_ver, not_target_reason,
+      event_draft, load_error, load_failed_at, load_fail_run_id, load_retry_count,
+      model, prompt_ver, policy_ver, estimator_version, schema_ver,
+      outcome, closed_at)
+    values (
+      (t ->> 'learner_id')::uuid, _assign_date, _run_id,
+      case when 실패 then '적재실패' else '대기' end,
+      run.snapshot_as_of,
+      case when 실패 then coalesce(bs, '{"ver":1}'::jsonb) else bs end,
+      case when 실패 then '{}'::text[]
+           else coalesce((select array_agg(x) from jsonb_array_elements_text(t -> 'skill_ids') x), '{}') end,
+      run.skill_taxonomy_ver,
+      t ->> 'not_target_reason',
+      case when 실패 then null else draft end,
+      case when 실패 then 실패사유 else null end,
+      case when 실패 then now() else null end,
+      case when 실패 then _run_id else null end,
+      0,
+      run.model, run.prompt_ver, run.policy_ver, run.estimator_version, run.schema_ver,
+      case when 실패 then '내부오류' else null end,
+      case when 실패 then now() else null end)
+    returning * into 새행;
+    created := created + 1;
+
+    -- 비대상은 같은 트랜잭션에서 ⑥' 착지(D1 — 별도 착지 경로 0).
+    if not 실패 and (t ->> 'not_target_reason') is not null then
+      select * into fin from engine.jobs_finalize(
+        새행.job_id, 새행.fence, '대상아님',
+        jsonb_build_object(
+          'task_assigned', jsonb_build_object(
+            'task_snapshot', draft -> 'task_snapshot', 'payload', jsonb_build_object('ver', 1)),
+          'intervention_delivered', jsonb_build_object(
+            'payload', jsonb_build_object(
+              'ver', 2,
+              'output_text', (
+                select h ->> '문장' from jsonb_array_elements(draft -> 'task_snapshot' -> '호흡') h
+                 where (h ->> '차례')::int = 2 limit 1),
+              'generation_outcome', '대상아님',
+              'generation_gate_failed', null,
+              'generation_input_text', null),
+            'estimator_version', run.estimator_version,
+            'estimator_confidence', draft -> 'estimator_confidence',
+            'evidence_refs', draft -> 'evidence_refs'),
+          'submission_row', jsonb_build_object(
+            'task_snapshot', draft -> 'task_snapshot', 'task_schema_ver', 'task.v1')),
+        null, null, '적재');
+      if not fin.landed then
+        raise exception 'jobs_load: 비대상 착지 실패(%) — learner %', fin.reason, t ->> 'learner_id';
+      end if;
+    end if;
+  end loop;
+
+  -- 명단 집합 대조(갈래 5) — targets ∪ skipped_game ∪ existing(기존사건 갈래는 targets 안).
+  select array_agg(distinct lid) into 명단 from (
+    select t2 ->> 'learner_id' as lid from jsonb_array_elements(_targets) t2
+    union
+    select g::text from unnest(_skipped_game) g) u(lid);
+  select encode(extensions.digest(
+           convert_to(coalesce(string_agg(lid, E'\n' order by lid collate "C"), ''), 'UTF8'),
+           'sha256'), 'hex')
+    into 해시 from unnest(명단) lid;
+  if 해시 is distinct from run.roster_hash and run.run_kind = '배치' then
+    raise exception 'jobs_load: 명단 집합이 시작 행의 roster_hash 와 다르다(갈래 5 — 「누구」가 갈렸다)';
+  end if;
+
+  -- 완주 채움 — 자기 실행 행(A4 · 대상 식의 정본 = §3-6 ⓑ).
+  -- ⚠ 구제 실행(㉨ 경유)은 finished_at 을 영영 안 채운다(갈래 2·22) — 배치만 채운다.
+  if run.run_kind = '배치' then
+  select count(*) into 만든수 from engine.generation_jobs g
+   where g.assign_date = _assign_date and g.batch_run_id = _run_id;
+  select count(*) into 대상수 from engine.generation_jobs g
+   where g.assign_date = _assign_date
+     and g.status not in ('대상아님','적재실패');
+  update engine.generation_batch_runs
+     set target_count = 대상수, loaded_count = 만든수,
+         skipped_game_count = cardinality(_skipped_game),
+         skipped_existing_count = existing,
+         partial_count = partial,
+         finished_at = now()
+   where run_id = _run_id;
+  end if;
+
+  return jsonb_build_object(
+    'created', created, 'existing', existing, 'partial', partial,
+    'skipped_game', cardinality(_skipped_game));
+end
+$function$;
+
+do $migration2$
+declare
+  expected_checksum constant text := 'cc31d9270f26708adc6aeb5fa079ac953182fee7d98a57d8d75e903d784a5baf'; -- migration-checksum
+begin
+  insert into engine.schema_migrations(version, name, checksum)
+  values ('20260903000000', '20260903000000_jobs_load_guard_restore_c16.sql', expected_checksum);
+end
+$migration2$;
+
+commit;
+
 -- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
---
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
 -- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -379,3 +723,42 @@ select case when 테이블수=23 and RLS켜짐=23 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
   from 셈;
+*/
+-- 사후 메모:
+-- ① 이 조각 = engine.jobs_load 활성일 가드 «복원»(09-01 confluence_reads_c15 가 덮어 지운 것) — 표·칸·CHECK 변경 0 · 함수 하나만 다시 만든다.
+-- ② 아래 기대 목록은 20260831130000 이 세운 현행 그대로다(변경 0 — 마지막 조각이 이 줄을 든다).
+--    ⚠ 이 줄은 마지막 조각이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    ⚠ `season_no_overlap_c11`(EXCLUDE) · `…_once_c11`(UNIQUE) · `companion_qa_*_fkey` 는 여기
+--      없다 — CHECK 가 아니라 이 줄의 대상이 아니고, 이름도 c11 그대로 산다(값목록이 없어
+--      판 판별과 무관하다 · 위 기대제약 목록에는 그 이름 그대로 들어 있다).
+--    기대: attempts_gate_values_c16 · attempts_response_present_c16 · attempts_result_gate_c16
+--         · attempts_ver_nonempty_c16 · batch_runs_counts_order_c16 · batch_runs_counts_pair_c16
+--         · batch_runs_enrolled_nonneg_c16 · batch_runs_finished_cols_c16
+--         · batch_runs_level_dist_ok_c16 · batch_runs_partial_pair_c16
+--         · batch_runs_partial_range_c16 · batch_runs_roster_equation_c16
+--         · batch_runs_skipped_range_c16 · batch_runs_ver_nonempty_c16 · broadcast_segment_kind_c16
+--         · classes_key_nonblank_c16 · companion_qa_answer_paired_c16
+--         · companion_qa_question_nonblank_c16 · corrections_promotion_intent_c16
+--         · corrections_supersedes_not_self_c16 · corrections_verdict_c16 · cron_runs_outcome_c16
+--         · jobs_anchor_present_c16 · jobs_claim_cols_c16 · jobs_deciding_pair_c16
+--         · jobs_deciding_result_matches_c16 · jobs_deciding_scope_c16 · jobs_draft_present_c16
+--         · jobs_idle_cols_c16 · jobs_load_failed_cols_c16 · jobs_nontarget_cols_c16
+--         · jobs_nonterminal_cols_c16 · jobs_skill_ids_present_c16 · jobs_status_outcome_pairs_c16
+--         · jobs_terminal_cols_c16 · jobs_ver_nonempty_c16 · jobs_winner_fence_current_c16
+--         · jobs_winner_fence_pair_c16 · jobs_winner_only_success_c16 · jobs_winner_present_c16
+--         · jobs_winner_result_only_success_c16 · jobs_winner_result_pair_c16
+--         · l10n_reviews_final_paired_c16 · l10n_reviews_supersedes_not_self_c16
+--         · l10n_reviews_verdict_c16 · l10n_strings_id_ascii_c16
+--         · l10n_strings_ko_nonblank_c16 · l10n_strings_max_len_c16
+--         · l10n_strings_status_c16 · learners_gender_c16
+--         · learners_goal_track_c16 · learners_group_no_c16 · learners_home_aimag_c16
+--         · learners_seat_no_c16 · learners_signup_attempts_nonneg_c16
+--         · learners_temp_password_paired_c16 · learning_events_correction_target_c16
+--         · learning_events_event_type_c16 · learning_events_task_type_c16
+--         · pipeline_jobs_discard_reason_c16 · season_compass_answers_c16 · season_dates_c16
+--         · season_review_decided_c16 · season_review_self_c16 · season_review_verdict_c16
+--         · staff_role_c16 · submissions_due_paired_c16 · submissions_task_format_c16
+--         · submissions_translation_source_c16 · teacher_notes_body_nonblank_c16
+--         · teacher_notes_disposition_c16 · teacher_notes_origin_c16
