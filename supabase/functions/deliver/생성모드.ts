@@ -120,6 +120,11 @@ function 학생조립(학생: Record<string, unknown>, 재료: {
         /* ㉢ 나침반(경로 A) — 대상조회가 배정 날짜의 시즌에서 걷어 온 season_goal.
          * 없으면 null → 요약에 안 실린다(널 규칙 · 나침반 0행이 개원 전 정상 상태). */
         시즌목표: (학생.시즌목표 ?? null) as string | null,
+        /* ㉢ 입학 회차(2026-09-05 · 유호 픽 ㉮) — 대상조회의 `입학나침반` lateral 이 걷어 온 둘.
+         * 시즌목표와 **다른 행**에서 온다(입학 회차에만 저장된다 · 그쪽 주석이 까닭을 쥔다).
+         * 없으면 null → 요약에 안 실린다(널 규칙 그대로 · 나침반 0행이 개원 전 정상 상태). */
+        왜배우나: (학생.왜배우나 ?? null) as string | null,
+        토픽쓸곳: (학생.토픽쓸곳 ?? null) as string | null,
       });
     } catch (e) {
       console.error('[deliver/생성] 상태오류 강등(폴백으로 간다)', learner_id, String((e as Error)?.message ?? e).slice(0, 200));

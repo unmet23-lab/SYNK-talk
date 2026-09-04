@@ -295,12 +295,35 @@ function 대상질의(스냅기준: string, 한사람: string | null,
              where sn.starts_on <= (${스냅기준}::timestamptz at time zone ${시간대})::date
                and (sn.ends_on is null or sn.ends_on >= (${스냅기준}::timestamptz at time zone ${시간대})::date)
              limit 1) as 시즌목표,
+           입학나침반.왜배우나, 입학나침반.토픽쓸곳,
            배정.occurred_at as 마지막배정, 배정.task_snapshot as 마지막스냅샷,
            교정.corrected_text as 교정문, 교정.correction_id as 교정id, 교정.원사건,
            동의.consent_ver, 동의.consent_id,
            재제출.원제출사건, 재제출.원시드, 재제출.원챌린지,
            원신호.행들 as 원신호
       from engine.learners l
+      left join lateral (
+        /* ㉢ 입학 회차 나침반(2026-09-05 · 유호 픽 ㉮) — 「왜 배우나」·「토픽 쓸 곳」.
+         *   바로 위 시즌목표와 **다른 행**을 본다: 그쪽은 「오늘을 덮는 시즌」이고 여기는
+         *   「입학 그날」이다. 이 둘은 입학 회차에만 저장되고 이후 시즌 행에는 아예 없다 —
+         *   DB CHECK(season_compass_answers_c11)가 회차별 키 집합을 못박고 있어서, 시즌 행에서
+         *   찾으면 셋째 시즌부터 영원히 null 이 된다(값이 없는 게 아니라 «다른 행에» 있다).
+         * 🔑 회차를 가르는 술어 = self_in_5y_changed is null. 회차 열을 따로 두지 않은 것이
+         *   그 표의 설계이고(같은 판정이 두 칸에 앉으면 갈린다), 여기도 그 술어를 그대로 쓴다.
+         * 🔑 order by recorded_at 은 고르기 규칙이 아니라 **입학 행이 하나**라는 사실의 표기다
+         *   (learner_id, season_id 유일키 + 입학은 한 번). 인덱스 season_compass_learner_recorded
+         *   가 이 정렬을 덮는다.
+         * 🔒 판정하지 않는다 — 원값을 그대로 걷어 요약의 «맥락 줄»로만 간다(lib/시즌맥락.js
+         *   목적줄들). 점수·태그로 바꾸는 것은 세 곳이 막아 둔 길이다.
+         * ⚠ 이 주석에 백틱을 쓰지 않는다 — sql 템플릿 리터럴 «안»이라 거기서 끊긴다.
+         *   09-05 에 실제로 밟았다(바로 위 교정 lateral 이 같은 경고를 이미 적어 두고 있었다). */
+        select c.answers->>'why_learning' as 왜배우나,
+               c.answers->>'topik_use'    as 토픽쓸곳
+          from engine.season_compass c
+         where c.learner_id = l.learner_id
+           and c.self_in_5y_changed is null
+         order by c.recorded_at
+         limit 1) 입학나침반 on true
       left join lateral (
         select e.occurred_at, s.task_snapshot
           from engine.learning_events e
