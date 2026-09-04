@@ -47,14 +47,18 @@ import 학생계정 from './학생계정.mjs';
 import 로그인코드 from './로그인코드.mjs';
 import 계약 from './수집_교정_계약.json' with { type: 'json' };
 
-const { 머리글자리, 표읽기, 행별가르기, 반미배정, 계획, 급수정규화 } = 명부규칙 as {
+const { 머리글자리, 표읽기, 행별가르기, 반미배정, 계획, 급수정규화, 담당지는가, 반갈래 } = 명부규칙 as {
   머리글자리: (표: string[][]) => { 오류: string[] };
   표읽기: (표: string[][]) => {
     행들: Array<{ 번호: string; 전화: string; 이름: string; 역할: string; 반: string; 급수: string; 줄: number }>;
-    대상아닌행?: Array<{ 역할: string }>;
+    /* 🔑 학생이 «아닌» 행 — 강사·학부모가 여기 온다. 여태 세기만 하고 버렸는데, 담당 반이
+     *   이 안에 있었다(09-05 · 아래 §강사 담당 반). 그래서 타입을 학생 행과 같은 폭으로 넓힌다. */
+    대상아닌행?: Array<{ 번호: string; 이름: string; 역할: string; 반: string; 줄: number }>;
     오류: string[];
   };
   급수정규화: (값: unknown) => string | null;
+  담당지는가: (값: string) => boolean;
+  반갈래: (값: string) => string[];
   행별가르기: (행들: unknown[]) => {
     정상: Array<{ 번호: string; 전화: string; 이름: string; 반: string; 급수?: string; 줄: number }>;
     문제들: Array<{ 줄: number; 번호: string; 사유: string }>;
@@ -66,7 +70,14 @@ const { 머리글자리, 표읽기, 행별가르기, 반미배정, 계획, 급�
     막힌것: Array<{ 번호: string; 사유: string }>;
   };
 };
-const { 학생번호표기 } = 학생계정 as { 학생번호표기: (입력: string) => string };
+const { 학생번호표기, 직원번호맞나, 이메일 } = 학생계정 as {
+  학생번호표기: (입력: string) => string;
+  /* 담당 반은 **번호**로 잇는다(이름으로 이으면 동명이인 하나가 남의 반을 연다).
+   * 직원 번호는 `SYNK` + 글자 + 숫자 2자리(`SYNK-T01`) — 학생 채번기가 원리상 못 만드는 모양이라
+   * 학생 번호와 구조상 안 겹친다(lib/학생계정.js 머리말). */
+  직원번호맞나: (입력: string) => boolean;
+  이메일: (계정번호: string) => string;
+};
 const { 정규형 } = 로그인코드 as { 정규형: (입력: string) => string };
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false });
@@ -315,6 +326,122 @@ Deno.serve(async (req) => {
     조해제 = 해제.length;
   }
 
+  /* ── 강사 담당 반 (`engine.staff_classes` · 09-05) ───────────────────────────
+   * 🔑 **이미 오는 것을 받는다** — 시트 4열 `role` 과 5열 `class_name` 은 학생 처리에서 벌써
+   *   읽는다. 강사 행은 여태 `대상아닌행` 으로 갈라져 «세기만» 하고 버려졌는데, 그 안에 담당
+   *   관계가 들어 있었다. 반을 «다시» 입력하는 화면을 만들지 않는다(반 열별칭과 같은 판단).
+   *
+   * ■ 왜 지금 서나 — 관찰 통로가 열려도 «적을 학생»이 0명이었다
+   *   `teach` 의 `observe/roster` 는 `learners.class_id → classes → staff_classes → staff`
+   *   3단 조인으로 학생을 준다. 그 표에 행을 넣는 운영 통로가 **0개**라(insert 는 시험 도구
+   *   둘뿐 · 09-05 실측) 강사가 관찰 화면을 열면 목록이 빈 채로 떴다 — 403 이 아니라 빈 목록
+   *   이라 「고장」으로도 안 보인다. `docs/관찰태그_자동화_설계.md` §5 「선행 1」의 그 자리다.
+   *
+   * ■ 🔴 이름으로 잇지 않는다 — 번호가 계정을 가리킨다
+   *   동명이인 하나가 남의 반을 여는 열쇠가 된다. 직원 번호(`SYNK-T01` 꼴)로만 잇고, 규격 밖
+   *   행은 사유를 달아 되돌린다(시트를 고칠 사람에게 줄·번호로 간다).
+   *
+   * ■ 🔴 새 반을 여기서 «만들지» 않는다
+   *   반의 정본은 학생 명부다(위 §반). 강사 행의 오타로 반이 서면 유령 반에 담당이 붙고, 그
+   *   강사는 아무 학생도 못 보는데 화면은 정상으로 보인다 — 조용한 실패다. 못 찾은 반은 되돌린다.
+   *
+   * ■ 🔴 스냅샷이다 — 시트에서 빠진 담당은 «지운다»
+   *   담당은 곧 **권한**이다(학생 이름과 관찰 원문을 여는 열쇠). 반이 바뀐 강사의 옛 담당이
+   *   남으면 그 강사가 남의 반 학생을 계속 본다. 그래서 조·좌석과 같은 규율로 맞춘다.
+   *   ⚠ 「모른다」와 「없다」를 가른다 — 강사 행이 **하나도 없는** 판(역할 열을 아직 안 쓰는
+   *   시트·옛 스윕)은 무동작이다. 담당을 빼는 정상 흐름은 그 행의 반 칸을 비우는 것이고,
+   *   그러면 그 강사의 짝이 0이 되어 아래 삭제가 지운다.
+   *   ⚠ 지우는 범위는 **이번 판에 실린 강사**뿐이다 — 시트 밖 계정(시험용)의 담당은 안 건드린다.
+   *
+   * ■ 여기서 «계정»은 만들지 않는다 (F269 와 같은 결)
+   *   `engine.staff` 행이 없는 강사는 되돌린다. 직원 계정이 서는 자리는 따로이고, 시트를
+   *   고칠 수 있는 사람이 직원을 만들 수 있게 되면 그것이 권한 통로가 된다.
+   */
+  type 강사줄 = { 번호: string; 이름: string; 역할: string; 반: string; 줄: number };
+  const 강사행 = ((대상아닌행 || []) as 강사줄[]).filter((r) => 담당지는가(r.역할));
+  let 담당새로: string[] = [];
+  let 담당해제 = 0;
+  const 담당문제: Array<{ 줄: number; 번호: string; 사유: string }> = [];
+
+  if (강사행.length) {
+    const 이메일지도 = new Map<string, { 줄: number; 번호: string; 반들: string[] }>();
+    for (const r of 강사행) {
+      if (!직원번호맞나(r.번호)) {
+        담당문제.push({
+          줄: r.줄, 번호: r.번호 || '(번호 없음)',
+          사유: '직원 번호 규격이 아니다(`SYNK-T01` 꼴) — 담당을 세우지 못했다',
+        });
+        continue;
+      }
+      이메일지도.set(이메일(r.번호), { 줄: r.줄, 번호: r.번호, 반들: 반갈래(r.반) });
+    }
+
+    if (이메일지도.size) {
+      /* `active` 만 본다 — `revoked_before` 는 **토큰**을 무르는 장치라 축이 다르다(lib/토큰.js).
+       * 계정을 아주 닫는 것은 `active=false` 이고, 그때 담당도 함께 끊긴다(아래 조회에서 빠진다). */
+      const 직원들 = await sql`
+        select u.email::text as email, s.staff_id
+          from engine.staff s join auth.users u on u.id = s.auth_user_id
+         where u.email in ${sql([...이메일지도.keys()])} and s.active`;
+      const 직원지도 = new Map(
+        (직원들 as unknown as Array<{ email: string; staff_id: string }>).map((r) => [r.email, r.staff_id]),
+      );
+
+      const 원하는반 = [...new Set([...이메일지도.values()].flatMap((v) => v.반들))];
+      const 반들 = 원하는반.length
+        ? await sql`select class_id, class_key from engine.classes
+                     where class_key in ${sql(원하는반)} and active`
+        : [];
+      const 강사반지도 = new Map(
+        (반들 as unknown as Array<{ class_id: string; class_key: string }>).map((r) => [r.class_key, r.class_id]),
+      );
+
+      const 짝들: Array<{ staff_id: string; class_id: string; schema_ver: string }> = [];
+      const 실린직원 = new Set<string>();
+      for (const [메일, v] of 이메일지도) {
+        const staff_id = 직원지도.get(메일);
+        if (!staff_id) {
+          담당문제.push({
+            줄: v.줄, 번호: v.번호,
+            사유: '앱 직원 명부에 없는 번호 — 담당을 세우지 못했다(계정이 아직 안 섰거나 번호가 다르다)',
+          });
+          continue;
+        }
+        실린직원.add(staff_id);   // 반이 비어도 «실렸다» — 그래야 아래 삭제가 담당 해제를 집행한다
+        for (const 반이름 of v.반들) {
+          const class_id = 강사반지도.get(반이름);
+          if (!class_id) {
+            담당문제.push({ 줄: v.줄, 번호: v.번호, 사유: `학생 명부에 없는 반 「${반이름}」 — 담당을 세우지 못했다` });
+            continue;
+          }
+          짝들.push({ staff_id, class_id, schema_ver: (계약 as { 버전: string }).버전 });
+        }
+      }
+
+      if (실린직원.size) {
+        const 살릴staff = 짝들.map((p) => p.staff_id);
+        const 살릴class = 짝들.map((p) => p.class_id);
+        const 지운것 = await sql`
+          delete from engine.staff_classes sc
+           where sc.staff_id in ${sql([...실린직원])}
+             and not exists (
+               select 1 from (select unnest(${살릴staff}::uuid[]) as staff_id,
+                                     unnest(${살릴class}::uuid[]) as class_id) v
+                where v.staff_id = sc.staff_id and v.class_id = sc.class_id)
+          returning sc.staff_id`;
+        담당해제 = 지운것.length;
+      }
+
+      if (짝들.length) {
+        const 넣은것 = await sql`
+          insert into engine.staff_classes ${sql(짝들 as unknown as Record<string, never>[], 'staff_id', 'class_id', 'schema_ver')}
+          on conflict (staff_id, class_id) do nothing
+          returning staff_id`;
+        담당새로 = (넣은것 as unknown as Array<{ staff_id: string }>).map((r) => r.staff_id);
+      }
+    }
+  }
+
   /* 다음 한 걸음 = 동의 (유호 확정: 등록 직후). 여기서 만들지 않는다 — 세어서 부르기만 한다.
    * 이름을 다 부른다: 숫자만 주면 원장이 누구인지 찾으러 DB 를 열고, 그 왕복이 곧 「나중에」가 된다. */
   let 무동의: string[] = [];
@@ -354,6 +481,12 @@ Deno.serve(async (req) => {
     조갱신,
     조해제,
     조편성문제,
+    /* 강사 담당 반(09-05) — 강사 행이 하나도 없는 판에서는 셋 다 0·빈 배열이다(무동작).
+     * 🔑 `담당문제` 가 비어 있지 않으면 **관찰·반피드백 화면이 그 강사에게 빈 목록으로 뜬다** —
+     *   증상이 「고장」으로 안 보이는 자리라, 수신자가 이 목록을 소리 내야 한다. */
+    담당새로: 담당새로.length,
+    담당해제,
+    담당문제,
     schema_ver: (계약 as { 버전: string }).버전,
   });
 });
