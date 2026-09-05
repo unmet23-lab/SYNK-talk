@@ -41,7 +41,31 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const https = require('node:https');
 const { 인자게이트 } = require('../lib/플래그.js');
+
+/* 🔴 **긴 기다림은 `fetch` 로 못 한다** (09-05 실측 · 240초 곡을 굽다가 `terminated` 로 죽었다).
+ *   Node 내장 fetch 는 몸통을 기다리는 한도가 **5분**으로 박혀 있고 늘릴 자리가 없다
+ *   (`undici` 를 따로 깔면 되지만, 그 하나 때문에 저장소에 짐을 늘리지 않는다).
+ *   그런데 4분짜리 곡은 굽는 데 **8분**쯤 걸린다 ⇒ 반드시 그 한도에 걸린다.
+ * ⚠ 이때 나는 말이 `terminated` 뿐이라 «몫이 없어서 거절당한 것»으로 오해하기 쉽다.
+ *   실은 정반대다 — **몫이 있어서 굽기 시작했는데 우리가 먼저 끊은 것**이고, 그러면 그 몫은 그냥 날아간다.
+ * ✅ 그래서 오래 기다리는 쪽(GET)만 `node:https` 로 내린다. 여기는 한도를 우리가 정한다. */
+const 기다림한도 = 20 * 60 * 1000;   // 20분. 상한 300초 곡이 ~10분이라 두 배로 잡는다
+
+function 긴GET(url, 머리) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { headers: 머리 }, (res) => {
+      let 모음 = '';
+      res.setEncoding('utf8');
+      res.on('data', (조각) => { 모음 += 조각; });
+      res.on('end', () => resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, 본문: 모음 }));
+      res.on('error', reject);
+    });
+    req.setTimeout(기다림한도, () => req.destroy(new Error(`${기다림한도 / 60000}분을 기다렸는데 안 끝났다`)));
+    req.on('error', reject);
+  });
+}
 
 const 아는플래그 = ['--결', '--벌', '--씨앗', '--길이', '--낼곳', '--연주곡', '--결목록', '--되살리기', '--통로'];
 
@@ -121,9 +145,9 @@ async function 한번굽기(state, { 길이, 씨앗, 무작위, 통로 = 'simple
 
   /* 🔑 결과는 «흘러서» 온다(SSE). 한 번에 안 오므로 조각을 모아 마지막 `complete` 를 읽는다.
    *   ⚠ 2분 곡에 3분 반쯤 걸린다 — 중간에 끊으면 남의 실행 자리만 쓰고 빈손이다. */
-  const 흐름 = await fetch(`${SPACE}/gradio_api/call/${문}/${event_id}`, { headers: 머리 });
+  const 흐름 = await 긴GET(`${SPACE}/gradio_api/call/${문}/${event_id}`, 머리);
   if (!흐름.ok) throw new Error(`받기 실패 ${흐름.status}`);
-  const 본문 = await 흐름.text();
+  const 본문 = 흐름.본문;
 
   /* 🔴 **`error` 를 먼저 본다.** 첫 판이 이걸 뒤로 미뤄서 「소리가 안 왔다」라는 쓸모없는 말만 냈다 —
    *   실제로는 서버가 까닭을 또박또박 말하고 있었다(09-05 실측: 남의 실행 자리 몫이 바닥).
