@@ -51,10 +51,10 @@ import { 목소리판정 } from '../lib/가이드목소리.js';
 /* Metro 는 require 를 정적으로 읽는다 — 목록을 코드로 파생할 수 없어 손 지도가 필요하고,
    그 지도가 `표정컷`과 갈라지는 것은 tests/마스코트배선.test.js 가 잡는다. */
 const 컷그림 = {
-  재염색_본체: require('../assets/마스코트/재염색_본체.webp'),
-  재염색_놀람: require('../assets/마스코트/재염색_놀람.webp'),
-  재염색_눈웃음: require('../assets/마스코트/재염색_눈웃음.webp'),
-  재염색_눈감음: require('../assets/마스코트/재염색_눈감음.webp'),
+  몽글_본체: require('../assets/마스코트/몽글_본체.webp'),
+  몽글_놀람: require('../assets/마스코트/몽글_놀람.webp'),
+  몽글_눈웃음: require('../assets/마스코트/몽글_눈웃음.webp'),
+  몽글_눈감음: require('../assets/마스코트/몽글_눈감음.webp'),
   까몽_본체: require('../assets/마스코트/까몽_본체.webp'),
   까몽_놀람: require('../assets/마스코트/까몽_놀람.webp'),
   까몽_눈웃음: require('../assets/마스코트/까몽_눈웃음.webp'),
