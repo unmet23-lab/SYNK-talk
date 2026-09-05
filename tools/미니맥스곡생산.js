@@ -155,6 +155,43 @@ function state만들기(설명, { 연주곡 = false, 제목 = '', 가사 = '' } 
   };
 }
 
+/** 🔑 **곡을 굽기 «전»에 노랫말과 세 칸을 받아 온다** (09-06 신설 · 이 도구가 되살아나게 된 까닭).
+ *   `compose_assist` 는 딥시크(남의 글쓰기 모델)를 불러 네 칸을 지어 돌려준다.
+ *   ✅ 그래픽카드를 안 쓰므로 **허깅페이스 실행 몫을 한 톨도 안 먹는다.**
+ *   ⇒ 이 넷을 받아 적어 두면, 다음부터는 씨앗과 함께 그대로 다시 넘겨 **한 바이트까지 같은 곡**을 만든다.
+ * 🔴 이것을 안 하고 `/simple_generate` 로 곧장 구우면, 그 안쪽에서 네 칸을 «매번 새로» 짓고
+ *   그 글은 어디에도 안 남는다(09-06 실측: 같은 씨앗 두 번 → 닮음 0.07 = 남남). */
+async function 짓기(state, 길이) {
+  const t = 토큰();
+  const 머리 = { 'content-type': 'application/json' };
+  if (t) 머리.authorization = `Bearer ${t}`;
+  const 던짐 = await fetch(`${SPACE}/gradio_api/call/compose_assist`, {
+    method: 'POST', headers: 머리,
+    body: JSON.stringify({ data: [{ ...state, assist: 'all' }, 길이] }),
+  });
+  if (!던짐.ok) throw new Error(`짓기 던지기 실패 ${던짐.status}: ${(await 던짐.text()).slice(0, 200)}`);
+  const { event_id } = await 던짐.json();
+  if (!event_id) throw new Error('짓기 event_id 가 안 왔다 — Space 가 바뀐 것으로 보인다');
+  const 흐름 = await 긴GET(`${SPACE}/gradio_api/call/compose_assist/${event_id}`, 머리);
+  if (!흐름.ok) throw new Error(`짓기 받기 실패 ${흐름.status}`);
+  let 끝 = null; let 오류 = null;
+  for (const 덩이 of 흐름.본문.split('\n\n')) {
+    const 종류 = (덩이.match(/^event:\s*(\S+)/m) || [])[1];
+    const 자료 = (덩이.match(/^data:\s*(.*)$/m) || [])[1];
+    if (!자료) continue;
+    if (종류 === 'error') { 오류 = 자료; continue; }
+    if (종류 === 'complete') { try { 끝 = JSON.parse(자료); } catch { /* 조각난 줄은 버린다 */ } }
+  }
+  if (오류) throw new Error(`짓기를 거절당했다: ${String(오류).slice(0, 300)}`);
+  const 지은 = 끝 && 끝[0];
+  if (!지은 || !String(지은.lyrics || '').trim()) throw new Error('노랫말이 안 돌아왔다 — 짓는 자리가 막힌 것으로 보인다');
+  /* generate 1111~1115줄이 요구하는 둘: 세 칸 중 하나라도 있어야 하고, 노랫말이 비면 안 된다. */
+  if (!['global_meta', 'vocals', 'arrangement'].some((k) => String(지은[k] || '').trim())) {
+    throw new Error('소리 설명 세 칸이 전부 비었다 — 이대로 구우면 서버가 거절한다');
+  }
+  return { ...state, ...지은, mode: 'studio' };
+}
+
 /** gradio 한 번 부르기. 던지고(POST) → 흘러오는 것을 읽어(GET) 마지막 결과를 집는다.
  *  🔑 두 통로의 «인자 모양이 똑같다»(09-05 실측) — 그래서 이름만 갈아 끼우면 된다. */
 async function 한번굽기(state, { 길이, 씨앗, 무작위, 통로 = 'simple' }) {
@@ -213,13 +250,18 @@ async function 한번굽기(state, { 길이, 씨앗, 무작위, 통로 = 'simple
   const 소리 = 마지막[2];
   const 쓴씨앗 = 마지막[3];
   /* 🔑 `simple` 만 다섯째를 준다 = **모델이 스스로 지은 가사**. 우리 가사를 버린 자리라
-   *   이것을 안 적으면 「무슨 노랫말로 불렸나」가 곡 안에만 남고 글로는 사라진다(09-04 사고의 자리). */
-  const 지은가사 = typeof 마지막[4] === 'string' ? 마지막[4] : null;
+   *   이것을 안 적으면 「무슨 노랫말로 불렸나」가 곡 안에만 남고 글로는 사라진다(09-04 사고의 자리).
+   * 🔴 09-06 정정 — 다섯째는 «글자»가 아니라 **state 통째**다(app.py 1566~1578: `yield ..., state, ...`).
+   *   글자만 받던 첫 판은 언제나 null 을 적었다(09-06 실측: 씨앗8888 사이드카의 지은가사 칸이 비었다).
+   *   그래서 둘 다 받는다 — 글자면 그대로, state 면 그 안의 `lyrics` 칸을 꺼낸다. */
+  const 다섯째 = 마지막[4];
+  const 돌아온state = (다섯째 && typeof 다섯째 === 'object' && typeof 다섯째.lyrics === 'string') ? 다섯째 : null;
+  const 지은가사 = typeof 다섯째 === 'string' ? 다섯째 : (돌아온state ? 돌아온state.lyrics : null);
   if (!소리 || !(소리.url || 소리.path)) throw new Error(`소리가 안 왔다: ${JSON.stringify(마지막).slice(0, 200)}`);
   const url = 소리.url || `${SPACE}/gradio_api/file=${소리.path}`;
   const 받음 = await fetch(url, { headers: t ? { authorization: `Bearer ${t}` } : {} });
   if (!받음.ok) throw new Error(`내려받기 실패 ${받음.status}`);
-  return { 소리: Buffer.from(await 받음.arrayBuffer()), 씨앗: 쓴씨앗, 지은가사 };
+  return { 소리: Buffer.from(await 받음.arrayBuffer()), 씨앗: 쓴씨앗, 지은가사, 돌아온state };
 }
 
 /** 🔑 이 도구의 존재 이유 — 곡 옆에 «다시 만드는 법»을 통째로 박는다. */
@@ -282,16 +324,27 @@ async function 본체(argv) {
   console.log(`낼곳: ${낼곳}\n`);
 
   for (let i = 1; i <= 벌; i++) {
-    const state = state만들기(결들[결].설명, { 연주곡 });
-    process.stdout.write(`  · ${i}/${벌} 굽는 중 … `);
+    let state = state만들기(결들[결].설명, { 연주곡 });
     const t0 = Date.now();
     let r;
+    let 굽는문 = 통로;
     try {
+      /* 🔴 **먼저 짓고, 그 다음에 굽는다** (09-06 · 이 두 걸음이 나뉘어야 곡이 되살아난다).
+       *   `simple` 한 발로 구우면 안쪽에서 네 칸을 새로 짓고 그 글이 사라진다. 그래서 밖에서 짓는다.
+       *   짓기는 그래픽카드를 안 쓰니 몫이 안 들고, 소리는 어차피 네 칸만 보므로 결과는 같은 결이다. */
+      if (통로 === 'simple') {
+        process.stdout.write(`  · ${i}/${벌} 노랫말 짓는 중 … `);
+        state = await 짓기(state, 길이);
+        굽는문 = 'studio';   // 지은 넷을 손대지 않고 그대로 넘기는 문
+        process.stdout.write(`지었다(${String(state.lyrics).length}자) · 굽는 중 … `);
+      } else {
+        process.stdout.write(`  · ${i}/${벌} 굽는 중 … `);
+      }
       r = await 한번굽기(state, {
         길이,
         씨앗: 정한씨앗 ? Number(정한씨앗) : 0,
         무작위: !정한씨앗,
-        통로,
+        통로: 굽는문,
       });
     } catch (e) {
       console.log(`✗ ${e.message}`);
@@ -302,12 +355,27 @@ async function 본체(argv) {
     const 이름 = `${결}_씨앗${r.씨앗}_${통로}`;
     const 곡경로 = path.join(낼곳, `${이름}.wav`);
     fs.writeFileSync(곡경로, r.소리);
+    /* 🔴 **씨앗만으로는 못 되살린다** (09-06 실측 · 이 도구의 첫 판이 놓쳤던 자리).
+     *   `simple` 통로는 굽기 «전»에 노랫말과 세 칸을 매번 **새로 쓴다**(app.py 544~552 · 1566~1578).
+     *   그 글을 짓는 것은 딥시크(남의 글쓰기 모델)이고, 부를 때 씨앗도 온도도 안 넘긴다 ⇒ 매번 다른 글.
+     *   그리고 소리를 만드는 자리(generate 1110~1123)는 **문면을 아예 안 본다** — 그 넷만 본다.
+     *   ⇒ 같은 씨앗으로 두 번 구우면 남남이 나온다(09-06 실측: 닮음 0.07 · 남남 바닥값과 같다).
+     * ✅ 그래서 **돌아온 네 칸을 그대로 적고, 되살릴 때는 `studio` 로 넘긴다.**
+     *   그 문은 넷을 손대지 않고 그대로 넘기므로 씨앗이 곡을 붙잡는다.
+     *   09-06 실측: 같은 넷 + 같은 씨앗으로 두 번 구운 곡의 sha256 이 **한 바이트도 다르지 않았다.** */
+    const 되살릴state = r.돌아온state || state;   // 밖에서 지었으면 state 가 이미 네 칸을 쥔다
+    const 네칸있나 = ['global_meta', 'vocals', 'arrangement'].some((k) => String(되살릴state[k] || '').trim())
+      && String(되살릴state.lyrics || '').trim().length > 0;
     const 적을것 = {
       결, 씨앗: r.씨앗, 길이, 연주곡, 손잡이,
       문면: 결들[결].설명,
-      state,
-      통로문: 통로,
-      통로: `${SPACE} /${통로}_generate`,
+      state: 되살릴state,
+      통로문: 네칸있나 ? 'studio' : 통로,   // 🔑 되살리기는 언제나 넷을 지키는 문으로 간다
+      처음통로: 통로,                        // 무엇으로 «처음» 구웠나는 따로 남긴다
+      통로: `${SPACE} /${굽는문}_generate`,
+      되살아나나: 네칸있나
+        ? '된다 — 이 사이드카의 네 칸 + 씨앗이면 한 바이트까지 같다(09-06 실측)'
+        : '🔴 안 된다 — 네 칸이 없다. 씨앗만으로는 다른 곡이 나온다',
       지은가사: r.지은가사 || null,   // simple 통로만 준다 — 무슨 노랫말로 불렸나가 글로도 남는다
       구운날: new Date().toLocaleDateString('sv-SE'),
       되살리는법: `node tools/미니맥스곡생산.js --되살리기 "${곡경로.replace(/\.wav$/, '.json')}"`,
@@ -318,6 +386,9 @@ async function 본체(argv) {
     console.log(`     ${곡경로}`);
     console.log(`     씨앗을 적었다 → ${path.basename(사이드카)}${탈 ? ` (장부는 못 썼다: ${탈})` : ''}`);
     if (r.지은가사) console.log(`     모델이 지은 노랫말도 적었다(${r.지은가사.length}자)`);
+    console.log(네칸있나
+      ? '     ✅ 되살릴 네 칸도 적었다 — 이 곡은 한 바이트까지 다시 만들 수 있다'
+      : '     🔴 되살릴 네 칸이 없다 — 씨앗만 있고, 이 곡은 다시 못 만든다');
   }
 }
 
