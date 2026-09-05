@@ -47,9 +47,21 @@ const { 인자게이트 } = require('../lib/플래그.js');   // 모르는 낱�
 const 아는플래그 = ['--벌', '--낼곳', '--결', '--셈만'];
 
 const ROOT = path.resolve(__dirname, '..');
-const 키경로 = process.env.GEMINI_KEY_PATH || 'C:/Users/q1212/SYNK_보안/제미나이.txt';
+const { 벌텍스머리, 벌텍스프로젝트 } = require('../lib/벌텍스토큰.js');
 const 모델 = 'lyria-3-pro-preview';
-const 엔드포인트 = 'https://generativelanguage.googleapis.com/v1beta/interactions';
+/* 🚪 **클라우드 창구로 부른다**(2026-09-05 · 유호 지시 「응 옮겨줘」).
+ *   구글 공식: `The $300 credit can't pay for Gemini API in AI Studio costs.`
+ *   ⇒ 같은 `lyria-3-pro-preview` 라도 개인용 창구(`generativelanguage`)로 부르면 무료 크레딧이
+ *     못 내고, 클라우드 창구(`aiplatform`)로 부르면 낸다. 09-05 실측: 사흘에 ₩4,980 이 새고 있었다.
+ * 🔑 옮겨도 **모델은 그대로**다 — 목록 조회로 `lyria-3-pro-preview` 가 양쪽에 다 있음을 확인했다(09-05).
+ *   그래서 곡 품질이 안 내려간다. 인증만 API 키 → OAuth 토큰으로 바뀐다(`lib/벌텍스토큰.js` 가 왜인지 안다).
+ * 🔴 주소를 찾는 데 **두 번 헛짚었다** — 자를 남긴다:
+ *   · 리전 호스트(`us-central1-aiplatform…`) → 400 `Unsupported location: us-central1`
+ *   · 리전 호스트 + `/locations/global` → 400 `Lyria 3 is only supported in the global location`
+ *   ✅ 전역 호스트 + `/locations/global` 이라야 통과한다(호스트와 경로가 **둘 다** global 이어야 한다).
+ * ⚠ `:predict` 가 아니다 — Lyria 3 은 `interactions` 문이다(`:predict` 로 던지면 404 · 09-05 실측).
+ *   구세대 `lyria-002` 만 `:predict` 를 쓴다. 둘을 섞으면 조용히 404 다. */
+const 엔드포인트 = () => `https://aiplatform.googleapis.com/v1beta1/projects/${벌텍스프로젝트()}/locations/global/interactions`;
 const 크레딧경로 = path.join(ROOT, 'bots/송출/크레딧.md');
 /* 🔴 **생산 장부** — 「몇 번 불렀고 몇 번 막혔고 얼마 썼나」 (유호 지시 2026-09-03 「대책이 필요한데?」).
  *
@@ -98,11 +110,9 @@ const { 결차례, 결ascii } = require('../lib/라디오곡차례.js');   // �
  * 🔑 그래서 이름 규칙(`synk-radio-NN-<결>-air`)이 세 곳의 접점이다 — 주인은 `lib/라디오곡차례.js` 하나.
  *   (⚠ `lib/라디오편성.js` 와 헷갈리지 않는다 — 그쪽은 퀴즈 문항 추첨 가중이다.) */
 
-function 키() {
-  const raw = fs.readFileSync(키경로, 'utf8');
-  const m = raw.match(/AQ\.[A-Za-z0-9_\-.]+/) || raw.match(/AIza[A-Za-z0-9_\-]{20,}/);
-  return m ? m[0] : raw.trim().split(/\r?\n/).filter(Boolean).pop();
-}
+/* 🗑 옛 `키()` 는 09-05 에 걷었다 — 클라우드 창구는 API 키를 «원리상» 안 받는다.
+ *   (조직 밖 프로젝트라 키 제한을 넓힐 자리가 없다 · 까닭은 `lib/벌텍스토큰.js` 머리말)
+ *   인증 머리를 만드는 곳은 이제 `벌텍스머리()` 하나다. */
 
 /** 응답 JSON 안 어디에 있든 첫 오디오 블록을 찾아낸다 — 구조가 깊어 재귀가 안전하다(09-01 실측). */
 function 오디오찾기(x) {
@@ -116,11 +126,11 @@ function 오디오찾기(x) {
 }
 
 /** 한 생성. 차단은 던지고, 부르는 쪽이 **문면 그대로** 재시도한다(낱말 수술은 마지막 수단). */
-async function 한생성(프롬프트, k, 결) {
+async function 한생성(프롬프트, 머리, 결) {
   셈.호출 += 1;   // 성공·차단을 가리지 않고 «부른 것»을 센다(차단도 과금되는 것으로 보인다)
-  const res = await fetch(엔드포인트, {
+  const res = await fetch(엔드포인트(), {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-goog-api-key': k },
+    headers: 머리,
     body: JSON.stringify({ model: 모델, input: 프롬프트 }),
   });
   const 본문 = await res.text();
@@ -139,10 +149,10 @@ async function 한생성(프롬프트, k, 결) {
   return Buffer.from(b64, 'base64');
 }
 
-async function 생성재시도(프롬프트, k, 회 = 3, 결) {
+async function 생성재시도(프롬프트, 머리, 회 = 3, 결) {
   let 마지막;
   for (let i = 1; i <= 회; i++) {
-    try { return await 한생성(프롬프트, k, 결); } catch (e) {
+    try { return await 한생성(프롬프트, 머리, 결); } catch (e) {
       마지막 = e;
       /* 🔴 차단이 «아닌» 오류(키 죽음·네트워크·크레딧 0)는 재시도해도 같은 답이다 —
        *   그 자리에서 던져 전체를 멈춘다. 계속 돌면 같은 실패를 벌 수만큼 반복하며 돈만 센다. */
@@ -215,7 +225,7 @@ function 조각살리기(조각, 낼곳, n, 결) {
   } catch (_) { return null; }   // 살리기 실패가 생산 전체를 죽이지는 않는다
 }
 
-async function 한벌(n, 결, 낼곳, k, 규격) {
+async function 한벌(n, 결, 낼곳, 규격) {
   const 프롬프트 = `${공통머리} ${결들[결]}`;
   const 조각 = [];
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'synk-radio-'));
@@ -223,7 +233,9 @@ async function 한벌(n, 결, 낼곳, k, 규격) {
     process.stdout.write(`  · ${결} 생성 ${i + 1}/3 … `);
     let buf;
     try {
-      buf = await 생성재시도(프롬프트, k, 3, 결);
+      /* 🔑 머리를 **생성마다** 새로 얻는다 — 토큰이 1시간짜리라 여덟 벌(24생성 · 20분+)을
+       *   한 번 얻은 토큰으로 돌면 뒤쪽이 만료로 죽는다. 캐시가 있어 대부분 파일 읽기 한 번이다. */
+      buf = await 생성재시도(프롬프트, await 벌텍스머리(), 3, 결);
     } catch (e) {
       /* 차단이 «아닌» 오류(키·네트워크·크레딧 0)는 다음 벌도 똑같이 죽는다 — 그대로 던져 전체를 멈춘다. */
       if (!e.차단소진) {
@@ -322,7 +334,9 @@ async function main() {
   if (argv.includes('--셈만')) return;
 
   fs.mkdirSync(낼곳, { recursive: true });
-  const k = 키();
+  /* 🔑 첫 토큰을 **여기서 미리** 받는다 — 자격이 죽었으면 곡을 한 개도 굽기 전에 알아야 한다
+   *   (한 벌 굽고 나서 알면 그만큼이 그냥 나간 돈이다). 값은 안 쓰고 «되나»만 본다. */
+  await 벌텍스머리();
   const 결과 = []; const 크레딧줄 = []; const 실패들 = [];
   /* 🔴 `toISOString()` 은 **UTC** 다 — KST 자정 직후에 구우면 장부에 «어제»가 박힌다
    *   (09-02 00:2x 에 구운 8벌이 전부 09-01 로 찍혔다). 장부는 「우리가 언제 만들었나」의
@@ -334,7 +348,7 @@ async function main() {
      * (번호로 타면 07 부터 시작할 때 전자 블록 한복판에 떨어진다) */
     const 결 = 한결 || 결차례[i % 결차례.length];
     console.log(`\n[${i + 1}/${벌}] ${결} → ${String(n).padStart(2, '0')}번`);
-    const r = await 한벌(n, 결, 낼곳, k, 규격);
+    const r = await 한벌(n, 결, 낼곳, 규격);
     /* 🔴 차단으로 접힌 벌은 «건너뛰고 계속»한다 — 전체를 멈추면 이미 성공한 벌까지 크레딧 장부에
      *   안 적히고, 다음 실행이 또 1번부터 시작한다. 다만 **조용히 넘어가지 않는다**(아래 요약이 센다). */
     if (r.실패) {
