@@ -94,6 +94,37 @@ const 결들 = {
     설명: 'warm korean city pop, gentle female vocal, bright piano and soft synth, mid tempo, hopeful morning mood',
     뭐냐: '유호님 「너무 좋은데?」 판(_씨앗없음_ko_vocal)과 같은 문면',
   },
+
+  /* ── 새 무대 넷의 결 (2026-09-05 · 유호 지시 「그 장르 곡도 만들자」) ────────────────
+   * 🔑 문면을 «무대 사진»에서 뽑았다 — 화면이 곡에 박혀 나가므로 소리와 그림이 어긋나면
+   *   학생은 그 어긋남을 먼저 듣는다. 형제 저장소 `docs/라디오/무대/<결>.png` 가 그 그림이다.
+   * 🔑 넷 다 «가사 없는 결»로 잡았다. 시티팝 둘이 이미 목소리를 쥐고 있어서, 새 넷까지
+   *   노래하면 24시간 내내 사람 목소리가 끊이지 않는다. 자습·새벽 자리를 남긴다.
+   * ⚠ 아직 «시험 판»이다 — 유호님이 들으시고 고르신 뒤에야 방송 판(6분+)으로 늘린다. */
+  도시: {
+    설명: 'lo-fi korean city pop, rainy evening rooftop mood, mellow rhodes piano, soft brushed drums, '
+      + 'warm upright bass, distant city hum, no vocals, slow tempo around 88 bpm, wet plate reverb, '
+      + 'streetlight glow through mist, nostalgic and calm',
+    뭐냐: '무대 = 비 갠 저녁의 골목 옥상(city.png) · 창문 불빛과 젖은 지붕의 온도',
+  },
+  드림하늘: {
+    설명: 'ethereal dream pop instrumental, floating above soft clouds, airy pad textures, gentle music box, '
+      + 'breathy wordless humming, no lyrics, very slow tempo around 68 bpm, wide shimmering reverb, '
+      + 'weightless pastel light',
+    뭐냐: '무대 = 구름 위의 계단(dream_sky.png) · 파스텔과 양털 구름의 떠 있는 결',
+  },
+  드림물: {
+    설명: 'minimal ambient instrumental, endless mirror water at sunset, sparse piano notes with long decay, '
+      + 'slow synth swells, faint water ripples, no vocals, very slow tempo around 60 bpm, '
+      + 'deep spacious reverb, serene and glassy',
+    뭐냐: '무대 = 끝없는 거울 물(dream_water.png) · 해가 수면에 비치는 정면 역광',
+  },
+  드림들판: {
+    설명: 'warm folk ambient instrumental, glowing meadow at dusk, soft acoustic guitar arpeggio, '
+      + 'gentle string pad, distant humming, small twinkling bells like fireflies, no vocals, '
+      + 'slow tempo around 72 bpm, golden and tender',
+    뭐냐: '무대 = 빛나는 들판(dream_field.png) · 초록 언덕과 반딧불, 뒤로 주황 노을',
+  },
 };
 
 function 인자값(argv, 이름, 기본) {
