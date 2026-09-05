@@ -8,15 +8,23 @@
  *   🔑 그리고 이 통로의 기본값이 `randomize_seed: true` 다 — 아무것도 안 하면 매번 씨앗이 굴러가고
  *      그 값은 화면에만 잠깐 떴다가 사라진다. **그래서 「안 적었다」가 아니라 「적을 자리가 없었다」가 맞다.**
  *
- * ■ ✅ 되는 까닭 = 굽고 나면 **쓴 씨앗이 돌아온다**(`/studio_generate` 의 넷째 반환값 `Seed` · 09-05 실측).
+ * ■ ✅ 되는 까닭 = 굽고 나면 **쓴 씨앗이 돌아온다**(두 통로 모두 넷째 반환값이 `Seed` · 09-05 실측).
  *   ⇒ 무작위로 굽더라도 그 값을 받아 적으면 같은 곡을 다시 만들 수 있다.
  *   이 도구는 그 값을 **곡 파일 옆에 사이드카(`<곡이름>.json`)로 박고** 장부에도 한 줄 적는다.
  *   🔑 사이드카를 쓰는 까닭: 곡을 다른 폴더로 옮겨도 씨앗이 **따라간다.** 장부만 있으면 옮기는 순간 끊긴다.
  *
- * ■ 🔴 가사를 지키는 통로는 `/studio_generate` **하나**다
- *   `/compose_assist` 와 `/simple_generate` 는 **우리 가사를 버리고 새로 짓는다**(Space 소스 확인 09-05).
- *   09-04 에 그것을 모른 채 구워서 한국어 가사가 전부 영어로 불렸고 유호님이 잡으셨다.
- *   ⇒ 이 도구는 다른 통로를 쓰지 않는다.
+ * ■ 🔴 통로가 **둘**이고, 무엇을 지키느냐가 다르다 (09-05 저녁에 이 자리를 다시 갈랐다)
+ *   | 통로 | 가사 | 유호 판정 |
+ *   |---|---|---|
+ *   | `/simple_generate` | 모델이 **스스로 짓는다**(우리 가사를 버린다) | ✅ **「노래 느낌은 이게 제일 나아」**(씨앗8888) |
+ *   | `/studio_generate` | 우리 것을 **그대로 지킨다** | — |
+ *   🔴 첫 판은 `/studio_generate` 하나만 쓰도록 못 박았는데, **그것이 틀렸다.**
+ *      유호님이 제일 좋다고 하신 곡(`씨앗8888_긴가사`)이 바로 «가사를 버리는» 쪽에서 나왔다.
+ *      ⇒ 모델이 스스로 짠 구성이 우리가 넣은 것보다 나았다는 뜻이고, 그 길을 막으면 좋은 곡을 막는다.
+ *   🔑 그래서 기본은 `simple` 이다. 우리가 쓴 가사를 꼭 지켜야 할 때만 `--통로 studio`.
+ *   ⚠ 09-04 에 한국어 가사가 전부 영어로 불린 사고는 이 통로 탓이 맞다(설명만 보고 새로 짓는다).
+ *      그러니 «우리 가사»가 목적이면 studio, «좋은 노래»가 목적이면 simple 이다. 목적이 갈린다.
+ *   ✅ 곁수확: `simple` 은 반환값이 하나 더 온다 — **모델이 지은 가사**. 사이드카에 같이 박는다.
  *
  * ■ 🔴 손잡이는 기본값을 안 건드린다 — `guidance 1.7 · steps 30 · headroom 0`
  *   올리면 소리가 천장에 부딪혀 잘린다(09-04 실측: 밀기 3 → 잘린 지점 3,385곳 · 기본값 → 0곳).
@@ -27,6 +35,7 @@
  *   node tools/미니맥스곡생산.js --되살리기 <곡.json>                 사이드카를 읽어 그 곡을 그대로 다시 만든다
  *   node tools/미니맥스곡생산.js --결목록                             쓸 수 있는 결과 그 문면을 보여준다
  *   옵션: --길이 <초 · 기본 120> · --낼곳 <폴더> · --연주곡(목소리 없이)
+ *         --통로 simple|studio (기본 simple = 모델이 가사를 짓는다 · 유호님이 제일 좋다 하신 판이 이쪽)
  */
 'use strict';
 const fs = require('node:fs');
@@ -34,7 +43,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { 인자게이트 } = require('../lib/플래그.js');
 
-const 아는플래그 = ['--결', '--벌', '--씨앗', '--길이', '--낼곳', '--연주곡', '--결목록', '--되살리기'];
+const 아는플래그 = ['--결', '--벌', '--씨앗', '--길이', '--낼곳', '--연주곡', '--결목록', '--되살리기', '--통로'];
 
 const ROOT = path.resolve(__dirname, '..');
 const SPACE = 'https://minimaxai-minimax-music3.hf.space';
@@ -91,13 +100,15 @@ function state만들기(설명, { 연주곡 = false, 제목 = '', 가사 = '' } 
   };
 }
 
-/** gradio 한 번 부르기. 던지고(POST) → 흘러오는 것을 읽어(GET) 마지막 결과를 집는다. */
-async function 한번굽기(state, { 길이, 씨앗, 무작위 }) {
+/** gradio 한 번 부르기. 던지고(POST) → 흘러오는 것을 읽어(GET) 마지막 결과를 집는다.
+ *  🔑 두 통로의 «인자 모양이 똑같다»(09-05 실측) — 그래서 이름만 갈아 끼우면 된다. */
+async function 한번굽기(state, { 길이, 씨앗, 무작위, 통로 = 'simple' }) {
+  const 문 = 통로 === 'studio' ? 'studio_generate' : 'simple_generate';
   const t = 토큰();
   const 머리 = { 'content-type': 'application/json' };
   if (t) 머리.authorization = `Bearer ${t}`;
 
-  const 던짐 = await fetch(`${SPACE}/gradio_api/call/studio_generate`, {
+  const 던짐 = await fetch(`${SPACE}/gradio_api/call/${문}`, {
     method: 'POST',
     headers: 머리,
     body: JSON.stringify({
@@ -110,7 +121,7 @@ async function 한번굽기(state, { 길이, 씨앗, 무작위 }) {
 
   /* 🔑 결과는 «흘러서» 온다(SSE). 한 번에 안 오므로 조각을 모아 마지막 `complete` 를 읽는다.
    *   ⚠ 2분 곡에 3분 반쯤 걸린다 — 중간에 끊으면 남의 실행 자리만 쓰고 빈손이다. */
-  const 흐름 = await fetch(`${SPACE}/gradio_api/call/studio_generate/${event_id}`, { headers: 머리 });
+  const 흐름 = await fetch(`${SPACE}/gradio_api/call/${문}/${event_id}`, { headers: 머리 });
   if (!흐름.ok) throw new Error(`받기 실패 ${흐름.status}`);
   const 본문 = await 흐름.text();
 
@@ -146,11 +157,14 @@ async function 한번굽기(state, { 길이, 씨앗, 무작위 }) {
   /* 돌아오는 넷: [상태글, 상태글, 소리파일, **씨앗**] — 넷째가 이 도구가 존재하는 까닭이다. */
   const 소리 = 마지막[2];
   const 쓴씨앗 = 마지막[3];
-  if (!소리 || !(소리.url ||소리.path)) throw new Error(`소리가 안 왔다: ${JSON.stringify(마지막).slice(0, 200)}`);
+  /* 🔑 `simple` 만 다섯째를 준다 = **모델이 스스로 지은 가사**. 우리 가사를 버린 자리라
+   *   이것을 안 적으면 「무슨 노랫말로 불렸나」가 곡 안에만 남고 글로는 사라진다(09-04 사고의 자리). */
+  const 지은가사 = typeof 마지막[4] === 'string' ? 마지막[4] : null;
+  if (!소리 || !(소리.url || 소리.path)) throw new Error(`소리가 안 왔다: ${JSON.stringify(마지막).slice(0, 200)}`);
   const url = 소리.url || `${SPACE}/gradio_api/file=${소리.path}`;
   const 받음 = await fetch(url, { headers: t ? { authorization: `Bearer ${t}` } : {} });
   if (!받음.ok) throw new Error(`내려받기 실패 ${받음.status}`);
-  return { 소리: Buffer.from(await 받음.arrayBuffer()), 씨앗: 쓴씨앗 };
+  return { 소리: Buffer.from(await 받음.arrayBuffer()), 씨앗: 쓴씨앗, 지은가사 };
 }
 
 /** 🔑 이 도구의 존재 이유 — 곡 옆에 «다시 만드는 법»을 통째로 박는다. */
@@ -181,9 +195,12 @@ async function 본체(argv) {
   const 되살릴것 = 인자값(argv, '--되살리기', null);
   if (되살릴것) {
     const j = JSON.parse(fs.readFileSync(되살릴것, 'utf8'));
-    console.log(`되살린다: 결 ${j.결} · 씨앗 ${j.씨앗} · 길이 ${j.길이}초`);
+    /* 🔑 통로도 사이드카에서 가져온다 — 씨앗이 같아도 «다른 문»으로 던지면 다른 곡이 나온다.
+     *   옛 사이드카(통로 칸이 없던 판)는 `simple` 로 읽는다(그 시절 기본값). */
+    const 통로 = j.통로문 || 인자값(argv, '--통로', 'simple');
+    console.log(`되살린다: 결 ${j.결} · 씨앗 ${j.씨앗} · 길이 ${j.길이}초 · 통로 ${통로}`);
     const 낼곳 = 인자값(argv, '--낼곳', path.dirname(되살릴것));
-    const r = await 한번굽기(j.state, { 길이: j.길이, 씨앗: j.씨앗, 무작위: false });
+    const r = await 한번굽기(j.state, { 길이: j.길이, 씨앗: j.씨앗, 무작위: false, 통로 });
     const 이름 = `${j.결}_씨앗${j.씨앗}_되살림`;
     const p = path.join(낼곳, `${이름}.wav`);
     fs.writeFileSync(p, r.소리);
@@ -201,9 +218,12 @@ async function 본체(argv) {
   const 낼곳 = 인자값(argv, '--낼곳', 기본낼곳);
   const 연주곡 = argv.includes('--연주곡');
   const 정한씨앗 = 인자값(argv, '--씨앗', null);
+  const 통로 = 인자값(argv, '--통로', 'simple');
+  if (통로 !== 'simple' && 통로 !== 'studio') throw new Error(`모르는 통로 "${통로}" — simple(모델이 가사를 짓는다 · 기본) 또는 studio(우리 가사를 지킨다)`);
 
   fs.mkdirSync(낼곳, { recursive: true });
   console.log(`결 ${결} · ${벌}벌 · ${길이}초 · ${연주곡 ? '연주곡' : '노래'} · 씨앗 ${정한씨앗 || '무작위(받아서 적는다)'}`);
+  console.log(`통로 ${통로}${통로 === 'simple' ? ' (모델이 가사를 짓는다 — 유호님이 제일 좋다 하신 씨앗8888 이 이 통로다)' : ' (우리 가사를 지킨다)'}`);
   console.log(`낼곳: ${낼곳}\n`);
 
   for (let i = 1; i <= 벌; i++) {
@@ -216,20 +236,24 @@ async function 본체(argv) {
         길이,
         씨앗: 정한씨앗 ? Number(정한씨앗) : 0,
         무작위: !정한씨앗,
+        통로,
       });
     } catch (e) {
       console.log(`✗ ${e.message}`);
       continue;   // 한 벌이 죽어도 나머지는 굽는다
     }
     const 초 = ((Date.now() - t0) / 1000).toFixed(0);
-    const 이름 = `${결}_씨앗${r.씨앗}`;
+    /* 🔑 이름에 통로도 박는다 — 씨앗이 같아도 통로가 다르면 다른 곡이라, 이름만 보고 갈려야 한다. */
+    const 이름 = `${결}_씨앗${r.씨앗}_${통로}`;
     const 곡경로 = path.join(낼곳, `${이름}.wav`);
     fs.writeFileSync(곡경로, r.소리);
     const 적을것 = {
       결, 씨앗: r.씨앗, 길이, 연주곡, 손잡이,
       문면: 결들[결].설명,
       state,
-      통로: `${SPACE} /studio_generate`,
+      통로문: 통로,
+      통로: `${SPACE} /${통로}_generate`,
+      지은가사: r.지은가사 || null,   // simple 통로만 준다 — 무슨 노랫말로 불렸나가 글로도 남는다
       구운날: new Date().toLocaleDateString('sv-SE'),
       되살리는법: `node tools/미니맥스곡생산.js --되살리기 "${곡경로.replace(/\.wav$/, '.json')}"`,
     };
@@ -238,6 +262,7 @@ async function 본체(argv) {
     console.log(`✅ ${(r.소리.length / 1024 / 1024).toFixed(1)}MB · ${초}초 · 씨앗 ${r.씨앗}`);
     console.log(`     ${곡경로}`);
     console.log(`     씨앗을 적었다 → ${path.basename(사이드카)}${탈 ? ` (장부는 못 썼다: ${탈})` : ''}`);
+    if (r.지은가사) console.log(`     모델이 지은 노랫말도 적었다(${r.지은가사.length}자)`);
   }
 }
 
