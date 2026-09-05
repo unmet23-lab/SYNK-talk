@@ -46,7 +46,11 @@ for f in "$SRC"/*.{mp3,m4a,wav,flac,ogg}; do
   DEST="$OUT/${NAME}.ts"
   if [ -e "$DEST" ]; then echo "  · $NAME — 이미 있다(건너뜀)"; continue; fi
   # 곡 이름 꼬리에서 장르를 읽는다 — `…-<장르>-air` 꼴(생산 도구가 그렇게 짓는다).
-  GENRE=$(printf %s "$NAME" | sed -n 's/.*-\([a-z][a-z]*\)-air$/\1/p')
+  # 🔴 밑줄을 읽는다(09-05). 그 전 `[a-z][a-z]*` 는 `dream_sky` 에서 밑줄 뒤 `sky` 만 집어
+  #   `sky.png` 를 찾다 실패했다. 드림코어 셋이 거기서 통째로 막혔다 —
+  #   화면이 조용히 기본으로 떨어지므로 로그만 봐서는 안 보이는 자리다.
+  #   같은 병이 `lib/라디오곡차례.js` 의 `트랙읽기` 에도 있었고 그날 같이 고쳤다.
+  GENRE=$(printf %s "$NAME" | sed -n 's/.*-\([a-z][a-z0-9_]*\)-air$/\1/p')
   if [ -d "$BG" ] && [ -n "$GENRE" ] && [ -e "$BG/$GENRE.png" ]; then
     VIN=(-loop 1 -i "$BG/$GENRE.png")
   elif [ -d "$BG" ] && [ -e "$BG/기본.png" ]; then
