@@ -557,7 +557,9 @@ async function 한건(사건: Record<string, unknown>, learner_id: string, ver: 
      * 같은 얼굴 — 앱 사건통로가 성공으로 접고 큐를 비운다). 아래 일반 갈래로 흘리면
      * SERVER_ERROR/retryable:true 라 앱이 영원히 재시도한다(그 줄 주석이 경고한 그 상태).
      * ⚠ 이 조회는 tx **밖**이다(begin 이 이미 롤백하고 던졌다) — 맨 sql 로 그날 행을 찾는다. */
-    if (/estimate_daily_once|goal_daily_once/i.test(글)) {
+    /* c16 09-06 — 확인 답의 유일 색인이 «하루 1회»에서 «하루 카드마다 1회»(estimate_card_once_c16 · shown_key 축)로 바뀌었다
+     *   (철학 Ⅱ-8 「맞아? 카드 하루 두 장」 · 4회차 심문 A1: 같은 카드 재전송은 duplicate 로 접고 다른 카드의 답은 새 행). */
+    if (/estimate_daily_once|estimate_card_once|goal_daily_once/i.test(글)) {
       /* c14 — 목표 답(goal.responded)의 하루 1회 색인(goal_daily_once_c14)도 같은 갈래다:
        * 두 기기 경쟁의 늦은 쪽을 duplicate 로 접는다(학생 잘못도 서버 잘못도 아니다). */
       const 중복사건 = /goal_daily_once/i.test(글) ? 'goal.responded' : 'estimate.responded';

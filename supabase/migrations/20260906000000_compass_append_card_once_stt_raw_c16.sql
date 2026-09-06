@@ -1,11 +1,133 @@
+/* 철학 심문(4·5회차)이 잡은 소급 불가 셋 — 나침반 덧붙임 · 확인 답 «하루 두 장» · STT 원신호 불변 보관 (2026-09-06)
+ *
+ * ■ 셋 다 「첫 학생 뒤엔 되살릴 수 없는」 자리다(철학 v1.21~v1.24 · 발전안 §6-3·§6-4·§6-5).
+ *
+ * ① 나침반 뿌리 문항 «덧붙임» — season_compass_answers_c16 의 시즌 회차 규칙을 넓힌다.
+ *    옛 규칙: 시즌 행의 키 집합은 정확히 {self_in_5y, season_goal}. 그래서 학생이 시즌 회고에서 「왜 배우나」·
+ *    「토픽 쓸 곳」을 「바꿀래」 해도 실을 칸이 없었다(철학 Ⅱ-4 v1.21 · 유호 확정 09-06 「자동으로 다시 묻지 않되
+ *    「바꿀래」를 누르면 새 답을 덧붙인다 · 옛 답은 남긴다」). 새 규칙: 시즌 행은 둘이 필수이고 why_learning·topik_use 는
+ *    «있어도 되는» 키다. 입학 행 규칙은 그대로(넷 정확히). 옛 답은 입학 행에 그대로 산다 — 시즌마다 새 행 · 덮어쓰기 없음.
+ *    이름은 그대로 `_c16` 이다 — 계약판이 안 올랐다(값목록이 아니라 «허용 범위»만 넓혔다 · 접미는 판을 말한다).
+ *    JS 쪽 같은 판정 = lib/나침반문항.js 답검사(허용키) · 회귀 tests/나침반덧붙임.test.js 가 두 층을 대조한다.
+ *
+ * ② 확인 답 «하루 두 장» — estimate_daily_once_c13(learner × 몽골 날짜) → estimate_card_once_c16(learner × 날짜 × shown_key).
+ *    철학 Ⅱ-8(v1.22) 「맞아? 카드 하루 두 장」인데 물리 방벽이 하루 1행이라 둘째 카드의 답이 duplicate 로 접혀 버려졌다
+ *    (4회차 심문 A1 · «재전송»과 «새 답»을 못 갈랐다). 같은 카드(shown_key)의 재전송은 여전히 duplicate 로 접힌다.
+ *    functions/events 는 두 이름을 다 duplicate 로 읽고, functions/progress 는 오늘 답한 카드를 둘째 장 후보에서 뺀다.
+ *
+ * ③ STT 원신호 불변 보관 — engine.stt_raw(append-only). submissions.stt_segments 는 재전사가 덮을 수 있는 «최신 판»이고,
+ *    여기 남는 것은 벤더 응답 그대로다(철학 A-1 v1.23 「원신호도 음성 원본도 안에서 버리지 않는다」 · 4회차 G3 · 5회차 G1).
+ *    모델이 바뀌어 다시 채점할 사슬은 원본이 있어야 산다. 쓰는 자리는 functions/transcribe 하나(전사 UPDATE 뒤 INSERT 한 문장).
+ *    학생 식별자 0(event_id 만 · 원문 텍스트는 벤더 응답 안에 있으므로 RLS 켜고 정책 0 = 서비스 역할만).
+ *
+ * ■ 되돌림: alter table engine.season_compass drop constraint season_compass_answers_c16, add constraint … (20260902100000 본문);
+ *          drop index if exists engine.estimate_card_once_c16; create unique index estimate_daily_once_c13 … (20260824090000 본문);
+ *          drop table if exists engine.stt_raw; delete from engine.schema_migrations where version='20260906000000'; */
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260906000000';
+  migration_name constant text := '20260906000000_compass_append_card_once_stt_raw_c16.sql';
+  expected_checksum constant text := '90b92efd644e16dd848553fbfaf954676699d1e31dc1005188ceef54d81dec5c'; -- migration-checksum
+  base_version constant text := '20260903000000';   -- 체인은 «바로 앞 조각»을 가리킨다
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 합본 위에서만 돈다 — engine.schema_migrations 가 없다(빈 DB 면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      '이 조각은 % 위에서만 돈다 — 이력에 그 판이 없다(부분·혼합·불명이라 중단한다)',
+      base_version;
+  end if;
+end
+$migration$;
+
+-- ══════════ ① 나침반 뿌리 문항 덧붙임 — 시즌 행이 why_learning·topik_use 를 «실을 수» 있다 ══════════
+-- 🔑 필수는 그대로 둘(self_in_5y·season_goal) · 덧붙임 둘은 있어도 되고 없어도 된다 · 그 밖의 키는 여전히 거절.
+alter table engine.season_compass
+  drop constraint if exists season_compass_answers_c16,
+  add constraint season_compass_answers_c16 check (
+    (
+      self_in_5y_changed is null
+      and answers ?& array['why_learning', 'self_in_5y', 'topik_use', 'season_goal']
+      and answers - array['why_learning', 'self_in_5y', 'topik_use', 'season_goal'] = '{}'::jsonb
+    ) or (
+      self_in_5y_changed is not null
+      and answers ?& array['self_in_5y', 'season_goal']
+      and answers - array['self_in_5y', 'season_goal', 'why_learning', 'topik_use'] = '{}'::jsonb
+    )
+  );
+
+comment on constraint season_compass_answers_c16 on engine.season_compass is
+  '입학 행 = 넷 정확히 · 시즌 행 = 둘 필수 + 뿌리 둘(why_learning·topik_use) 덧붙임 허용(09-06 · 철학 Ⅱ-4 v1.21 「바꿀래」). 옛 답은 입학 행에 그대로.';
+
+-- ══════════ ② 확인 답 «하루 두 장» — 카드(shown_key)마다 하루 1행 ══════════
+drop index if exists engine.estimate_daily_once_c13;
+create unique index if not exists estimate_card_once_c16
+  on engine.learning_events (learner_id, engine.ub_date(ingested_at), (payload->>'shown_key'))
+  where event_type = 'estimate.responded';
+
+-- ══════════ ③ STT 원신호 불변 보관 ══════════
+create table if not exists engine.stt_raw (
+  raw_id          bigint generated always as identity primary key,
+  event_id        uuid not null references engine.submissions(event_id) on delete restrict,
+  stt_model       text,
+  stt_lang        text,
+  vendor_response jsonb not null,
+  recorded_at     timestamptz not null default now()
+);
+comment on table engine.stt_raw is
+  'STT 벤더 응답 원본 — append-only · 재전사가 submissions.stt_segments 를 덮어도 여기 원신호는 남는다(철학 A-1 v1.23 · 09-06). 학생 식별자 0(event_id 만).';
+create index if not exists stt_raw_event on engine.stt_raw (event_id, recorded_at desc);
+alter table engine.stt_raw enable row level security;   -- 정책 0 = 서비스 역할만 읽고 쓴다
+
+create or replace function engine.stt_raw_protect() returns trigger
+  language plpgsql as $protect$
+begin
+  raise exception 'stt_raw 는 덧붙이기만 한다 — 원신호는 고치지도 지우지도 않는다(철학 A-1)';
+end
+$protect$;
+drop trigger if exists stt_raw_protect on engine.stt_raw;
+create trigger stt_raw_protect
+  before update or delete on engine.stt_raw
+  for each row execute function engine.stt_raw_protect();
+
+do $migration2$
+declare
+  expected_checksum constant text := '90b92efd644e16dd848553fbfaf954676699d1e31dc1005188ceef54d81dec5c'; -- migration-checksum
+begin
+  if not exists (select 1 from engine.schema_migrations where version = '20260906000000') then
+    insert into engine.schema_migrations(version, name, checksum)
+    values ('20260906000000', '20260906000000_compass_append_card_once_stt_raw_c16.sql', expected_checksum);
+  end if;
+end
+$migration2$;
+
+commit;
+
 -- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
---
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
 -- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -335,3 +457,42 @@ select case when 테이블수=24 and RLS켜짐=24 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
   from 셈;
+*/
+-- 사후 메모:
+-- ① 이 조각 = 나침반 덧붙임(CHECK 몸만 · 이름 그대로) + 확인 답 카드 유일 색인(옛 색인 drop) + stt_raw 표 하나(RLS 켜짐 · 정책 0 · 트리거 하나).
+-- ② 아래 기대 목록은 20260903000000 의 현행 그대로다 — CHECK 이름은 변경 0(season_compass_answers_c16 은 몸만 넓혔다).
+--    ⚠ 이 줄은 마지막 조각이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    ⚠ `season_no_overlap_c11`(EXCLUDE) · `…_once_c11`(UNIQUE) · `companion_qa_*_fkey` · `stt_raw_*` 는 여기
+--      없다 — CHECK 가 아니라 이 줄의 대상이 아니고, 이름도 그대로 산다(값목록이 없어
+--      판 판별과 무관하다 · 위 기대제약 목록에는 그 이름 그대로 들어 있다).
+--    기대: attempts_gate_values_c16 · attempts_response_present_c16 · attempts_result_gate_c16
+--         · attempts_ver_nonempty_c16 · batch_runs_counts_order_c16 · batch_runs_counts_pair_c16
+--         · batch_runs_enrolled_nonneg_c16 · batch_runs_finished_cols_c16
+--         · batch_runs_level_dist_ok_c16 · batch_runs_partial_pair_c16
+--         · batch_runs_partial_range_c16 · batch_runs_roster_equation_c16
+--         · batch_runs_skipped_range_c16 · batch_runs_ver_nonempty_c16 · broadcast_segment_kind_c16
+--         · classes_key_nonblank_c16 · companion_qa_answer_paired_c16
+--         · companion_qa_question_nonblank_c16 · corrections_promotion_intent_c16
+--         · corrections_supersedes_not_self_c16 · corrections_verdict_c16 · cron_runs_outcome_c16
+--         · jobs_anchor_present_c16 · jobs_claim_cols_c16 · jobs_deciding_pair_c16
+--         · jobs_deciding_result_matches_c16 · jobs_deciding_scope_c16 · jobs_draft_present_c16
+--         · jobs_idle_cols_c16 · jobs_load_failed_cols_c16 · jobs_nontarget_cols_c16
+--         · jobs_nonterminal_cols_c16 · jobs_skill_ids_present_c16 · jobs_status_outcome_pairs_c16
+--         · jobs_terminal_cols_c16 · jobs_ver_nonempty_c16 · jobs_winner_fence_current_c16
+--         · jobs_winner_fence_pair_c16 · jobs_winner_only_success_c16 · jobs_winner_present_c16
+--         · jobs_winner_result_only_success_c16 · jobs_winner_result_pair_c16
+--         · l10n_reviews_final_paired_c16 · l10n_reviews_supersedes_not_self_c16
+--         · l10n_reviews_verdict_c16 · l10n_strings_id_ascii_c16
+--         · l10n_strings_ko_nonblank_c16 · l10n_strings_max_len_c16
+--         · l10n_strings_status_c16 · learners_gender_c16
+--         · learners_goal_track_c16 · learners_group_no_c16 · learners_home_aimag_c16
+--         · learners_seat_no_c16 · learners_signup_attempts_nonneg_c16
+--         · learners_temp_password_paired_c16 · learning_events_correction_target_c16
+--         · learning_events_event_type_c16 · learning_events_task_type_c16
+--         · pipeline_jobs_discard_reason_c16 · season_compass_answers_c16 · season_dates_c16
+--         · season_review_decided_c16 · season_review_self_c16 · season_review_verdict_c16
+--         · staff_role_c16 · submissions_due_paired_c16 · submissions_task_format_c16
+--         · submissions_translation_source_c16 · teacher_notes_body_nonblank_c16
+--         · teacher_notes_disposition_c16 · teacher_notes_origin_c16

@@ -206,7 +206,19 @@ Deno.serve(async (req) => {
          returning event_id`;
       /* 0행 = 다른 배치가 먼저 썼다(`transcript is null` 이 막았다). 실패가 아니라 **겹침**이라
        *   갈래를 따로 둔다 — 이게 늘면 배치 주기가 왕복보다 짧다는 신호지 고장이 아니다. */
-      if (쓴것.length) { 성공 += 1; if (구간 && 구간.stt_segments.length) 구간실림 += 1; } else { 센다(사유, '겹침'); 미룸 += 1; }
+      if (쓴것.length) {
+        성공 += 1; if (구간 && 구간.stt_segments.length) 구간실림 += 1;
+        /* c16 09-06 — 원신호 «불변» 보관(engine.stt_raw · append-only). submissions 의 stt_segments 는 재전사가 덮을 수 있는 «최신 판»이고,
+         *   여기 남는 것은 벤더 응답 그대로다 — 모델이 바뀌어 다시 채점할 사슬은 원본이 있어야 산다(철학 A-1 v1.23 · 4회차 심문 G3 · 5회차 G1).
+         *   전사 UPDATE 와 «다른» 문장이라 실패해도 전사는 들어간다 — 그 실패는 사유로 센다(조용히 0건이 되면 안 되는 자리). */
+        try {
+          await sql`insert into engine.stt_raw (event_id, stt_model, stt_lang, vendor_response)
+                    values (${행.event_id}::uuid, ${전사판}, ${값.언어}, ${sql.json(본문 as never)})`;
+        } catch (e) {
+          console.error('[transcribe] 원신호 보관 실패(전사는 들어갔다)', 행.event_id, String((e as Error)?.message ?? e));
+          센다(사유, '원신호보관실패');
+        }
+      } else { 센다(사유, '겹침'); 미룸 += 1; }
     } catch (e) {
       const 말 = String((e as Error)?.message ?? e);
       console.error('[transcribe] 예외', 행.event_id, 말);

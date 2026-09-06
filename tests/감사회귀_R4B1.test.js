@@ -29,7 +29,8 @@ test('D6-16 「borderRadius: 20, padding: 22」 리터럴이 src 에 0건이다 
   /* 탐지력 — 실저장소 0건과 「아무것도 안 읽음」은 같은 모양이라, 소비처가 실제로 토큰을 쓰는지로 분모를 세운다. */
   const 소비처 = fs.readdirSync(path.join(ROOT, 'src')).filter((x) => x.endsWith('.js'))
     .filter((f) => /borderRadius: 판눈금\.반경, padding: 판눈금\.여백/.test(소스(`src/${f}`)));
-  assert.equal(소비처.length, 10, `판눈금 소비처가 ${소비처.length}곳이다 — 열 파일에서 걷었으니 열이어야 한다`);
+  /* 09-06 — 열한째 소비처 = src/라디오화면.js(유튜브 링크·안내 한 장 · 철학 Ⅱ-1 셋째 줄 v1.22). 새 카드는 리터럴이 아니라 토큰을 쓴다. */
+  assert.equal(소비처.length, 11, `판눈금 소비처가 ${소비처.length}곳이다 — 열 파일에서 걷고 라디오 화면이 하나 더 썼으니 열하나여야 한다`);
 });
 
 test('D6-16 토큰 값이 현행 실측 그대로다 — 걷기는 이동이지 개정이 아니다(시각 리스크 0 약속)', () => {

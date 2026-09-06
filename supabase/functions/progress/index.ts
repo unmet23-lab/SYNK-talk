@@ -214,11 +214,16 @@ Deno.serve(async (req: Request) => {
       const [답이력] = await sql`
         select count(*) filter (where (e.ingested_at at time zone ${시간대})::date = ${오늘}::date) as 오늘답수,
                coalesce(jsonb_agg(jsonb_build_object('축', e.payload->>'trait_axis', '키', e.payload->>'shown_key'))
-                 filter (where e.payload->>'response' = '아니다'), '[]'::jsonb) as 부정쌍들
+                 filter (where e.payload->>'response' = '아니다'), '[]'::jsonb) as 부정쌍들,
+               coalesce(jsonb_agg(jsonb_build_object('축', e.payload->>'trait_axis', '키', e.payload->>'shown_key'))
+                 filter (where (e.ingested_at at time zone ${시간대})::date = ${오늘}::date), '[]'::jsonb) as 오늘쌍들
           from engine.learning_events e
          where e.learner_id = ${행.learner_id}::uuid
            and e.event_type = 'estimate.responded'`;
       const 부정키들 = ((답이력.부정쌍들 ?? []) as Array<{ 축: string; 키: string }>)
+        .map((p) => 부정키(String(p.축), String(p.키)));
+      /* 하루 «두 장»(09-06 · 철학 Ⅱ-8 v1.22 · 색인 estimate_card_once_c16) — 오늘 이미 답한 카드는 둘째 장 후보에서 뺀다. */
+      const 오늘답한키들 = ((답이력.오늘쌍들 ?? []) as Array<{ 축: string; 키: string }>)
         .map((p) => 부정키(String(p.축), String(p.키)));
       /* 🔴 기아 방지(심문 전건판정 2026-09-02 ㉮) — 축별 「마지막으로 답한 날」.
        * 없으면 lib 이 고정 우선순위로 내려앉으므로 **질의를 따로 세우고 따로 삼킨다** —
@@ -246,7 +251,7 @@ Deno.serve(async (req: Request) => {
        * 여기서 골라 다듬으면 서버가 보여준 추정과 상태가 배운 추정이 갈린다(두 벌 금지 그대로). */
       오늘의확인 = 확인카드(
         { 리듬: 상태.축.리듬, 작성과정: 상태.축.작성과정, 집중띠: 상태.축.집중띠 },
-        { 오늘답함: Number(답이력.오늘답수) > 0, 부정키들, 축별마지막날 },
+        { 오늘답수: Number(답이력.오늘답수) || 0, 오늘답한키들, 부정키들, 축별마지막날 },
         기준, 상태.estimator_version);
     } catch (e) {
       console.error('[progress] 오늘의확인 판정 실패(null 로 낸다)', String((e as Error)?.message ?? e));

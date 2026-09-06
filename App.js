@@ -8,6 +8,7 @@ import { useFonts } from 'expo-font';
 import 말하기화면 from './src/말하기화면';
 import 답장화면 from './src/답장화면';
 import 어제의나, { 진행받기 } from './src/어제의나';
+import 라디오화면 from './src/라디오화면';
 /* 검수문 — 개발 빌드 전용(`src/검수문.js` 머리말).
  * 🔴 **정적 import 를 쓰지 않는다.** Metro 는 tree-shaking 을 완전히 하지 않아 최상단 import 는
  *   프로덕션 번들에 «코드가 남을» 수 있다(진입이 `__DEV__` 안이라 실행은 안 되지만, 안 남는다고
@@ -373,6 +374,8 @@ export default function App() {
             <몽글문화면 토큰={세션.access_token} 돌아가기={() => set화면('시스템')} />
           )}
           {화면 === '어제' && <어제의나 값={견줌값?.견줌 ?? null} 돌아가기={() => set화면('말하기')} />}
+          {/* 밤 라디오 — 유튜브 링크·안내 한 장(철학 Ⅱ-1 셋째 줄 · v1.22 · 유호 확정 09-06). 재생기 없음 · 수집 없음. */}
+          {화면 === '라디오' && <라디오화면 돌아가기={() => set화면('말하기')} />}
           {/* 🔴 검수문 — **개발 빌드에서만**(`src/검수문.js` 머리말 · 위 조건부 require).
               왜 필요한가: 화면들이 전부 서버 데이터가 있어야 닿아서, 박자·연기 같은 «움직임»을
               눈으로 볼 자리가 없었다(08-24 실측 — 에뮬레이터를 띄워도 로그인 화면뿐이었다). */}
@@ -402,7 +405,8 @@ export default function App() {
       {/* 🔴 배치 미달은 **원장에게만** 값이 온다 — 학생 화면에는 이 칸이 아예 안 그려진다.
           코랄을 쓰지 않는다: 이 화면의 신호 1점은 녹음 버튼이고(`테마.신호자리`), 둘로
           만들면 R1 이 깨진다. 위계는 **밝기**로 준다(다른 두 링크보다 한 층 위). */}
-      {화면 === '말하기' && (배치미달 || 교정 || 견줌값?.견줌) && (
+      {/* 🔴 「밤 라디오」 링크는 늘 있다(유튜브 링크·안내 한 장 · 09-06) — 그래서 겉테줄은 말하기 화면이면 늘 선다. */}
+      {화면 === '말하기' && (
         <View style={s.겉테줄}>
           {배치미달 && (
             <Text style={s.미달글} maxFontSizeMultiplier={글자배율상한}>오늘 배달 {배치미달.배정}/{배치미달.재적}</Text>
@@ -427,6 +431,14 @@ export default function App() {
               <Text style={s.겉테글} maxFontSizeMultiplier={글자배율상한}>어제의 나</Text>
             </Pressable>
           )}
+          <Pressable
+            onPress={() => set화면('라디오')}
+            accessibilityRole="button"
+            accessibilityLabel="밤 라디오"
+            hitSlop={{ top: 18, bottom: 10, left: 8, right: 8 }}
+          >
+            <Text style={s.겉테글} maxFontSizeMultiplier={글자배율상한}>밤 라디오</Text>
+          </Pressable>
         </View>
       )}
       {/* 검수문 입구 — 개발 빌드에서만. 겉테 오른쪽 끝에 붙여 학생 흐름(동사 하나)을 안 건드린다. */}
