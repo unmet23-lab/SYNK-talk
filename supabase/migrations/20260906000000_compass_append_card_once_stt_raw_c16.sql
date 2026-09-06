@@ -30,7 +30,7 @@ do $migration$
 declare
   migration_version constant text := '20260906000000';
   migration_name constant text := '20260906000000_compass_append_card_once_stt_raw_c16.sql';
-  expected_checksum constant text := '90b92efd644e16dd848553fbfaf954676699d1e31dc1005188ceef54d81dec5c'; -- migration-checksum
+  expected_checksum constant text := 'a5be782a9a734d541260922ed079b3d152c2e7e6a835f11c3474824427221a52'; -- migration-checksum
   base_version constant text := '20260903000000';   -- 체인은 «바로 앞 조각»을 가리킨다
   recorded_checksum text;
 begin
@@ -88,7 +88,7 @@ create unique index if not exists estimate_card_once_c16
 -- ══════════ ③ STT 원신호 불변 보관 ══════════
 create table if not exists engine.stt_raw (
   raw_id          bigint generated always as identity primary key,
-  event_id        uuid not null references engine.submissions(event_id) on delete restrict,
+  event_id        uuid not null references engine.learning_events(event_id) on delete restrict,   -- 제출 사건(submissions.event_id 와 같은 값 · 유일키는 사건 표가 쥔다)
   stt_model       text,
   stt_lang        text,
   vendor_response jsonb not null,
@@ -112,7 +112,7 @@ create trigger stt_raw_protect
 
 do $migration2$
 declare
-  expected_checksum constant text := '90b92efd644e16dd848553fbfaf954676699d1e31dc1005188ceef54d81dec5c'; -- migration-checksum
+  expected_checksum constant text := 'a5be782a9a734d541260922ed079b3d152c2e7e6a835f11c3474824427221a52'; -- migration-checksum
 begin
   if not exists (select 1 from engine.schema_migrations where version = '20260906000000') then
     insert into engine.schema_migrations(version, name, checksum)
@@ -444,7 +444,7 @@ select case when 테이블수=24 and RLS켜짐=24 and 정책수=7
               and (select v from 빠진트리거) is null
               and 라디오보강열=10 and 라디오보강인덱스=3
               and (select version from 현재이력)='20260906000000'
-              and (select checksum from 현재이력)='90b92efd644e16dd848553fbfaf954676699d1e31dc1005188ceef54d81dec5c' -- migration-checksum
+              and (select checksum from 현재이력)='a5be782a9a734d541260922ed079b3d152c2e7e6a835f11c3474824427221a52' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 24·24·7·0·0·5·1·0·0·1·0·0·0·0·22·0·0·0·0·2·6·6·0·0·0·1·1·1·30·0·1·26·0·11·0·1·1·0·1·10·3 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
