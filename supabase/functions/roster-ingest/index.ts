@@ -47,16 +47,17 @@ import 학생계정 from './학생계정.mjs';
 import 로그인코드 from './로그인코드.mjs';
 import 계약 from './수집_교정_계약.json' with { type: 'json' };
 
-const { 머리글자리, 표읽기, 행별가르기, 반미배정, 계획, 급수정규화, 담당지는가, 반갈래 } = 명부규칙 as {
+const { 머리글자리, 표읽기, 행별가르기, 반미배정, 계획, 급수정규화, 입학시즌정규화, 담당지는가, 반갈래 } = 명부규칙 as {
   머리글자리: (표: string[][]) => { 오류: string[] };
   표읽기: (표: string[][]) => {
-    행들: Array<{ 번호: string; 전화: string; 이름: string; 역할: string; 반: string; 급수: string; 줄: number }>;
+    행들: Array<{ 번호: string; 전화: string; 이름: string; 역할: string; 반: string; 급수: string; 입학시즌: string; 줄: number }>;
     /* 🔑 학생이 «아닌» 행 — 강사·학부모가 여기 온다. 여태 세기만 하고 버렸는데, 담당 반이
      *   이 안에 있었다(09-05 · 아래 §강사 담당 반). 그래서 타입을 학생 행과 같은 폭으로 넓힌다. */
     대상아닌행?: Array<{ 번호: string; 이름: string; 역할: string; 반: string; 줄: number }>;
     오류: string[];
   };
   급수정규화: (값: unknown) => string | null;
+  입학시즌정규화: (값: unknown) => string | null;
   담당지는가: (값: string) => boolean;
   반갈래: (값: string) => string[];
   행별가르기: (행들: unknown[]) => {
@@ -184,10 +185,11 @@ Deno.serve(async (req) => {
       display_name: r.이름 || null,
       class_id: 반지도.get(r.반) ?? null,
       level_current: 급수정규화((r as { 급수?: string }).급수),   // 못 읽으면 null = 모름(심문 S7)
+      entry_season: 입학시즌정규화((r as { 입학시즌?: string }).입학시즌),   // 못 읽으면 null = 모름(09-07 · 아래 채움 블록과 같은 값공간)
       schema_ver: (계약 as { 버전: string }).버전,
     }));
     const 결과 = await sql`
-      insert into engine.learners ${sql(행값들 as unknown as Record<string, never>[], 'student_code', 'contact', 'display_name', 'class_id', 'level_current', 'schema_ver')}
+      insert into engine.learners ${sql(행값들 as unknown as Record<string, never>[], 'student_code', 'contact', 'display_name', 'class_id', 'level_current', 'entry_season', 'schema_ver')}
       on conflict (student_code) do nothing
       returning student_code`;
     새로 = (결과 as unknown as Array<{ student_code: string }>).map((r) => r.student_code);
@@ -235,6 +237,27 @@ Deno.serve(async (req) => {
          and l.level_current is distinct from v.level_current
       returning l.student_code`;
     급수갱신 = (결과 as unknown as Array<{ student_code: string }>).map((r) => r.student_code);
+  }
+
+  /* ── 입학 시즌(2026-09-07 · 브랜드 v2 ㉢-1 · appsscript v9.318~319) — 급수와 같은 무늬로 별도 문장이되,
+   * 갱신이 아니라 **«빈 자리에만» 채움**이다: 시트 쪽 「입학시즌」이 «한 번 적히면 코드가 안 덮는» 선점 칸이라
+   * 여기서도 `entry_season is null` 인 행만 채운다 — 사람이 시트를 고쳐도 talk 의 첫 값은 남는다(두 곳의
+   * 규칙이 같아야 「몇 기인가」가 두 답이 되지 않는다). 못 읽은 값(null)은 «모름»이라 건너뛴다. 값공간 =
+   * `입학시즌정규화`(lib · yyyy-MM-dd 만) 하나. */
+  let 입학시즌채움: string[] = [];
+  const 입학짝들 = 정상
+    .filter((r) => !막힌번호.has(정규형(r.번호)))   // 동일성 미확인 행에 시즌을 적지 않는다(반·급수와 같은 자리)
+    .map((r) => ({ code: 학생번호표기(r.번호), es: 입학시즌정규화((r as { 입학시즌?: string }).입학시즌) }))
+    .filter((p): p is { code: string; es: string } => p.es !== null);
+  if (입학짝들.length) {
+    const 결과 = await sql`
+      update engine.learners l set entry_season = v.entry_season
+        from (select unnest(${입학짝들.map((p) => p.code)}::text[]) as student_code,
+                     unnest(${입학짝들.map((p) => p.es)}::text[]) as entry_season) v
+       where l.student_code = v.student_code
+         and l.entry_season is null
+      returning l.student_code`;
+    입학시즌채움 = (결과 as unknown as Array<{ student_code: string }>).map((r) => r.student_code);
   }
 
   /* 반비움잔존(관측만 · S7 곁 발견) — 시트에서 반이 «비워진» 학생의 talk 행에 옛 class_id 가
@@ -476,6 +499,9 @@ Deno.serve(async (req) => {
      * 비워졌는데 talk 에 옛 class_id 가 남은 수(자동 해제 안 함 — 유호 판정 자리). 급수 열을
      * 아직 안 쓰는 시트에서는 둘 다 0 이다(옛 스윕 호환 = 무동작). */
     급수갱신,
+    /* 입학 시즌(09-07). `입학시즌채움` = 이번 스윕이 «빈 자리에» 처음 채운 학생 — 갱신이 아니라 선점이라 두 번째 스윕부터는
+     * 값이 같아도 다르더라도 0 이다(시트를 손으로 고쳐도 talk 의 첫 값이 남는다). 「입학시즌」 열을 아직 안 싣는 시트에서는 0 이다. */
+    입학시즌채움,
     반비움잔존,
     /* 조·좌석(숙제서클 §10-3) — `조편성` 키가 없던 판에서는 셋 다 0·빈 배열이다. */
     조갱신,

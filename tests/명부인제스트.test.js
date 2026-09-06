@@ -161,6 +161,44 @@ test('응답이 조 갱신·해제·문제를 센다 — 0건과 안 잰 것이 
 
 /* ── ③ 동봉 완결성 ── */
 
+/* ── ④ 입학 시즌(2026-09-07 · appsscript v9.318~319 · 브랜드 v2 ㉢-1) ── */
+
+test('표읽기: 「입학시즌」 머리글을 이름으로 받고, 그 칸만 채운 줄도 빈 줄로 접지 않는다', () => {
+  const 표 = [
+    ['user_id', '이름', 'role', 'class_name', '연락처', '입학시즌'],
+    ['SYNK-001', '밧자', 'student', '주말11A', '9911-2233', '2026-11-30'],
+    ['SYNK-002', '터그스', 'student', '', '8800-1122', ''],
+    ['', '', '', '', '', '2026-11-30'],   // 번호도 전화도 없는데 시즌만 있는 줄 — 빈 줄로 접혀 사라지면 안 되고, 역할이 빈 «읽힌 줄»로 소리가 나야 한다
+  ];
+  const { 행들, 오류 } = 규칙.표읽기(표);
+  assert.deepEqual(행들.map((r) => r.입학시즌), ['2026-11-30', '']);
+  assert.equal(오류.length, 1, '시즌만 채운 줄이 조용히 사라졌다(빈 줄로 접혔다) — 사라진 것은 어느 화면에도 안 뜬다');
+  assert.match(오류[0], /^4번째 줄/, '그 줄이 4번째 줄로 지목돼야 원장이 시트에서 찾는다');
+  assert.deepEqual(규칙.헤더찾기(['user_id', '연락처', 'entry_season']).입학시즌, 2, 'entry_season 별칭이 안 잡힌다');
+  assert.deepEqual(규칙.헤더찾기(['user_id', '연락처']).입학시즌, -1, '칸이 없으면 -1 (없는 열을 위치로 짐작하지 않는다)');
+});
+
+test('입학시즌정규화: yyyy-MM-dd 만 값이다 — 「1기」 같은 이름표·날짜 아닌 것은 null(모름)', () => {
+  assert.equal(규칙.입학시즌정규화('2026-11-30'), '2026-11-30');
+  assert.equal(규칙.입학시즌정규화(' 2026-11-30 '), '2026-11-30');
+  assert.equal(규칙.입학시즌정규화('1기'), null);
+  assert.equal(규칙.입학시즌정규화('Mon Nov 30 2026 00:00:00'), null, 'String(Date) 로 굳은 값은 받지 않는다 — 시트 쪽이 텍스트로 굳혀 보낸다');
+  assert.equal(규칙.입학시즌정규화(''), null);
+  assert.equal(규칙.입학시즌정규화(null), null);
+});
+
+test('🔴 서버 문은 entry_season 을 «빈 자리에만» 채운다 — 갱신이 아니라 선점(시트와 같은 규칙 · 두 답 금지)', () => {
+  const 블록 = 주석뺀소스.slice(주석뺀소스.indexOf('let 입학시즌채움'), 주석뺀소스.indexOf('입학시즌채움 = ('));
+  assert.ok(블록.length > 0, '입학시즌 채움 블록이 없다');
+  assert.match(블록, /set entry_season = v\.entry_season/, 'entry_season 을 안 쓴다');
+  assert.match(블록, /l\.entry_season is null/, '빈 자리 조건이 없다 — 시트 오타 한 번에 talk 의 첫 값이 덮인다');
+  assert.ok(!/entry_season is distinct from/.test(블록), '«바뀐 행 갱신» 꼴이다 — 이 칸은 갱신 칸이 아니라 선점 칸이다');
+  assert.match(블록, /입학시즌정규화\(/, '정규화를 lib 하나(입학시즌정규화)에서 안 받는다 — 값공간이 두 곳에 살면 갈린다');
+  assert.match(블록, /막힌번호\.has\(/, '연락처 어긋난 행(막힌것)을 안 뺀다 — 같은 사람인지 모르는 행에 시즌을 적는다');
+  const 삽입 = 주석뺀소스.slice(주석뺀소스.indexOf('insert into engine.learners'), 주석뺀소스.indexOf('on conflict (student_code) do nothing'));
+  assert.match(삽입, /'entry_season'/, '새 학생 삽입에 entry_season 칸이 없다 — 첫 스윕에 온 값이 다음 스윕에서야 채워진다');
+});
+
 test('동봉 표 — 규칙 lib·의존·계약 JSON 이 전부 실린다', () => {
   const 표 = JSON.parse(fs.readFileSync(path.join(FN디렉터리, '동봉.json'), 'utf8'));
   assert.deepEqual(표, {
