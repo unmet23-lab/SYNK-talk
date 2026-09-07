@@ -25801,7 +25801,8 @@ select case when 테이블수=24 and RLS켜짐=24 and 정책수=7
  *   학생에게 나가는 것은 `lib/오늘과제.js` 의 **허용 목록**이 가른다 — 새 키의 기본값은 「안 나감」이라
  *   이 표에 정답이 있어도 통로가 열리지 않는다. 그 목록을 넓혀 정답을 내보내지 않는다.
  *
- * ■ 소급 0 · 트리거 0 · 뷰 0 · RLS 0(engine 스키마는 함수만 붙는다 · 다른 표와 같은 꼴) · 계약판 그대로(c16 · 제출 쪽 새 칸 0).
+ * ■ 소급 0 · 트리거 0 · 뷰 0 · 계약판 그대로(c16 · 제출 쪽 새 칸 0) · RLS 켬 · 정책 0(= 서비스 역할만 읽고 쓴다 · 다른 engine 표와 같은 꼴).
+ * 🔴 첫 판에 RLS 를 빠뜨렸다가 tests/L0스키마.test.js 가 잡았다 — 어느 DB 에도 붓기 «전»이라 같은 버전을 고쳤다(붓고 나면 새 조각이어야 한다).
  *
  * 되돌림: drop table if exists engine.sunday_bundles;
  *         delete from engine.schema_migrations where version='20260907200000'; */
@@ -25812,7 +25813,7 @@ do $migration$
 declare
   migration_version constant text := '20260907200000';
   migration_name constant text := '20260907200000_sunday_bundles_c16.sql';
-  expected_checksum constant text := '7dfec8d1aaab42f8371474a1fb7149e2fd011e89cf4650789cbe9011e344f694'; -- migration-checksum
+  expected_checksum constant text := 'f18e9889a69ae4ddb290433499dd62656d1e724ba20102779305fe0b9265bbfc'; -- migration-checksum
   base_version constant text := '20260907100000';   -- 체인은 «바로 앞 조각»을 가리킨다
   recorded_checksum text;
 begin
@@ -25877,7 +25878,7 @@ comment on column engine.sunday_bundles.delivered_event_id is
 
 do $migration2$
 declare
-  expected_checksum constant text := '7dfec8d1aaab42f8371474a1fb7149e2fd011e89cf4650789cbe9011e344f694'; -- migration-checksum
+  expected_checksum constant text := 'f18e9889a69ae4ddb290433499dd62656d1e724ba20102779305fe0b9265bbfc'; -- migration-checksum
 begin
   if not exists (select 1 from engine.schema_migrations where version = '20260907200000') then
     insert into engine.schema_migrations(version, name, checksum)
@@ -26217,7 +26218,7 @@ select case when 테이블수=25 and RLS켜짐=25 and 정책수=7
               and (select v from 빠진트리거) is null
               and 라디오보강열=10 and 라디오보강인덱스=3
               and (select version from 현재이력)='20260907100000'
-              and (select checksum from 현재이력)='7dfec8d1aaab42f8371474a1fb7149e2fd011e89cf4650789cbe9011e344f694' -- migration-checksum
+              and (select checksum from 현재이력)='f18e9889a69ae4ddb290433499dd62656d1e724ba20102779305fe0b9265bbfc' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 25·25·7·0·0·5·1·0·0·1·0·0·0·0·22·0·0·0·0·2·6·6·0·0·0·1·1·1·30·0·1·26·0·11·0·1·1·0·1·10·3 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,

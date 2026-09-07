@@ -94,7 +94,9 @@ test('🔴 시크릿 미설정은 503 이다 — 없는 자물쇠를 「통과�
 
 test('🔴 이 문은 «큐»를 안 건드린다 — 배정 사건 조립은 functions/deliver 하나가 진다', () => {
   assert.doesNotMatch(주석뺀소스, /task\.assigned/, '받는 문이 배정 사건을 직접 쓰면 조립이 두 곳에 산다');
-  assert.doesNotMatch(주석뺀소스, /engine\.learning_events|engine\.submissions/,
+  /* 🔑 «읽기»는 막지 않는다 — 되돌리는 GET 이 제출을 세려면 그 두 표를 읽어야 한다.
+   *   가르는 것은 쓰기다: 큐 표에 직접 쓰면 동의판·급수 스냅샷 조립이 갈라진다. */
+  assert.doesNotMatch(주석뺀소스, /insert into engine\.learning_events|insert into engine\.submissions|update engine\.learning_events|update engine\.submissions/,
     '큐 표에 직접 쓰면 동의판·급수 스냅샷 조립이 갈라진다(이 저장소가 가장 크게 데인 유형)');
   assert.match(주석뺀소스, /engine\.sunday_bundles/, '재료 표에 놓는 자리가 없다');
 });
@@ -219,6 +221,40 @@ test('🔴 낸 뒤 재료에 사건 id 를 적는다 — 그 칸이 「이미 �
   assert.match(본문, /멱등키\('task', learner_id, 오늘\)/, '배정 멱등키가 말하기·게임과 같은 자리가 아니다 — 「그날 1건」이 깨진다');
   assert.match(본문, /자율일배정\(/, '조립을 lib 에서 안 가져온다 — 받은 판과 낸 판이 갈린다');
   assert.doesNotMatch(본문, /insert into engine\.sunday_bundles/, '내는 자리가 재료를 새로 만들면 받는 문과 두 벌이 된다');
+});
+
+/* ── ⑦ 되돌리는 쪽(GET) ── */
+
+test('🔴 되돌리는 GET 도 같은 자물쇠를 지난다 — 값에 배정ID(학생번호가 든 글자)가 실린다', () => {
+  const i = 주석뺀소스.indexOf('req.method === \'GET\'');
+  const 자물쇠 = 주석뺀소스.indexOf('같은비밀(들고온, 비밀)');
+  assert.ok(자물쇠 > -1 && i > 자물쇠, 'GET 갈래가 시크릿 검사보다 «앞»에 있다 — 밖에서 그날 제출 현황이 통째로 읽힌다');
+  assert.match(주석뺀소스, /method !== 'POST' && req\.method !== 'GET'/, 'GET 을 405 로 막고 있다(되돌리기가 안 돈다)');
+});
+
+test('🔴 «찬 것»은 제출 행이면서 전사 글자가 있는 것뿐이다 — 무음 녹음이 완주가 되지 않는다', () => {
+  assert.match(주석뺀소스, /event_type = 'submission\.created'/, '배정 행도 제출로 세면 「내기만 하면 찬 것」이 된다');
+  assert.match(주석뺀소스, /length\(btrim\(coalesce\(s\.body_original, s\.transcript, ''\)\)\)[\s\S]{0,20}> 0/,
+    '전사 글자 수를 안 재면 무음 녹음이 찬 것으로 세어진다(설계 §⑥ · 2회차 아스트라 P1)');
+  assert.match(주석뺀소스, /'낭독' \|\| a\.종류 === '답하기'/, '굳히기·오답·진단까지 여기서 세면 appsscript 쪽과 두 벌이 된다');
+});
+
+test('되돌리는 값에 학생 식별자를 안 싣는다 — 배정ID 로 충분하다', () => {
+  const i = 주석뺀소스.indexOf('async function 되돌리기');
+  const 본문 = 주석뺀소스.slice(i, 주석뺀소스.indexOf('Deno.serve', i));
+  assert.doesNotMatch(본문, /learner_id|이메일|email|student_code/, '더 줄 이유가 없는 식별자가 응답에 실린다');
+  assert.match(본문, /ok: true, 자율일: day, 배정/, 'appsscript 가 읽는 봉투 꼴({ ok, 배정 })이 아니다');
+});
+
+test('보내는 쪽(appsscript)이 그 열쇠를 들고 온다 — 형제 저장소가 있을 때만 잰다', () => {
+  const 엔진 = path.resolve(ROOT, '..', 'SYNK-appsscript', '엔진_자율일.js');
+  if (!fs.existsSync(엔진)) return;   // 형제 저장소 없음 — 이 검사는 건너뛴다(F296 과 같은 꼴)
+  const 소스 = fs.readFileSync(엔진, 'utf8');
+  const i = 소스.indexOf('function 자율일말하기제출_');
+  assert.ok(i > -1, 'appsscript 쪽 되돌림 읽는 함수가 없다');
+  const 본문 = 소스.slice(i, 소스.indexOf('\nfunction ', i + 10));
+  assert.match(본문, /'x-sunday-bundle-key': key/, '열쇠를 안 보내면 이 문이 401 을 낸다 — 낭독·답하기가 영영 미집계로 남는다');
+  assert.match(본문, /if \(!url \|\| !anon \|\| !key\) return null;/, '열쇠가 없으면 아예 안 불러야 한다(401 을 「답 없음」과 섞지 않는다)');
 });
 
 test('표를 세운 마이그레이션이 확인 블록의 기대열에 칸을 다 올렸다', () => {

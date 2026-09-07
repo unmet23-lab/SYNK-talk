@@ -64,8 +64,52 @@ function 같은비밀(a: string, b: string): boolean {
   return 다름 === 0;
 }
 
+/** GET — 그 자율일의 «찬 항목»을 배정별로 되돌려 준다(appsscript `자율일말하기제출_` 이 읽는다).
+ *
+ * ■ 왜 되돌리나 — 낭독·답하기는 talk 에만 남는다
+ *   굳히기·오답은 appsscript `quiz_log` 가, 진단은 진단 세션이 쥔다. 낭독·답하기만 이쪽이라,
+ *   이 답이 없으면 월요일 완주 판정에서 그 둘이 «미집계»로 남는다(설계 §④ — 조용히 완주로 접지 않는다).
+ *
+ * ■ 🔴 충족 조건은 «제출 존재»가 아니라 **전사 글자 수 > 0** (설계 §⑥ · 2회차 아스트라 P1)
+ *   무음 녹음도 제출 행은 만든다. 그것을 찼다고 세면 「냈는데 아무 말도 안 한 날」이 완주가 된다.
+ *   ⚠ 아직 전사가 안 붙은 제출은 «안 찬 것»으로 센다 — 화요일 재집계가 그 사이 붙은 것을 다시 센다.
+ *
+ * ■ 학생 식별자를 안 싣는다
+ *   배정ID 안에 학생번호가 들어 있어 그 자체가 식별자다. 그래서 이름·이메일·learner_id 는 안 낸다 —
+ *   appsscript 는 배정ID 로 제 시트 행을 찾으므로 더 줄 이유가 없다(적게 주는 쪽이 늘 안전하다).
+ */
+async function 되돌리기(day: string) {
+  if (!날짜꼴받기(day)) return 봉투(400, { error: 'bad_day', 설명: 'day=yyyy-MM-dd 가 필요하다' });
+  const 행들 = await sql`
+    select b.assignment_id, b.bundle
+      from engine.sunday_bundles b
+     where b.autonomy_date = ${day}::date`;
+  const 배정: Record<string, string[]> = {};
+  for (const r of 행들) {
+    const 묶음 = (r.bundle ?? {}) as { 항목?: Array<Record<string, unknown>> };
+    const 항목ID들 = (묶음.항목 ?? [])
+      .filter((a) => a && (a.종류 === '낭독' || a.종류 === '답하기'))
+      .map((a) => String(a.항목ID ?? ''))
+      .filter(Boolean);
+    if (!항목ID들.length) { 배정[String(r.assignment_id)] = []; continue; }
+    /* 제출인 행만 센다 — `submissions` 에는 배치가 쓴 배정 행도 산다(P0 §6-1). 안 걸면 «내기만 하면
+     * 찬 것»이 되어 배정 1건이 제출 1건으로 세어진다(tasks·progress 가 지키는 그 자리와 같은 축). */
+    const 찬것 = await sql`
+      select distinct s.task_ref
+        from engine.submissions s
+        join engine.learning_events e on e.event_id = s.event_id
+       where e.event_type = 'submission.created'
+         and s.task_ref = any(${항목ID들}::text[])
+         and coalesce(length(btrim(coalesce(s.body_original, s.transcript, ''))), 0) > 0`;
+    배정[String(r.assignment_id)] = 찬것.map((x) => String(x.task_ref));
+  }
+  return 봉투(200, { ok: true, 자율일: day, 배정 });
+}
+
+const 날짜꼴받기 = (s: string) => /^\d{4}-\d{2}-\d{2}$/u.test(String(s ?? ''));
+
 Deno.serve(async (req) => {
-  if (req.method !== 'POST') return 봉투(405, { error: 'method_not_allowed' });
+  if (req.method !== 'POST' && req.method !== 'GET') return 봉투(405, { error: 'method_not_allowed' });
 
   const 비밀 = Deno.env.get('SUNDAY_BUNDLE_SECRET') ?? '';
   if (!비밀) {
@@ -74,6 +118,17 @@ Deno.serve(async (req) => {
   }
   const 들고온 = req.headers.get('x-sunday-bundle-key') ?? '';
   if (!같은비밀(들고온, 비밀)) return 봉투(401, { error: 'unauthorized' });
+
+  /* 🔑 GET 도 같은 자물쇠를 지난다 — 되돌려 주는 값에 배정ID(= 학생번호가 든 글자)가 실려서다.
+   *   anon 키만으로 열면 밖에서 「그날 누가 무엇을 냈나」를 통째로 읽는다. */
+  if (req.method === 'GET') {
+    try {
+      return await 되돌리기(new URL(req.url).searchParams.get('day') ?? '');
+    } catch (e) {
+      console.error('[sunday-bundle] 되돌리기 실패', e);
+      return 봉투(500, { error: 'db_error', 설명: String((e as Error)?.message ?? e).slice(0, 300) });
+    }
+  }
 
   let 몸: Record<string, unknown>;
   try { 몸 = await req.json(); } catch { return 봉투(400, { error: 'bad_json' }); }
