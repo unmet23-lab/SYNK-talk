@@ -88,7 +88,7 @@ function 긴GET(url, 머리) {
 }
 
 const 아는플래그 = ['--결', '--벌', '--씨앗', '--길이', '--낼곳', '--연주곡', '--결목록', '--되살리기', '--통로',
-  '--밀기', '--안다듬기', '--노랫말시도'];
+  '--밀기', '--안다듬기', '--노랫말시도', '--끝잦아듦', '--잦아듦초', '--끝맺음재기'];
 
 const ROOT = path.resolve(__dirname, '..');
 const SPACE = 'https://minimaxai-minimax-music3.hf.space';
@@ -493,6 +493,66 @@ async function 본체(argv) {
     for (const [이름, v] of Object.entries(결들)) {
       console.log(`  ${이름}\n    ${v.뭐냐}\n    문면: ${v.설명}\n`);
     }
+    return;
+  }
+
+  /* 🎬 **이미 있는 곡들이 제 발로 끝났나를 잰다**(몫 0 · 굽지 않는다).
+   *   폴더를 주면 그 안의 wav·mp3 전량을, 파일을 주면 그것만 잰다. */
+  if (argv.includes('--끝맺음재기')) {
+    const 과녁 = 인자값(argv, '--끝맺음재기', 기본낼곳);
+    const 파일들 = fs.statSync(과녁).isDirectory()
+      ? fs.readdirSync(과녁).filter((f) => /\.(wav|mp3)$/i.test(f) && !/_원본\.wav$/i.test(f))
+        .map((f) => path.join(과녁, f))
+      : [과녁];
+    console.log(`끝맺음을 잰다 — ${파일들.length}벌\n`);
+    console.log('  자 = 마지막 1초 평균이 곡 전체 평균보다 얼마나 낮은가(문턱 20)\n');
+    let 끝맺은수 = 0; let 끊긴수 = 0; let 못잰수 = 0;
+    for (const f of 파일들) {
+      /* 사이드카가 있으면 주문 길이를 거기서 읽는다 — 없으면 길이 견줌은 건너뛰고 소리로만 잰다. */
+      let 주문 = null;
+      const 사이드카 = f.replace(/\.[^.]+$/, '.json');
+      if (fs.existsSync(사이드카)) {
+        try { 주문 = JSON.parse(fs.readFileSync(사이드카, 'utf8')).길이 || null; } catch { /* 없으면 없는 대로 */ }
+      }
+      const r = 끝맺음재기(f, 주문);
+      const 표 = r.끝맺었나 === true ? '✅' : (r.끝맺었나 === false ? '🔴' : '⚠');
+      if (r.끝맺었나 === true) 끝맺은수 += 1;
+      else if (r.끝맺었나 === false) 끊긴수 += 1;
+      else 못잰수 += 1;
+      const 길이글 = r.실제 !== null
+        ? `${r.실제.toFixed(0)}초${주문 ? `/주문 ${주문}` : ''}` : '길이 못 잼';
+      console.log(`  ${표} ${path.basename(f).padEnd(44)} ${길이글.padStart(14)} · 마지막 1초가 ${r.차이 ?? '못 잼'} 낮다`);
+    }
+    /* 🔑 «합계 = 갈래 + 갈래»로 낸다 — 0건이 성공 얼굴로 지나가지 않게. */
+    console.log(`\n  합계 ${파일들.length} = 제 발로 끝남 ${끝맺은수} + 끊김 ${끊긴수} + 못 잼 ${못잰수}`);
+    if (끊긴수) console.log(`  ↳ 끊긴 것은 다시 굽거나 \`--끝잦아듦 <파일>\` 로 끝에 잦아듦을 입힌다.`);
+    return;
+  }
+
+  /* 🩹 **끊긴 곡을 살린다** — 끝에 잦아듦(페이드아웃)을 입혀 「끝난 느낌」을 만든다.
+   * ⚠ 이것은 «고치기»가 아니라 «감추기»다. 노래는 여전히 도중에 멈춘 자리에서 멈춘다.
+   *   제대로 고치는 길은 노랫말을 짧게 잡아 다시 굽는 것이고, 이 문은 다시 못 굽는 곡을 위한 것이다.
+   *   그래서 원본을 `_끊긴판.wav` 로 남긴다 — 유호님 귀가 「이게 더 낫다」 하실 수 있다. */
+  const 잦아듦과녁 = 인자값(argv, '--끝잦아듦', null);
+  if (잦아듦과녁) {
+    const 초 = Math.max(1, Number(인자값(argv, '--잦아듦초', '6')));
+    const 길이 = 길이재기(잦아듦과녁);
+    if (!길이) throw new Error(`길이를 못 쟀다 — 파일이 맞나: ${잦아듦과녁}`);
+    if (길이 <= 초) throw new Error(`곡(${길이.toFixed(0)}초)이 잦아듦(${초}초)보다 짧다`);
+    const 전 = 끝맺음재기(잦아듦과녁, null);
+    const 끊긴판 = 잦아듦과녁.replace(/\.[^.]+$/, '_끊긴판$&');
+    fs.copyFileSync(잦아듦과녁, 끊긴판);
+    const { execFileSync } = require('node:child_process');
+    const 임시 = `${잦아듦과녁}.tmp.wav`;
+    execFileSync('ffmpeg', ['-y', '-v', 'error', '-i', 끊긴판,
+      '-af', `afade=t=out:st=${(길이 - 초).toFixed(2)}:d=${초}:curve=exp`,
+      '-ar', '44100', '-c:a', 'pcm_s16le', 임시], { stdio: 'pipe' });
+    fs.renameSync(임시, 잦아듦과녁);
+    const 후 = 끝맺음재기(잦아듦과녁, null);
+    console.log(`🩹 끝 ${초}초에 잦아듦을 입혔다 — ${잦아듦과녁}`);
+    console.log(`   마지막 1초가 ${전.차이} → ${후.차이} 낮아졌다${후.끝맺었나 ? ' ✅' : ''}`);
+    console.log(`   입히기 «전» 판은 ${path.basename(끊긴판)} 로 남겼다(귀로 견주신 뒤 하나를 지우면 된다)`);
+    console.log('   ⚠ 이것은 감추기다 — 노래 자체는 여전히 도중에 멈춘 자리에서 멈춘다.');
     return;
   }
 
