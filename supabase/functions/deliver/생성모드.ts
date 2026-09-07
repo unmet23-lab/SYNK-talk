@@ -3,7 +3,7 @@
  * ■ 왜 벤더 0 인가(§3) — 이 함수도 150초를 진다. 선판정(순수)·상태 굳히기·큐 적재(DB)만 하고,
  *   벤더 대기는 전부 단건 워커(deliver-one)의 몫이다. 학급 17명이 한 호출에 다 들어가는 근거.
  * ■ 진입 = index.ts 배달하기의 활성 게이트(전원 모드만) — 재료(학급·교정문·원신호)는 현행
- *   배달과 **같은 조회 하나**(`대상조회`)를 지나고, 게임 갈래도 **같은 함수**(`게임갈래`)를
+ *   배달과 **같은 조회 하나**(`대상조회`)를 지나고, 앞선 갈래(자율일 → 게임)도 **같은 함수**(`먼저갈래`)를
  *   먼저 탄다(두 벌이면 같은 학생이 두 통로에서 다른 것을 받는다).
  * ■ 상태의 생산자는 여기 «하나»다(D2 · §3-5-b A8) — `학습자상태()` 1회 + `과제요약()` 으로
  *   draft(스냅샷·요약·근거)를 굳혀 job 에 싣는다. 워커는 그 draft 를 «렌더만» 한다.
@@ -183,9 +183,11 @@ export async function 생성배달(ctx: {
   sql: Sql; 오늘: string; 스냅기준: string;
   대상: Record<string, unknown>[];
   봉투: (status: number, body: Record<string, unknown>) => Response;
-  게임갈래: (학생: Record<string, unknown>, 오늘: string, ver: string) => Promise<Record<string, unknown> | null>;
+  /* 배달과 «같은 함수»를 받는다 — 판정이 두 벌이 되면 같은 학생이 두 통로에서 다른 것을 받는다.
+   🔑 이름이 `게임갈래` 가 아닌 까닭: 이 앞선 갈래는 이제 «자율일 → 게임» 둘을 차례로 본다(09-07). */
+  먼저갈래: (학생: Record<string, unknown>, 오늘: string, ver: string) => Promise<Record<string, unknown> | null>;
 }): Promise<Response> {
-  const { sql, 오늘, 스냅기준, 대상, 봉투, 게임갈래 } = ctx;
+  const { sql, 오늘, 스냅기준, 대상, 봉투, 먼저갈래 } = ctx;
   const 시작 = Date.now();
 
   /* ── 실행판(⓪ 에 굳는다 · 워커의 자기 판과 같은 조립 하나) ── */
@@ -287,7 +289,11 @@ export async function 생성배달(ctx: {
     }
 
     /* 게임 갈래 — 현행과 같은 함수 하나. 서면 job 0(§3-4 · A11 ①), 실패는 load_error 로. */
-    const 게임 = await 게임갈래(학생, 오늘, 판.schema_ver);
+    /* 🔴 이 변수의 값은 게임일 수도 «자율일»일 수도 있다(09-07 에 앞선 갈래가 둘이 됐다).
+     *   이름과 아래 통계 라벨(`게임`·`게임실패`)은 그대로 뒀다 — 라벨은 batch_run 장부에 쌓이는
+     *   값이라 여기서 갈면 옛 회차와 못 견준다. ⏳ 라벨을 출처별로 가르는 것은 별건이다(트랙 §0-판매).
+     *   지금 잃는 것은 «일요일 회차의 건너뜀 사유»뿐이고, 무엇을 냈는지는 배정 행이 쥔다. */
+    const 게임 = await 먼저갈래(학생, 오늘, 판.schema_ver);
     if (게임) {
       if (게임.status === 'failed') {
         targets.push({ learner_id, load_error: `게임배정실패: ${String(게임.사유 ?? '')}`.slice(0, 200) });
@@ -331,9 +337,11 @@ export async function 구제배달(ctx: {
   sql: Sql; 오늘: string; 스냅기준: string;
   학생: Record<string, unknown>;
   봉투: (status: number, body: Record<string, unknown>) => Response;
-  게임갈래: (학생: Record<string, unknown>, 오늘: string, ver: string) => Promise<Record<string, unknown> | null>;
+  /* 배달과 «같은 함수»를 받는다 — 판정이 두 벌이 되면 같은 학생이 두 통로에서 다른 것을 받는다.
+   🔑 이름이 `게임갈래` 가 아닌 까닭: 이 앞선 갈래는 이제 «자율일 → 게임» 둘을 차례로 본다(09-07). */
+  먼저갈래: (학생: Record<string, unknown>, 오늘: string, ver: string) => Promise<Record<string, unknown> | null>;
 }): Promise<Response> {
-  const { sql, 오늘, 스냅기준, 학생, 봉투, 게임갈래 } = ctx;
+  const { sql, 오늘, 스냅기준, 학생, 봉투, 먼저갈래 } = ctx;
   const learner_id = String(학생.learner_id);
   const 응답 = (결과: string, 나머지: Record<string, unknown> = {}) =>
     봉투(200, { ok: true, date: 오늘, mode: '구제', 결과, ...나머지 });
@@ -371,7 +379,8 @@ export async function 구제배달(ctx: {
   }
 
   /* 게임 갈래 — 현행과 같은 함수 하나(게임이 서면 job 0 그대로 그 배정을 반환한다). */
-  const 게임 = await 게임갈래(학생, 오늘, 실행판.schema_ver);
+  /* 위와 같다 — 값은 게임일 수도 자율일일 수도 있고, 라벨은 옛 회차와의 견줌을 위해 그대로 둔다. */
+  const 게임 = await 먼저갈래(학생, 오늘, 실행판.schema_ver);
   if (게임) {
     if (게임.status === 'failed') return 응답('게임실패', { 사유: 게임.사유 ?? null });
     return 응답('게임', { event_id: 게임.event_id ?? null });

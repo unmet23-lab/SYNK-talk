@@ -24,5 +24,6 @@
   "문장끊기.mjs": "lib/문장끊기.js",
   "예비과제.mjs": "lib/예비과제.js",
   "예비과제풀.mjs": "contents/예비과제풀.js",
-  "CORS.mjs": "lib/CORS.js"
+  "CORS.mjs": "lib/CORS.js",
+  "자율일재료.mjs": "lib/자율일재료.js"
 }

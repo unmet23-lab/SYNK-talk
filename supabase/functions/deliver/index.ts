@@ -32,6 +32,7 @@ import 토큰모듈 from './토큰.mjs';
 import 상태모듈 from './학습자상태.mjs';
 import 회수모듈 from './성과회수.mjs';
 import 게임모듈 from './게임배정.mjs';
+import 자율일모듈 from './자율일재료.mjs';
 import 라디오태스크모듈 from './라디오태스크.mjs';
 import 계약판모듈 from './계약판.mjs';
 import CORS모듈 from './CORS.mjs';
@@ -520,7 +521,7 @@ async function 배달하기(오늘: string, 한사람: string | null = null, 맥
       }
       if (맥락 === '배치' && !한사람) {
         const 대상 = await 대상조회(스냅기준, null);
-        return await 생성배달({ sql, 오늘, 스냅기준, 대상: 대상 as unknown as Record<string, unknown>[], 봉투, 게임갈래 });
+        return await 생성배달({ sql, 오늘, 스냅기준, 대상: 대상 as unknown as Record<string, unknown>[], 봉투, 먼저갈래 });
       }
       if (맥락 === '구제' && 한사람) {
         const 대상 = await 대상조회(스냅기준, 한사람);
@@ -528,7 +529,7 @@ async function 배달하기(오늘: string, 한사람: string | null = null, 맥
           console.error('[deliver] 🔴 구제 대상 없음', 한사람);
           return 봉투(404, { ok: false, date: 오늘, mode: '구제', error: { code: 'NOT_FOUND', message: '그 학생이 없습니다' } });
         }
-        return await 구제배달({ sql, 오늘, 스냅기준, 학생: 대상[0] as Record<string, unknown>, 봉투, 게임갈래 });
+        return await 구제배달({ sql, 오늘, 스냅기준, 학생: 대상[0] as Record<string, unknown>, 봉투, 먼저갈래 });
       }
       return 봉투(400, { ok: false, date: 오늘, error: {
         code: 'BAD_REQUEST', message: '배치=전원 · 구제=단건 조합만 받습니다(§3-1)',
@@ -727,6 +728,105 @@ async function 배달하기(오늘: string, 한사람: string | null = null, 맥
   return 봉투(200, 몸);
 }
 
+const { 자율일배정 } = 자율일모듈 as {
+  자율일배정: (재료행: unknown) => null | {
+    task_type: string; task_ref: string; task_schema_ver: string; 출처: string; degraded: boolean;
+    task_snapshot: Record<string, unknown>;
+  };
+};
+
+/** 일요일 자율일 갈래 — 토요일 밤에 받아 둔 재료(`engine.sunday_bundles`)를 그날 배정 1건으로 낸다.
+ *  재료가 없으면 «null»이고 호출자의 다음 갈래(게임 → 말하기)가 그대로 받는다 — 자율일이 못 서는 날
+ *  학생이 빈손이 되는 갈래는 없다(게임갈래와 같은 축).
+ *
+ *  🔑 **판정·조립은 `lib/자율일재료.js` 하나가 진다** — 여기는 행만 만든다. 받는 문과 이 자리가 각자
+ *    판을 조립하면 「받은 것」과 「낸 것」이 갈리고, 갈린 날 증상은 「학생 화면이 이상하다」 하나다.
+ *  🔴 일요일에 게임날이 겹쳐도 자율일이 이긴다 — 그날의 자율일 묶음은 그 주 문형을 겨눠 지은 것이고,
+ *    안 내면 appsscript 쪽에서 «미집계»로 남는다(게임은 다음 게임날이 있다).
+ *  🔴 낸 뒤 재료에 사건 id 를 적는다 — 그 칸이 「이미 냈다」의 유일한 표시라서, 안 적으면 다음 판이
+ *    같은 재료를 다시 조립하려 들고 멱등키에 막혀 «duplicate» 로만 보인다(원인이 안 남는다). */
+async function 자율일갈래(학생: Record<string, unknown>, 오늘: string, ver: string) {
+  const learner_id = String(학생.learner_id);
+  let 재료: Record<string, unknown> | null = null;
+  try {
+    const 행 = await sql`
+      select assignment_id, autonomy_date::text as autonomy_date, week_no, week_ver, bundle, delivered_event_id
+        from engine.sunday_bundles
+       where learner_id = ${learner_id}::uuid and autonomy_date = ${오늘}::date
+       limit 1`;
+    재료 = (행[0] as Record<string, unknown>) ?? null;
+  } catch (e) {
+    /* 🔴 한 학생의 조회 실패가 배치 전체를 500 으로 만들면 안 된다(C0 §4-1 head-of-line blocking).
+     *   다음 갈래로 내려가면 그 학생은 평일 편지를 받는다 — 빈손보다 낫다. */
+    console.error('[deliver] 자율일 재료 조회 실패(다음 경로로 내려간다)', learner_id, String((e as Error)?.message ?? e));
+    return null;
+  }
+  const 낼것 = 자율일배정(재료);
+  if (!낼것) return null;
+
+  const 지금 = new Date().toISOString();
+  const 공통 = {
+    actor_kind: 'ai' as const,
+    level_snapshot: (학생.level_current ?? null) as string | null,
+    goal_snapshot: (학생.goal_track ?? null) as string | null,
+    consent_ver: String(학생.consent_ver),
+    consent_id: String(학생.consent_id),
+  };
+
+  try {
+    return await sql.begin(async (tx) => {
+      const 배정 = await tx`
+        insert into engine.learning_events (
+          learner_id, event_type, task_type, actor_kind, occurred_at, idempotency_key,
+          level_snapshot, goal_snapshot, intervention_id, consent_ver, consent_id, degraded,
+          retry_of_event_id, source_kind, payload, schema_ver
+        ) values (
+          ${learner_id}::uuid, 'task.assigned', ${낼것.task_type}, ${공통.actor_kind},
+          ${지금}::timestamptz, ${멱등키('task', learner_id, 오늘)},
+          ${공통.level_snapshot}, ${공통.goal_snapshot},
+          /* 개입 고리 없음 — 자율일 묶음은 그 주 문형으로 «미리» 지은 것이라 「왜 이 학생에게 이것을」이
+           * 개입 판정에서 나오지 않는다. 🔑 칸을 안 싣는 것과 null 을 싣는 것은 다르다 — 안 실으면
+           * 다음 사람이 「이 통로는 고리를 못 나른다」로 읽고, 그 오독이 래칫(tests/개입스탬프.test.js ③)에 걸린다.
+           * ⚠ 이 주석은 SQL 템플릿 «안»이다 — 백틱을 쓰면 리터럴이 그 자리에서 끊긴다(09-07 에 한 번 깼다). */
+          null::uuid,
+          ${공통.consent_ver}, ${공통.consent_id}::uuid, ${낼것.degraded},
+          /* 재발화 고리도 없다 — 오답 재출제는 talk 사건이 아니라 «퀴즈 통로»로 돌아오고,
+           * 그 고리는 appsscript 배정 행의 원오답 칸이 쥔다(설계 §⑥ 🔴 원오답 고리). */
+          null::uuid,
+          ${사건출처('task.assigned')}::engine.source_kind, ${sql.json({ ver: 1 })}, ${ver}
+        )
+        on conflict (learner_id, idempotency_key) do nothing
+        returning event_id`;
+      if (!배정.length) {
+        /* 그날 배정이 이미 있다(낮에 다른 갈래가 먼저 섰다). 재료는 그대로 두고 넘어간다 —
+         * 이 학생의 일요일은 appsscript 쪽에서 «미집계»로 남고, 그 편이 두 배정보다 정직하다. */
+        return { learner_id, status: 'duplicate', degraded: 낼것.degraded, 출처: 낼것.출처 };
+      }
+      await tx`
+        insert into engine.submissions (
+          event_id, task_type, task_ref, task_snapshot, task_schema_ver, occurred_at, schema_ver,
+          due_at, due_ver
+        ) values (
+          ${배정[0].event_id}::uuid, ${낼것.task_type}, ${낼것.task_ref},
+          ${sql.json(낼것.task_snapshot)}, ${낼것.task_schema_ver}, ${지금}::timestamptz, ${ver},
+          (${오늘}::date + 1)::timestamp at time zone ${시간대}::text, 'due.v1'
+        )`;
+      await tx`
+        update engine.sunday_bundles
+           set delivered_event_id = ${배정[0].event_id}::uuid
+         where assignment_id = ${String(재료!.assignment_id)}`;
+      return {
+        learner_id, status: 'assigned', event_id: 배정[0].event_id,
+        intervention_id: null, degraded: 낼것.degraded, 출처: 낼것.출처,
+      };
+    });
+  } catch (e) {
+    const 글 = String((e as Error)?.message ?? e);
+    console.error('[deliver] 자율일 배정 실패', learner_id, 글);
+    return { learner_id, status: 'failed', 사유: 글.slice(0, 200) };
+  }
+}
+
 /** 게임(G1~G4) 갈래 — 판정+배정 한 벌. 게임이 «못 서면 null»(호출자의 다음 갈래가 받는다).
  *  배달(현행 말하기)과 생성 모드가 **같은 함수**를 먼저 시도한다 — 게임날 판정이 두 벌이 되면
  *  한쪽만 고친 날 같은 학생이 두 통로에서 다른 것을 받는다. */
@@ -822,6 +922,17 @@ async function 게임갈래(학생: Record<string, unknown>, 오늘: string, ver
   return null;
 }
 
+/** 배정을 «먼저» 다투는 갈래들 — 자율일 → 게임 순. 둘 다 못 서면 null 이고 말하기가 받는다.
+ *  🔑 배달(`한명`)과 생성 모드(`생성모드.ts`)가 **이 함수 하나**를 지난다. 순서가 두 곳에 적히면
+ *    한쪽만 고친 날 같은 학생이 통로에 따라 다른 것을 받는다(게임갈래를 공유하기로 한 까닭 그대로).
+ *  🔴 일요일에 게임날이 겹치면 자율일이 이긴다 — 그날 묶음은 그 주 문형을 겨눠 지은 것이라 안 내면
+ *    appsscript 쪽에서 «미집계»로 남는다. 게임은 다음 게임날이 있다(설계 §③-㉣). */
+async function 먼저갈래(학생: Record<string, unknown>, 오늘: string, ver: string) {
+  const 자율일결과 = await 자율일갈래(학생, 오늘, ver);
+  if (자율일결과) return 자율일결과;
+  return await 게임갈래(학생, 오늘, ver);
+}
+
 /** 한 학생 = 한 트랜잭션. 개입과 배정은 같이 서거나 같이 없다. */
 async function 한명(학생: Record<string, unknown>, 오늘: string, ver: string, 스냅기준: string) {
   const learner_id = String(학생.learner_id);
@@ -839,8 +950,8 @@ async function 한명(학생: Record<string, unknown>, 오늘: string, ver: stri
     consent_id: String(학생.consent_id),
   };
 
-  const 게임결과 = await 게임갈래(학생, 오늘, ver);
-  if (게임결과) return 게임결과;
+  const 먼저결과 = await 먼저갈래(학생, 오늘, ver);
+  if (먼저결과) return 먼저결과;
 
   const 결정 = 오늘과제({
     날짜: 오늘,

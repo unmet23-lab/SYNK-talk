@@ -312,7 +312,7 @@ with 기대열(t, c) as (values
   (select count(*) from pg_indexes
     where schemaname='engine' and indexname='goal_daily_once_c14') as 목표하루유일
 )
-select case when 테이블수=24 and RLS켜짐=24 and 정책수=7
+select case when 테이블수=25 and RLS켜짐=25 and 정책수=7
               and 새는테이블권한=0 and 새는스키마권한=0 and 삭제차단=5 and 실패상태=1
               and 이력정책=0 and 잡없는제출=0 and 검수뷰=1 and 옛검수정책=0
               and 마감없는배정=0 and 분모칸오염=0 and 폐기사유없는폐기=0
@@ -330,9 +330,9 @@ select case when 테이블수=24 and RLS켜짐=24 and 정책수=7
               and (select v from 빠진트리거) is null
               and 라디오보강열=10 and 라디오보강인덱스=3
               and (select version from 현재이력)='20260907100000'
-              and (select checksum from 현재이력)='f14953ab3a11bb7f9b5487a387c91e5a30d850379d13faac8a7f16a20ac7691b' -- migration-checksum
+              and (select checksum from 현재이력)='7dfec8d1aaab42f8371474a1fb7149e2fd011e89cf4650789cbe9011e344f694' -- migration-checksum
             then '✅ 전부 통과'
-            else '❌ 아래 칸을 그대로 알려주세요 (기대: 24·24·7·0·0·5·1·0·0·1·0·0·0·0·22·0·0·0·0·2·6·6·0·0·0·1·1·1·30·0·1·26·0·11·0·1·1·0·1·10·3 · 빠진 칸은 전부 비어 있어야 합니다)'
+            else '❌ 아래 칸을 그대로 알려주세요 (기대: 25·25·7·0·0·5·1·0·0·1·0·0·0·0·22·0·0·0·0·2·6·6·0·0·0·1·1·1·30·0·1·26·0·11·0·1·1·0·1·10·3 · 빠진 칸은 전부 비어 있어야 합니다)'
        end as 판정,
        (select version from 현재이력) as 현재버전,
        (select checksum from 현재이력) as checksum,

@@ -99,7 +99,7 @@ test('① 운영 층에서 learning_events 에 붓는 통로는 장부 3파일�
     '통로가 장부와 다르다 — 새 생산자를 냈으면 이 파일 머리의 장부에 등재하고, 그 통로가 개입'
     + ' 사건(intervention.delivered · task.assigned)을 나른다면 ②③의 스탬프·고리부터 배선하라.'
     + ' 지나간 행은 소급 불가다(규격 ⓪).');
-  assert.equal(실측.get('supabase/functions/deliver/index.ts').length, 3, 'deliver 의 insert 벌수가 갈렸다 — ②③의 분모가 낡는다');
+  assert.equal(실측.get('supabase/functions/deliver/index.ts').length, 4, 'deliver 의 insert 벌수가 갈렸다 — ②③의 분모가 낡는다');   // 3→4: 자율일 배정(2026-09-07 · 일요일 자율일 갈래)
 });
 
 test('② intervention.delivered 를 넣는 insert 는 다섯 칸 전부 싣는다 — 미탑재 상한 0 (래칫)', () => {
@@ -126,7 +126,10 @@ test('③ task.assigned insert — retry_of 는 전부 · intervention_id 없는
   const 배정블록 = [...실측.entries()]
     .flatMap(([f, 블록들]) => 블록들.map((b) => ({ f, b })))
     .filter(({ b }) => b.includes("'task.assigned'"));
-  assert.equal(배정블록.length, 2, '배정을 리터럴로 넣는 insert 는 deliver 의 게임·말하기 두 벌이다 — 늘었으면 아래 상한을 재판정하라');
+  /* 2→3 재판정(2026-09-07) — 셋째는 «일요일 자율일» 배정이다. 재판정한 것 둘: retry_of_event_id 를 싣고(값은
+     * null · 오답 고리는 appsscript 배정 행이 쥔다 · 설계 §⑥), intervention_id 도 싣는다(값 null · 개입 판정에서
+     * 나온 배정이 아니다). 그래서 아래 «고리없음 상한 1»은 그대로 게임 하나다. */
+  assert.equal(배정블록.length, 3, '배정을 리터럴로 넣는 insert 는 deliver 의 자율일·게임·말하기 세 벌이다 — 늘었으면 아래 상한을 재판정하라');
   for (const { f, b } of 배정블록) {
     assert.ok(열목록(b).includes('retry_of_event_id'),
       `${f}: 배정 insert 에 retry_of_event_id 가 없다 — 설계의 유일한 결과 변수(L0 §9-2)가 이 통로에서 끊긴다`);
