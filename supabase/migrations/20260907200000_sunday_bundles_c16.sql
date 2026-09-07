@@ -1,11 +1,119 @@
+/* 일요일 자율일 묶음 — engine.sunday_bundles (2026-09-07 · appsscript 자율일 설계 v1.3 §⑧ 「talk 가 받을 것」)
+ *
+ * ■ 무엇이 비어 있었나 — 토요일 밤에 appsscript 가 지은 «그 학생의 일요일 묶음»을 talk 가 놓을 자리가 없었다.
+ *   묶음 = 굳히기 8 · 낭독 2 · 답하기 2 · 오답 ≤5 · (필수진단 주면) 진단 1. 학생마다 다르고, 그날 한 번만 짓는다.
+ *
+ * ■ 🔴 왜 «큐»가 아니라 «재료»인가 — 큐는 새 테이블이 아니다(P0 §6-1 · F124)
+ *   과제 큐는 `task.assigned` 사건 + 그 `submissions.task_snapshot` 이고 그 규칙은 그대로다. 이 표는 큐가 아니라
+ *   **배치가 조립할 재료**를 담는다. 재료와 큐를 가르는 까닭은 «조립을 한 곳이 지게» 하기 위해서다 —
+ *   배정 사건에는 동의판·급수 스냅샷·목표 스냅샷·consent_id 가 함께 실려야 하고, 그 조립은 `functions/deliver`
+ *   하나가 안다. 받는 문이 사건을 직접 쓰면 같은 조립이 두 곳에 살아 갈라진다(이 저장소가 가장 크게 데인 유형).
+ *   ⇒ 받는 문(`functions/sunday-bundle`)은 여기까지만 놓고, 일요일 배치가 이 행을 읽어 평소와 같은 길로 배정한다.
+ *
+ * ■ 하루 한 벌 — (learner_id, autonomy_date) unique
+ *   배정 사건의 멱등키가 `task:{learner}:{날짜}` 라 「그날 배정 1건」이 이미 유일 제약이다. 재료도 같은 폭이라야
+ *   둘이 어긋나지 않는다. 🔴 **발행 뒤 불변**(자율일 설계 §③-㉠) — 같은 배정ID 가 다시 와도 안 갈아 끼운다.
+ *   예외 하나: 항목이 0 이던 묶음이 채워져 오는 경우만 받는다(공급 실패가 늦게 나은 날 · 배포 검수 P3 21f680c14c40).
+ *   그 판정은 적재 쪽(함수)이 지고, 표는 «덮어쓰기가 기본이 아니다»만 진다.
+ *
+ * ■ 칸 뜻
+ *   assignment_id  = appsscript 가 채번한 배정ID(`학생번호|yyyy-MM-dd` 꼴) — 항목ID 가 `배정ID#종류N` 로 여기 붙는다.
+ *   autonomy_date  = 그 자율일(일요일 · 몽골 달력으로 끊은 날짜 · 배정 사건의 날짜와 같은 글자라야 짝이 선다).
+ *   week_no·week_ver = 1기 차시 1~8 과 그때의 차시 표 판(`c1w-…`). 표가 바뀌어도 옛 묶음은 옛 판을 쥔다.
+ *   bundle         = 받은 묶음 그대로(항목 배열 · 문항 스냅샷 포함). 🔴 서버가 베껴 채우지 않는다(C0 §task_snapshot 규약).
+ *   delivered_event_id = 배치가 이 재료로 배정을 쓴 뒤 그 사건을 가리킨다. null = 아직 안 냈다(재료만 있다).
+ *
+ * ■ 🔴 정답이 이 표에 산다 — 앱으로는 안 나간다
+ *   굳히기·오답 항목의 문항 스냅샷에는 정답 자리가 들어 있다(채점은 appsscript `quiz_log` 가 한다 · 설계 §⑥).
+ *   학생에게 나가는 것은 `lib/오늘과제.js` 의 **허용 목록**이 가른다 — 새 키의 기본값은 「안 나감」이라
+ *   이 표에 정답이 있어도 통로가 열리지 않는다. 그 목록을 넓혀 정답을 내보내지 않는다.
+ *
+ * ■ 소급 0 · 트리거 0 · 뷰 0 · RLS 0(engine 스키마는 함수만 붙는다 · 다른 표와 같은 꼴) · 계약판 그대로(c16 · 제출 쪽 새 칸 0).
+ *
+ * 되돌림: drop table if exists engine.sunday_bundles;
+ *         delete from engine.schema_migrations where version='20260907200000'; */
+
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260907200000';
+  migration_name constant text := '20260907200000_sunday_bundles_c16.sql';
+  expected_checksum constant text := 'f14953ab3a11bb7f9b5487a387c91e5a30d850379d13faac8a7f16a20ac7691b'; -- migration-checksum
+  base_version constant text := '20260907100000';   -- 체인은 «바로 앞 조각»을 가리킨다
+  recorded_checksum text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception
+      '이 조각은 합본 위에서만 돈다 — engine.schema_migrations 가 없다(빈 DB 면 합본을 처음부터 부어라)';
+  end if;
+
+  select checksum into recorded_checksum
+    from engine.schema_migrations
+   where version = migration_version;
+
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception
+        'migration % checksum 불일치: DB=%, 파일=% — 같은 버전을 고쳐 쓰지 않는다',
+        migration_version, recorded_checksum, expected_checksum;
+    end if;
+    return;
+  end if;
+
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception
+      'migration % 는 % 위에서만 돈다 — 체인이 끊겼다',
+      migration_version, base_version;
+  end if;
+end
+$migration$;
+
+-- ══════════ 표 하나 — 소급 0 · default 는 받은 시각뿐 ══════════
+create table if not exists engine.sunday_bundles (
+  assignment_id      text primary key,
+  learner_id         uuid not null references engine.learners(learner_id),
+  autonomy_date      date not null,
+  week_no            smallint not null,
+  week_ver           text not null,
+  bundle             jsonb not null,
+  received_at        timestamptz not null default now(),
+  delivered_event_id uuid references engine.learning_events(event_id),
+  schema_ver         text not null
+);
+
+create unique index if not exists sunday_bundles_learner_date_uk
+  on engine.sunday_bundles (learner_id, autonomy_date);
+
+create index if not exists sunday_bundles_undelivered_idx
+  on engine.sunday_bundles (autonomy_date)
+  where delivered_event_id is null;
+
+comment on table engine.sunday_bundles is
+  '일요일 자율일 묶음의 «재료» — appsscript 토요일 밤 배치가 보낸 것을 그대로 놓는 자리. 큐가 아니다(큐는 task.assigned + submissions.task_snapshot). 일요일 배치가 이 행을 읽어 평소와 같은 조립으로 배정한다 — 조립을 두 곳에 두지 않기 위해서다.';
+comment on column engine.sunday_bundles.assignment_id is
+  'appsscript 배정ID(학생번호|yyyy-MM-dd). 항목ID 가 「배정ID#종류N」 로 여기 붙는다. 발행 뒤 불변 — 같은 값이 다시 와도 안 갈아 끼운다(항목 0 이던 묶음이 채워져 오는 경우만 예외 · 판정은 함수가 진다).';
+comment on column engine.sunday_bundles.bundle is
+  '받은 묶음 그대로(항목 배열 · 문항 스냅샷 포함). 서버가 베껴 채우지 않는다. 🔴 굳히기·오답의 정답이 여기 산다 — 학생에게 나가는 것은 lib/오늘과제.js 허용 목록이 가른다(새 키 기본값 = 안 나감).';
+comment on column engine.sunday_bundles.delivered_event_id is
+  '이 재료로 쓴 task.assigned 사건. null = 아직 안 냈다. 배정 사건 자체가 하루 1건 유일이라 이 칸은 «냈나»의 표시일 뿐 큐 상태가 아니다.';
+
+do $migration2$
+declare
+  expected_checksum constant text := 'f14953ab3a11bb7f9b5487a387c91e5a30d850379d13faac8a7f16a20ac7691b'; -- migration-checksum
+begin
+  insert into engine.schema_migrations(version, name, checksum)
+  values ('20260907200000', '20260907200000_sunday_bundles_c16.sql', expected_checksum);
+end
+$migration2$;
+
+commit;
+
 -- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
---
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
+-- 확인 (한 번에) — 아래 블록은 실행되지 않는 사후 확인 쿼리의 정본 사본이다.
+-- 실제 확인은 합본 밖 supabase/확인_적용후상태.sql을 별도 실행한다.
 -- ============================================================================
+/*
 with 기대열(t, c) as (values
   ('learning_events','goal_snapshot'),
   ('learning_events', 'request_hash'), ('learning_events','skill_taxonomy_ver'),
@@ -343,3 +451,42 @@ select case when 테이블수=24 and RLS켜짐=24 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
   from 셈;
+*/
+-- 사후 메모:
+-- ① 이 조각 = learners.entry_season 칸 하나(입학 시즌 키 · 소급 0 · CHECK 0 · 트리거 0 · 뷰 0 · 표 0). 테이블수·RLS·정책 전부 그대로(24·24·7).
+-- ② 아래 기대 목록은 20260906000000 의 현행 그대로다 — CHECK 이름 변경 0(칸 하나만 더했다).
+--    ⚠ 이 줄은 마지막 조각이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    ⚠ `season_no_overlap_c11`(EXCLUDE) · `…_once_c11`(UNIQUE) · `companion_qa_*_fkey` · `stt_raw_*` 는 여기
+--      없다 — CHECK 가 아니라 이 줄의 대상이 아니고, 이름도 그대로 산다(값목록이 없어
+--      판 판별과 무관하다 · 위 기대제약 목록에는 그 이름 그대로 들어 있다).
+--    기대: attempts_gate_values_c16 · attempts_response_present_c16 · attempts_result_gate_c16
+--         · attempts_ver_nonempty_c16 · batch_runs_counts_order_c16 · batch_runs_counts_pair_c16
+--         · batch_runs_enrolled_nonneg_c16 · batch_runs_finished_cols_c16
+--         · batch_runs_level_dist_ok_c16 · batch_runs_partial_pair_c16
+--         · batch_runs_partial_range_c16 · batch_runs_roster_equation_c16
+--         · batch_runs_skipped_range_c16 · batch_runs_ver_nonempty_c16 · broadcast_segment_kind_c16
+--         · classes_key_nonblank_c16 · companion_qa_answer_paired_c16
+--         · companion_qa_question_nonblank_c16 · corrections_promotion_intent_c16
+--         · corrections_supersedes_not_self_c16 · corrections_verdict_c16 · cron_runs_outcome_c16
+--         · jobs_anchor_present_c16 · jobs_claim_cols_c16 · jobs_deciding_pair_c16
+--         · jobs_deciding_result_matches_c16 · jobs_deciding_scope_c16 · jobs_draft_present_c16
+--         · jobs_idle_cols_c16 · jobs_load_failed_cols_c16 · jobs_nontarget_cols_c16
+--         · jobs_nonterminal_cols_c16 · jobs_skill_ids_present_c16 · jobs_status_outcome_pairs_c16
+--         · jobs_terminal_cols_c16 · jobs_ver_nonempty_c16 · jobs_winner_fence_current_c16
+--         · jobs_winner_fence_pair_c16 · jobs_winner_only_success_c16 · jobs_winner_present_c16
+--         · jobs_winner_result_only_success_c16 · jobs_winner_result_pair_c16
+--         · l10n_reviews_final_paired_c16 · l10n_reviews_supersedes_not_self_c16
+--         · l10n_reviews_verdict_c16 · l10n_strings_id_ascii_c16
+--         · l10n_strings_ko_nonblank_c16 · l10n_strings_max_len_c16
+--         · l10n_strings_status_c16 · learners_gender_c16
+--         · learners_goal_track_c16 · learners_group_no_c16 · learners_home_aimag_c16
+--         · learners_seat_no_c16 · learners_signup_attempts_nonneg_c16
+--         · learners_temp_password_paired_c16 · learning_events_correction_target_c16
+--         · learning_events_event_type_c16 · learning_events_task_type_c16
+--         · pipeline_jobs_discard_reason_c16 · season_compass_answers_c16 · season_dates_c16
+--         · season_review_decided_c16 · season_review_self_c16 · season_review_verdict_c16
+--         · staff_role_c16 · submissions_due_paired_c16 · submissions_task_format_c16
+--         · submissions_translation_source_c16 · teacher_notes_body_nonblank_c16
+--         · teacher_notes_disposition_c16 · teacher_notes_origin_c16
