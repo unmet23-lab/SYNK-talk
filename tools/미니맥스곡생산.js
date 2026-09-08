@@ -93,7 +93,7 @@ const 아는플래그 = ['--결', '--벌', '--씨앗', '--길이', '--낼곳', '
 const ROOT = path.resolve(__dirname, '..');
 const SPACE = 'https://minimaxai-minimax-music3.hf.space';
 const 장부경로 = path.join(ROOT, 'docs/_ops/곡씨앗.jsonl');
-const 기본낼곳 = 'C:/Users/q1212/OneDrive/Desktop/SYNK 자산/음악/_보기용';
+const 기본낼곳 = 'C:/Users/q1212/OneDrive/Desktop/SYNK PULSE/음악/작업중';
 
 /* 🔴 **이 셋이 소리의 성격을 정한다.** 부르는 쪽이 제각기 정하면 곡마다 결이 갈리므로 여기가 주인이다.
  *   `guidance`(밀기) 3 = 유호님이 좋다 하신 `_씨앗없음_citypop_vocal` 과 같은 값(위 머리말의 표).

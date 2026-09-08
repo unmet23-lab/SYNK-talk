@@ -21,7 +21,7 @@
  *   «모르겠음»과 폴더 밖(뿌리)에 있는 파일은 굽지 않고 이름만 보고한다 — 결은 유호님이 정하신다.
  *
  * 쓰기:
- *   node tools/수노곡판.js --낼곳 <폴더>                받은곳 기본값(바탕화면 SYNK 자산/음악/수노_받은것)
+ *   node tools/수노곡판.js --낼곳 <폴더>                받은곳 기본값(바탕화면 SYNK PULSE/음악/수노_받은것)
  *   node tools/수노곡판.js --받은곳 <폴더> --낼곳 <폴더>
  *   node tools/수노곡판.js --낼곳 <폴더> --번호 13      첫 번호를 손으로(기본 = 크레딧.md 최대 번호 + 1)
  *   node tools/수노곡판.js --그냥보기                    무엇을 어떻게 구울지만 찍고 끝낸다(ffmpeg 0회)
@@ -40,7 +40,7 @@ const 아는플래그 = ['--받은곳', '--낼곳', '--번호', '--그냥보기'
 const ROOT = path.resolve(__dirname, '..');
 const 크레딧경로 = path.join(ROOT, 'bots/송출/크레딧.md');
 const 생산장부경로 = path.join(ROOT, 'docs/_ops/곡생산.jsonl');
-const 기본받은곳 = path.join(os.homedir(), 'OneDrive', 'Desktop', 'SYNK 자산', '음악', '수노_받은것');
+const 기본받은곳 = path.join(os.homedir(), 'OneDrive', 'Desktop', 'SYNK PULSE', '음악', '수노_받은것');
 
 /** 폴더 이름 → 결(한글). 안내문의 칸 셋만 안다 — 늘리면 안내문도 같이 고친다. */
 const 칸결 = { '시티팝_몽글': '시티팝', '차분_까몽': '차분', '전자_마린': '전자' };

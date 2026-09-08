@@ -300,7 +300,7 @@ async function main() {
   const 한결 = i결 >= 0 ? argv[i결 + 1] : null;
   const 낼곳 = i낼곳 >= 0 && argv[i낼곳 + 1]
     ? argv[i낼곳 + 1]
-    : path.join(os.homedir(), 'OneDrive/Desktop/SYNK 자산/라디오팩');
+    : path.join(os.homedir(), 'OneDrive/Desktop/SYNK PULSE/음악/방송후보');
   const 규격 = 곡판규격.판들 ? 곡판규격.판들.방송 : 곡판규격.방송;
   if (!규격) throw new Error('곡판규격에서 «방송» 판을 못 찾았다 — 규격의 주인이 바뀌었는지 본다');
 
