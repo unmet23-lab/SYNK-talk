@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 /* AppState — 복원막힘(D7-3) 자동 재시도의 귀. ⚠ 윗줄에 합치지 않는다 —
    tests/감사회귀_W2C1.test.js 가 윗줄을 문자열 그대로 문다. */
@@ -36,6 +36,7 @@ import { 색, 폰트, 모노트래킹, 글자배율상한 } from './src/테마';
 import { 상단밀림 } from './src/인셋';
 import 기호 from './src/기호';
 import { use등장 } from './lib/모션.js';
+import { 답장갱신기 } from './lib/답장갱신.js';
 
 /* 화면 전환의 등장 한 박자 (감사 D5-2) — 부모가 key={화면} 을 줘 화면이 바뀔 때마다 remount 되고,
    그때 use등장 한 박자가 돈다. 겉테(SYSTEM·답장·어제 링크)는 이 틀 밖에 산다 — 테는 서 있고
@@ -59,6 +60,7 @@ export default function App() {
   const [복원중, set복원중] = useState(true);
   const [교정, set교정] = useState(null); // 나에게 온 최신 교정 1건 (없으면 답장 링크를 안 그린다)
   const [교정막힘, set교정막힘] = useState(null); // 서버 `blocked` — 있으면 답장 화면이 사건을 안 보낸다
+  const 답장갱신참조 = useRef(null);
   const [견줌값, set견줌값] = useState(null); // {견줌, 오늘의확인} — 견줌은 첫날 null(「어제의 나」 링크를 안 그린다)
   const [배치미달, set배치미달] = useState(null); // 오늘 배달이 덜 돈 것 (원장만 값을 받는다 · P0 §6-5)
   const [복원막힘, set복원막힘] = useState(false); // 복원이 retryable 로 막혔다(D7-3) — 키체인은 그대로다
@@ -139,33 +141,35 @@ export default function App() {
     return () => 구독.remove();
   }, [복원막힘, 세션]);
 
-  /* 답장(교정)이 **있을 때만** 링크를 그린다 — P0 §5 S1-8 「교정이 없으면 화면에 안 뜸」 ·
-     C0 §4-3 ② 「빈 카드 금지」. 그래서 목록을 여기서 한 번 읽고 화면에 내려준다:
-     🔑 링크의 근거와 화면이 그리는 것이 **같은 한 번의 조회**여야 한다. 두 번 읽으면 링크는
-        떴는데 화면은 비는 날이 생기고, 학생 눈에는 앱이 고장난 것으로 보인다.
-     🔴 실패는 **조용하다** — 답장 링크가 안 뜰 뿐 말하기는 그대로 돌아야 한다(교정 조회가
-        죽었다고 오늘 발화를 막으면, 못 고칠 이유로 학생의 하루를 버린다).
-     🔑 `blocked` 도 **같은 한 번의 조회**에서 받는다(2026-08-10) — 답장 화면이 이 값으로 사건
-        큐를 멈춘다(`lib/교정로그.보낼것`). 따로 읽으면 카드와 막힘이 다른 순간을 가리킨다.
-     🔴 실패했을 때 막힘을 **지우지 않는다** — 「모른다」를 「안 막혔다」로 적는 자리이고, 새는
-        방향은 언제나 「보낸다」다. 다음 성공 조회가 덮는다(목록은 지운다 — 그건 화면이 그릴
-        재료라 낡은 것을 그리면 학생이 이미 사라진 교정을 본다). */
+  // 링크와 답장 내용·막힘은 같은 조회에서 받는다. 제출 뒤와 앱 복귀 때도 갱신한다.
+  // 세션이 바뀌면 이전 계정의 요청과 타이머를 종료하고 화면의 답장도 비운다.
   useEffect(() => {
+    set교정(null);
+    set교정막힘(null);
     if (!세션) return undefined;
-    let 살아있음 = true;
-    (async () => {
-      try {
-        const { 목록, 막힘 } = await 교정목록받기(세션.access_token);
-        if (살아있음) {
-          set교정(목록[0] || null);
-          set교정막힘(막힘 || null);
-        }
-      } catch {
-        if (살아있음) set교정(null);
-      }
-    })();
-    return () => { 살아있음 = false; };
+    const 갱신 = 답장갱신기({
+      읽기: () => 교정목록받기(세션.access_token),
+      받기: ({ 목록, 막힘 }) => {
+        set교정(목록[0] || null);
+        set교정막힘(막힘 || null);
+      },
+      // 조회 실패로 동의 막힘을 지우지 않는다. 다음 성공한 응답이 판정한다.
+      오류: () => set교정(null),
+    });
+    답장갱신참조.current = 갱신;
+    갱신.활성바꾸기(!AppState.currentState || AppState.currentState === 'active');
+    갱신.새로읽기();
+    const 구독 = AppState.addEventListener('change', (상태) => 갱신.활성바꾸기(상태 === 'active'));
+    return () => {
+      구독.remove();
+      갱신.종료();
+      if (답장갱신참조.current === 갱신) 답장갱신참조.current = null;
+    };
   }, [세션]);
+
+  const 제출도착 = useCallback(() => {
+    답장갱신참조.current?.새로읽기({ 제출뒤: true });
+  }, []);
 
   /* 「어제의 나」도 같은 규칙이다(P0 §5 S1-11) — **한 번 읽어** 링크의 근거와 화면의 내용을
      같은 것으로 만든다. 🔴 첫날이면 `null` 이 오고 그때는 링크 자체를 안 그린다: 눌러서
@@ -291,6 +295,7 @@ export default function App() {
               토큰에는 합성 이메일뿐이라, 이 자리를 지나지 않으면 화면이 그 번호를 모른다(F176 ①). */}
           {화면 === '말하기' && (
             <말하기화면
+              제출도착={제출도착}
               토큰={세션.access_token}
               학생번호={세션.학생번호}
               캐릭터={캐릭터}

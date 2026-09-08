@@ -12,7 +12,7 @@
  */
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { 직렬화, 역직렬화, 밀린것 } from '../lib/제출로그.js';
+import { 직렬화, 역직렬화, 밀린것, 업로드참조보존 } from '../lib/제출로그.js';
 import { 세션남기기세움, 세션잊기 } from './인증API.js';
 import { 혼잣말캐릭터들 } from '../lib/마스코트생명.js';
 
@@ -47,11 +47,14 @@ export async function 로그읽기() {
 
 export async function 로그쓰기(로그) {
   if (웹) {
-    메모리로그 = 로그;
+    메모리로그 = 업로드참조보존(로그, 메모리로그);
     return;
   }
   const f = new FS.File(FS.Paths.document, 'talk_log.jsonl');
-  f.write(직렬화(로그));
+  // 이전 화면이 저장한 참조를 새 화면의 오래된 로그가 지우지 않게 한다.
+  // 동기 읽기와 쓰기 사이에 await를 두지 않아 같은 JS 실행 안의 다른 쓰기가 끼지 않는다.
+  const 저장로그 = f.exists ? 역직렬화(f.textSync()).로그 : [];
+  f.write(직렬화(업로드참조보존(로그, 저장로그)));
 }
 
 /* ── 교정 사건 로그 ───────────────────────────────────────────────────────────

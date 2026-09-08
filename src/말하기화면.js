@@ -32,6 +32,7 @@ import { wav조립 } from '../lib/wav조립.js';
 import { 정본 as 음성정본 } from '../lib/음성헤더.js';
 import { 마이크준비, 마이크끄기 } from '../lib/마이크권한.js';
 import { 흐름id, 항목추가, 다음시도번호, 학습출석, 전송기록, 보낼것, 되듣기기록, 되듣기보낼것, 선택기록, 선택보낼것, 배달상태, 압축, 깨진기록안내 } from '../lib/제출로그.js';
+import { 업로드기록저장기 } from '../lib/업로드기록저장.js';
 /* 문구는 「어제의 나」 화면과 **같은 함수**에서 나온다 — 두 곳에 적으면 한쪽만 고쳐지고,
    갈라진 날 학생은 같은 사실을 두 문장으로 듣는다(`lib/견줌.js`). */
 import { 늘어난말 } from '../lib/견줌.js';
@@ -184,7 +185,7 @@ export async function 한국어음성() {
 
 export default function 말하기화면({
   급수 = 0, 토큰 = null, 학생번호 = null, 견줌 = null, 견줌다시읽기 = null, 확인카드값 = null,
-  목표카드값 = null, 캐릭터 = '몽글',
+  목표카드값 = null, 캐릭터 = '몽글', 제출도착 = null,
 }) {
   const 폴백 = useMemo(() => 급수편지(급수), [급수]);
 
@@ -288,10 +289,27 @@ export default function 말하기화면({
    * 🔴 실패를 조용히 두지 않는다 — 사유가 화면에 서고 로그에도 남는다. 조용하면 학생도 우리도
    *   「말했으니 저장됐겠지」로 알고, 그 착각은 데이터가 없다는 걸 몇 주 뒤에 알게 만든다(P0 §4-1).
    */
+  const 업로드저장참조 = useRef(null);
+  if (!업로드저장참조.current) {
+    업로드저장참조.current = 업로드기록저장기({
+      읽기: () => 로그참조.current,
+      쓰기: 로그쓰기,
+      반영: (다음) => { 로그참조.current = 다음; set로그(다음); },
+    });
+  }
   const 보내기 = async (항목) => {
     let r;
     try {
-      r = await 발화보내기(토큰, 항목);
+      // 업로드 참조가 기기에 남기 전에는 사건을 보내지 않는다. 로그갱신은 쓰기 오류를
+      // 화면에만 알리므로 여기서는 직접 await 해 저장 실패를 제출 API까지 전달한다.
+      const 최신항목 = 로그참조.current.find((e) => e.id === 항목.id) || 항목;
+      // 다른 화면에서 끝난 업로드의 참조도 읽는다. 화면의 오래된 스냅샷만 믿으면
+      // 재마운트 후 같은 파일을 새 주소로 올릴 수 있다.
+      const { 로그: 저장된 } = await 로그읽기();
+      const 보관항목 = 저장된.find((e) => e.id === 항목.id);
+      const 보낼항목 = { ...최신항목, audio_ref: 보관항목?.audio_ref || 최신항목.audio_ref || null };
+      r = await 발화보내기(토큰, 보낼항목,
+        (audio_ref) => 업로드저장참조.current(항목.id, audio_ref));
     } catch (e) {
       // 예상 못한 실패는 **재시도 대상**이다 — 원인을 모르는 것을 「소용없다」로 접지 않는다.
       r = { 오류: String((e && e.message) || e), 끝: false };
@@ -301,6 +319,8 @@ export default function 말하기화면({
       if (항목.task_meta) set오류(r.오류);
       return;
     }
+    // 전송이 실제로 닿은 뒤에만 답장을 갱신한다. 이탈 기록은 교정 대상이 아니다.
+    if (r.event_id && 항목.status === 'submitted' && 제출도착) 제출도착();
     /* 🔴 **「내 목소리를 되들었다」 — c9 `content.viewed` 의 둘째 생산자**(절단문서 ①-2 의 마지막 값).
      *   여기가 **제출이 착지한 직후**인 것이 요건이다: 이 관측의 부모는 방금 생긴 그 제출 사건이라,
      *   녹음 화면에서 바로 보내면 부모가 아직 없어 서버가 `retryable:false` 로 접고 앱은 그것을

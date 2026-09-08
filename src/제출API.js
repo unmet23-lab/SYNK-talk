@@ -28,6 +28,7 @@ import { 말 } from '../contents/문구_오류.js';
 
 /** 녹음 확장자 → `uploads/sign` 이 받는 content_type. 표에 없으면 올리지 않는다. */
 const 타입표 = { m4a: 'audio/m4a', wav: 'audio/wav', aac: 'audio/aac', mp3: 'audio/mpeg' };
+const 전송중 = new Map();
 
 /**
  * 녹음 파일을 올리고 그 참조를 받는다 (C0 §4-2).
@@ -59,18 +60,32 @@ export async function 음성올려받기(토큰, 경로) {
  *
  * @param {string} 토큰
  * @param {object} 항목   `lib/제출로그.js` 의 항목
- * @returns {Promise<{event_id?: string, 오류?: string, 끝?: boolean}>}
+ * @param {Function} 업로드기록저장 audio_ref를 로컬 로그에 기록하고 디스크 쓰기가 끝나면 이행한다.
+ * @returns {Promise<{event_id?: string, 오류?: string, 끝?: boolean, audio_ref?: string}>}
  *   `끝: true` = 다시 보내도 소용없다(계약 위반·폴백 과제).
  */
-export async function 발화보내기(토큰, 항목) {
+export async function 발화보내기(토큰, 항목, 업로드기록저장) {
+  // 복귀 재전송과 방금 누른 제출이 겹쳐도 같은 녹음은 한 번만 올린다.
+  const key = 항목 && 항목.idempotency_key;
+  if (key && 전송중.has(key)) return 전송중.get(key);
+  const 작업 = 발화한번보내기(토큰, 항목, 업로드기록저장);
+  if (key) 전송중.set(key, 작업);
+  try { return await 작업; }
+  finally { if (key) 전송중.delete(key); }
+}
+
+async function 발화한번보내기(토큰, 항목, 업로드기록저장) {
   if (!토큰) return { 오류: 말('err.no_token'), 끝: false };
   /* 🔴 폴백(고정 과제) 날의 발화는 **보낼 수 없다** — 어느 과제에 대한 것인지도, 그때 급수도
    *   앱이 알 길이 없다(C0 §4-3 ①). 지어내면 큐와 안 이어진 행이 조용히 쌓인다.
    *   `끝: true` 로 못 박는다: 그날 배정이 없었다는 사실은 내일 다시 시도해도 바뀌지 않는다. */
   if (!항목.task_meta) return { 오류: 말('err.kept.no_task'), 끝: true };
 
-  let audio_ref = null;
-  if (항목.audio) {
+  let audio_ref = 항목.audio_ref || null;
+  if (항목.audio && !audio_ref) {
+    // 저장 통로가 없으면 업로드도 시작하지 않는다. 참조를 기억하지 못한 채 사건을 보내면
+    // 응답 유실 후 새 참조가 새 사건으로 저장되어 같은 발화가 두 번 세어진다.
+    if (typeof 업로드기록저장 !== 'function') return { 오류: 말('err.kept.record'), 끝: false };
     try {
       audio_ref = await 음성올려받기(토큰, 항목.audio);
     } catch (e) {
@@ -78,10 +93,19 @@ export async function 발화보내기(토큰, 항목) {
       // (멱등키가 같아 나중에 성공한 업로드가 그 행을 못 고친다).
       return { 오류: 말('err.upload.failed', { 채움: { 원인: String(e.message || e) } }), 끝: e.retryable === false };
     }
+    try {
+      // 반드시 사건 송신 전에 지속 저장한다. 쓰기 실패 시 원본 항목도 변경하지 않는다.
+      await 업로드기록저장(audio_ref);
+    } catch {
+      return { 오류: 말('err.kept.record'), 끝: false };
+    }
   }
 
   /* 🔴 사건을 여기서 만들고 **통로에 넘긴다** — 통로가 만들면 재시도마다 새 멱등키가 난다.
    *   자가검증·`duplicate` 해석은 그 통로 하나가 진다(`src/사건통로.js`). */
   const 사건 = 제출사건(항목, audio_ref);
-  return 사건보내기(토큰, 사건);
+  const 결과 = await 사건보내기(토큰, 사건);
+  // 재마운트한 화면이 진행 중 요청을 공유한 경우에도 자기 로그에 같은 참조를 남긴다.
+  // 이 지점의 참조는 이미 지속 저장을 마쳤다. 사건 응답 유실도 참조를 버릴 이유가 아니다.
+  return { ...결과, ...(audio_ref ? { audio_ref } : {}) };
 }
