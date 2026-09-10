@@ -19,10 +19,12 @@ import postgres from 'npm:postgres@3.4.4';
 import 전사모듈 from './전사.mjs';
 import 경로모듈 from './업로드경로.mjs';
 import 토큰모듈 from './토큰.mjs';
-import 사유모듈 from './벤더사유.mjs';
+import 동의모듈 from './동의게이트.mjs';
 
 const { 서비스역할 } = 토큰모듈 as { 서비스역할: (req: Request) => boolean };
-const { 벤더사유 } = 사유모듈 as { 벤더사유: (글: unknown, 상한?: number) => string | null };
+const { 지금유효 } = 동의모듈 as {
+  지금유효: (db: unknown, learner: string) => Promise<unknown[]>;
+};
 const { 버킷, 저장소헤더, 저장소키흠 } = 경로모듈 as {
   버킷: string;
   저장소헤더: (키: string) => Record<string, string>;
@@ -78,8 +80,8 @@ function 봉투(status: number, body: Record<string, unknown>) {
  *   하루 뒤 사라졌다. 게다가 이 함수는 `pg_cron` 이 **10분마다(하루 144회)** 부르고 그 응답은
  *   `net.http_post` 라 아무도 안 읽는다 — 즉 봉투에 안 실으면 그 사유는 어디에도 안 남는다.
  *   #Q83(교정 배치가 400 으로 전량 튕긴 것)이 며칠 늦은 자리가 정확히 같은 모양이었다.
- * 🔑 **수를 세되 원문도 한 줄 남긴다** — 갈래별 수는 「무엇이 몇 건」을, `벤더사유` 는 「왜」를
- *   진다. 수만 있으면 처방이 안 나오고(400 이 「어디를」을 안 말한다), 글만 있으면 규모를 모른다. */
+ * 🔑 오류에는 짧은 고정 코드·HTTP 상태만 남긴다. 벤더 본문·예외 메시지에는 학생 원문이나
+ *   음성 경로가 섞일 수 있으므로 로그와 응답에 싣지 않는다. 상세 원인은 합성 입력으로 재현한다. */
 function 센다(칸: Record<string, number>, 이름: string) {
   칸[이름] = (칸[이름] ?? 0) + 1;
 }
@@ -102,7 +104,35 @@ async function 원본받기(ref: string): Promise<{ bytes: Uint8Array } | { 오�
 /** 확장자는 **실제 그것**으로 넘긴다 — m4a 를 .wav 로 적으면 벤더가 앞머리부터 오판한다. */
 const 확장자 = (ref: string) => (ref.match(/\.([A-Za-z0-9]+)$/)?.[1] ?? 'wav').toLowerCase();
 
-Deno.serve(async (req) => {
+/* 정본 = lib/동의게이트.js 지금유효술어. 목록·DB 쓰기는 같은 조각을 쓰고,
+ * 다운로드·전송 직전은 정본 지금유효()를 다시 호출한다. pipeline_jobs의 상태로 대신하지 않는다. */
+const 동의조건 = () => sql`exists (
+  select 1 from engine.learning_events e
+  join engine.consents k on k.learner_id = e.learner_id
+  where e.event_id = s.event_id and e.event_type = 'submission.created'
+    and agreed_at <= now()
+    and (revoked_at is null or revoked_at > now()))`;
+
+const 대기조건 = () => sql`
+  from engine.submissions s
+  join engine.learning_events e on e.event_id = s.event_id
+  where s.transcript_state = ${상태.대기} and s.audio_ref is not null
+    and s.audio_deleted_at is null and s.transcript is null
+    and ${동의조건()}`;
+
+type 전사행 = { event_id: string; audio_ref: string; learner_id: string };
+
+async function 사용가능(행: 전사행): Promise<boolean> {
+  if (!(await 지금유효(sql, 행.learner_id)).length) return false;
+  const 남음 = await sql`
+    select s.event_id from engine.submissions s
+    where s.event_id = ${행.event_id}::uuid and s.audio_ref = ${행.audio_ref}
+      and s.audio_deleted_at is null and s.transcript is null
+      and ${동의조건()}`;
+  return 남음.length > 0;
+}
+
+async function 처리(req: Request) {
   if (req.method !== 'POST') return 봉투(405, { error: 'method_not_allowed' });
   if (!서비스역할(req)) return 봉투(401, { error: 'service_role 만 부를 수 있습니다' });
 
@@ -113,34 +143,32 @@ Deno.serve(async (req) => {
   /* 🔑 **분모를 먼저 센다.** 「0건 처리」가 「대기가 0」인지 「집다가 죽었다」인지 갈려야 한다
    *   (F207 — 미실행은 통과와 같은 모양으로 온다). */
   const [{ count: 대기수 }] = await sql`
-    select count(*)::int as count from engine.submissions
-     where transcript_state = ${상태.대기}`;
+    select count(*)::int as count ${대기조건()}`;
 
   if (!키) {
-    console.error('[transcribe] OPENAI_API_KEY 미설정 — 행을 건드리지 않고 끝낸다');
+    console.error('[transcribe]', 'no_api_key');
     return 봉투(200, { 대기: 대기수, 처리: 0, 이유: 'no_api_key' });
   }
 
-  const 행들 = await sql<{ event_id: string; audio_ref: string }[]>`
-    select event_id, audio_ref from engine.submissions
-     where transcript_state = ${상태.대기} and audio_ref is not null and transcript is null
-     order by occurred_at
+  const 행들 = await sql<전사행[]>`
+    select s.event_id, s.audio_ref, e.learner_id ${대기조건()}
+     order by s.occurred_at
      limit ${배치}`;
 
   /* 🔑 구간을 **따로 센다**(F207). 전사만 세면 「전사 5」가 「구간도 5」로 읽히는데, 세그먼트
    *   형식이 바뀐 날엔 전사만 들어오고 검수 게이트는 조용히 하한으로 되돌아간다 — 그 차이가
    *   응답 두 수의 차이로 그 자리에서 보여야 한다. */
   let 성공 = 0; let 구간실림 = 0; let 못박음 = 0; let 미룸 = 0;
-  /* 갈래별 수 + 벤더가 말한 첫 한 줄. **첫 건만** 싣는다 — 배치가 통째로 같은 이유로 죽는 것이
-   * 흔한 모양이라(#Q83 은 396건 전량이 한 이유였다) 25건을 다 실으면 봉투가 로그가 된다. */
+  /* 호환 필드 벤더사유에는 원문 대신 첫 고정 코드만 싣는다. */
   const 사유: Record<string, number> = {};
   let 첫벤더말: string | null = null;
   for (const 행 of 행들) {
     try {
+      if (!(await 사용가능(행))) { 센다(사유, '이용중단'); 미룸 += 1; continue; }
       const 받음 = await 원본받기(행.audio_ref);
       if ('오류' in 받음) {
         /* Storage 가 안 주는 것은 **우리 쪽**이다 — 못박지 않는다(다음 배치가 다시 집는다). */
-        console.error('[transcribe] 원본 실패', 행.event_id, 받음.오류);
+        console.error('[transcribe]', 받음.오류);
         센다(사유, `원본:${받음.오류}`);
         미룸 += 1;
         continue;
@@ -151,6 +179,8 @@ Deno.serve(async (req) => {
       fd.append('response_format', 'verbose_json');
       fd.append('language', 언어);
 
+      // 다운로드 중 철회·파일 삭제를 다시 본다. 이 확인과 외부 HTTP 전송은 원자적이지 않다.
+      if (!(await 사용가능(행))) { 센다(사유, '이용중단'); 미룸 += 1; continue; }
       const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
         method: 'POST',
         headers: { Authorization: `Bearer ${키}` },
@@ -159,17 +189,20 @@ Deno.serve(async (req) => {
       });
 
       if (!r.ok) {
-        const 글 = (await r.text()).slice(0, 300);
+        await r.body?.cancel();
         const 판정 = 전사실패(r.status);
-        console.error('[transcribe] 벤더 실패', 행.event_id, r.status, 글);
-        /* 🔑 `글` 은 **이미 손에 있었다** — 지금까지 `console.error` 에만 넣고 버렸다.
-         *   `못박음`/`미룸` 과 갈래를 따로 세는 이유는, 401(우리 키 문제)과 400(그 파일 문제)이
-         *   둘 다 「미룸 N」 으로 접히면 고칠 사람이 누구인지가 응답에서 사라지기 때문이다. */
+        console.error('[transcribe]', 'vendor_http', r.status);
         센다(사유, `벤더:${r.status}`);
-        첫벤더말 ??= 벤더사유(글);
+        첫벤더말 ??= `vendor_http_${r.status}`;
         if (판정.state) {
-          await sql`update engine.submissions set transcript_state = ${판정.state} where event_id = ${행.event_id}::uuid`;
-          못박음 += 1;
+          const 실패표식 = await sql`
+            update engine.submissions s set transcript_state = ${판정.state}
+             where event_id = ${행.event_id}::uuid and transcript is null
+               and audio_ref = ${행.audio_ref} and audio_deleted_at is null
+               and ${동의조건()}
+             returning event_id`;
+          if (실패표식.length) 못박음 += 1;
+          else { 센다(사유, '저장제외'); 미룸 += 1; }
         } else 미룸 += 1;
         continue;
       }
@@ -179,7 +212,7 @@ Deno.serve(async (req) => {
       if (!값) {
         /* 우리가 아는 모양이 아니다 — 벤더가 형식을 바꿨거나 딴것을 줬다. 못박으면 그 배포
          * 구간의 발화가 전부 죽으므로 미룬다(고칠 사람은 우리다). */
-        console.error('[transcribe] 응답 형식 밖', 행.event_id);
+        console.error('[transcribe]', 'invalid_response');
         센다(사유, '응답형식밖');
         미룸 += 1;
         continue;
@@ -193,37 +226,44 @@ Deno.serve(async (req) => {
       /* 🔴 이 갈래는 **행을 실패로 안 만든다** — 전사는 들어가고 구간만 빈다. 그래서 위 세 갈래보다
        *   더 조용하다: 「전사 5 · 구간 0」 이 정상처럼 보이고, 검수 게이트만 조용히 하한으로 내려간다.
        *   세는 이유가 그것이다(수치 둘의 차이는 사람이 눈치채야 하지만, 갈래 이름은 안 그렇다). */
-      if (!구간) { console.error('[transcribe] 세그먼트 형식 밖 — 그 칸은 안 건드린다', 행.event_id); 센다(사유, '구간형식밖'); }
+      if (!구간) { console.error('[transcribe]', 'invalid_segments'); 센다(사유, '구간형식밖'); }
       /* 🔴 `transcript is null` — 자물쇠와 **같은 방향**이다. 이게 없으면 두 배치가 겹친 날
        *   DB 트리거가 예외를 던지고 그 예외가 배치를 통째로 세운다. */
       const 쓴것 = await sql`
-        update engine.submissions
+        update engine.submissions s
            set transcript = ${값.transcript}, transcript_state = ${상태.기계},
                stt_model = ${전사판}, stt_lang = ${값.언어}${구간
              ? sql`, stt_segments = ${sql.json(구간.stt_segments as never)}, stt_confidence = ${구간.stt_confidence}`
              : sql``}
          where event_id = ${행.event_id}::uuid and transcript is null
+           and audio_ref = ${행.audio_ref} and audio_deleted_at is null
+           and ${동의조건()}
          returning event_id`;
-      /* 0행 = 다른 배치가 먼저 썼다(`transcript is null` 이 막았다). 실패가 아니라 **겹침**이라
-       *   갈래를 따로 둔다 — 이게 늘면 배치 주기가 왕복보다 짧다는 신호지 고장이 아니다. */
+      /* 0행은 다른 배치가 먼저 썼거나, 철회·파일 삭제가 확인된 경우다. 이미 보낸 HTTP 요청은
+       * 되돌리지 못한다. DB 쓰기의 조건은 각 문장 시작 시점을 보며 철회와 완전한 직렬화는 아니다. */
       if (쓴것.length) {
         성공 += 1; if (구간 && 구간.stt_segments.length) 구간실림 += 1;
         /* c16 09-06 — 원신호 «불변» 보관(engine.stt_raw · append-only). submissions 의 stt_segments 는 재전사가 덮을 수 있는 «최신 판»이고,
          *   여기 남는 것은 벤더 응답 그대로다 — 모델이 바뀌어 다시 채점할 사슬은 원본이 있어야 산다(철학 A-1 v1.23 · 4회차 심문 G3 · 5회차 G1).
          *   전사 UPDATE 와 «다른» 문장이라 실패해도 전사는 들어간다 — 그 실패는 사유로 센다(조용히 0건이 되면 안 되는 자리). */
         try {
-          await sql`insert into engine.stt_raw (event_id, stt_model, stt_lang, vendor_response)
-                    values (${행.event_id}::uuid, ${전사판}, ${값.언어}, ${sql.json(본문 as never)})`;
-        } catch (e) {
-          console.error('[transcribe] 원신호 보관 실패(전사는 들어갔다)', 행.event_id, String((e as Error)?.message ?? e));
+          const 원신호 = await sql`
+            insert into engine.stt_raw (event_id, stt_model, stt_lang, vendor_response)
+            select ${행.event_id}::uuid, ${전사판}, ${값.언어}, ${sql.json(본문 as never)}
+             from engine.submissions s
+             where s.event_id = ${행.event_id}::uuid and s.audio_ref = ${행.audio_ref}
+               and s.audio_deleted_at is null and ${동의조건()}
+             returning event_id`;
+          if (!원신호.length) 센다(사유, '원신호저장제외');
+        } catch {
+          console.error('[transcribe]', 'raw_store_failed');
           센다(사유, '원신호보관실패');
         }
-      } else { 센다(사유, '겹침'); 미룸 += 1; }
-    } catch (e) {
-      const 말 = String((e as Error)?.message ?? e);
-      console.error('[transcribe] 예외', 행.event_id, 말);
+      } else { 센다(사유, '저장제외'); 미룸 += 1; }
+    } catch {
+      console.error('[transcribe]', 'unexpected_error');
       센다(사유, '예외');
-      첫벤더말 ??= 벤더사유(말);
+      첫벤더말 ??= 'unexpected_error';
       미룸 += 1;
     }
   }
@@ -234,4 +274,13 @@ Deno.serve(async (req) => {
     대기: 대기수, 집음: 행들.length, 전사: 성공, 구간: 구간실림, 못박음, 미룸,
     사유, 벤더사유: 첫벤더말,
   });
+}
+
+Deno.serve(async (req: Request) => {
+  try { return await 처리(req); }
+  catch {
+    // 대기 조회 등 배치 바깥 DB 실패도 런타임의 미처리 예외 로그로 원문을 흘리지 않는다.
+    console.error('[transcribe]', 'batch_failed');
+    return 봉투(503, { error: 'batch_failed' });
+  }
 });

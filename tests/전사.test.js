@@ -182,7 +182,7 @@ test('신뢰도는 세 자리로 맞춘다 — 열이 numeric(6,3) 이라 안 �
 /* ── 세그먼트 배선 — 판정이 실제로 행에 닿는가 ─────────────────────── */
 
 test('🔴 구간이 전사와 **같은 UPDATE** 로 나간다 — 나누면 반쪽 행이 영구히 안 집어진다', () => {
-  const m = /update engine\.submissions[\s\S]*?returning event_id/.exec(배치);
+  const m = /update engine\.submissions(?:\s+s)?\s+set transcript =[\s\S]*?returning event_id/.exec(배치);
   assert.ok(m, 'UPDATE 문을 못 찾았다');
   assert.match(m[0], /transcript =/);
   assert.match(m[0], /stt_segments =/, '전사만 실리면 구간은 다음 배치가 두 번 다시 안 집는다');
@@ -195,7 +195,7 @@ test('🔴 구간이 전사와 **같은 UPDATE** 로 나간다 — 나누면 반
  *   가를 자가 영영 없다(그 값은 그날 안 적으면 안 돌아온다). 그리고 빈 채로도 배치는 초록이다. */
 
 test('🔴 전사판·언어가 전사와 **같은 UPDATE** 로 나간다 — 나중에 소급해 채울 수 없는 칸이다', () => {
-  const m = /update engine\.submissions[\s\S]*?returning event_id/.exec(배치);
+  const m = /update engine\.submissions(?:\s+s)?\s+set transcript =[\s\S]*?returning event_id/.exec(배치);
   assert.ok(m, 'UPDATE 문을 못 찾았다');
   assert.match(m[0], /stt_model = /, '전사판을 안 적으면 벤더가 둘로 늘어난 뒤 옛 행과 새 행이 안 갈린다');
   assert.match(m[0], /stt_lang = /, '벤더가 «다르게 들었다»고 말한 날 그 사실이 관측이다');
@@ -263,7 +263,7 @@ test('🔴 배치가 기존 전사를 덮지 않는다 — DB 자물쇠와 같�
    *   UPDATE 에 칸을 «정당하게» 더한 날(stt_model·stt_lang) 조건이 창 밖으로 밀려 빨개졌다 —
    *   재는 것은 「가까이 있나」가 아니라 「**같은 UPDATE 안에** 있나」이므로 그렇게 다시 건다.
    *   느슨해지지 않는다: 상한을 늘린 게 아니라 `returning` 까지로 경계를 «좁혔다». */
-  const m = /update engine\.submissions[\s\S]*?returning event_id/.exec(배치);
+  const m = /update engine\.submissions(?:\s+s)?\s+set transcript =[\s\S]*?returning event_id/.exec(배치);
   assert.ok(m, 'UPDATE 문을 못 찾았다');
   assert.match(m[0], /transcript is null/,
     'UPDATE 에 `transcript is null` 이 없으면 겹친 배치가 트리거 예외로 배치를 통째로 세운다');
