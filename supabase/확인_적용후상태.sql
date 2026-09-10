@@ -329,7 +329,7 @@ select case when 테이블수=25 and RLS켜짐=25 and 정책수=7
               and (select v from 빠진제약) is null
               and (select v from 빠진트리거) is null
               and 라디오보강열=10 and 라디오보강인덱스=3
-              and (select version from 현재이력)='20260907100000'
+              and (select version from 현재이력)='20260907200000'
               and (select checksum from 현재이력)='f18e9889a69ae4ddb290433499dd62656d1e724ba20102779305fe0b9265bbfc' -- migration-checksum
             then '✅ 전부 통과'
             else '❌ 아래 칸을 그대로 알려주세요 (기대: 25·25·7·0·0·5·1·0·0·1·0·0·0·0·22·0·0·0·0·2·6·6·0·0·0·1·1·1·30·0·1·26·0·11·0·1·1·0·1·10·3 · 빠진 칸은 전부 비어 있어야 합니다)'

@@ -301,14 +301,16 @@ function 꼬리확인쿼리(sql) {
 }
 const 쿼리정규화 = (s) => s.replace(/^\s*--.*$/gm, '').replace(/\s+/g, ' ').trim();
 
-test('사후 확인 쿼리 = 스키마 꼬리 사본 (두 곳이 갈라지면 빨개진다)', () => {
+test('사후 확인 쿼리 = 스키마 꼬리 + 파일명에서 파생한 최신 판번호', () => {
   const 스키마 = fs.readFileSync(path.join(ROOT, 'supabase', 'L0_스키마.sql'), 'utf8');
   const 사후 = fs.readFileSync(path.join(ROOT, 'supabase', '확인_적용후상태.sql'), 'utf8');
   const 꼬리 = 꼬리확인쿼리(스키마);
   assert.ok(꼬리, '스키마 꼬리에서 「확인 (한 번에)」 블록을 못 찾았다 — 추출기가 죽으면 이 검사는 무의미하다');
-  assert.equal(쿼리정규화(사후), 쿼리정규화(꼬리),
+  const 마지막파일 = fs.readdirSync(path.join(ROOT, 'supabase', 'migrations')).filter((n) => n.endsWith('.sql')).sort().at(-1);
+  const 최신꼬리 = 꼬리.replace(/(\(select version from 현재이력\)\s*=\s*)'\d{14}'/, `$1'${마지막파일.slice(0, 14)}'`);
+  assert.equal(쿼리정규화(사후), 쿼리정규화(최신꼬리),
     '확인_적용후상태.sql 이 스키마 꼬리와 다르다.\n'
-    + '  둘 중 하나만 고쳤다 — 정본은 스키마 꼬리다. 꼬리를 고치고 그대로 복사해라.');
+    + '  마이그레이션_합본.js로 다시 파생한다. 이미 적용한 조각은 수정하지 않는다.');
 });
 
 test('탐지력 픽스처 — 사본이 한 글자라도 어긋나면 잡는다', () => {

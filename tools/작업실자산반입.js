@@ -6,6 +6,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const sharp = require('sharp');
+const { 인자게이트 } = require('../lib/플래그.js');
+const args = process.argv.slice(2);
+const 아는플래그 = ['--원본'];
+const 플래그오류 = 인자게이트('작업실자산반입', args, 아는플래그);
+if (플래그오류 || (args.length && (args.length !== 2 || args[0] !== '--원본' || args[1].startsWith('--')))) {
+  console.error(플래그오류 || '사용법: node tools/작업실자산반입.js [--원본 <이미지 경로>]');
+  process.exit(2);
+}
 const root = path.resolve(__dirname, '..');
 const record = JSON.parse(fs.readFileSync(path.join(root, 'assets/장면/편지작업실_출처.json'), 'utf8'));
 const at = process.argv.indexOf('--원본');

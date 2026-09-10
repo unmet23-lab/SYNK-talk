@@ -7,6 +7,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const sharp = require('sharp');
+const { 인자게이트 } = require('../lib/플래그.js');
+const args = process.argv.slice(2);
+const 아는플래그 = ['--정본'];
+const 플래그오류 = 인자게이트('브랜드자산반입', args, 아는플래그);
+if (플래그오류 || (args.length && (args.length !== 2 || args[0] !== '--정본' || args[1].startsWith('--')))) {
+  console.error(플래그오류 || '사용법: node tools/브랜드자산반입.js [--정본 <저장소 경로>]');
+  process.exit(2);
+}
 const root = path.resolve(__dirname, '..');
 const at = process.argv.indexOf('--정본');
 const canonical = path.resolve(at >= 0 ? process.argv[at + 1] : path.join(root, '..', 'SYNK-appsscript'));
