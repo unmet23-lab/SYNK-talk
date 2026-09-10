@@ -1,0 +1,26 @@
+{
+  "프롬프트": "prompts/교정.md (v7-q1-8ef065559215)",
+  "prompt_ver": "v7-q1-8ef065559215",
+  "돌린날": "2026-09-10",
+  "실행자": "tools/eval-run.js --원격(리허설 correct?평가=1) (claude-sonnet-5)",
+  "완주": true,
+  "새로돌림": 2,
+  "건너뜀": 0,
+  "사용량합": {
+    "입력": 0,
+    "캐시생성": 0,
+    "캐시읽음": 0,
+    "출력": 0
+  },
+  "맥락시험": null,
+  "항목": [
+    {
+      "id": "E01",
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
+    },
+    {
+      "id": "E02",
+      "사유": "벤더:400 — invalid_request_error: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
+    }
+  ]
+}
