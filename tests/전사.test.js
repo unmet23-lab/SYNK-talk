@@ -131,6 +131,43 @@ test('🔴 신뢰도를 못 읽은 조각은 분모에서 뺀다 — 0 으로 �
   assert.strictEqual(r.stt_confidence, 0.8, '신뢰도 없는 98초가 값을 0 쪽으로 끌었다');
 });
 
+test('🔴 null·문자열·boolean 확률은 미측정이다 — 생산자와 소비자가 숫자로 꾸미지 않는다', () => {
+  for (const 미측정 of [null, undefined, '', ' ', '0', '-0.5', false, true, NaN, Infinity, -Infinity, [], {}]) {
+    const r = 세그먼트값({ segments: [
+      조각(0, 1, 0.8),
+      { start: 1, end: 99, text: '미측정 구간', avg_logprob: 미측정, no_speech_prob: 미측정 },
+    ] });
+    const s = r.stt_segments[1];
+    assert.strictEqual(s.avg_logprob, null);
+    assert.strictEqual(s.no_speech_prob, null);
+    assert.strictEqual(s.confidence, null);
+    assert.strictEqual(r.stt_confidence, 0.8, '미측정 98초가 발화 신뢰도에 섞였다');
+    assert.strictEqual(세그먼트펴기(r.stt_segments)[1].신뢰, null);
+    assert.strictEqual(세그먼트펴기(r.stt_segments)[1].저신뢰, false);
+    assert.strictEqual(청취문턱(r.stt_segments).ms, 3000, '미측정을 저신뢰로 읽어 문턱이 부풀었다');
+  }
+});
+
+test('진짜 숫자 0은 측정값이다 — 로그확률 0은 confidence 1, 무음확률 0도 보존한다', () => {
+  const r = 세그먼트값({ segments: [{ start: 0, end: 5, avg_logprob: 0, no_speech_prob: 0 }] });
+  assert.strictEqual(r.stt_segments[0].avg_logprob, 0);
+  assert.strictEqual(r.stt_segments[0].no_speech_prob, 0);
+  assert.strictEqual(r.stt_segments[0].confidence, 1);
+  assert.strictEqual(r.stt_confidence, 1);
+});
+
+test('로그확률과 무음확률의 미측정은 독립이다 — 한쪽을 다른 쪽으로 추정하지 않는다', () => {
+  const r = 세그먼트값({ segments: [
+    { start: 0, end: 1, avg_logprob: null, no_speech_prob: 0.42 },
+    { start: 1, end: 2, avg_logprob: Math.log(0.5), no_speech_prob: null },
+  ] });
+  assert.strictEqual(r.stt_segments[0].confidence, null);
+  assert.strictEqual(r.stt_segments[0].no_speech_prob, 0.42);
+  assert.strictEqual(r.stt_segments[1].confidence, 0.5);
+  assert.strictEqual(r.stt_segments[1].no_speech_prob, null);
+  assert.strictEqual(r.stt_confidence, 0.5);
+});
+
 test('발화 신뢰도는 **길이 가중** 평균이다 — 짧은 추임새가 긴 문장과 같은 무게면 안 된다', () => {
   const r = 세그먼트값({ segments: [조각(0, 1, 0.9), 조각(1, 11, 0.5)] });
   // 단순 평균이면 0.7. 길이 가중이면 (0.9·1 + 0.5·10)/11 = 0.536.

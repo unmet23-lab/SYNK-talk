@@ -18,7 +18,7 @@ const path = require('node:path');
 
 const 뿌리 = path.resolve(__dirname, '..');
 const {
-  VERDICT, 하한ms, 저신뢰문턱, 정규화, 판정, 청취문턱, 폐기어휘, 승인요청, 폐기요청,
+  VERDICT, 하한ms, 저신뢰문턱, 정규화, 판정, 세그먼트펴기, 청취문턱, 폐기어휘, 승인요청, 폐기요청,
 } = require(path.join(뿌리, 'lib', '검수확정.js'));
 
 /* ── ① verdict 판정 순서 ──────────────────────────────────────────── */
@@ -184,6 +184,26 @@ test('신뢰도가 없는 조각은 저신뢰로 세지 않는다', () => {
    * UX ②(거기만 듣게)와 게이트 ①이 서로를 무효화한다. */
   const r = 청취문턱([{ start: 0, end: 20 }]);
   assert.deepEqual(r, { ms: 하한ms, 재료: true }, '신뢰도 없는 조각이 문턱을 20초로 부풀렸다');
+});
+
+test('🔴 null·문자열·boolean 신뢰도는 미측정으로 남는다 — 저신뢰 0이 아니다', () => {
+  for (const confidence of [null, undefined, '', ' ', '0', '0.5', false, true, NaN, Infinity, -Infinity, [], {}]) {
+    const 구간 = [{ start: 0, end: 20, confidence }];
+    assert.strictEqual(세그먼트펴기(구간)[0].신뢰, null);
+    assert.strictEqual(세그먼트펴기(구간)[0].저신뢰, false);
+    assert.deepEqual(청취문턱(구간), { ms: 하한ms, 재료: true });
+  }
+});
+
+test('진짜 confidence 0은 저신뢰다 — 숫자 0·문턱 0.7·1의 기존 뜻을 보존한다', () => {
+  const 구간 = [
+    { start: 0, end: 5, confidence: 0 },
+    { start: 5, end: 10, confidence: 저신뢰문턱 },
+    { start: 10, end: 15, confidence: 1 },
+  ];
+  assert.deepEqual(세그먼트펴기(구간).map((s) => s.신뢰), [0, 저신뢰문턱, 1]);
+  assert.deepEqual(세그먼트펴기(구간).map((s) => s.저신뢰), [true, false, false]);
+  assert.deepEqual(청취문턱(구간), { ms: 5000, 재료: true });
 });
 
 test('전부 또렷하면 하한으로 되돌린다 (발주 §3 「0이면 하한 3초」)', () => {
