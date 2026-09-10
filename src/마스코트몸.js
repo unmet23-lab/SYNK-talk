@@ -36,6 +36,7 @@
  *   대신 시간은 rAF 로 직접 민다. 숨은 3.6초 주기라 30fps 로 충분하고, 그 이상은 낭비다.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 
 /* Skia 를 «있으면» 쓴다 — 없는 환경(Expo Go·웹)에서 import 만으로 화면이 죽으면 안 된다.
    그래서 정적 import 가 아니라 한 번만 시도하는 지연 로드다. */
@@ -43,6 +44,11 @@ let SK = null;
 let 못쓴까닭 = null;
 function 스키아() {
   if (SK || 못쓴까닭) return SK;
+  // 웹 번들에 모듈이 있어도 CanvasKit은 초기화되지 않는다. 기존 Image 폴백을 쓴다.
+  if (Platform.OS === 'web') {
+    못쓴까닭 = '웹에서는 일반 이미지로 표시한다';
+    return null;
+  }
   try {
     // eslint-disable-next-line global-require
     const m = require('@shopify/react-native-skia');
