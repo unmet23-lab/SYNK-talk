@@ -486,5 +486,5 @@ test('c16 어휘 둘이 계약 허용필드에 있다 — 검증기가 목록 �
   for (const k of ['fold_date', 'promote_ver']) {
     assert.ok(f.includes(k), `payload_허용필드에 ${k} 가 없다 — 실으면 검증기가 전 사건을 거절한다`);
   }
-  assert.equal(계약.버전, 'c17');   // c16 → c17(첫 주 소급 불가 어휘 ⓐ · 09-11) — 접기 어휘 둘은 그대로 산다
+  assert.equal(계약.버전, 'c16');
 });
