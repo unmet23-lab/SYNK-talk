@@ -1,11 +1,109 @@
--- ============================================================================
--- 적용 후 확인 — 생성된 기준선 합본이 제대로 섰는지 한 줄로 판정한다.
--- 합본 밖에서 별도 실행하는 읽기 전용 SQL이다.
---
--- 정본 = supabase/L0_스키마.sql 꼬리의 「확인 (한 번에)」 주석 블록.
--- 아래 본문은 그 블록의 사본이다. 둘이 갈라지면 tests/L0스키마.test.js가 실패한다.
--- 판정과 함께 현재 migration version·checksum·name·applied_at을 낸다.
--- ============================================================================
+/* 교정 자동화 연결 — 기존 ops 회차 장부·Vault·처리 잡 재사용 (2026-09-11).
+ * 야간 16:13 UTC(몽골 다음날 00:13): 완료 배치 회수 후 새 배치 최대 100건 제출.
+ * 회수 전용: 매시 07/17/27/37/47/57분. 새 벤더 제출은 0이며 학생 데이터 쓰기는 완료 결과만.
+ * 배달 16:05 UTC보다 뒤이므로 그 밤 새로 접수한 교정은 이미 배달한 과제를 소급 변경하지 않는다.
+ * 원문/동의/학습 계약판(c16)/기존 5개 예약/AI 모델을 변경하지 않는다. 새 표·유일 제약도 없다.
+ * pipeline_jobs의 nullable correction_batch_id는 내부 접수 영수증이다(외부 API 계약 불변).
+ * 리허설처럼 기존 예약이 0인 환경에는 자동 예약을 만들지 않는다. 부분 등록 상태는 멈춘다.
+ * 운영의 신규 2개 예약은 비활성으로 등록한다. 새 correct 배포·대조 뒤에만 두 잡을 활성화한다.
+ * HTTP는 트랜잭션 commit 뒤 실행되는 pg_net 큐다. 이 조각 적용 자체는 교정을 호출하지 않는다.
+ * 복구: 두 새 예약만 비활성화하고 이전 correct 배포로 되돌린다. 원문/이력은 삭제하지 않는다.
+ */
+begin;
+
+do $migration$
+declare
+  migration_version constant text := '20260911070000';
+  migration_name constant text := '20260911070000_correct_automation_c16.sql';
+  expected_checksum constant text := 'cb9d8c7d3b254ac4cf2702ffadcf03dc5952e59ab5fc3485e0a38d4807794da8'; -- migration-checksum
+  base_version constant text := '20260907200000';
+  recorded_checksum text;
+  previous_jobs integer;
+  active_jobs integer;
+  target_url text;
+begin
+  if to_regclass('engine.schema_migrations') is null then
+    raise exception '교정 자동화: 기준 이력 없음';
+  end if;
+  select checksum into recorded_checksum from engine.schema_migrations where version = migration_version;
+  if found then
+    if recorded_checksum is distinct from expected_checksum then
+      raise exception '교정 자동화: 적용 이력 checksum 불일치';
+    end if;
+    return;
+  end if;
+  if not exists (select 1 from engine.schema_migrations where version = base_version) then
+    raise exception '교정 자동화: 이전 c16 조각 미적용';
+  end if;
+  if to_regprocedure('ops.발사(text,text)') is null or to_regprocedure('ops.수확()') is null then
+    raise exception '교정 자동화: 기존 ops 발사/수확 없음';
+  end if;
+
+  select count(*), count(*) filter (where active) into previous_jobs, active_jobs
+    from cron.job where jobname in
+      ('deliver-daily', 'deliver-check', 'transcribe-batch', 'radio-promote-hourly', 'ops-harvest');
+  if previous_jobs not in (0, 5) or active_jobs <> previous_jobs then
+    raise exception '교정 자동화: 기존 예약 부분 등록/비활성 상태';
+  end if;
+  if exists (select 1 from cron.job where jobname in ('correct-nightly', 'correct-collect')) then
+    raise exception '교정 자동화: 같은 이름의 미등록 이력 예약 존재';
+  end if;
+
+  alter table engine.pipeline_jobs add column correction_batch_id text;
+  comment on column engine.pipeline_jobs.correction_batch_id is
+    '교정 내부 접수 영수증: null=미접수, submitting=접수 미확정(자동 재과금 금지), 그 외=벤더 batch ID. 학생 원문/공개 API에 노출하지 않는다.';
+
+  /* 기존 두 인자 API를 유지한다. 교정에만 130초, 기존 잡은 종전 pg_net 기본값 5초.
+   * 함수 전체 교체는 하나의 트랜잭션 안이다. 기존 ACL은 보존되며 새 자격증명은 만들지 않는다. */
+  create or replace function ops.발사(p_job text, p_url text) returns bigint
+  language plpgsql as $fn$
+  declare rid bigint;
+  begin
+    select net.http_post(
+      url := p_url,
+      headers := jsonb_build_object('Content-Type', 'application/json',
+        'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'service_role_key')),
+      body := '{}'::jsonb,
+      timeout_milliseconds := case when p_job in ('correct-nightly', 'correct-collect') then 130000 else 5000 end)
+      into rid;
+    begin
+      insert into ops.cron_runs(jobname, request_id, outcome) values (p_job, rid, '대기');
+    exception when others then null;
+    end;
+    return rid;
+  exception when others then
+    insert into ops.cron_runs(jobname, request_id, outcome, error_msg)
+      values (p_job, null, '발사실패', 'dispatch_failed:' || sqlstate);
+    return null;
+  end
+  $fn$;
+
+  if previous_jobs = 5 then
+    select decrypted_secret into target_url from vault.decrypted_secrets where name = 'functions_base_url';
+    if target_url is null or target_url !~ '^https://[a-z0-9]+[.]supabase[.]co/functions/v1$'
+       or not exists (select 1 from vault.decrypted_secrets where name = 'service_role_key' and length(decrypted_secret) > 0) then
+      raise exception '교정 자동화: 기존 Vault 설정 확인 필요';
+    end if;
+    perform cron.schedule('correct-nightly', '13 16 * * *', $job$
+      select ops.발사('correct-nightly',
+        (select decrypted_secret from vault.decrypted_secrets where name = 'functions_base_url') || '/correct');
+    $job$);
+    perform cron.schedule('correct-collect', '7-57/10 * * * *', $job$
+      select ops.발사('correct-collect',
+        (select decrypted_secret from vault.decrypted_secrets where name = 'functions_base_url') || '/correct?%ED%9A%8C%EC%88%98=1');
+    $job$);
+    perform cron.alter_job(job_id := jobid, active := false)
+      from cron.job where jobname in ('correct-nightly', 'correct-collect');
+  end if;
+
+  insert into engine.schema_migrations(version, name, checksum)
+    values (migration_version, migration_name, expected_checksum);
+end
+$migration$;
+commit;
+
+-- 확인 (한 번에) — c16 구조에 내부 접수 영수증 1칸과 최신 이력/체크섬을 확인한다.
+/*
 with 기대열(t, c) as (values
   ('pipeline_jobs','correction_batch_id'),
   ('learning_events','goal_snapshot'),
@@ -344,3 +442,42 @@ select case when 테이블수=25 and RLS켜짐=25 and 정책수=7
        (select v from 빠진트리거) as 빠진트리거,
        *
   from 셈;
+*/
+-- 사후 메모:
+-- ① 이 조각 = pipeline_jobs 내부 접수 영수증 1칸 + 기존 ops 함수 갱신 + 신규 교정 예약 2개 비활성 등록.
+-- ② 아래 CHECK 기대 목록은 직전 c16 그대로다 — CHECK 이름 변경 0.
+--    ⚠ 이 줄은 마지막 조각이 들고 있어야 한다. 합본은 조각을 이어붙인 것이라
+--      tests/L0스키마.test.js 가 「마지막 기대: 줄」 뒤를 훑는데, 새 조각이 자기 줄 없이
+--      붙으면 그 조각의 파일명이 제약 이름으로 읽혀 빨개진다.
+--    ⚠ `season_no_overlap_c11`(EXCLUDE) · `…_once_c11`(UNIQUE) · `companion_qa_*_fkey` · `stt_raw_*` 는 여기
+--      없다 — CHECK 가 아니라 이 줄의 대상이 아니고, 이름도 그대로 산다(값목록이 없어
+--      판 판별과 무관하다 · 위 기대제약 목록에는 그 이름 그대로 들어 있다).
+--    기대: attempts_gate_values_c16 · attempts_response_present_c16 · attempts_result_gate_c16
+--         · attempts_ver_nonempty_c16 · batch_runs_counts_order_c16 · batch_runs_counts_pair_c16
+--         · batch_runs_enrolled_nonneg_c16 · batch_runs_finished_cols_c16
+--         · batch_runs_level_dist_ok_c16 · batch_runs_partial_pair_c16
+--         · batch_runs_partial_range_c16 · batch_runs_roster_equation_c16
+--         · batch_runs_skipped_range_c16 · batch_runs_ver_nonempty_c16 · broadcast_segment_kind_c16
+--         · classes_key_nonblank_c16 · companion_qa_answer_paired_c16
+--         · companion_qa_question_nonblank_c16 · corrections_promotion_intent_c16
+--         · corrections_supersedes_not_self_c16 · corrections_verdict_c16 · cron_runs_outcome_c16
+--         · jobs_anchor_present_c16 · jobs_claim_cols_c16 · jobs_deciding_pair_c16
+--         · jobs_deciding_result_matches_c16 · jobs_deciding_scope_c16 · jobs_draft_present_c16
+--         · jobs_idle_cols_c16 · jobs_load_failed_cols_c16 · jobs_nontarget_cols_c16
+--         · jobs_nonterminal_cols_c16 · jobs_skill_ids_present_c16 · jobs_status_outcome_pairs_c16
+--         · jobs_terminal_cols_c16 · jobs_ver_nonempty_c16 · jobs_winner_fence_current_c16
+--         · jobs_winner_fence_pair_c16 · jobs_winner_only_success_c16 · jobs_winner_present_c16
+--         · jobs_winner_result_only_success_c16 · jobs_winner_result_pair_c16
+--         · l10n_reviews_final_paired_c16 · l10n_reviews_supersedes_not_self_c16
+--         · l10n_reviews_verdict_c16 · l10n_strings_id_ascii_c16
+--         · l10n_strings_ko_nonblank_c16 · l10n_strings_max_len_c16
+--         · l10n_strings_status_c16 · learners_gender_c16
+--         · learners_goal_track_c16 · learners_group_no_c16 · learners_home_aimag_c16
+--         · learners_seat_no_c16 · learners_signup_attempts_nonneg_c16
+--         · learners_temp_password_paired_c16 · learning_events_correction_target_c16
+--         · learning_events_event_type_c16 · learning_events_task_type_c16
+--         · pipeline_jobs_discard_reason_c16 · season_compass_answers_c16 · season_dates_c16
+--         · season_review_decided_c16 · season_review_self_c16 · season_review_verdict_c16
+--         · staff_role_c16 · submissions_due_paired_c16 · submissions_task_format_c16
+--         · submissions_translation_source_c16 · teacher_notes_body_nonblank_c16
+--         · teacher_notes_disposition_c16 · teacher_notes_origin_c16

@@ -88,9 +88,10 @@ test('🔴 설정 문제로는 행을 못박지 않는다 — 키가 오는 날 
   for (const 이유 of ['no_api_key', 'no_prompt_ver', 'tag_drift']) {
     assert.ok(본체.includes(`'${이유}'`), `${이유} 갈래가 없다`);
   }
-  // 그 갈래들이 UPDATE·INSERT 앞에서 끝나는지는 「쓰기가 단 한 곳」이라는 사실로 보증한다.
-  const 쓰기 = [...본체.matchAll(/\b(insert\s+into|update)\s+engine\./gi)];
-  assert.equal(쓰기.length, 1, `이 함수의 쓰기는 한 곳이어야 한다(지금 ${쓰기.length}곳)`);
+  // 교정 저장과 전송 lease는 별개다. lease는 설정 검사를 통과한 전송 직전에만 얻는다.
+  assert.equal([...본체.matchAll(/insert\s+into\s+engine\.corrections/gi)].length, 1);
+  assert.equal([...본체.matchAll(/update\s+engine\.pipeline_jobs/gi)].length, 4);
+  assert.ok(!/set\s+status\s*=/.test(본체), '실패로 영구 제외하는 상태 변경은 금지');
 });
 
 test('🔴 겹친 배치가 두 벌을 적지 않는다 — 쓰기에 자물쇠 방향이 걸려 있다', () => {
@@ -148,14 +149,13 @@ test('🔴 회수는 설정 검사보다 앞이다 — 이미 값을 치른 결�
   }
 });
 
-test('🔴 도는 배치가 있으면 새로 안 내보낸다 — 두 번 나가면 두 번 청구된다', () => {
-  /* 행은 자물쇠(`where not exists`)가 막아 주지만 **돈은 이미 나간 뒤**다. 그래서 제출 앞에
-   * 「지금 도는 게 있나」를 묻고, 있으면 그 회차를 쉰다(늦어질 뿐 두 번 청구되지 않는다). */
+test('🔴 접수된 제출은 다시 안 내보낸다 — 타 서비스 배치는 운영을 막지 않는다', () => {
   assert.match(본체, /processing_status !== 'ended'/, '도는 배치를 가리는 조건이 없다');
-  assert.ok(본체.includes("'batch_in_flight'"), '도는 중일 때 멈추는 갈래가 없다');
+  assert.match(본체, /p\.correction_batch_id is null/);
+  assert.match(본체, /j\.correction_batch_id is null/);
   const 제출 = 본체.indexOf('배치몸통(');
-  const 막이 = 본체.indexOf("'batch_in_flight'");
-  assert.ok(막이 > 0 && 막이 < 제출, '제출이 「도는 배치」 검사보다 먼저 온다');
+  assert.ok(본체.indexOf('j.correction_batch_id is null') < 제출);
+  assert.doesNotMatch(본체, /if \(!즉시 && 도는배치 > 0\)/);
 });
 
 test('🔴 custom_id 규격은 내보내기 «전에» 본다 — 어기면 배치 한 벌이 통째로 400 이다', () => {
@@ -168,13 +168,12 @@ test('🔴 custom_id 규격은 내보내기 «전에» 본다 — 어기면 배�
   assert.ok(규격 > 0 && 규격 < 제출, '규격 검사가 제출보다 뒤에 있다 — 그러면 이미 왕복한 뒤다');
 });
 
-test('🔴 벤더가 말한 «왜»를 응답에 싣는다 — 상태 코드만으로는 어디를 고칠지 모른다', () => {
-  /* 본문은 `console.error` 에도 나가지만 그건 Edge 로그를 따로 여는 일이다. 응답에 없어서
-   * 「400 이다」까지만 보이던 자리가 #Q83 이 며칠 늦은 이유다. */
-  for (const 이유 of ['batch_submit_failed', 'batch_list_failed']) {
+test('🔴 실패 단계와 HTTP 상태를 싣되 벤더 원문은 응답·운영 장부로 보내지 않는다', () => {
+  for (const 이유 of ['batch_submit_failed']) {
     const m = new RegExp(`이유: '${이유}'[^}]*`).exec(본체);
     assert.ok(m, `${이유} 갈래를 못 찾았다`);
-    assert.match(m[0], /벤더사유/, `${이유} 갈래가 벤더 사유를 안 싣는다`);
+    assert.match(m[0], /status:/, `${이유} 갈래가 HTTP 상태를 안 싣는다`);
+    assert.doesNotMatch(m[0], /벤더사유|글/);
   }
 });
 
@@ -221,9 +220,9 @@ test('🔴 평가 통로(?평가=1) — DB 무접촉·상한·원자재 반환 (
  *   「배치 제출 POST」라는 두 landmark 사이의 **구간을 떠서 그 안에 문지기가 있는지**를 묻는다
  *   — 문지기가 지워지거나 제출 뒤로 밀리면 그 구간에서 사라지므로 같은 적색이 난다. */
 test('🔴 회수 전용 문(?회수=1) — 걷되 «내보내지 않는다»', () => {
-  const 구간 = /회수 = \{ 배치:[\s\S]*?fetch\(배치경로, \{\s*method: 'POST'/.exec(본체);
+  const 구간 = /회수 = \{ 배치:[\s\S]*?가져오기\(배치경로, \{\s*method: 'POST'/.exec(본체);
   assert.ok(구간, '「걷기 끝 → 배치 제출」 구간을 못 떴다 — 이 검사가 헛돌고 있다(landmark 가 낡았다)');
-  assert.match(납작(구간[0]), /if \(회수만\) \{ return 봉투\(200,/,
+  assert.match(납작(구간[0]), /if \(회수만\) \{ return 봉투\(회수HTTP실패 \|\| 미확정수 \? 502 : 200,/,
     '회수 전용 문이 배치 제출 «앞»에 없다 — `?회수=1` 이 걷고 나서 새 배치를 또 낸다(=승인 없는 지출)');
 });
 

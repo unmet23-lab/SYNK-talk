@@ -173,6 +173,8 @@ test('🔴 등록층 사각 — URL 없는 cron 도 센다 (slug 추출은 이 �
    * 거기 안 잡힌다 — 즉 그 회귀만으로는 **잡이 늘어도 아무것도 안 빨개진다**.
    * 이 검사가 그 분모를 따로 지고 있다. 새 잡을 걸면 여기서 한 번 답해야 한다. */
   const 아는잡 = [
+    'correct-collect',        // 회수만 → ops.발사/수확; 신규 유료 제출 없음
+    'correct-nightly',        // 야간 배치 → ops.발사/수확
     'deliver-check',          // → /deliver?점검
     'deliver-daily',          // → /deliver
     'ops-harvest',            // 순수 SQL — URL 없음(그래서 이 검사가 필요하다)

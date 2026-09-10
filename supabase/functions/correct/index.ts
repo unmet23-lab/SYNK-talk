@@ -9,8 +9,8 @@
  *
  * ■ 두 통로 — 기본은 **배치**, `?즉시=1` 이면 그 자리에서 (유호 승인 08-09 「캐싱 + 배치」)
  *   ① **배치**(기본): 벤더의 Message Batches 로 절반 값에 돌린다. 비동기라 한 번의 호출이
- *      두 마디를 한다 — **먼저 회수, 그다음 제출.** 야간 cron 이 매일 한 번 부르면 어젯밤
- *      제출분을 걷고 오늘치를 내보낸다. 왕복은 최대 24시간까지 걸릴 수 있다.
+ *      두 마디를 한다 — **먼저 회수, 그다음 제출.** 야간 cron이 새 배치를 내보내고,
+ *      10분 간격 회수-only가 완료 결과를 걷는다. 벤더 처리는 최대 24시간까지 걸릴 수 있다.
  *   ② **즉시**(`?즉시=1`): 종전대로 한 건씩 동기 왕복. 값은 정가지만 **지금 결과가 필요한
  *      자리**(키를 넣은 날의 첫 확인, 검수자가 급히 한 건)가 남아야 해서 지운 게 아니라 뒀다.
  *   두 통로는 같은 `요청몸통()` 을 쓴다 — 프롬프트·모델·캐시 설정이 갈리면 「배치로 만든 것」과
@@ -39,12 +39,11 @@
  *   가드는 늘 통과하고, 새는 방향은 학생 발화가 **벤더로 나가는** 쪽이다. 술어의 정본은
  *   `lib/동의게이트.js 지금유효술어` 하나이고 `tests/동의게이트.test.js` 가 이 파일을 묶는다.
  *
- * ■ 락을 안 건다 (`transcribe` 와 같은 근거)
- *   벤더 왕복 내내 트랜잭션을 열어 두는 값이 크다. 대신 INSERT 자체에 「이미 AI 교정이 있으면
- *   넣지 않는다」를 걸었다 — 두 배치가 같은 행을 집어도 두 번째는 0행이 된다.
- *   ⚠ 완전한 상호배제는 아니다(부분 유니크 인덱스가 있어야 원리상 닫힌다 — 그건 마이그레이션
- *     이라 이 배선의 몫이 아니다). 겹쳐서 두 벌이 서더라도 검수 뷰가 **가장 최근 하나**를
- *     고르므로 화면은 안 깨진다. 남는 것은 지워야 할 행 하나뿐이고 그건 되돌릴 수 있다.
+ * ■ 기존 pipeline 잡의 lease와 짧은 저장 잠금을 쓴다.
+ *   HTTP 동안 DB 트랜잭션은 열지 않는다. 전송 전 lease가 겹친 유료 제출을 막고,
+ *   저장할 때만 같은 잡을 잠근 뒤 AI 교정 부재·현재 동의·삭제 상태를 다시 검사한다.
+ *   기존 append-only 교정/재검수 이력은 보존한다. 이 저장 통로를 우회하는 다른 writer까지
+ *   전역 UNIQUE로 제한하는 변경은 아니다.
  */
 import postgres from 'npm:postgres@3.4.4';
 import 토큰모듈 from './토큰.mjs';
@@ -67,7 +66,7 @@ type 교정칸 = {
 
 const {
   모델, 왕복제한밀리, 메시지경로, 배치경로, 벤더헤더,
-  교정요청판: 프롬프트판, 태그어긋남, 요청몸통, 응답글, 교정값, 재시도가능, 벤더사유,
+  교정요청판: 프롬프트판, 태그어긋남, 요청몸통, 응답글, 교정값, 재시도가능,
   배치몸통, 배치키어긋남, 배치줄해석, 캐시성적, 성적합,
 } = 교정모듈 as {
   모델: string;
@@ -81,7 +80,6 @@ const {
   응답글: (본문: unknown) => string | null;
   교정값: (글: string, 태그목록: string[]) => 교정칸;
   재시도가능: (status: number) => boolean;
-  벤더사유: (글: string, 상한?: number) => string | null;
   배치몸통: (행들: unknown[], 지시문: string, 판: string) => Record<string, unknown>;
   배치키어긋남: (행들: unknown[], 판: string) => string[];
   배치줄해석: (줄: string) => {
@@ -113,6 +111,22 @@ const 배치최대 = 500;
 const 회수상한 = 5;
 /* 목록을 몇 개까지 보나. 도는 배치가 있는지 판단하는 근거라 넉넉히 본다. */
 const 목록상한 = 20;
+const 접수미확정 = 'submitting';
+const uuid꼴 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// 시도 도장은 custom_id에만 붙인다. 요청 품질 지문/저장 prompt_ver는 바꾸지 않는다.
+function 결과해석(줄: string, 영수증: { submission_id: string; attempt_id: string }[]) {
+  let 본;
+  try { 본 = JSON.parse(줄); } catch { return { 사유: '결과형식밖' } as any; }
+  const m = typeof 본?.custom_id === 'string' && 본.custom_id.match(/^a([0-9a-f]{32})_(.+)$/i);
+  if (!m) return { 사유: '키형식밖' } as any;
+  const h = m[1];
+  const attempt_id = `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+  const row = 영수증.find((r) => r.attempt_id === attempt_id);
+  if (!row) return { 사유: '키형식밖' } as any;
+  본.custom_id = `${row.submission_id}_${m[2]}`;
+  return { ...배치줄해석(JSON.stringify(본)), attempt_id };
+}
 
 const { 행들에서판 } = 계약판모듈 as { 행들에서판: (행들: unknown) => string | null };
 
@@ -132,8 +146,15 @@ function 센다(칸: Record<string, number>, 이름: string) {
   칸[이름] = (칸[이름] ?? 0) + 1;
 }
 
+function 안전사유(값: unknown): string {
+  const 앞 = String(값 ?? '').split(':')[0];
+  return ['형식밖', '교정문없음', '태그없음', '계약밖태그', '상충태그', '옛글자',
+    '결과형식밖', '키형식밖', '응답형식밖', '모델없음', '배치오류', '배치canceled',
+    '배치expired', '배치알수없음'].includes(앞) ? 앞 : '응답형식밖';
+}
+
 /**
- * **이 함수의 유일한 쓰기.** 동기 통로와 배치 회수가 같은 문을 쓴다 — 두 곳에 적으면 열
+ * **교정 행의 유일한 쓰기.** 동기 통로와 배치 회수가 같은 문을 쓴다 — 두 곳에 적으면 열
  * 목록·자물쇠 조건이 갈리고, 갈린 뒤엔 한쪽만 고쳐도 초록이 된다.
  *
  * 🔑 `where not exists` — 자물쇠와 **같은 방향**이다(`transcribe` 의 `transcript is null`).
@@ -143,8 +164,16 @@ function 센다(칸: Record<string, number>, 이름: string) {
  */
 async function 적기(
   submissionId: string, 값: 교정칸, 모델이름: string, 판: string, ver: string,
+  attemptId: string, batchId: string | null,
 ): Promise<boolean> {
-  const 쓴것 = await sql`
+  // 외부 HTTP 동안에는 잠그지 않는다. 같은 제출의 회수/즉시 저장만 짧게 직렬화한다.
+  return sql.begin(async (tx) => {
+  const 잠금 = await tx`
+    select job_id from engine.pipeline_jobs
+     where submission_id = ${submissionId}::uuid
+     for update`;
+  if (!잠금.length) return false;
+  const 쓴것 = await tx`
     insert into engine.corrections (
       submission_id, actor_kind, corrected_text, error_tags, explanation,
       model, prompt_ver, schema_ver
@@ -155,8 +184,23 @@ async function 적기(
      where not exists (
              select 1 from engine.corrections c
               where c.submission_id = ${submissionId}::uuid and c.actor_kind = 'ai')
+       and exists (
+             select 1 from engine.submissions s
+             join engine.learning_events e on e.event_id = s.event_id
+             join engine.pipeline_jobs j on j.submission_id = s.submission_id
+              where s.submission_id = ${submissionId}::uuid
+                and e.event_type = 'submission.created'
+                and j.status not in ('discarded', 'revoked', 'verified')
+                and j.attempt_id = ${attemptId}::uuid
+                and j.correction_batch_id is not distinct from ${batchId}::text
+                and s.audio_deleted_at is null
+                and exists (select 1 from engine.consents k
+                             where k.learner_id = e.learner_id
+                               and agreed_at <= now()
+                               and (revoked_at is null or revoked_at > now())))
     returning correction_id`;
   return 쓴것.length > 0;
+  });
 }
 
 /* 대기 술어 — 분모 세기와 실제로 집기가 **같은 조건**을 봐야 한다. 두 벌로 적으면 「대기는
@@ -176,6 +220,7 @@ const 대기조건 = () => sql`
         on e.event_id = s.event_id and e.event_type = 'submission.created'
       join engine.pipeline_jobs j on j.submission_id = s.submission_id
      where j.status not in ('discarded', 'revoked', 'verified')
+       and s.audio_deleted_at is null
        and coalesce(s.body_original, s.transcript) is not null
        and btrim(coalesce(s.body_original, s.transcript)) <> ''
        and exists (
@@ -192,12 +237,57 @@ const 대기조건 = () => sql`
        and btrim(regexp_replace(regexp_replace(btrim(s.body_original), '[[:space:]]+', ' ', 'g'), '[.]$', ''))
          = btrim(regexp_replace(regexp_replace(btrim(s.task_snapshot -> '정답' ->> '교정문'), '[[:space:]]+', ' ', 'g'), '[.]$', '')))`;
 
-Deno.serve(async (req: Request) => {
+// 이미 있는 잡의 lease만 쓴다. HTTP 불확실 응답은 소유권을 유지해 같은 날 재과금을 막는다.
+// 23시간 뒤에도 진행 중인 벤더 배치가 있으면 목록 확인이 새 제출을 계속 막는다.
+async function 전송차례(ids: string[], 즉시: boolean) {
+  if (!ids.length) return [];
+  return sql<{ submission_id: string; attempt_id: string }[]>`
+    update engine.pipeline_jobs p
+       set attempt_id = gen_random_uuid(),
+           lease_until = now() + make_interval(secs => ${즉시 ? 180 : 23 * 3600}),
+           correction_batch_id = ${즉시 ? null : 접수미확정},
+           updated_at = now()
+     where p.submission_id = any(${ids}::uuid[])
+       and (p.lease_until is null or p.lease_until <= now())
+       and p.correction_batch_id is null
+       and p.submission_id in (select s.submission_id ${대기조건()})
+    returning p.submission_id, p.attempt_id`;
+}
+
+async function 전송유효(차례: { submission_id: string; attempt_id: string }[]) {
+  if (!차례.length) return new Set<string>();
+  const 허용 = await sql<{ submission_id: string }[]>`
+    select s.submission_id ${대기조건()}
+       and s.submission_id = any(${차례.map((r) => r.submission_id)}::uuid[])
+       and j.attempt_id = any(${차례.map((r) => r.attempt_id)}::uuid[])
+       and j.lease_until > now()`;
+  return new Set(허용.map((r) => r.submission_id));
+}
+
+async function 처리(req: Request): Promise<Response> {
   if (req.method !== 'POST') return 봉투(405, { error: 'method_not_allowed' });
   if (!서비스역할(req)) return 봉투(401, { error: 'service_role 만 부를 수 있습니다' });
 
+  const 마감 = Date.now() + 115_000;
+  const 가져오기 = (주소: string, 설정: RequestInit = {}) => {
+    const 남음 = 마감 - Date.now();
+    if (남음 <= 0) throw new Error('request_deadline');
+    return fetch(주소, { ...설정, redirect: 'error',
+      signal: AbortSignal.timeout(Math.min(왕복제한밀리, 남음)) });
+  };
+
   const 키 = Deno.env.get('ANTHROPIC_API_KEY') ?? '';
   const url = new URL(req.url);
+  const 시험제출 = url.searchParams.get('시험제출');
+  if (시험제출 !== null && !uuid꼴.test(시험제출)) return 봉투(400, { error: 'test_submission_invalid' });
+  if (시험제출 !== null && url.searchParams.get('평가') === '1') return 봉투(400, { error: 'test_scope_conflict' });
+  if (시험제출 !== null) {
+    const 시험 = await sql`select s.submission_id from engine.submissions s
+      join engine.learning_events e on e.event_id = s.event_id
+      join engine.learners l on l.learner_id = e.learner_id
+      where s.submission_id = ${시험제출}::uuid and l.is_test = true`;
+    if (!시험.length) return 봉투(403, { error: 'test_submission_only' });
+  }
 
   /* ── 평가 통로 (`?평가=1`) — **DB 무접촉** · eval 실행기 전용 ─────────────────────
    * 픽스처를 DB 에 넣지 않고(리허설도 append-only 라 지울 수 없는 행이 된다) **같은 동봉·같은
@@ -227,7 +317,7 @@ Deno.serve(async (req: Request) => {
         결과.push({ id: 항?.id ?? null, 사유: '문장없음' }); continue;
       }
       try {
-        const r = await fetch(메시지경로, {
+        const r = await 가져오기(메시지경로, {
           method: 'POST',
           headers: 벤더헤더(키),
           body: JSON.stringify(요청몸통({
@@ -239,8 +329,7 @@ Deno.serve(async (req: Request) => {
           /* 🔑 벤더가 말한 «왜»를 같이 싣는다(#Q83 — 상태 코드만으로는 처방이 안 나온다 · 배치
            * 통로의 그 규율). 08-20 실측: 59×400 이 사유 없이 «벤더:400» 으로만 남아, 크레딧
            * 소진인지 요청 결함인지 밖에서 가릴 수 없었다. */
-          const 실패글 = (await r.text()).slice(0, 300);
-          결과.push({ id: 항.id, 사유: `벤더:${r.status}`, 벤더사유: 벤더사유(실패글), 재시도가능: 재시도가능(r.status) });
+          결과.push({ id: 항.id, 사유: `벤더:${r.status}`, 재시도가능: 재시도가능(r.status) });
           continue;
         }
         const 본문 = await r.json();
@@ -253,7 +342,7 @@ Deno.serve(async (req: Request) => {
           usage: (본문 as { usage?: unknown }).usage ?? null,
         });
       } catch (e) {
-        결과.push({ id: 항.id, 사유: `예외:${String((e as Error)?.name ?? e).slice(0, 40)}` });
+        결과.push({ id: 항.id, 사유: 'vendor_request_failed' });
       }
     }
     return 봉투(200, { prompt_ver: 판, 모델, 결과, 캐시: 성적합(평가성적) });
@@ -279,7 +368,10 @@ Deno.serve(async (req: Request) => {
 
   /* 🔑 **분모를 먼저 센다.** 아래 어느 갈래로 빠지든 「몇 건이 기다리고 있었나」는 나온다 —
    *   그래야 「0건 처리」를 「할 게 없었다」로 오독하지 않는다(F207). */
-  const [{ count: 대기수 }] = await sql`select count(*)::int as count ${대기조건()}`;
+  const [{ count: 대기수 }] = await sql`select count(*)::int as count ${대기조건()}
+    and (${시험제출}::uuid is null or s.submission_id = ${시험제출}::uuid)`;
+  if (!대기수) return 봉투(200, { 대기: 0, 적음: 0,
+    이유: 회수만 ? 'nothing_to_collect' : 'nothing_to_submit' });
 
   let 적음 = 0; let 미룸 = 0;
   /* 버린 것은 **사유별로** 센다 — 합쳐 세면 「모델이 형식을 어긴다」와 「계약 밖 태그를 붙인다」가
@@ -303,7 +395,7 @@ Deno.serve(async (req: Request) => {
 
   if (!키) {
     console.error('[correct] ANTHROPIC_API_KEY 미설정 — 행을 건드리지 않고 끝낸다');
-    return 봉투(200, { 대기: 대기수, 적음: 0, 이유: 'no_api_key' });
+    return 봉투(503, { 대기: 대기수, 적음: 0, 이유: 'no_api_key' });
   }
 
   // 계약판은 **DB 에게 묻는다** — 손 상수를 두면 마이그레이션마다 사람이 같이 올려야 한다.
@@ -319,71 +411,102 @@ Deno.serve(async (req: Request) => {
    * 「다음 회차가 다시 집는다」로 끝난다 — 행을 실패로 못박는 자리가 없다. */
   let 회수: Record<string, unknown> | null = null;
   let 도는배치 = 0;
+  let 회수HTTP실패 = false;
+  let 미확정수 = 0;
   if (!즉시) {
-    const 목록r = await fetch(`${배치경로}?limit=${목록상한}`, {
-      headers: 벤더헤더(키), signal: AbortSignal.timeout(왕복제한밀리),
-    });
-    if (!목록r.ok) {
-      const 글 = (await 목록r.text()).slice(0, 300);
-      console.error('[correct] 배치 목록 실패', 목록r.status, 글);
-      return 봉투(200, {
-        대기: 대기수, 적음: 0, 이유: 'batch_list_failed',
-        status: 목록r.status, 벤더사유: 벤더사유(글),
-      });
+    // 같은 Anthropic workspace의 다른 프로젝트/서비스 배치는 정상 경로에서 조회하지 않는다.
+    const 영수증 = await sql`select s.submission_id, j.attempt_id, j.correction_batch_id
+      ${대기조건()} and j.correction_batch_id is not null
+      and (${시험제출}::uuid is null or s.submission_id = ${시험제출}::uuid)
+      order by j.updated_at, s.submission_id`;
+    const 미확정 = 영수증.filter((r) => r.correction_batch_id === 접수미확정);
+    const 복구됨 = new Set<string>();
+    // 접수 응답을 잃은 시도만 페이지를 재탐색한다. 도장을 확인 못하면 자동 재과금하지 않는다.
+    if (미확정.length) {
+      let cursor: string | null = null;
+      const 본커서 = new Set<string>();
+      for (let page = 0; page < 목록상한 && Date.now() < 마감 - 5000; page++) {
+        const rr = await 가져오기(`${배치경로}?limit=100${cursor ? `&after_id=${encodeURIComponent(cursor)}` : ''}`,
+          { headers: 벤더헤더(키) });
+        if (!rr.ok) { 회수HTTP실패 = true; 센다(버림, `회수실패:${rr.status}`); break; }
+        const list = await rr.json();
+        if (!Array.isArray(list.data)) throw new Error('batch_list_invalid');
+        for (const b of list.data.filter((b: any) => b.processing_status === 'ended')) {
+          const result = await 가져오기(`${배치경로}/${encodeURIComponent(b.id)}/results`, { headers: 벤더헤더(키) });
+          if (!result.ok) { 회수HTTP실패 = true; continue; }
+          for (const line of (await result.text()).split('\n')) {
+            if (!line.trim()) continue;
+            const parsed = 결과해석(line, 미확정);
+            const match = 미확정.find((r) => r.submission_id === parsed.submission_id && r.attempt_id === parsed.attempt_id);
+            if (!match || 복구됨.has(match.submission_id)) continue;
+            const changed = await sql`update engine.pipeline_jobs set correction_batch_id = ${b.id}, updated_at = now()
+              where submission_id = ${match.submission_id}::uuid and attempt_id = ${match.attempt_id}::uuid
+                and correction_batch_id = ${접수미확정} returning submission_id`;
+            if (changed.length) { match.correction_batch_id = b.id; 복구됨.add(match.submission_id); }
+          }
+        }
+        if (복구됨.size === 미확정.length || !list.has_more) break;
+        const next = list.last_id ?? list.data.at(-1)?.id;
+        if (typeof next !== 'string' || !next || 본커서.has(next)) break;
+        본커서.add(next); cursor = next;
+      }
     }
-    const 목록 = (await 목록r.json()) as {
-      data?: { id: string; processing_status: string; created_at?: string }[];
-    };
-    const 배치들 = 목록.data ?? [];
-    /* `ended` 가 아니면 아직 도는 중이다(`in_progress`·`canceling`). 그 사이엔 새로 안 내보낸다 —
-     * 같은 발화가 두 벌 나가면 값을 두 번 치른다(행은 자물쇠가 막지만 돈은 이미 나갔다). */
+    미확정수 = 미확정.length - 복구됨.size;
+    const 배치들 = [];
+    for (const id of new Set(영수증.map((r) => r.correction_batch_id).filter((id) => id !== 접수미확정))) {
+      const r = await 가져오기(`${배치경로}/${encodeURIComponent(id)}`, { headers: 벤더헤더(키) });
+      if (!r.ok) { 회수HTTP실패 = true; 센다(버림, `회수실패:${r.status}`); continue; }
+      const batch = await r.json();
+      if (batch.id !== id || typeof batch.processing_status !== 'string') throw new Error('batch_receipt_invalid');
+      배치들.push(batch);
+    }
     도는배치 = 배치들.filter((b) => b.processing_status !== 'ended').length;
-    /* 🔑 목록이 어느 순서로 오는지를 **전제하지 않는다.** 최신순일 것 같지만 확인할 방법이
-     *   여기 없고, 틀렸다면 증상은 「새 배치가 며칠째 안 걷힌다」다 — 오류가 아니라 지연이라
-     *   아무도 안 본다. 우리가 직접 최신순으로 세운다. */
-    const 끝난것 = 배치들
-      .filter((b) => b.processing_status === 'ended')
-      .sort((a, b) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')));
+    // 영수증 기반이므로 최신 목록 밖으로 밀려도 매 회차 직접 찾아간다.
+    const 끝난것 = 배치들.filter((b) => b.processing_status === 'ended');
     const 걷을것 = 끝난것.slice(0, 회수상한);
 
     let 줄수 = 0;
     for (const b of 걷을것) {
-      const r = await fetch(`${배치경로}/${b.id}/results`, {
+      const r = await 가져오기(`${배치경로}/${encodeURIComponent(b.id)}/results`, {
         headers: 벤더헤더(키), signal: AbortSignal.timeout(왕복제한밀리),
       });
       if (!r.ok) {
-        console.error('[correct] 결과 회수 실패', b.id, r.status);
+        회수HTTP실패 = true;
+        console.error('[correct] batch_results_failed', r.status);
         센다(버림, `회수실패:${r.status}`);
         continue;
       }
       for (const 줄 of (await r.text()).split('\n')) {
         if (!줄.trim()) continue;
         줄수 += 1;
-        const 해석 = 배치줄해석(줄);
-        /* 🔑 여기서는 사유를 **자르지 않는다.** `배치오류:invalid_request` 와 `배치expired` 는
-         *   처방이 반대다(요청을 고쳐라 / 그냥 다시 내보내라). 앞머리만 세면 그 둘이 한 숫자가
-         *   된다. 아래 `교정값()` 쪽은 반대로 자른다 — 거긴 뒤에 태그 목록이 통째로 붙어서
-         *   안 자르면 사유 칸이 값목록으로 부푼다. */
-        /* 🔑 장부엔 **안 자른 사유**를 적는다. 계수기는 갈래별로 접어야 읽히지만, 장부는 건별이라
-         *   접을 이유가 없다 — 여기 칸이 답하는 질문은 「이 발화가 왜 못 갔나」 하나다.
-         * ⚠ `결과형식밖`·`키형식밖` 은 `custom_id` 를 못 푼 갈래라 `submission_id` 가 없다.
-         *   그때 장부는 `대상없음` 으로 세고 넘어간다 — 어느 건에도 못 붙이는 실패다. */
+        const 해석 = 결과해석(줄, 영수증);
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(해석.submission_id ?? '')) {
+          센다(버림, '키형식밖'); 미룸 += 1; continue;
+        }
+        if (시험제출 !== null && 해석.submission_id !== 시험제출) continue;
+        const 현재대상 = await sql`select s.submission_id ${대기조건()}
+          and s.submission_id = ${해석.submission_id}::uuid
+          and j.attempt_id = ${해석.attempt_id}::uuid and j.correction_batch_id = ${b.id}`;
+        if (!현재대상.length) { 미룸 += 1; continue; }
+        // 벤더 사유/태그의 자유 문자열은 학생 정보가 섞일 수 있어 고정 코드만 기록한다.
         if (해석.사유) {
-          console.error('[correct] 회수 버림', b.id, 해석.사유);
-          센다(버림, 해석.사유);
-          await 장부에(해석.submission_id, 해석.사유);
+          const 사유 = 안전사유(해석.사유);
+          console.error('[correct] batch_result_rejected', 사유);
+          센다(버림, 사유);
+          await 장부에(해석.submission_id, 사유);
           미룸 += 1; continue;
         }
         if (해석.사용량) 성적들.push(캐시성적(해석.사용량));
         const 값 = 교정값(해석.글!, 태그목록);
         if (값.사유) {
-          console.error('[correct] 버림', 해석.submission_id, 값.사유);
-          센다(버림, 값.사유.split(':')[0]);
-          await 장부에(해석.submission_id, 값.사유);
+          const 사유 = 안전사유(값.사유);
+          console.error('[correct] correction_rejected', 사유);
+          센다(버림, 사유);
+          await 장부에(해석.submission_id, 사유);
           미룸 += 1; continue;
         }
         try {
-          if (await 적기(해석.submission_id!, 값, 해석.모델!, 해석.판!, ver)) {
+          if (await 적기(해석.submission_id!, 값, 해석.모델!, 해석.판!, ver, 해석.attempt_id, b.id)) {
             적음 += 1;
             /* 🔑 **성공했을 때 지운다.** 안 지우면 어제 죽었다가 오늘 살아난 행이 영원히
              *   실패로 보인다. 부르는 자리를 INSERT 가 실제로 쓴 갈래로 좁혀서, 재실행의
@@ -391,10 +514,9 @@ Deno.serve(async (req: Request) => {
             await 장부정리(해석.submission_id);
           } else 미룸 += 1;
         } catch (e) {
-          const 말 = String((e as Error)?.message ?? e);
-          console.error('[correct] 적기 예외', 해석.submission_id, 말);
+          console.error('[correct] correction_write_failed');
           센다(버림, '예외');
-          await 장부에(해석.submission_id, '예외', 말);
+          await 장부에(해석.submission_id, '예외');
           미룸 += 1;
         }
       }
@@ -407,11 +529,14 @@ Deno.serve(async (req: Request) => {
    *   회수 블록 «안»이 아니라 «밖»에 두는 이유는 위 주석의 ⚠ 와 같다 — 블록 조건이 바뀌어도
    *   이 문은 서 있어야 한다. `캐시` 를 같이 싣는 것이 이 통로의 존재 이유다(단가). */
   if (회수만) {
-    return 봉투(200, {
+    return 봉투(회수HTTP실패 || 미확정수 ? 502 : 200, {
       대기: 대기수, 적음, 미룸, 버림, 장부, 이유: '회수만', 회수,
+      needs_attention: 미확정수 > 0, 접수미확정: 미확정수,
       캐시: 성적합(성적들), ...(즉시요청 ? { 무시한즉시: true } : {}),
     });
   }
+  if (회수HTTP실패) return 봉투(502, { 대기: 대기수, 적음, 미룸, 버림, 장부,
+    이유: 'batch_results_failed', 회수 });
 
   /* ── ② 내보내기 전 검사 ──────────────────────────────────────────────── */
 
@@ -420,7 +545,7 @@ Deno.serve(async (req: Request) => {
   const 판 = 프롬프트판(지시문 as string);
   if (!판) {
     console.error('[correct] prompts/교정.md 에서 「현재 vN」을 못 읽었다');
-    return 봉투(200, { 대기: 대기수, 적음, 미룸, 버림, 장부, 이유: 'no_prompt_ver', 회수 });
+    return 봉투(503, { 대기: 대기수, 적음, 미룸, 버림, 장부, 이유: 'no_prompt_ver', 회수 });
   }
 
   /* 🔴 프롬프트의 통제 어휘와 계약 값목록이 갈라지면 **내보내기 전에** 멈춘다.
@@ -430,15 +555,13 @@ Deno.serve(async (req: Request) => {
   const 어긋남 = 태그어긋남(지시문 as string, 태그목록);
   if (어긋남.프롬프트에없음.length || 어긋남.계약에없음.length) {
     console.error('[correct] 🔴 값목록이 갈라졌다', JSON.stringify(어긋남));
-    return 봉투(200, { 대기: 대기수, 적음, 미룸, 버림, 장부, 이유: 'tag_drift', 어긋남, 회수 });
+    return 봉투(503, { 대기: 대기수, 적음, 미룸, 버림, 장부, 이유: 'tag_drift', 회수 });
   }
 
   /* ── ③ 내보내기 ───────────────────────────────────────────────────────
    * 방금 걷은 것 때문에 대기가 줄었을 수 있으므로 **조회는 지금 다시 한다**(위의 `대기수`는
    * 분모를 위한 스냅샷이다). 두 번 나가면 두 번 청구된다. */
-  if (!즉시 && 도는배치 > 0) {
-    return 봉투(200, { 대기: 대기수, 적음, 미룸, 버림, 장부, 이유: 'batch_in_flight', 회수, 캐시: 성적합(성적들) });
-  }
+  // 이미 접수된 행은 receipt가 막는다. 다른 배치가 도는 중이어도 새 제출 자체를 막지 않는다.
 
   const 조회행들 = await sql<{ submission_id: string; 문장: string; 급수: string | null; 시즌목표: string | null }[]>`
     select s.submission_id,
@@ -458,53 +581,84 @@ Deno.serve(async (req: Request) => {
                and (sn.ends_on is null or sn.ends_on >= (e.occurred_at at time zone ${시간대})::date)
              limit 1) as 시즌목표
     ${대기조건()}
+       and (j.lease_until is null or j.lease_until <= now())
+       and j.correction_batch_id is null
+       and (${시험제출}::uuid is null or s.submission_id = ${시험제출}::uuid)
      order by s.occurred_at
      limit ${뽑을수}`;
   /* 맥락은 **여기 한 곳**에서 조립한다 — 즉시·배치가 같은 값을 들게(하나만 고치면 「즉시로 만든
    * 것」과 「배치로 만든 것」이 갈린다 — 이 파일 머리 :16 의 그 경고). 없으면 null 이고, 그때
    * 요청몸통은 v1 과 바이트 동일이다(맥락 없음 폴백의 정본 = lib/교정엔진.js :140). */
-  const 행들 = 조회행들.map((행) => ({ ...행, 맥락: 시즌줄(행.시즌목표) }));
+  let 행들 = 조회행들.map((행) => ({ ...행, 맥락: 시즌줄(행.시즌목표) }));
 
   if (!즉시) {
     if (!행들.length) {
-      return 봉투(200, { 대기: 대기수, 적음, 미룸, 버림, 장부, 이유: 'nothing_to_submit', 회수, 캐시: 성적합(성적들) });
+      return 봉투(미확정수 ? 502 : 200, { 대기: 대기수, 적음, 미룸, 버림, 장부,
+        이유: 미확정수 ? 'batch_receipt_unresolved' : 'nothing_to_submit', needs_attention: 미확정수 > 0,
+        접수미확정: 미확정수, 회수, 캐시: 성적합(성적들) });
     }
     /* 🔴 `custom_id` 규격은 **내보내기 전에** 본다 — `tag_drift` 와 같은 자리다. 어기면 벤더가
-     *   배치 한 벌을 통째로 400 으로 튕기는데, 그 실패는 아래에서 `봉투(200, …)` 으로 나가므로
-     *   cron 이 켜지는 날 매 회차 조용히 0건이 된다. 여기서 물으면 0원이고, 안 물으면 왕복 한 번.
+     *   배치 한 벌을 통째로 400 으로 튕긴다. 실패는 5xx로 회차 장부에 남기지만,
+     *   여기서 먼저 물으면 유료 제출 왕복을 하지 않는다.
      *   ⚠ 왕복이 아니라 **규격**을 재는 자리다 — 통과가 「벤더가 받아 준다」의 증명은 아니다. */
     const 키어긋남 = 배치키어긋남(행들, 판);
     if (키어긋남.length) {
-      console.error('[correct] 🔴 custom_id 규격 밖', 키어긋남.length, 키어긋남.slice(0, 3).join(','));
+      console.error('[correct] batch_key_invalid', 키어긋남.length);
       센다(버림, '키규격밖');
-      return 봉투(200, {
+      return 봉투(503, {
         대기: 대기수, 적음, 미룸, 버림, 장부, 이유: 'batch_key_invalid',
-        규격밖: 키어긋남.length, 보기: 키어긋남.slice(0, 3), 회수,
+        규격밖: 키어긋남.length, 회수,
       });
     }
 
-    const r = await fetch(배치경로, {
+    const 차례 = await 전송차례(행들.map((r) => r.submission_id), false);
+    const 허용 = await 전송유효(차례);
+    행들 = 행들.filter((r) => 허용.has(r.submission_id));
+    if (!행들.length) return 봉투(200, { 대기: 대기수, 적음, 미룸, 버림, 장부,
+      이유: 'nothing_claimed', 회수 });
+
+    const 몸통 = 배치몸통(행들, 지시문 as string, 판) as { requests: { custom_id: string }[] };
+    for (let i = 0; i < 행들.length; i++) {
+      const attempt = 차례.find((r) => r.submission_id === 행들[i].submission_id)!.attempt_id;
+      몸통.requests[i].custom_id = `a${attempt.replace(/-/g, '')}_${판}`;
+      if (!/^[a-zA-Z0-9_-]{1,64}$/.test(몸통.requests[i].custom_id)) {
+        // Anthropic custom_id 최대 64자. 짧은 지문+UUID 조합도 항상 실제 규격을 다시 검사한다.
+        throw new Error('batch_attempt_key_invalid');
+      }
+    }
+
+    const r = await 가져오기(배치경로, {
       method: 'POST',
       headers: 벤더헤더(키),
-      body: JSON.stringify(배치몸통(행들, 지시문 as string, 판)),
+      body: JSON.stringify(몸통),
       signal: AbortSignal.timeout(왕복제한밀리),
     });
     if (!r.ok) {
-      const 글 = (await r.text()).slice(0, 300);
-      console.error('[correct] 배치 제출 실패', r.status, 글);
+      console.error('[correct] batch_submit_failed', r.status);
+      // 접수 거절이 확정된 상태만 다음 예약에서 다시 집는다. timeout/5xx는 미확정 유지.
+      if ([400, 401, 403, 404, 413, 422, 429].includes(r.status)) {
+        await sql`update engine.pipeline_jobs set correction_batch_id = null, lease_until = null, updated_at = now()
+          where submission_id = any(${행들.map((r) => r.submission_id)}::uuid[])
+            and attempt_id = any(${차례.map((r) => r.attempt_id)}::uuid[])
+            and correction_batch_id = ${접수미확정}`;
+      }
       센다(버림, 재시도가능(r.status) ? `제출_재시도:${r.status}` : `제출_영구:${r.status}`);
-      /* 🔑 **벤더가 말한 사유를 응답에 싣는다.** 여기 없으면 「400 이다」까지만 알고 «왜»는
-       *   Edge 로그를 따로 열어야 나온다 — 그 한 칸이 없어서 #Q83 이 며칠 늦었다. 로그에 이미
-       *   같은 글이 나가므로 새로 드러나는 것은 없고(노출 층이 안 늘어난다), 길이만 자른다. */
-      return 봉투(200, {
+      // 응답·로그·회차 장부에는 단계와 HTTP 상태만 남기고 벤더 본문은 남기지 않는다.
+      return 봉투(502, {
         대기: 대기수, 적음, 미룸, 버림, 장부, 이유: 'batch_submit_failed',
-        status: r.status, 벤더사유: 벤더사유(글), 회수,
+        status: r.status, 회수,
       });
     }
     const 만든것 = (await r.json()) as { id?: string };
+    if (typeof 만든것.id !== 'string' || !만든것.id) throw new Error('batch_response_invalid');
+    const 기록 = await sql`update engine.pipeline_jobs set correction_batch_id = ${만든것.id}, updated_at = now()
+      where submission_id = any(${행들.map((r) => r.submission_id)}::uuid[])
+        and attempt_id = any(${차례.map((r) => r.attempt_id)}::uuid[])
+        and correction_batch_id = ${접수미확정} returning submission_id`;
+    if (기록.length !== 행들.length) throw new Error('batch_receipt_write_failed');
     return 봉투(200, {
       대기: 대기수, 적음, 미룸, 버림, 장부, 회수,
-      제출: 행들.length, 배치id: 만든것.id ?? null,
+      제출: 행들.length, 접수기록: true, needs_attention: 미확정수 > 0,
       캐시: 성적합(성적들), 모델, prompt_ver: 판,
     });
   }
@@ -512,7 +666,9 @@ Deno.serve(async (req: Request) => {
   /* ── ③' 즉시 통로 — 한 건씩 동기 왕복 ─────────────────────────────────── */
   for (const 행 of 행들) {
     try {
-      const r = await fetch(메시지경로, {
+      const 차례 = await 전송차례([행.submission_id], true);
+      if (!(await 전송유효(차례)).has(행.submission_id)) { 미룸 += 1; continue; }
+      const r = await 가져오기(메시지경로, {
         method: 'POST',
         headers: 벤더헤더(키),
         body: JSON.stringify(요청몸통({ 지시문: 지시문 as string, 문장: 행.문장, 급수: 행.급수, 맥락: 행.맥락 })),
@@ -520,8 +676,7 @@ Deno.serve(async (req: Request) => {
       });
 
       if (!r.ok) {
-        const 글 = (await r.text()).slice(0, 300);
-        console.error('[correct] 벤더 실패', 행.submission_id, r.status, 글);
+        console.error('[correct] vendor_failed', r.status);
         /* 🔴 **행은 여전히 실패로 못박지 않는다** — 다음 회차가 다시 집는 자기치유가 기본값이고,
          *   영구 실패는 대신 같은 자리를 매번 먹는다. 그 수가 배치 크기에 가까워지면 앞머리가
          *   막힌 것이다(`lib/교정엔진.js 재시도가능` 머리말).
@@ -532,7 +687,7 @@ Deno.serve(async (req: Request) => {
          *   그래서 지금은 **세고 + 적는다** — 못박기(`status`)와 적기(`last_error`)는 다른 일이다. */
         const 갈래 = 재시도가능(r.status) ? `벤더_재시도:${r.status}` : `벤더_영구:${r.status}`;
         센다(버림, 갈래);
-        await 장부에(행.submission_id, 갈래, 벤더사유(글));
+        await 장부에(행.submission_id, 갈래);
         미룸 += 1;
         continue;
       }
@@ -541,7 +696,7 @@ Deno.serve(async (req: Request) => {
       성적들.push(캐시성적((본문 as { usage?: unknown }).usage));
       const 글 = 응답글(본문);
       if (!글) {
-        console.error('[correct] 응답 형식 밖', 행.submission_id);
+        console.error('[correct] vendor_response_invalid');
         센다(버림, '응답형식밖');
         await 장부에(행.submission_id, '응답형식밖');
         미룸 += 1;
@@ -553,22 +708,22 @@ Deno.serve(async (req: Request) => {
         /* 🔴 **빈 행을 만들지 않는다.** 교정문도 태그도 없는 행을 적으면 검수 뷰가 그 행 때문에
          *   큐에 뜨고 검수자 화면엔 빈 카드가 뜬다 — `functions/corrections` 가 학생 쪽에서
          *   막으려던 그 모양이다. 안 적으면 다음 배치가 다시 집는다. */
-        console.error('[correct] 버림', 행.submission_id, 값.사유);
-        센다(버림, 값.사유.split(':')[0]);
-        await 장부에(행.submission_id, 값.사유);
+        const 사유 = 안전사유(값.사유);
+        console.error('[correct] correction_rejected', 사유);
+        센다(버림, 사유);
+        await 장부에(행.submission_id, 사유);
         미룸 += 1;
         continue;
       }
 
-      if (await 적기(행.submission_id, 값, 모델, 판, ver)) {
+      if (await 적기(행.submission_id, 값, 모델, 판, ver, 차례[0].attempt_id, null)) {
         적음 += 1;
         await 장부정리(행.submission_id);
       } else 미룸 += 1;
     } catch (e) {
-      const 말 = String((e as Error)?.message ?? e);
-      console.error('[correct] 예외', 행.submission_id, 말);
+      console.error('[correct] correction_request_failed');
       센다(버림, '예외');
-      await 장부에(행.submission_id, '예외', 말);
+      await 장부에(행.submission_id, '예외');
       미룸 += 1;
     }
   }
@@ -577,4 +732,10 @@ Deno.serve(async (req: Request) => {
     대기: 대기수, 집음: 행들.length, 적음, 미룸, 버림, 장부,
     캐시: 성적합(성적들), 모델, prompt_ver: 판,
   });
+}
+
+// 런타임의 기본 예외 로그에 DB/벤더 원문이 넘어가지 않게 고정 코드로 끝낸다.
+Deno.serve(async (req: Request) => {
+  try { return await 처리(req); }
+  catch { return 봉투(503, { error: 'correction_request_failed', needs_attention: true }); }
 });

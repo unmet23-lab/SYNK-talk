@@ -159,7 +159,9 @@ function 건단위실패자리(src) {
   for (const m of src.matchAll(/센다\(버림,/g)) {
     const 블록 = 감싼블록(src, m.index);
     if (블록 == null) continue;
-    if (!/submission_id/.test(블록)) continue;      // 배치 단위 — 붙일 건이 없다
+    // HTTP 응답으로 회차 전체를 끝내는 실패는 ops 회차 장부의 몫이다.
+    if (/return 봉투\(/.test(블록)) continue;
+    if (!/submission_id/.test(블록)) continue;      // 건별 사유를 붙일 대상이 없다
     자리.push({ 블록, 적나: /장부에\s*\(/.test(블록) });
   }
   return 자리;
@@ -205,6 +207,11 @@ test('🔑 탐지력 — 배치 단위 실패(붙일 건이 없는 자리)는 �
     }`;
   assert.deepStrictEqual(건단위실패자리(배치소스), [],
     'submission_id 가 없는 자리까지 요구하면 따를 수 없는 처방이 된다(F103)');
+});
+
+test('배치 영수증의 배열 UPDATE를 단건 실패 로그로 오인하지 않는다', () => {
+  const source = `if (!r.ok) { await release(행들.map((r) => r.submission_id)); 센다(버림, '제출_영구:400'); return 봉투(502, {}); }`;
+  assert.deepStrictEqual(건단위실패자리(source), []);
 });
 
 test('🔑 탐지력 — 적으면 통과한다 (고친 뒤의 모양)', () => {
