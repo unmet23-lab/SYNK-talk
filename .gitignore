@@ -60,3 +60,6 @@ evals/과제생성_결과_초안.json
 # tools/NPC변환.py 가 굽기 산출에서 언제든 다시 낸다. 판정 지면 정본은 appsscript docs/NPC_시안.html.
 assets/npc/NPC_시트.png
 assets/npc/NPC_시트_*.png
+
+# 교수 작업실 생성 원본 — 로컬 보존, 앱은 출처가 기록된 WebP를 소비한다.
+/tmp/교수작업실소스/

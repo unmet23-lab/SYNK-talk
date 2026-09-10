@@ -1,0 +1,236 @@
+{
+  "date": "2026-09-11",
+  "usage": "PC G1 펠트 게임용 연구실과 소품. Android 빌드·배포와 무관하다.",
+  "generator": "tools/교수장면자산반입.js",
+  "encoder": {
+    "sharp": "0.35.3",
+    "libvips": "8.18.3",
+    "webp": "1.6.0"
+  },
+  "generation": {
+    "tool": "Codex built-in ImageGen",
+    "model_label": "정확한 모델명은 이 반입 작업에서 확인하지 않음",
+    "original_path": "C:/Users/q1212/.codex/generated_images/01a08bec-1f1d-7903-b772-c36f94a712f1/exec-e89f0125-1492-4e53-ae95-b8e4206428f2.png",
+    "native_width": 1672,
+    "native_height": 941,
+    "resolution_note": "생성 원본 실제 1672×941. 확대하지 않았으며 4K 원본이 아니다.",
+    "references": [
+      {
+        "path": "assets/장면/편지작업실.webp",
+        "role": "기존 펠트 스튜디오의 재질·조명 참조",
+        "sha256": "f638c65421a3057d20e7dda0bb3c4d517c1ffd90a8c1fc6a29bcdba5434a5461",
+        "width": 1672,
+        "height": 941
+      },
+      {
+        "path": "assets/npc/prof-calm.webp",
+        "role": "교수의 형태·색·안경·눈 참조",
+        "sha256": "1f8f5ad7471b33a8617e5d08dad2c15e3b3824c303c01be0707af21aac2a0740",
+        "width": 1024,
+        "height": 1024
+      }
+    ]
+  },
+  "assets": [
+    {
+      "name": "research",
+      "usage": "PC G1 교수 연구실의 장면 배경. 원본 전체 화폭을 유지한다.",
+      "source": {
+        "path": "C:/Users/q1212/.codex/generated_images/01a08bec-1f1d-7903-b772-c36f94a712f1/exec-e89f0125-1492-4e53-ae95-b8e4206428f2.png",
+        "canonical_path": null,
+        "sha256": "d584cc1d7cabb48e06e22ba1fbfd8f93b3dffa857bab96b8a2803408eef0c55d",
+        "width": 1672,
+        "height": 941,
+        "bytes": 2248792,
+        "format": "png",
+        "has_alpha": false
+      },
+      "preserved_source": "tmp/교수작업실소스/research-source.png",
+      "output": {
+        "path": "assets/교수작업실/research.webp",
+        "sha256": "02a6898155d05b878a974daf4d92a84588fed1282b9b822b3f76f290158821e2",
+        "width": 1672,
+        "height": 941,
+        "bytes": 401104,
+        "format": "webp",
+        "has_alpha": false
+      },
+      "transform": {
+        "webp_quality": 96,
+        "alpha_quality": 100,
+        "effort": 6,
+        "resize": null,
+        "crop": false,
+        "recolor": false,
+        "background_removal": false,
+        "upscale": false
+      }
+    },
+    {
+      "name": "envelope",
+      "usage": "편지 전달·열기 동작에 사용하는 펠트 봉투 소품.",
+      "source": {
+        "path": "C:/Users/q1212/Documents/SYNK-appsscript/docs/Loom_자산/구움/공방_편지봉투.avif",
+        "canonical_path": "docs/Loom_자산/구움/공방_편지봉투.avif",
+        "sha256": "f21077b69183b25d1222db18c0b4c9b1cd938679d6289be1613b772911a9c27b",
+        "width": 3176,
+        "height": 2680,
+        "bytes": 754847,
+        "format": "heif",
+        "has_alpha": true
+      },
+      "preserved_source": null,
+      "output": {
+        "path": "assets/교수작업실/envelope.webp",
+        "sha256": "60e6d9d1a642ee43a66b779581eeb1217e59f7594f4ab0ad041097ec85878491",
+        "width": 1536,
+        "height": 1296,
+        "bytes": 611734,
+        "format": "webp",
+        "has_alpha": true
+      },
+      "transform": {
+        "webp_quality": 96,
+        "alpha_quality": 100,
+        "effort": 6,
+        "resize": {
+          "max_width": 1536,
+          "max_height": 1536,
+          "fit": "inside",
+          "without_enlargement": true
+        },
+        "crop": false,
+        "recolor": false,
+        "background_removal": false,
+        "upscale": false
+      }
+    },
+    {
+      "name": "notebook",
+      "usage": "배경 제거 ImageGen의 참조 전용. 불투명 사각 이미지이며 현재 UI에서는 사용하지 않는다.",
+      "source": {
+        "path": "C:/Users/q1212/Documents/SYNK-appsscript/docs/Loom_자산/구움/공방_공책과연필.avif",
+        "canonical_path": "docs/Loom_자산/구움/공방_공책과연필.avif",
+        "sha256": "4d5b4df9ec676c4d0bec63269d70e4f3a78bc8708dd75abfac725a285fa079d4",
+        "width": 4096,
+        "height": 4096,
+        "bytes": 598312,
+        "format": "heif",
+        "has_alpha": false
+      },
+      "preserved_source": null,
+      "output": {
+        "path": "assets/교수작업실/notebook.webp",
+        "sha256": "899dd290cc7995eb98e6d9e9472184c014b60175149eee8ff62c62f4da0a034a",
+        "width": 1536,
+        "height": 1536,
+        "bytes": 371078,
+        "format": "webp",
+        "has_alpha": false
+      },
+      "transform": {
+        "webp_quality": 96,
+        "alpha_quality": 100,
+        "effort": 6,
+        "resize": {
+          "max_width": 1536,
+          "max_height": 1536,
+          "fit": "inside",
+          "without_enlargement": true
+        },
+        "crop": false,
+        "recolor": false,
+        "background_removal": false,
+        "upscale": false
+      }
+    },
+    {
+      "name": "notebook-cutout",
+      "usage": "현재 PC G1 UI의 편지 작성·기록 소품. 공책과 연필만 남긴 투명 이미지.",
+      "source": {
+        "path": "C:/Users/q1212/.codex/generated_images/01a08bec-1f1d-7903-b772-c36f94a712f1/exec-f237abae-15b7-434e-85e8-42fd66c779a0.png",
+        "canonical_path": null,
+        "sha256": "e1f4acffc768c73b7691ab373a6c71f406ee2351b5630d14f1d142a8b70e0a09",
+        "width": 1254,
+        "height": 1254,
+        "bytes": 1909423,
+        "format": "png",
+        "has_alpha": true
+      },
+      "preserved_source": "tmp/교수작업실소스/notebook-cutout-source.png",
+      "generation": {
+        "tool": "Codex built-in ImageGen",
+        "operation": "참조 이미지의 밝은 천 배경 제거",
+        "model_label": "정확한 모델명은 이 반입 작업에서 확인하지 않음",
+        "instruction_from_task": "coralwoolfelt notebook+creamelasticstrap+onewoodpencilexactidentity, removeonlycreamfabricground, fullobjectcentered,RGBAtransparent,maxnativeres,noextrashapes.",
+        "references": [
+          {
+            "path": "assets/교수작업실/notebook.webp",
+            "width": 1536,
+            "height": 1536,
+            "sha256": "899dd290cc7995eb98e6d9e9472184c014b60175149eee8ff62c62f4da0a034a"
+          }
+        ],
+        "resolution_note": "편집 원본 실제 1254×1254. 원래 4096px 소품이나 1536px 참조의 해상도를 유지했다고 표기하지 않는다."
+      },
+      "output": {
+        "path": "assets/교수작업실/notebook-cutout.webp",
+        "sha256": "f2591ff7650f3607dd835e5774434b0e193f761168e8594f4e9a82ef7938b7aa",
+        "width": 1254,
+        "height": 1254,
+        "bytes": 469202,
+        "format": "webp",
+        "has_alpha": true
+      },
+      "transform": {
+        "webp_quality": 96,
+        "alpha_quality": 100,
+        "effort": 6,
+        "resize": null,
+        "crop": false,
+        "recolor": false,
+        "background_removal": false,
+        "upscale": false
+      }
+    },
+    {
+      "name": "calendar",
+      "usage": "일정·기한을 가리키는 펠트 달력 소품.",
+      "source": {
+        "path": "C:/Users/q1212/Documents/SYNK-appsscript/docs/Loom_자산/구움/공방_달력.avif",
+        "canonical_path": "docs/Loom_자산/구움/공방_달력.avif",
+        "sha256": "57879d05405193dbde49561deed502d20be2fdab05397725e33047a95c22f85d",
+        "width": 2470,
+        "height": 2970,
+        "bytes": 839235,
+        "format": "heif",
+        "has_alpha": true
+      },
+      "preserved_source": null,
+      "output": {
+        "path": "assets/교수작업실/calendar.webp",
+        "sha256": "c7cc9e28793b019cd5c644bd958ea4959571ea453d5470f6edd1cd0eea22ac17",
+        "width": 1277,
+        "height": 1536,
+        "bytes": 733090,
+        "format": "webp",
+        "has_alpha": true
+      },
+      "transform": {
+        "webp_quality": 96,
+        "alpha_quality": 100,
+        "effort": 6,
+        "resize": {
+          "max_width": 1536,
+          "max_height": 1536,
+          "fit": "inside",
+          "without_enlargement": true
+        },
+        "crop": false,
+        "recolor": false,
+        "background_removal": false,
+        "upscale": false
+      }
+    }
+  ]
+}

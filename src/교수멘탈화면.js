@@ -33,6 +33,7 @@ import { 관측보고 } from './관측';
  * 이미 이 화면의 게이지가 쥐고 있다. 실시간 3단은 G3(알바변명) 전용이다. */
 import NPC from './NPC.js';
 import { LAB로고 } from './브랜드자산.js';
+import { 교수작업실장면, 편지책갈피 } from './교수작업실장면.js';
 import { 전이상태 } from '../lib/NPC연출.js';
 /**
  * G1 「교수님 멘탈 구하기」 — 격식 메일 쓰기 게임 (발주_게임모듈.md G1 · 게임층 설계).
@@ -71,7 +72,7 @@ import { 전이상태 } from '../lib/NPC연출.js';
  * ■ 신호 1점 = **보내기 버튼**(코랄 면 · `테마.신호자리.교수멘탈`) — 말하기의 녹음 버튼과 같은 규칙.
  */
 
-export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null, 시작단계 = '전략', 확인 = null, 확인뒤 = null }) {
+export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null, 시작단계 = '전략', 확인 = null, 확인뒤 = null, 가이드 = null }) {
   // 09-11 사용자 요청: 이 화면의 구 BGM을 제거한다. 읽기와 쓰기에 집중하도록 무음으로 둔다.
   useEffect(() => { bgm정지(); return () => bgm정지(); }, []);
   const { width, height } = useWindowDimensions();
@@ -281,7 +282,7 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
   const 전송대기 = !!(메일항목 && !메일항목.event_id && !메일항목.send_final);
 
   return (
-    <ScrollView ref={문서스크롤} style={s.wrap} contentContainerStyle={[s.inner, 좁다 && s.inner_좁음]} keyboardShouldPersistTaps="handled">
+    <ScrollView ref={문서스크롤} style={s.wrap} contentContainerStyle={[s.inner, 단계 === '전략' && s.inner_이야기, 좁다 && s.inner_좁음]} keyboardShouldPersistTaps="handled">
       <머리 />
       <View style={s.단계줄} accessibilityLabel={`지금은 ${단계 === '전략' ? '방법 고르기' : 단계 === '쓰기' ? '편지 쓰기' : '답장 기다리기'} 단계`}>
         {['방법 고르기', '편지 쓰기', '답장 기다리기'].map((말, i) => <View key={말} style={s.단계항목}>
@@ -290,41 +291,23 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
         </View>)}
       </View>
 
-      {단계 !== '쓰기' ? <View style={s.작업실}>
+      {단계 === '대기' ? <View style={s.작업실}>
         <Image source={require('../assets/장면/편지작업실.webp')} resizeMode="contain"
           style={[s.장면, { width: 장면너비, height: 장면너비 * 941 / 1672 }]}
           accessibilityLabel="몽글, 까몽, 마린이 함께 편지를 준비하는 작업실" />
         <Text style={s.종류}>교수님 멘탈 구하기</Text>
         <Text accessibilityRole="header" style={[s.제목, 넓다 && s.제목_넓음]}>
-          {단계 === '전략' ? '어떤 말로 시작할까요?' : 전송실패 ? '메일을 보내지 못했어요' : 전송대기 ? '연결되면 이어서 보내요' : '답장을 기다리고 있어요'}
+          {전송실패 ? '메일을 보내지 못했어요' : 전송대기 ? '연결되면 이어서 보내요' : '답장을 기다리고 있어요'}
         </Text>
-        <Text style={s.소개글}>{단계 === '전략' ? '마음을 전하는 방법은 하나가 아니니까요.' : 전송실패 ? '메일을 보내지 못했어요. 선생님께 알려 주세요.' : 전송대기 ? '메일은 기기에 남아 있어요. 앱을 다시 열면 이어서 보내요.' : '답장은 며칠 걸릴 수 있어요.\n답장이 오면 「답장」에서 볼 수 있어요.'}</Text>
-      </View> : <View style={s.쓰기머리}>
+        <Text style={s.소개글}>{전송실패 ? '메일을 보내지 못했어요. 선생님께 알려 주세요.' : 전송대기 ? '메일은 기기에 남아 있어요. 앱을 다시 열면 이어서 보내요.' : '답장은 며칠 걸릴 수 있어요.\n답장이 오면 「답장」에서 볼 수 있어요.'}</Text>
+      </View> : 단계 === '쓰기' ? <View style={s.쓰기머리}>
         <Text style={s.종류}>교수님 멘탈 구하기</Text>
         <Text accessibilityRole="header" style={[s.제목, 넓다 && s.제목_넓음]}>이제, 나의 말로.</Text>
-      </View>}
+      </View> : null}
 
       {오류 ? <View accessibilityLiveRegion="polite" style={s.오류판}><Text style={s.오류}>{오류}</Text></View> : null}
 
-      {단계 === '전략' && <View style={s.내용}>
-        <View style={s.상황}>
-          <Text style={s.카드라벨}>오늘의 상황</Text>
-          <Text style={s.상황글}>{문항.질문}</Text>
-          <Text style={s.본문글}>{문항.지시문}</Text>
-        </View>
-        {보기 ? <View style={s.전략목록}>
-          <Text style={s.선택라벨}>나는 이렇게 말할래요</Text>
-          {보기.options_shown.map((o) => <Pressable key={o.option_id} onPress={() => 고르기(o.option_id)} accessibilityRole="button"
-            style={({ pressed, hovered, focused }) => [s.전략카드, hovered && s.단추호버, focused && s.단추초점, pressed && s.눌림]}>
-            <View style={s.선택말}>
-              <Text style={s.전략글}>{o.label}</Text>
-              {보기.recommended_option === o.option_id ? <Text style={s.추천표시}>오늘의 추천</Text> : null}
-            </View>
-            <View style={s.다음자리}><선아이콘 종류="다음" /></View>
-          </Pressable>)}
-          <Text style={s.메모}>방법을 고른 다음, 직접 메일을 써요.</Text>
-        </View> : null}
-      </View>}
+      {단계 === '전략' && <교수작업실장면 재료={재료} 가이드={가이드} 보기={보기} onConfirm={고르기} />}
 
       {단계 === '쓰기' && <View style={s.내용}>
         <View style={s.받는줄}>
@@ -337,6 +320,7 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
           {고른전략라벨 ? <View style={s.고른방법}><Text style={s.메모}>내가 고른 방법</Text><Text style={s.방법글}>{고른전략라벨}</Text></View> : null}
           <Text style={s.메모}>{문항.지시문}</Text>
         </View>
+        <편지책갈피 가이드={가이드} 칸이름들={칸이름들} />
         <TextInput style={s.본문입력} placeholder="교수님께 보낼 메일을 써요"
           accessibilityLabel="교수님께 보낼 메일 본문" placeholderTextColor={색.잉크_메타}
           defaultValue="" onChangeText={(t) => { 본문참조.current = t; 입력됨(t); }} multiline textAlignVertical="top" />
@@ -421,8 +405,9 @@ const 어절줄바꿈 = Platform.select({ web: { wordBreak: 'keep-all', overflow
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: 색.바탕 },
   inner: { width: '100%', maxWidth: 736, alignSelf: 'center', paddingHorizontal: 24, paddingTop: 24, paddingBottom: 88 },
+  inner_이야기: { maxWidth: 1120 },
   inner_좁음: { paddingHorizontal: 20 },
-  머리: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 24, marginBottom: 28 },
+  머리: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 24, marginBottom: 16 },
   브랜드: { width: 150, height: 47 },
   머리말: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_보조 },
   단계줄: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },

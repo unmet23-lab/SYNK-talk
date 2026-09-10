@@ -1,0 +1,141 @@
+#!/usr/bin/env node
+'use strict';
+
+// 선택된 원본을 복사·형식 변환·단순 축소한다. 생성·재색칠·크롭·배경 제거는 하지 않는다.
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const sharp = require('sharp');
+const { 인자게이트 } = require('../lib/플래그.js');
+const { 형제정본 } = require('../lib/형제정본.js');
+
+const args = process.argv.slice(2);
+const 아는플래그 = ['--원본'];
+const 플래그오류 = 인자게이트('교수장면자산반입', args, 아는플래그);
+if (플래그오류 || (args.length && (args.length !== 2 || args[0] !== '--원본' || args[1].startsWith('--')))) {
+  console.error(플래그오류 || '사용법: node tools/교수장면자산반입.js [--원본 <연구실 PNG 경로>]');
+  process.exit(2);
+}
+
+const root = path.resolve(__dirname, '..');
+const outputDir = path.join(root, 'assets/교수작업실');
+const originalScene = 'C:/Users/q1212/.codex/generated_images/01a08bec-1f1d-7903-b772-c36f94a712f1/exec-e89f0125-1492-4e53-ae95-b8e4206428f2.png';
+const preservedScene = path.join(root, 'tmp/교수작업실소스/research-source.png');
+const sceneSource = args.length ? path.resolve(args[1]) : fs.existsSync(preservedScene) ? preservedScene : originalScene;
+const originalCutout = 'C:/Users/q1212/.codex/generated_images/01a08bec-1f1d-7903-b772-c36f94a712f1/exec-f237abae-15b7-434e-85e8-42fd66c779a0.png';
+const preservedCutout = path.join(root, 'tmp/교수작업실소스/notebook-cutout-source.png');
+const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+const slash = value => value.replace(/\\/g, '/');
+
+const sources = [
+  { name: 'research', source: sceneSource, original: originalScene, native: true,
+    preserved: 'tmp/교수작업실소스/research-source.png',
+    sha256: 'd584cc1d7cabb48e06e22ba1fbfd8f93b3dffa857bab96b8a2803408eef0c55d', width: 1672, height: 941,
+    usage: 'PC G1 교수 연구실의 장면 배경. 원본 전체 화폭을 유지한다.' },
+  { name: 'envelope', canonical: 'docs/Loom_자산/구움/공방_편지봉투.avif',
+    sha256: 'f21077b69183b25d1222db18c0b4c9b1cd938679d6289be1613b772911a9c27b', width: 3176, height: 2680,
+    usage: '편지 전달·열기 동작에 사용하는 펠트 봉투 소품.' },
+  { name: 'notebook', canonical: 'docs/Loom_자산/구움/공방_공책과연필.avif',
+    sha256: '4d5b4df9ec676c4d0bec63269d70e4f3a78bc8708dd75abfac725a285fa079d4', width: 4096, height: 4096,
+    usage: '배경 제거 ImageGen의 참조 전용. 불투명 사각 이미지이며 현재 UI에서는 사용하지 않는다.' },
+  { name: 'notebook-cutout', source: fs.existsSync(preservedCutout) ? preservedCutout : originalCutout,
+    original: originalCutout, native: true, requireAlpha: true,
+    preserved: 'tmp/교수작업실소스/notebook-cutout-source.png',
+    sha256: 'e1f4acffc768c73b7691ab373a6c71f406ee2351b5630d14f1d142a8b70e0a09', width: 1254, height: 1254,
+    usage: '현재 PC G1 UI의 편지 작성·기록 소품. 공책과 연필만 남긴 투명 이미지.',
+    generation: {
+      tool: 'Codex built-in ImageGen', operation: '참조 이미지의 밝은 천 배경 제거',
+      model_label: '정확한 모델명은 이 반입 작업에서 확인하지 않음',
+      instruction_from_task: 'coralwoolfelt notebook+creamelasticstrap+onewoodpencilexactidentity, removeonlycreamfabricground, fullobjectcentered,RGBAtransparent,maxnativeres,noextrashapes.',
+      references: [{ path: 'assets/교수작업실/notebook.webp', width: 1536, height: 1536,
+        sha256: '899dd290cc7995eb98e6d9e9472184c014b60175149eee8ff62c62f4da0a034a' }],
+      resolution_note: '편집 원본 실제 1254×1254. 원래 4096px 소품이나 1536px 참조의 해상도를 유지했다고 표기하지 않는다.',
+    } },
+  { name: 'calendar', canonical: 'docs/Loom_자산/구움/공방_달력.avif',
+    sha256: '57879d05405193dbde49561deed502d20be2fdab05397725e33047a95c22f85d', width: 2470, height: 2970,
+    usage: '일정·기한을 가리키는 펠트 달력 소품.' },
+];
+const referenceSources = [
+  { path: 'assets/장면/편지작업실.webp', role: '기존 펠트 스튜디오의 재질·조명 참조',
+    sha256: 'f638c65421a3057d20e7dda0bb3c4d517c1ffd90a8c1fc6a29bcdba5434a5461' },
+  { path: 'assets/npc/prof-calm.webp', role: '교수의 형태·색·안경·눈 참조',
+    sha256: '1f8f5ad7471b33a8617e5d08dad2c15e3b3824c303c01be0707af21aac2a0740' },
+];
+
+(async () => {
+  const canonicalRoot = 형제정본(root);
+  const references = await Promise.all(referenceSources.map(async entry => {
+    const bytes = fs.readFileSync(path.join(root, entry.path));
+    if (sha(bytes) !== entry.sha256) throw new Error(`참조 자산 지문이 다릅니다: ${entry.path}`);
+    const meta = await sharp(bytes).metadata();
+    return { ...entry, width: meta.width, height: meta.height };
+  }));
+  const prepared = await Promise.all(sources.map(async entry => {
+    const sourcePath = entry.source || path.join(canonicalRoot, entry.canonical);
+    const bytes = fs.readFileSync(sourcePath);
+    if (sha(bytes) !== entry.sha256) throw new Error(`선택된 원본 지문이 다릅니다: ${entry.name}`);
+    const meta = await sharp(bytes).metadata();
+    if (meta.width !== entry.width || meta.height !== entry.height) throw new Error(`원본 치수가 다릅니다: ${entry.name}`);
+    if (entry.requireAlpha && !meta.hasAlpha) throw new Error(`투명 원본이 아닙니다: ${entry.name}`);
+    let pipeline = sharp(bytes);
+    if (!entry.native) pipeline = pipeline.resize({ width: 1536, height: 1536, fit: 'inside', withoutEnlargement: true });
+    const output = await pipeline.webp({ quality: 96, alphaQuality: 100, effort: 6 }).toBuffer();
+    const outMeta = await sharp(output).metadata();
+    if (outMeta.width > meta.width || outMeta.height > meta.height || outMeta.hasAlpha !== meta.hasAlpha) {
+      throw new Error(`무확대·알파 보존 조건이 깨졌습니다: ${entry.name}`);
+    }
+    return { bytes, output, record: {
+      name: entry.name,
+      usage: entry.usage,
+      source: { path: slash(entry.original || sourcePath), canonical_path: entry.canonical || null,
+        sha256: entry.sha256, width: meta.width, height: meta.height, bytes: bytes.length,
+        format: meta.format, has_alpha: meta.hasAlpha },
+      preserved_source: entry.preserved || null,
+      ...(entry.generation ? { generation: entry.generation } : {}),
+      output: { path: `assets/교수작업실/${entry.name}.webp`, sha256: sha(output),
+        width: outMeta.width, height: outMeta.height, bytes: output.length, format: outMeta.format, has_alpha: outMeta.hasAlpha },
+      transform: { webp_quality: 96, alpha_quality: 100, effort: 6,
+        resize: entry.native ? null : { max_width: 1536, max_height: 1536, fit: 'inside', without_enlargement: true },
+        crop: false, recolor: false, background_removal: false, upscale: false },
+    } };
+  }));
+  const cutoutReference = sources.find(entry => entry.name === 'notebook-cutout').generation.references[0];
+  if (prepared.find(item => item.record.name === 'notebook').record.output.sha256 !== cutoutReference.sha256) {
+    throw new Error('공책 생성 참조의 지문이 달라졌습니다. 인코더와 원본을 확인하세요.');
+  }
+  const manifest = {
+    date: '2026-09-11',
+    usage: 'PC G1 펠트 게임용 연구실과 소품. Android 빌드·배포와 무관하다.',
+    generator: 'tools/교수장면자산반입.js',
+    encoder: { sharp: sharp.versions.sharp, libvips: sharp.versions.vips, webp: sharp.versions.webp },
+    generation: { tool: 'Codex built-in ImageGen', model_label: '정확한 모델명은 이 반입 작업에서 확인하지 않음',
+      original_path: originalScene, native_width: 1672, native_height: 941,
+      resolution_note: '생성 원본 실제 1672×941. 확대하지 않았으며 4K 원본이 아니다.', references },
+    assets: prepared.map(item => item.record),
+  };
+  fs.mkdirSync(outputDir, { recursive: true });
+  for (const item of prepared) {
+    if (item.record.preserved_source) {
+      const preserved = path.join(root, item.record.preserved_source);
+      fs.mkdirSync(path.dirname(preserved), { recursive: true });
+      fs.writeFileSync(preserved, item.bytes);
+    }
+    fs.writeFileSync(path.join(root, item.record.output.path), item.output);
+  }
+  fs.writeFileSync(path.join(outputDir, '출처.json'), JSON.stringify(manifest, null, 2) + '\n');
+  fs.writeFileSync(path.join(outputDir, 'README.md'), [
+    '# 교수 작업실 자산', '',
+    'PC G1 펠트 게임용 장면과 소품. 출처·지문·치수·인코더 판은 [출처.json](출처.json)에 있다.', '',
+    '- 연구실: 내장 ImageGen이 만든 1672×941 원본 PNG를 그대로 보존하고 같은 크기의 WebP 품질 96으로 변환했다. 4K 원본이 아니다.',
+    '- 기존 소품: Apps Script의 Loom AVIF를 긴 변 최대 1536px로만 축소했다. 봉투·달력은 알파를 보존한다.',
+    '- 현재 UI는 notebook-cutout.webp를 사용한다. 내장 ImageGen이 notebook.webp의 밝은 천 배경을 제거한 RGBA 원본을 1254×1254 그대로 WebP 품질 96으로 변환했다. 원본 알파를 보존한다.',
+    '- notebook.webp는 그 편집의 참조 전용이다. 원래 불투명한 4096×4096 소품을 1536×1536으로 변환한 파일이며 현재 UI에서는 사용하지 않는다.',
+    '- 연구실·투명 공책의 원본 PNG 바이트 사본은 Git 제외 경로 `tmp/교수작업실소스/research-source.png`와 `notebook-cutout-source.png`에 보존한다. 1MB를 넘는 이 원본은 커밋하지 않으며 원래 생성 파일도 보존한다.',
+    '- 이 반입 단계는 형식 변환·단순 축소만 한다. 크롭·재색칠·배경 제거·확대는 호출하지 않는다. 앞선 ImageGen 배경 제거와 반입 단계는 출처에서 구분한다.', '',
+    '| 파일 | 실제 크기 | 바이트 | 용도 |', '|---|---|---:|---|',
+    ...prepared.map(({ record: r }) => `| ${r.name}.webp | ${r.output.width}×${r.output.height} | ${r.output.bytes} | ${r.usage} |`), '',
+    '재생성: `node tools/교수장면자산반입.js`. 보존 PNG가 없으면 원래 생성 경로를 읽는다. 다른 위치의 동일 연구실 PNG는 `--원본 <경로>`로 지정한다. 투명 공책 PNG를 옮겼다면 기록된 `tmp/교수작업실소스/notebook-cutout-source.png` 위치에 동일 바이트를 둔다. Apps Script 정본 위치는 기존 `SYNK_APPSSCRIPT_ROOT`를 따른다.', '',
+    '이 도구는 새 이미지 생성·의미 편집을 호출하지 않는다. 실제 화면 배치·상호작용 검증은 화면 담당이 수행한다.', '',
+  ].join('\n'));
+  console.log(JSON.stringify({ preserved_source_sha256: sha(fs.readFileSync(preservedScene)), assets: manifest.assets }, null, 2));
+})().catch(error => { console.error(error.message); process.exitCode = 1; });
