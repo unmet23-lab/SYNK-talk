@@ -264,14 +264,24 @@ async function 전송유효(차례: { submission_id: string; attempt_id: string 
   return new Set(허용.map((r) => r.submission_id));
 }
 
+// fetch 호출 전 미전송이 확정된 시도만 해제한다. 이미 시작한 네트워크의 불확실 접수에는 쓰지 않는다.
+async function 미전송해제(차례: { submission_id: string; attempt_id: string }[]) {
+  for (const 행 of 차례) {
+    await sql`update engine.pipeline_jobs set correction_batch_id = null, lease_until = null, updated_at = now()
+      where submission_id = ${행.submission_id}::uuid and attempt_id = ${행.attempt_id}::uuid
+        and correction_batch_id = ${접수미확정}`;
+  }
+}
+
 async function 처리(req: Request): Promise<Response> {
   if (req.method !== 'POST') return 봉투(405, { error: 'method_not_allowed' });
   if (!서비스역할(req)) return 봉투(401, { error: 'service_role 만 부를 수 있습니다' });
 
   const 마감 = Date.now() + 115_000;
-  const 가져오기 = (주소: string, 설정: RequestInit = {}) => {
+  const 가져오기 = (주소: string, 설정: RequestInit = {}, 전송시작?: () => void) => {
     const 남음 = 마감 - Date.now();
     if (남음 <= 0) throw new Error('request_deadline');
+    전송시작?.();
     return fetch(주소, { ...설정, redirect: 'error',
       signal: AbortSignal.timeout(Math.min(왕복제한밀리, 남음)) });
   };
@@ -408,11 +418,13 @@ async function 처리(req: Request): Promise<Response> {
 
   /* ── ① 회수 (배치 통로에서만) ──────────────────────────────────────────
    * 이미 값을 치른 결과를 걷는 일이라 **설정 검사보다 앞**이다. 여기서 나오는 실패는 전부
-   * 「다음 회차가 다시 집는다」로 끝난다 — 행을 실패로 못박는 자리가 없다. */
+   * DB 쓰기/조회 실패는 다음 회차가 같은 결과를 다시 걷는다. 확정 결과 거절은 receipt를
+   * 보존하고 주의를 요청한다. 자동 재과금하지 않으며 수리 후 같은 결과의 재해석은 가능하다. */
   let 회수: Record<string, unknown> | null = null;
   let 도는배치 = 0;
   let 회수HTTP실패 = false;
   let 미확정수 = 0;
+  let 결과실패수 = 0;
   if (!즉시) {
     // 같은 Anthropic workspace의 다른 프로젝트/서비스 배치는 정상 경로에서 조회하지 않는다.
     const 영수증 = await sql`select s.submission_id, j.attempt_id, j.correction_batch_id
@@ -494,6 +506,7 @@ async function 처리(req: Request): Promise<Response> {
           console.error('[correct] batch_result_rejected', 사유);
           센다(버림, 사유);
           await 장부에(해석.submission_id, 사유);
+          결과실패수 += 1;
           미룸 += 1; continue;
         }
         if (해석.사용량) 성적들.push(캐시성적(해석.사용량));
@@ -503,6 +516,7 @@ async function 처리(req: Request): Promise<Response> {
           console.error('[correct] correction_rejected', 사유);
           센다(버림, 사유);
           await 장부에(해석.submission_id, 사유);
+          결과실패수 += 1;
           미룸 += 1; continue;
         }
         try {
@@ -517,6 +531,7 @@ async function 처리(req: Request): Promise<Response> {
           console.error('[correct] correction_write_failed');
           센다(버림, '예외');
           await 장부에(해석.submission_id, '예외');
+          결과실패수 += 1;
           미룸 += 1;
         }
       }
@@ -529,9 +544,10 @@ async function 처리(req: Request): Promise<Response> {
    *   회수 블록 «안»이 아니라 «밖»에 두는 이유는 위 주석의 ⚠ 와 같다 — 블록 조건이 바뀌어도
    *   이 문은 서 있어야 한다. `캐시` 를 같이 싣는 것이 이 통로의 존재 이유다(단가). */
   if (회수만) {
-    return 봉투(회수HTTP실패 || 미확정수 ? 502 : 200, {
+    return 봉투(회수HTTP실패 || 미확정수 || 결과실패수 ? 502 : 200, {
       대기: 대기수, 적음, 미룸, 버림, 장부, 이유: '회수만', 회수,
-      needs_attention: 미확정수 > 0, 접수미확정: 미확정수,
+      needs_attention: 회수HTTP실패 || 미확정수 > 0 || 결과실패수 > 0,
+      접수미확정: 미확정수, 결과실패: 결과실패수,
       캐시: 성적합(성적들), ...(즉시요청 ? { 무시한즉시: true } : {}),
     });
   }
@@ -593,9 +609,10 @@ async function 처리(req: Request): Promise<Response> {
 
   if (!즉시) {
     if (!행들.length) {
-      return 봉투(미확정수 ? 502 : 200, { 대기: 대기수, 적음, 미룸, 버림, 장부,
-        이유: 미확정수 ? 'batch_receipt_unresolved' : 'nothing_to_submit', needs_attention: 미확정수 > 0,
-        접수미확정: 미확정수, 회수, 캐시: 성적합(성적들) });
+      return 봉투(미확정수 || 결과실패수 ? 502 : 200, { 대기: 대기수, 적음, 미룸, 버림, 장부,
+        이유: 미확정수 ? 'batch_receipt_unresolved' : 결과실패수 ? 'batch_result_needs_attention' : 'nothing_to_submit',
+        needs_attention: 미확정수 > 0 || 결과실패수 > 0,
+        접수미확정: 미확정수, 결과실패: 결과실패수, 회수, 캐시: 성적합(성적들) });
     }
     /* 🔴 `custom_id` 규격은 **내보내기 전에** 본다 — `tag_drift` 와 같은 자리다. 어기면 벤더가
      *   배치 한 벌을 통째로 400 으로 튕긴다. 실패는 5xx로 회차 장부에 남기지만,
@@ -612,11 +629,17 @@ async function 처리(req: Request): Promise<Response> {
     }
 
     const 차례 = await 전송차례(행들.map((r) => r.submission_id), false);
-    const 허용 = await 전송유효(차례);
+    let 허용: Set<string>;
+    try { 허용 = await 전송유효(차례); }
+    catch { await 미전송해제(차례); throw new Error('batch_preflight_failed'); }
+    await 미전송해제(차례.filter((r) => !허용.has(r.submission_id)));
     행들 = 행들.filter((r) => 허용.has(r.submission_id));
     if (!행들.length) return 봉투(200, { 대기: 대기수, 적음, 미룸, 버림, 장부,
       이유: 'nothing_claimed', 회수 });
 
+    let 실제전송시작 = false;
+    let r: Response;
+    try {
     const 몸통 = 배치몸통(행들, 지시문 as string, 판) as { requests: { custom_id: string }[] };
     for (let i = 0; i < 행들.length; i++) {
       const attempt = 차례.find((r) => r.submission_id === 행들[i].submission_id)!.attempt_id;
@@ -627,12 +650,16 @@ async function 처리(req: Request): Promise<Response> {
       }
     }
 
-    const r = await 가져오기(배치경로, {
+    r = await 가져오기(배치경로, {
       method: 'POST',
       headers: 벤더헤더(키),
       body: JSON.stringify(몸통),
       signal: AbortSignal.timeout(왕복제한밀리),
-    });
+    }, () => { 실제전송시작 = true; });
+    } catch {
+      if (!실제전송시작) await 미전송해제(차례);
+      throw new Error('batch_submit_interrupted');
+    }
     if (!r.ok) {
       console.error('[correct] batch_submit_failed', r.status);
       // 접수 거절이 확정된 상태만 다음 예약에서 다시 집는다. timeout/5xx는 미확정 유지.
@@ -656,9 +683,10 @@ async function 처리(req: Request): Promise<Response> {
         and attempt_id = any(${차례.map((r) => r.attempt_id)}::uuid[])
         and correction_batch_id = ${접수미확정} returning submission_id`;
     if (기록.length !== 행들.length) throw new Error('batch_receipt_write_failed');
-    return 봉투(200, {
+    return 봉투(미확정수 || 결과실패수 ? 502 : 200, {
       대기: 대기수, 적음, 미룸, 버림, 장부, 회수,
-      제출: 행들.length, 접수기록: true, needs_attention: 미확정수 > 0,
+      제출: 행들.length, 접수기록: true, needs_attention: 미확정수 > 0 || 결과실패수 > 0,
+      접수미확정: 미확정수, 결과실패: 결과실패수,
       캐시: 성적합(성적들), 모델, prompt_ver: 판,
     });
   }

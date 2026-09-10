@@ -52,7 +52,10 @@ function setup(options = {}) {
     }
     if (q.startsWith('update engine.pipeline_jobs set correction_batch_id')) {
       if (options.receiptWriteError) throw new Error(raw);
-      if (q.includes('correction_batch_id = null')) { state.receipt = null; state.lease = 0; return []; }
+      if (q.includes('correction_batch_id = null')) {
+        assert.match(q, /attempt_id =/); assert.match(q, /and correction_batch_id =/);
+        state.receipt = null; state.lease = 0; return [];
+      }
       state.receipt = values[0]; return [{ submission_id: sid }];
     }
     if (q.startsWith('select s.submission_id from')) {
@@ -142,7 +145,7 @@ function setup(options = {}) {
       options.duringResults?.(state);
       if (options.resultsStatus) return new Response(raw, { status: options.resultsStatus });
       return new Response(JSON.stringify({ custom_id: `a${aid.replace(/-/g, '')}_${engine.교정요청판(prompt)}`,
-        result: { type: 'succeeded', message: message() } }) + '\n');
+        result: options.result || { type: 'succeeded', message: message() } }) + '\n');
     },
   });
   return { state, async call(query = '', authorized = true) {
@@ -185,8 +188,19 @@ test('동시 회수는 단건 잠금 뒤 NOT EXISTS를 다시 보아 한 번만 
   assert.equal(t.state.writes, 1); assert.equal(t.state.vendorPosts, 0);
 });
 test('점유 직후 동의가 철회되면 HTTP를 보내지 않는다', async () => {
-  const t = setup({ afterClaim: (s) => { s.consent = false; } }); await t.call();
+  const t = setup({ afterClaim: (s) => { if (s.claims === 1) s.consent = false; } }); await t.call();
   assert.equal(t.state.vendorPosts, 0); assert.equal(t.state.writes, 0);
+  assert.equal(t.state.receipt, null); assert.equal(t.state.lease, 0);
+  t.state.consent = true;
+  assert.equal((await t.call()).body.제출, 1); assert.equal(t.state.vendorPosts, 1);
+});
+
+test('전송 전 시간 소진은 fetch 0회이며 같은 attempt만 해제해 다음 회차가 집는다', async () => {
+  let exhausted = false;
+  const t = setup({ beforeEligibility: (s) => { if (!exhausted) { s.now += 120000; exhausted = true; } } });
+  assert.equal((await t.call()).status, 503);
+  assert.equal(t.state.vendorPosts, 0); assert.equal(t.state.receipt, null); assert.equal(t.state.lease, 0);
+  assert.equal((await t.call()).body.제출, 1); assert.equal(t.state.vendorPosts, 1);
 });
 test('결과 다운로드 중 철회되면 교정을 저장하지 않는다', async () => {
   const t = setup({ initial: { batch: 'ended' }, duringResults: (s) => { s.consent = false; } }); await t.call('?회수=1');
@@ -226,6 +240,19 @@ test('공급자 원문·DB 예외·학생 식별자는 응답/로그에 남지 �
 test('상충 태그는 자동 회수에서도 부분 저장하지 않는다', async () => {
   const t = setup({ initial: { batch: 'ended' }, tags: ['오류없음', '높임:주체'] }); const r = await t.call('?회수=1');
   assert.equal(t.state.writes, 0); assert.equal(r.body.버림.상충태그, 1);
+  assert.equal(r.status, 502); assert.equal(r.body.needs_attention, true);
+  t.state.now += 48 * 3600_000;
+  const next = await t.call(); assert.equal(next.status, 502); assert.equal(next.body.needs_attention, true);
+  assert.equal(next.body.이유, 'batch_result_needs_attention');
+  assert.equal(t.state.vendorPosts, 0); assert.equal(t.state.receipt, 'synthetic-batch');
+});
+
+test('종료된 벤더 오류는 receipt를 보존하고 비정상/주의로 보고해 몰래 재과금하지 않는다', async () => {
+  const t = setup({ initial: { batch: 'ended' }, result: { type: 'errored', error: { type: 'api_error', message: raw } } });
+  const r = await t.call('?회수=1'); assert.equal(r.status, 502); assert.equal(r.body.needs_attention, true);
+  assert.equal(r.body.결과실패, 1); assert.equal(t.state.receipt, 'synthetic-batch');
+  assert.equal(t.state.writes, 0); assert.equal(t.state.vendorPosts, 0);
+  assert.equal(JSON.stringify([r, t.state.logs]).includes(raw), false);
 });
 
 test('확정 영수증은 workspace 목록 밖에 있어도 직접 회수한다', async () => {

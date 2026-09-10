@@ -90,7 +90,7 @@ test('🔴 설정 문제로는 행을 못박지 않는다 — 키가 오는 날 
   }
   // 교정 저장과 전송 lease는 별개다. lease는 설정 검사를 통과한 전송 직전에만 얻는다.
   assert.equal([...본체.matchAll(/insert\s+into\s+engine\.corrections/gi)].length, 1);
-  assert.equal([...본체.matchAll(/update\s+engine\.pipeline_jobs/gi)].length, 4);
+  assert.equal([...본체.matchAll(/update\s+engine\.pipeline_jobs/gi)].length, 5);
   assert.ok(!/set\s+status\s*=/.test(본체), '실패로 영구 제외하는 상태 변경은 금지');
 });
 
@@ -222,7 +222,7 @@ test('🔴 평가 통로(?평가=1) — DB 무접촉·상한·원자재 반환 (
 test('🔴 회수 전용 문(?회수=1) — 걷되 «내보내지 않는다»', () => {
   const 구간 = /회수 = \{ 배치:[\s\S]*?가져오기\(배치경로, \{\s*method: 'POST'/.exec(본체);
   assert.ok(구간, '「걷기 끝 → 배치 제출」 구간을 못 떴다 — 이 검사가 헛돌고 있다(landmark 가 낡았다)');
-  assert.match(납작(구간[0]), /if \(회수만\) \{ return 봉투\(회수HTTP실패 \|\| 미확정수 \? 502 : 200,/,
+  assert.match(납작(구간[0]), /if \(회수만\) \{ return 봉투\(회수HTTP실패 \|\| 미확정수 \|\| 결과실패수 \? 502 : 200,/,
     '회수 전용 문이 배치 제출 «앞»에 없다 — `?회수=1` 이 걷고 나서 새 배치를 또 낸다(=승인 없는 지출)');
 });
 
