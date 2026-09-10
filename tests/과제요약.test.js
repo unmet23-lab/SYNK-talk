@@ -123,3 +123,66 @@ test('재료 결함은 던진다 — 상태 객체 없이 부르면 조용히 �
   assert.throws(() => 과제요약(null), /학습자상태/);
   assert.throws(() => 과제요약({}), /학습자상태/);
 });
+
+/* ── 「아니야」 제외 (철학 적용기준 「관측과 성향」 · 09-05 「아니야」= 빼기 · 2026-09-11) ────────────
+ * 학생이 맞아? 카드에서 부정한 추정의 «축»은 생성 요약에서 빠지고 axes_used 에도 안 센다. 원관측·정정
+ * 이력은 이 층 밖(행 · 학습자상태 확인축)에 그대로 산다 — 여기는 벤더에게 가는 «재료»만 가른다.
+ * 🔴 분모를 먼저 잰다 — 뺄 것이 애초에 없는 픽스처면 「뺐다」와 「아무 일도 없었다」가 같은 초록이다(F207). */
+const { 부정키, 부정키들 } = require('../lib/성향확인.js');
+
+test('🔴 「아니야」 받은 축은 요약·axes_used 에서 빠진다 — 분모(빼기 전 실림)를 먼저 잰다', () => {
+  const 상태 = 실물상태();
+  const 앞 = 과제요약(상태, { 목표: 'study' });
+  // 분모 — 빼기 전에 리듬이 «실제로» 실려 있다. 이것이 거짓이면 아래 단언은 전부 공허하다.
+  assert.ok(앞.axes_used.includes('리듬') && /^리듬: /m.test(앞.요약), `분모 소실 — 리듬이 애초에 안 실렸다: ${앞.요약}`);
+
+  const 뒤 = 과제요약(상태, { 목표: 'study', 부정키들: [부정키('리듬', '여유제출')] });
+  assert.ok(!뒤.axes_used.includes('리듬'), '부정된 축이 axes_used 에 남았다 — 읽기 기록·상태없음 판정이 거짓이 된다');
+  assert.ok(!/^리듬: /m.test(뒤.요약), `부정된 축의 관측 줄이 벤더 입력에 남았다: ${뒤.요약}`);
+  assert.deepEqual(뒤.제외축, ['리듬'], '뺀 축을 되돌려 주지 않는다 — 로그·회귀가 「빠졌다」를 볼 수 없다');
+  assert.equal(뒤.쓸축수, 앞.쓸축수 - 1, '쓸축수 = axes_used 길이(두 곳에서 안 센다) — 정확히 하나 줄어야 한다');
+  assert.equal(뒤.evidence_refs.axes_used, 뒤.axes_used, '같은 배열이어야 한다 — 사본이면 갈라진다');
+  // 나머지 줄은 한 글자도 안 바뀐다 — 제외는 «그 축 줄 하나»만 뺀다(재정렬·재렌더 금지).
+  assert.deepEqual(뒤.요약.split('\n'), 앞.요약.split('\n').filter((l) => !l.startsWith('리듬: ')));
+  // 원관측은 이 층 밖이다 — 상태 객체는 그대로다(여기서 지우거나 고치지 않는다).
+  assert.ok(상태.축.리듬 && 상태.축.리듬.n > 0, '상태 객체의 원관측을 건드렸다');
+});
+
+test('「아니야」 가 없으면 산출이 한 글자도 안 바뀐다 (빈 목록·null·미지정이 같은 모양)', () => {
+  const 상태 = 실물상태();
+  const 기준산출 = 과제요약(상태, { 목표: 'study', 급수: 'Lv4' });
+  assert.deepEqual(과제요약(상태, { 목표: 'study', 급수: 'Lv4', 부정키들: [] }), 기준산출);
+  assert.deepEqual(과제요약(상태, { 목표: 'study', 급수: 'Lv4', 부정키들: null }), 기준산출);
+  assert.deepEqual(기준산출.제외축, [], '부정이 없는데 제외축이 비지 않았다');
+});
+
+test('부정된 축이 상태에 없으면(널 축) 뺀 것이 아니다 — 제외축은 «실렸을 축»만 센다', () => {
+  const 상태 = 실물상태();   // 관심 축은 널이다(픽스처 머리말)
+  assert.equal(상태.축.관심, null, '픽스처 전제 — 관심 축이 널이어야 이 검사가 뜻이 있다');
+  const r = 과제요약(상태, { 부정키들: [부정키('관심', '아무키')] });
+  assert.deepEqual(r.제외축, [], '안 실릴 축을 「뺐다」로 셌다 — 빈 축은 뺀 게 아니다');
+  assert.deepEqual(r.axes_used, 과제요약(상태).axes_used);
+});
+
+test('원신호 → 부정키들 → 과제요약 사슬 — 한 키만 부정돼도 그 축 줄이 빠지고, 정정 이력(확인 축 계수)은 그대로 실린다', () => {
+  const 행 = [];
+  for (let d = 5; d >= 1; d -= 1) {
+    행.push(사건('task.assigned', 전(d * 일), { due_at: 전(d * 일 - 12 * 3600000) }));
+    행.push(사건('submission.created', 전(d * 일 - 3600000)));
+  }
+  행.push(사건('estimate.responded', 전(일 / 2), {
+    payload: { ver: 1, trait_axis: '리듬', shown_key: '여유제출', shown_text: '요즘 여유 있게 내시네요?', response: '아니다', estimator_version: 'v', estimate_as_of: 기준 },
+  }));
+  const 상태 = 학습자상태(행, { as_of: 기준, ingested_as_of: 기준, 시간대: 'Asia/Ulaanbaatar' });
+  const 키들 = 부정키들(행);
+  assert.deepEqual(키들, ['리듬:여유제출'], '분모 — 부정 키가 정확히 하나여야 아래가 실측이다');
+
+  const 앞 = 과제요약(상태);
+  assert.ok(앞.axes_used.includes('리듬') && 앞.axes_used.includes('확인'), `분모 소실: ${앞.axes_used.join(',')}`);
+  const 뒤 = 과제요약(상태, { 부정키들: 키들 });
+  assert.deepEqual(뒤.제외축, ['리듬']);
+  assert.ok(!뒤.axes_used.includes('리듬'), '부정된 축이 남았다');
+  assert.ok(뒤.axes_used.includes('확인'), '확인 축(정정 이력 계수)까지 빠졌다 — 여기는 «부정된 추정»만 뺀다');
+  assert.ok(/^확인: /m.test(뒤.요약) && /아니다수=1/.test(뒤.요약), `정정 이력 줄이 안 실렸다: ${뒤.요약}`);
+  assert.equal(뒤.쓸축수, 앞.쓸축수 - 1);
+});

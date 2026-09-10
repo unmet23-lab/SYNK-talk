@@ -194,3 +194,64 @@ test('progress 배선(v2) — 세 축 전달 · session.abandoned 걷기 · 라�
   assert.ok(/task_schema_ver/.test(소스), '라디오 판별 칸(task_schema_ver)이 안 실린다 — 낭독 행이 앱 행으로 샌다');
   assert.ok(/compose_meta/.test(소스), '작성과정 재료(compose_meta)가 안 실린다 — 축이 영원히 null 이다');
 });
+
+/* ── 「아니야」= 빼기 (철학 적용기준 「관측과 성향」 · 09-05 · 2026-09-11) ──────────────────────────
+ * 부정 키의 형식은 이 파일 한 원천이고, 추출(`부정키들`)·축 풀기(`부정축들`)도 같은 파일에 산다.
+ * 생성 요약(lib/과제요약.js)이 이걸로 축을 뺀다 — 재노출 게이트(progress)와 같은 «아니다» 규칙. */
+const { 부정키, 부정키풀기, 부정키들, 부정축들 } = require('../lib/성향확인.js');
+
+test('부정키풀기 — 부정키의 역이고 규격 밖은 null 이다(빈 축으로 접지 않는다)', () => {
+  assert.deepEqual(부정키풀기(부정키('리듬', '여유제출')), { 축: '리듬', 키: '여유제출' });
+  assert.deepEqual(부정키풀기('집중띠:주로저녁'), { 축: '집중띠', 키: '주로저녁' });
+  for (const 나쁨 of ['리듬', ':여유제출', '리듬:', '', null, undefined]) {
+    assert.equal(부정키풀기(나쁨), null, `규격 밖 ${JSON.stringify(나쁨)} 이 풀렸다`);
+  }
+});
+
+test('🔴 부정키들 — «아니다» 행만 · 첫 등장 순 · 중복 없음 · 반쪽 행·남의 사건은 안 센다 (분모 함께)', () => {
+  const 행 = (response, 축 = '리듬', 키 = '여유제출') => ({
+    event_type: 'estimate.responded', occurred_at: '2026-09-10T10:00:00Z',
+    payload: { ver: 1, trait_axis: 축, shown_key: 키, shown_text: '…', response, estimator_version: 'v', estimate_as_of: 't' },
+  });
+  const 행들 = [
+    행('맞다'),                                                     // 긍정 — 부정이 아니다
+    행('아니다'),                                                   // 부정 ①
+    행('아니다', '집중띠', '주로저녁'),                              // 부정 ②
+    행('아니다'),                                                   // ① 중복
+    행('아니다', '작성과정', ''),                                    // 반쪽(키 없음) — 안 센다
+    { event_type: 'submission.created', payload: { response: '아니다', trait_axis: '리듬', shown_key: '반복제출' } },   // 남의 사건
+    { event_type: 'estimate.responded', payload: null },
+  ];
+  assert.equal(행들.filter((e) => e.payload && e.payload.response === '아니다').length, 5,
+    '분모 — 「아니다」 표본이 다섯이어야 아래 걸러짐이 실측이다');
+  assert.deepEqual(부정키들(행들), ['리듬:여유제출', '집중띠:주로저녁']);
+  assert.deepEqual(부정키들([]), []);
+  assert.deepEqual(부정키들(null), []);
+  // progress 가 SQL 쌍으로 내는 것과 같은 형식 — 카드 게이트에 그대로 먹인다(한 원천의 증명).
+  assert.equal(확인카드(축들(), 이력({ 부정키들: 부정키들(행들) }), 't', 'v')?.shown_key, '반복제출',
+    '추출한 부정키가 재노출 게이트와 형식이 다르다 — 「아니야」가 생성에선 빠지고 카드에선 다시 뜬다');
+});
+
+test('부정축들 — 축 단위로 편다(첫 등장 순 · 중복 없음 · 규격 밖 무시)', () => {
+  assert.deepEqual(부정축들(['리듬:여유제출', '리듬:반복제출', '집중띠:주로저녁', '깨진키']), ['리듬', '집중띠']);
+  assert.deepEqual(부정축들([]), []);
+  assert.deepEqual(부정축들(null), []);
+});
+
+/* 배선 봉인 — 생성 오케스트레이터가 원신호에서 부정키들을 뽑아 과제요약 조각으로 넘기고, deliver 동봉 표가
+ * 이 파일(과 문구 사슬)을 싣는다. 순수층만 초록이면 아무도 안 부르는 상태다(등록층 규율 · 활성 전엔
+ * 이 통로가 어둡다 — 활성 조각이 서는 날 켜지는 것까지가 이 봉인의 뜻이다). */
+test('생성모드 배선 — 원신호 → 부정키들 → 과제요약 조각 · deliver 동봉 표에 성향확인 사슬', () => {
+  const { 코드만 } = require('./lib/소스검사.js');
+  const 방 = path.join(__dirname, '..', 'supabase', 'functions', 'deliver');
+  const 소스 = 코드만(fs.readFileSync(path.join(방, '생성모드.ts'), 'utf8'));
+  assert.ok(/from '\.\/성향확인\.mjs'/.test(소스), '생성모드가 성향확인 동봉본을 import 하지 않는다');
+  assert.ok(/부정키들\(\(학생\.원신호/.test(소스), '원신호에서 부정키들을 뽑지 않는다');
+  /* `\b` 는 한글에 안 선다(\w 가 아니다) — 구분자를 직접 적는다. */
+  assert.ok(/부정키들:\s*부정[,\s]/.test(소스), '부정키들을 과제요약 조각으로 안 넘긴다 — 뽑기만 하고 안 쓰면 아무것도 안 빠진다');
+  const 표 = JSON.parse(fs.readFileSync(path.join(방, '동봉.json'), 'utf8'));
+  assert.equal(표['성향확인.mjs'], 'lib/성향확인.js', 'deliver 동봉 표에 성향확인이 없다');
+  assert.equal(표['문구_성향확인.mjs'], 'contents/문구_성향확인.js',
+    '성향확인이 require 하는 문구 파일이 표에 없다 — 배포는 초록이고 부팅 import 에서 죽는다');
+  assert.equal(표['문구_동의.mjs'], 'contents/문구_동의.js', '문구_성향확인이 require 하는 문구_동의 가 표에 없다');
+});
