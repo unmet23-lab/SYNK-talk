@@ -13,7 +13,7 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const {
-  모델, 프롬프트판, 태그어긋남, 요청몸통, 응답글, 교정값, 재시도가능,
+  모델, 프롬프트판, 교정요청판, 교정지시문, 교정응답스키마, 태그어긋남, 요청몸통, 응답글, 교정값, 재시도가능,
 } = require('../lib/교정엔진.js');
 
 const 지시문 = fs.readFileSync(path.join(ROOT, 'prompts', '교정.md'), 'utf8');
@@ -40,6 +40,45 @@ test('🔴 프롬프트 판본을 실제 파일에서 읽는다 — 손 상수�
 });
 
 // ── 픽스처: 탐지력 ────────────────────────────────────────────────────────
+
+test('현재 규칙은 그대로 보내고 보관된 실패 규칙은 요청에서 제외한다', () => {
+  const 현재 = 지시문.slice(지시문.indexOf('## 역할'), 지시문.indexOf('## 버전 이력')).trim();
+  assert.equal(교정지시문(지시문), 현재);
+  assert.equal(요청몸통({ 지시문, 문장: '안녕하세요' }).system[0].text, 현재);
+  assert.deepEqual(태그어긋남(현재, 태그목록), { 프롬프트에없음: [], 계약에없음: [] });
+  assert.ok(현재.includes('## 학생 맥락'), '현행 맥락 규칙까지 보존한다');
+  assert.ok(!현재.includes('## 버전 이력'));
+  assert.equal(교정지시문(지시문.replace('## 버전 이력', '## 버전 이력\n폐기 예문')), 현재);
+  assert.equal(교정지시문(지시문.replace(/\r\n/g, '\n')), 현재.replace(/\r\n/g, '\n'));
+  assert.throws(() => 교정지시문(지시문.replace('## 버전 이력', '## 기록')), /경계/);
+  assert.throws(() => 교정지시문('> **현재 v7**\n## 버전 이력\n## 역할\n지시'), /경계/);
+});
+
+test('교정 다섯 칸은 동기·Batch 모두 같은 구조화 출력으로 요청한다', () => {
+  const { 배치몸통: 묶기 } = require('../lib/교정엔진.js');
+  const a = 요청몸통({ 지시문, 문장: '안녕하세요' });
+  const b = 묶기([{ submission_id: '00000000-0000-0000-0000-000000000000', 문장: '안녕하세요' }], 지시문, 교정요청판(지시문));
+  assert.equal(a.output_config.format.type, 'json_schema');
+  assert.deepEqual(a.output_config.format.schema, 교정응답스키마);
+  assert.deepEqual(교정응답스키마.required, ['고친문장', '오류태그', '오늘의포인트', '칭찬', '다음미션']);
+  assert.equal(교정응답스키마.additionalProperties, false);
+  assert.deepEqual(교정응답스키마.properties.오류태그, { type: 'array', items: { type: 'string' } });
+  assert.deepEqual(b.requests[0].params, a);
+});
+
+test('실제 요청판은 현행 규칙에 반응하고 실행에서 뺀 이력은 판을 바꾸지 않는다', () => {
+  const { 배치키, 배치키규격안, 배치키풀기 } = require('../lib/교정엔진.js');
+  const 판 = 교정요청판(지시문);
+  assert.match(판, /^v\d+-q1-[0-9a-f]{12}$/);
+  assert.notEqual(판, 프롬프트판(지시문), '과거 전체문서 요청판과 구분한다');
+  assert.equal(판, 교정요청판(지시문 + '\n보관 기록 추가'));
+  assert.notEqual(판, 교정요청판(지시문.replace('맞는 문장은 고치지 않는다.', '맞는 문장은 그대로 둔다.')));
+  assert.equal(교정요청판('판 없는 지시문'), null);
+  const key = 배치키('00000000-0000-0000-0000-000000000000', 판);
+  assert.equal(배치키규격안(key), true, '64자 안에 들어야 배치 전체 400을 피한다');
+  assert.equal(배치키풀기(key).판, 판);
+  assert.equal(배치키풀기('00000000-0000-0000-0000-000000000000_v7').판, 'v7');
+});
 
 test('값목록이 갈라지면 잡는다 — 양방향', () => {
   const 계약 = ['조사:주격(이/가·은/는)', '어미:시제', '오류없음'];

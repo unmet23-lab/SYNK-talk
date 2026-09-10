@@ -36,7 +36,7 @@ const ROOT = path.resolve(__dirname, '..');
 const 자격증명 = require('../lib/자격증명.js');
 const {
   모델, 왕복제한밀리, 메시지경로, 벤더헤더,
-  프롬프트판, 요청몸통, 응답글, 응답덩이꺼내기, 교정값, 재시도가능, 캐시성적, 성적합,
+  교정요청판: 프롬프트판, 요청몸통, 응답글, 응답덩이꺼내기, 교정값, 재시도가능, 캐시성적, 성적합,
 } = require('../lib/교정엔진.js');
 const 계약 = require(path.join(ROOT, '계약', '수집_교정_계약.json'));
 

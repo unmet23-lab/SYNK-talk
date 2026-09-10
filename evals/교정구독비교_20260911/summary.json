@@ -1,0 +1,126 @@
+{
+  "date": "2026-09-11",
+  "ids": [
+    "C01",
+    "C04",
+    "C11",
+    "C14",
+    "C15",
+    "C19",
+    "C26",
+    "C29",
+    "C35",
+    "C40",
+    "E02",
+    "E08",
+    "E10",
+    "E12",
+    "E34",
+    "E35",
+    "E44",
+    "E46",
+    "M02",
+    "M03"
+  ],
+  "caveat": "합성 20문항 묶음 구독 선별. 실제 단건 Claude/Gemini API 품질·지연·과금의 대조가 아님.",
+  "results": [
+    {
+      "variant": "full",
+      "repeat": 1,
+      "model": "gemini-3.1-pro-high",
+      "route": "google-ai-pro-subscription",
+      "total": 20,
+      "passed": 18,
+      "failures": [
+        {
+          "id": "E08",
+          "reasons": [
+            "빠짐: \"끝내고\"",
+            "태그 놓침: 어미:연결어미 / 실제 [어미:시제]",
+            "추가 태그(감점 아님): 어미:시제"
+          ]
+        },
+        {
+          "id": "M03",
+          "reasons": [
+            "빠짐: \"저는\""
+          ]
+        }
+      ],
+      "noResponse": 0,
+      "instructionChars": 8889
+    },
+    {
+      "variant": "full",
+      "repeat": 2,
+      "model": "gemini-3.1-pro-high",
+      "route": "google-ai-pro-subscription",
+      "total": 20,
+      "passed": 18,
+      "failures": [
+        {
+          "id": "E08",
+          "reasons": [
+            "빠짐: \"끝내고\""
+          ]
+        },
+        {
+          "id": "M03",
+          "reasons": [
+            "빠짐: \"저는\""
+          ]
+        }
+      ],
+      "noResponse": 0,
+      "instructionChars": 8889
+    },
+    {
+      "variant": "current",
+      "repeat": 1,
+      "model": "gemini-3.1-pro-high",
+      "route": "google-ai-pro-subscription",
+      "total": 20,
+      "passed": 18,
+      "failures": [
+        {
+          "id": "E08",
+          "reasons": [
+            "빠짐: \"끝내고\""
+          ]
+        },
+        {
+          "id": "M03",
+          "reasons": [
+            "빠짐: \"저는\""
+          ]
+        }
+      ],
+      "noResponse": 0,
+      "instructionChars": 3635
+    },
+    {
+      "variant": "current",
+      "repeat": 2,
+      "model": "gemini-3.1-pro-high",
+      "route": "google-ai-pro-subscription",
+      "total": 20,
+      "passed": 18,
+      "failures": [
+        {
+          "id": "E08",
+          "reasons": [
+            "빠짐: \"끝내고\""
+          ]
+        },
+        {
+          "id": "M03",
+          "reasons": [
+            "빠짐: \"저는\""
+          ]
+        }
+      ],
+      "noResponse": 0,
+      "instructionChars": 3635
+    }
+  ]
+}

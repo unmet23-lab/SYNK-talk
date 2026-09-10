@@ -67,7 +67,7 @@ type 교정칸 = {
 
 const {
   모델, 왕복제한밀리, 메시지경로, 배치경로, 벤더헤더,
-  프롬프트판, 태그어긋남, 요청몸통, 응답글, 교정값, 재시도가능, 벤더사유,
+  교정요청판: 프롬프트판, 태그어긋남, 요청몸통, 응답글, 교정값, 재시도가능, 벤더사유,
   배치몸통, 배치키어긋남, 배치줄해석, 캐시성적, 성적합,
 } = 교정모듈 as {
   모델: string;
@@ -75,7 +75,7 @@ const {
   메시지경로: string;
   배치경로: string;
   벤더헤더: (키: string) => Record<string, string>;
-  프롬프트판: (지시문: string) => string | null;
+  교정요청판: (지시문: string) => string | null;
   태그어긋남: (지시문: string, 태그목록: string[]) => { 프롬프트에없음: string[]; 계약에없음: string[] };
   요청몸통: (a: { 지시문: string; 문장: string; 급수: string | null; 맥락?: string }) => Record<string, unknown>;
   응답글: (본문: unknown) => string | null;
