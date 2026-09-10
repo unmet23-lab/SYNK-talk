@@ -75,6 +75,14 @@ const 기준3줄 = [
 
 const 초 = (ms) => (Math.round(ms / 100) / 10).toFixed(1);
 
+/** scalar 신뢰도는 postgres.js의 십진 숫자 문자열도 온다(JSONB 구간 confidence와 다르다).
+ * null·빈칸·boolean을 Number로 접어 측정값처럼 표시하지 않고, DB의 소수 자릿수는 보존한다. */
+export function 전사신뢰도문구(값) {
+  const 십진문자열 = typeof 값 === 'string' && /^[+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i.test(값);
+  const 측정됨 = (typeof 값 === 'number' || 십진문자열) && Number.isFinite(Number(값));
+  return 측정됨 ? ` · 전사 신뢰도 ${값}` : ' · 전사 신뢰도 미측정';
+}
+
 /**
  * 항목 하나를 열 때 편집 칸에 채울 값 — **화면 밖으로 내보내 회귀가 닿게 한다.**
  *
@@ -689,9 +697,7 @@ export default function 검수화면({ 토큰, 돌아가기 }) {
           <Text style={s.메타}>
             {[항목.task_type, 항목.task_format].filter(Boolean).join(' · ')}
             {항목.is_audit_sample ? ' · 감사 표본' : ''}
-            {Number.isFinite(Number(항목.stt_confidence))
-              ? ` · 전사 신뢰도 ${항목.stt_confidence}`
-              : ' · 전사 신뢰도 미측정'}
+            {전사신뢰도문구(항목.stt_confidence)}
           </Text>
           {항목.task_instruction ? (
             <Text style={s.지시문}>{항목.task_instruction}</Text>

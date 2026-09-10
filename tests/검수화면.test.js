@@ -23,7 +23,7 @@ const path = require('node:path');
 const { 코드만, 코드만픽스처 } = require('./lib/소스검사.js');
 const { ROOT } = require('./lib/화면세우기.js'); // ← 먼저 불러 react-native 치환을 켠다
 const {
-  편집초기값, 여는값, 조번호, 조묶기,
+  편집초기값, 여는값, 조번호, 조묶기, 전사신뢰도문구,
   빈화면꼴, 더받기보임, 이어받을까, 이어읽기상한,
 } = require(path.join(ROOT, 'src', '검수화면.js'));
 
@@ -35,6 +35,24 @@ const 항목 = (덮을것) => ({
   ai_explanation: 'Тайлбар',
   ai_error_tags: ['조사:주격(이/가·은/는)'],
   ...덮을것,
+});
+
+test('전사 신뢰도 미측정은 기존 문구로 표시한다 — null·빈칸·boolean은 0이 아니다', () => {
+  for (const 값 of [null, undefined, '', ' ', '\t', false, true, [], [0], {}, NaN, Infinity, -Infinity]) {
+    assert.equal(전사신뢰도문구(값), ' · 전사 신뢰도 미측정');
+  }
+});
+
+test('실제 숫자 0과 DB 숫자 문자열은 측정값이다 — scalar의 소수 자릿수를 보존한다', () => {
+  for (const 값 of [0, 0.7, 1, '0', '0.000', '0.700', '1.000']) {
+    assert.equal(전사신뢰도문구(값), ` · 전사 신뢰도 ${값}`);
+  }
+});
+
+test('숫자가 아닌 문자열을 전사 신뢰도처럼 표시하지 않는다', () => {
+  for (const 값 of ['null', 'false', 'NaN', 'Infinity', '0.7abc', '0x1', '0b1', '1e999']) {
+    assert.equal(전사신뢰도문구(값), ' · 전사 신뢰도 미측정');
+  }
 });
 
 test('처음 여는 항목은 기계 전사에서 시작한다', () => {
@@ -126,6 +144,11 @@ test('보낸 값이 없는 재검수는 항목에서 파생하되 승격은 안 
  *   모른다. 그 침묵이 곧 「자백을 적어 보낸다」로 이어지므로(그것이 ㉮ 가 고친 병이다) 회귀로 문다. */
 
 const 화면소스 = 코드만(fs.readFileSync(path.join(ROOT, 'src', '검수화면.js'), 'utf8'));
+
+test('검수 메타 줄이 미측정 판정을 실제로 소비한다 — 화면의 별도 숫자 강제 변환은 없다', () => {
+  assert.match(화면소스, /\{전사신뢰도문구\(항목\.stt_confidence\)\}/u);
+  assert.doesNotMatch(화면소스, /Number\(항목\.stt_confidence\)/u);
+});
 
 test('탐지력 픽스처 — 주석 제거기가 「설명 속의 코드」를 실제로 지운다', () => {
   /* 이 파일의 주석은 `열어봄`·`set열어봄` 을 여러 번 **설명**한다. 제거기가 놓치면 아래 셋이
