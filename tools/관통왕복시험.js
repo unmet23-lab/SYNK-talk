@@ -16,6 +16,23 @@
  *     V5 ㉠ 조각(급수·목표)이 과제요약에 실림(lib/과제요약.js:98-99) — ㉠
  *   같은 날 재실행 함정은 «재실행»이 아니라 «두 학생 비교»(A·B 를 회차마다 새로)로 우회한다.
  *
+ * ■ `--아니야` — 「아니야」 N 계열 셋(2026-09-11 · 철학 적용기준 「관측과 성향」 · 09-05 「아니야」= 빼기).
+ *   플래그가 없으면 이 파일의 행동은 위 V1~V5 그대로다(학생·호출·게이트 목록 어느 것도 안 는다).
+ *   이름은 N1~N3 — V6~V9 는 엔진 v3 §3-5-1 이 예약한 번호라 쓰지 않는다. 순수 조각은 lib/관통검증.js(회귀가 잰다).
+ *     N1 (㉡) 부정된 (축·키)를 progress 가 다시 안 낸다 — 아니야A 의 «첫 카드»를 lib 로 파생해 그 쌍에
+ *        「아니다」 행을 심고(확인사건 = 앱이 보내는 그 봉투), 학생 토큰으로 GET /v1/progress 를 불러
+ *        오늘의확인 쌍 ≠ 부정 쌍(null 허용 — 단 lib 이 같은 재료로 파생한 «부정 뒤 다음 카드»와 쌍이 같아야 한다).
+ *     N2 (㉡) 부정된 «축»이 생성 입력에서 빠진다 — 같은 원신호의 아니야B 는 같은 카드에 「맞다」로 답한다.
+ *        활성 게이트 안 구제 단건 ×2 뒤 draft 요약: A 에 「{축}: 」 줄 없음 · B 에 있음(분모) ·
+ *        axes_used 는 그 축 하나만 다르다(둘 다 한 답이라 확인 축은 양쪽에 선다). 벤더 0 · 워커 0회 그대로.
+ *     N3 (④ 누구에게) progress 응답이 학생 화면용 카드 실물을 든다 — 오늘의확인 다섯 칸(trait_axis ·
+ *        shown_key · shown_text · estimator_version · estimate_as_of) 전부 · 확인이 null 이면 오늘의목표 네 칸.
+ *   배포판 게이트: deliver 는 경성(낡으면 골격이 죽인다 — N2 도 그 뒤라 원리상 옛 판을 못 잰다) ·
+ *   progress 는 «연성»(연성게이트함수들 · 낡으면 N1·N3 를 «못쟀다»로 접고 V1~V5 는 돈다).
+ *   쓰기는 이 회차가 새로 만든 is_test 학생의 insert 뿐 — auth 계정도 회차마다 새로 만들어 insert 에 싣는다
+ *   (지난 회차 학생의 update 0 · 대가 = auth.users 가 학생 행과 같은 비율로 는다). 부정 행의 occurred_at 은
+ *   «지금»(답한 순간)이라 deliver 의 원신호 창(as_of=now)·progress 의 오늘(ingested_at) 둘 다에 든다.
+ *
  * ■ 🔴 리허설 전용 — learning_events 는 append-only 라 여기서 만든 행은 지워지지 않는다.
  *
  * ■ ⚠ 함정 넷 (명세 ② + 선행 왕복 실측)
@@ -63,10 +80,24 @@ const { 시즌줄 } = require(path.join(__dirname, '..', 'lib', '시즌맥락.js
 const { 과제요약, 축줄상한 } = require(path.join(__dirname, '..', 'lib', '과제요약.js'));
 // V4 ⓑ — correct 의 요청 조립을 **순수층으로** 부른다(벤더 0 · fetch 0).
 const { 요청몸통 } = require(path.join(__dirname, '..', 'lib', '교정엔진.js'));
+/* 「아니야」 N 계열(--아니야) — 첫 카드 파생·요약 줄 술어·axes_used 차·검증점 장부는 lib/관통검증.js(순수 · 회귀가 잰다).
+ * 카드→사건 조립은 lib/성향확인.js 확인사건(앱이 보내는 봉투 그대로) · 시험 계정 이메일 꼴은 lib/로그인코드.js 도메인. */
+const 관통검증 = require(path.join(__dirname, '..', 'lib', '관통검증.js'));
+const { 확인사건 } = require(path.join(__dirname, '..', 'lib', '성향확인.js'));
+const { 도메인 } = require(path.join(__dirname, '..', 'lib', '로그인코드.js'));
+const { randomUUID } = require('node:crypto');
+// 모르는 `--` 낱말은 조용히 무시하지 않는다(F400·F435 · tests/플래그게이트.test.js 등록층) — 판정은 lib 하나.
+const { 인자게이트 } = require(path.join(__dirname, '..', 'lib', '플래그.js'));
+/* 이 도구의 자기 플래그 전량 — `--아니야` 하나(N1~N3 갈래). 조준 축(`--운영`)은 없다(생성왕복시험과 같은 모양). */
+const 아는플래그 = ['--아니야'];
 
-/* 왕복 게이트 스코프 — 이 시험이 부르는 함수는 deliver 하나뿐이다(correct 는 순수층만 · 워커 0회).
+/* 왕복 게이트 스코프 — 이 시험이 «언제나» 부르는 함수는 deliver 하나뿐이다(correct 는 순수층만 · 워커 0회).
  * ⚠ 부르는 함수보다 좁으면 게이트가 옛 판을 초록으로 잰다(lib/왕복골격.js:22-25). */
 const 게이트함수들 = ['deliver'];
+/* 연성 스코프 — `--아니야` 갈래(N1·N3)만 부르는 함수. 낡으면 골격이 죽이는 대신 `배포판낡음` 으로 되돌려 주고
+ * 그 갈래를 «못쟀다»로 접는다(V1~V5 는 그대로 돈다). 플래그 없이는 목록을 안 실어 대조 자체가 없다(행동 불변).
+ * ⚠ 부르는 함수 ⊆ 경성 ∪ 연성 — tests/왕복골격.test.js 가 연성 선언·발동까지 같이 잰다. */
+const 연성게이트함수들 = ['progress'];
 
 const 날전 = (오늘, n) => {
   const d = new Date(`${오늘}T00:00:00Z`);
@@ -76,8 +107,11 @@ const 날전 = (오늘, n) => {
 const q = (s) => String(s).replace(/'/g, "''");
 
 async function main() {
-  const { ref, sql, 실행, service_role: service, 확인, 치명확인, 보고 } =
-    await 골격.열기('관통왕복시험', { 함수목록: 게이트함수들 });
+  const 플래그오류 = 인자게이트('관통왕복시험', process.argv.slice(2), 아는플래그);
+  if (플래그오류) die(플래그오류);
+  const 아니야 = process.argv.includes('--아니야');   // N1~N3 「아니야」 갈래 — 없으면 V1~V5 만(행동 불변 · 머리말)
+  const { ref, sql, 실행, anon, service_role: service, 확인, 치명확인, 보고, 배포판낡음 } =
+    await 골격.열기('관통왕복시험', { 함수목록: 게이트함수들, 연성함수목록: 아니야 ? 연성게이트함수들 : [] });
 
   /* deliver 호출부 — 배달왕복시험.js:76-92 승계: 5xx·비 JSON 만 짧게 재시도하고 4xx 는 판정
    * 재료라 그대로 돌려준다. «몇 번 만에 됐나»는 보고 꼬리에 남긴다(조용한 초록 금지). */
@@ -122,18 +156,14 @@ async function main() {
   const D1 = 날전(오늘, 1), D2 = 날전(오늘, 2), D3 = 날전(오늘, 3);
 
   /* ── V1~V5 장부 — 확인(초록/빨강)과 별개로 «어느 검증점의 것인가»를 든다.
-   * 측정 불능(전제 미충족)은 ✗ 가 아니라 «못쟀다»로 가른다(명세 ④ — 0 과 미측정 구분). */
+   * 측정 불능(전제 미충족)은 ✗ 가 아니라 «못쟀다»로 가른다(명세 ④ — 0 과 미측정 구분).
+   * 장부의 규칙(검사 0건 = 못쟀다 · ✗ 우선 · 못쟀다 > ✓)은 lib/관통검증.js 검증장부 하나다 — N 계열과 같은 자. */
   const 칸들 = ['V1', 'V2', 'V3', 'V4', 'V5'];
-  const V결과 = Object.fromEntries(칸들.map((k) => [k, []]));
-  const 못쟀다표 = {};
-  const 잰다 = (칸, 이름, 조건, 실제) => { const r = 확인(`${칸} ${이름}`, 조건, 실제); V결과[칸].push(r); return r; };
-  const 못쟀다 = (칸, 이유) => {
-    못쟀다표[칸] = 못쟀다표[칸] ? `${못쟀다표[칸]} · ${이유}` : 이유;
-    console.log(`  ⚠ ${칸} 못쟀다 — ${이유}`);
-  };
-  const 상태 = (칸) => (못쟀다표[칸] ? '못쟀다'
-    : V결과[칸].length === 0 ? '못쟀다'            // 검사 0건 = 미실행이지 통과가 아니다(F207)
-      : V결과[칸].every(Boolean) ? '✓' : '✗');
+  const 장부알림 = (칸, 이유) => console.log(`  ⚠ ${칸} 못쟀다 — ${이유}`);
+  const V = 관통검증.검증장부(칸들, { 확인, 알림: 장부알림 });
+  const { 잰다, 못쟀다, 상태, 못쟀다표 } = V;
+  /* N1~N3 「아니야」 장부 — 플래그가 있을 때만 선다(없으면 null · 아래 N 갈래 전부가 이 하나로 닫힌다). */
+  const N = 아니야 ? 관통검증.검증장부(['N1', 'N2', 'N3'], { 확인, 알림: 장부알림 }) : null;
 
   /* ══ 준비 ① — 학생 둘 + ㉠ (급수·goal_track 을 서로 다르게 · 둘 다 Lv3+ = 생성 «대상») ══
    * Lv1·Lv2 로 심으면 비대상(초급)이라도 draft 는 서지만, 대상 두 명이어야 「요약 필수」
@@ -272,11 +302,97 @@ async function main() {
   if (시즌오늘) await 나침반심기('B', 시즌오늘, B시즌목표);
   console.log(`  준비 완료 — 표식 ${표} · 오늘 ${오늘} · 판 ${판} · 시즌 ${시즌한벌 ? '한벌' : '날짜별'}`);
 
+  /* ══ 준비 N — 「아니야」 학생 둘 (--아니야 · N1~N3) ══
+   * · 같은 ㉡ 원신호(관통A 무늬: 배정 3 · 마감 전 제출 3 · low 1) → 리듬 후보가 선다(여유제출·반복제출).
+   * · 첫 카드는 lib 파생(관통검증.확인카드파생 = 학습자상태 → 확인카드)이 낸다 — 키를 손으로 적지 않는다. 재료는
+   *   progress 와 같은 세 사건·40일 창이되 due_at·task_schema_ver 는 submissions 에서 잇는다(DDL 상 그 표의 열 —
+   *   progress/index.ts:202 는 learning_events 에서 그 둘을 읽는데 그 표엔 그 열이 없다 · N1 셋째 검사가 이를 잰다).
+   * · A 는 그 카드에 「아니다」, B 는 「맞다」 — 사건은 확인사건(앱 봉투 그대로)으로 조립해 SQL 로 심는다(append-only).
+   * · A 는 progress 를 학생 토큰으로 불러야 하므로 auth 계정을 «회차마다 새로» 만들어 learners insert 에 함께 싣는다 —
+   *   배달왕복의 «계정 재사용 + update» 는 지난 회차 학생 행을 고치므로(명세 ② «기존 행 update 0») 여기선 안 쓴다. */
+  const N학생 = { 쌍: null, 카드: null, 이메일: null, 비번: 'Aniya-Rehearsal-1' };
+  const 원행들 = (학생) => sql(`
+    select e.event_id, e.event_type, e.occurred_at, s.due_at, e.task_type, s.task_schema_ver,
+           case when e.payload ? 'compose_meta'
+                then jsonb_build_object('compose_meta', e.payload -> 'compose_meta') end as payload
+      from engine.learning_events e
+      left join engine.submissions s on s.event_id = e.event_id
+     where e.learner_id = '${id[학생]}'::uuid
+       and e.event_type in ('task.assigned', 'submission.created', 'session.abandoned')
+       and e.occurred_at >= now() - interval '40 days'`);
+  if (N) {
+    console.log('\n■ 준비 N — 「아니야」 학생 2명 (--아니야 · 같은 ㉡ 원신호 · 첫 카드에 A 는 「아니다」 · B 는 「맞다」)');
+    N학생.이메일 = `probe-aniya-${표}${도메인}`;
+    const 만든 = await fetch(`https://${ref}.supabase.co/auth/v1/admin/users`, {
+      method: 'POST',
+      headers: { apikey: service, Authorization: `Bearer ${service}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: N학생.이메일, password: N학생.비번, email_confirm: true }),
+    });
+    const uid = 만든.ok ? (JSON.parse((await 만든.text()) || '{}').id || null) : null;
+    if (!uid) die(`아니야A 의 auth 계정을 못 만들었다 — auth HTTP ${만든.status}`);
+    const N둘 = await sql(`
+      insert into engine.learners (student_code, display_name, level_current, goal_track, schema_ver, is_test, auth_user_id)
+      values ('${표}-아니야A','아니야A','Lv3','study','${판}', true, '${uid}'::uuid),
+             ('${표}-아니야B','아니야B','Lv3','study','${판}', true, null)
+      returning learner_id, student_code`);
+    for (const r of N둘) id[r.student_code.endsWith('아니야A') ? 'NA' : 'NB'] = r.learner_id;
+    급수.NA = 'Lv3'; 급수.NB = 'Lv3';
+    await sql(`
+      insert into engine.consents (learner_id, consent_ver, agreed_at, schema_ver, recorded_by)
+      values ('${id.NA}'::uuid,'v18.9', now() - interval '30 days','${판}','tools/관통왕복시험.js'),
+             ('${id.NB}'::uuid,'v18.9', now() - interval '30 days','${판}','tools/관통왕복시험.js')`);
+    for (const 날 of [D3, D2, D1]) { await 배정심기('NA', 날); await 배정심기('NB', 날); }
+    for (const 학생 of ['NA', 'NB']) {
+      for (const 날 of [D3, D2, D1]) await 제출심기(학생, 날, '10:00');
+      await 퀴즈심기(학생, D2, 'low');
+    }
+    const { 카드 } = 관통검증.확인카드파생(await 원행들('NA'), { 기준: new Date().toISOString(), 시간대 });
+    const 카드섰다 = N.잰다('N1', '분모 — 아니야A 의 첫 확인 카드가 lib 파생으로 선다(카드가 없으면 부정할 것이 없다)', !!카드, 카드);
+    if (!카드섰다) {
+      for (const 칸 of ['N2', 'N3']) N.못쟀다(칸, '첫 카드가 안 서서 부정을 못 심었다(원신호·후보 규칙을 본다)');
+    } else {
+      N학생.카드 = 카드;
+      N학생.쌍 = 관통검증.카드쌍(카드);
+      const 답심기 = async (학생, 응답) => {
+        const 사건 = 확인사건(카드, 응답, {
+          correlation_id: randomUUID(),
+          idempotency_key: `estimate:${id[학생]}:${카드.trait_axis}:${카드.shown_key}`,
+        });
+        if (!사건) die('확인사건 조립이 null 이다 — 카드 다섯 값 중 하나가 비었다');
+        await sql(`
+          insert into engine.learning_events
+            (learner_id, event_type, actor_kind, occurred_at, idempotency_key, correlation_id,
+             level_snapshot, consent_ver, consent_id, degraded, source_kind, payload, schema_ver)
+          values ('${id[학생]}'::uuid, '${사건.event_type}', 'learner', '${사건.occurred_at}'::timestamptz,
+                  '${q(사건.idempotency_key)}', '${사건.correlation_id}'::uuid,
+                  null, 'v18.9', ${지금유효id식(`'${id[학생]}'::uuid`)}, false,
+                  '${사건출처('estimate.responded')}'::engine.source_kind,
+                  '${q(JSON.stringify(사건.payload))}'::jsonb, '${판}')`);
+      };
+      await 답심기('NA', '아니다');
+      await 답심기('NB', '맞다');
+      // 분모 — 부정 행이 실제로 앉았나(증분 · 이 회차 학생만). 이것이 거짓이면 N1~N3 전부가 공허하다.
+      const [{ na부정, nb부정, nb긍정 }] = await sql(`
+        select count(*) filter (where learner_id = '${id.NA}'::uuid and payload ->> 'response' = '아니다') as na부정,
+               count(*) filter (where learner_id = '${id.NB}'::uuid and payload ->> 'response' = '아니다') as nb부정,
+               count(*) filter (where learner_id = '${id.NB}'::uuid and payload ->> 'response' = '맞다') as nb긍정
+          from engine.learning_events
+         where event_type = 'estimate.responded'
+           and learner_id in ('${id.NA}'::uuid, '${id.NB}'::uuid)`);
+      const 분모 = Number(na부정) === 1 && Number(nb부정) === 0 && Number(nb긍정) === 1;
+      for (const 칸 of ['N1', 'N2', 'N3']) {
+        N.잰다(칸, `분모 — 부정 행이 A 에 1 · B 에 0(B 는 「맞다」 1)으로 앉았다 · 쌍 ${N학생.쌍.trait_axis}:${N학생.쌍.shown_key}`,
+          분모, { na부정, nb부정, nb긍정 });
+      }
+      console.log(`  준비 N 완료 — 첫 카드 ${N학생.쌍.trait_axis}:${N학생.쌍.shown_key} (A 아니다 · B 맞다)`);
+    }
+  }
+
   /* ══ 배달 — 활성 게이트(임시) 안에서 구제 단건 ×2 ══
    * 왜 구제인가: 과제요약(§6-2)은 생성 모드 전용이라 게이트 없이는 V2·V3·V5 를 원리상 못 잰다
    * (명세 ② · deliver/index.ts:279 「현행 경로는 그 칸을 안 읽는다」). `?맥락=구제&learner_id=`
    * 단건은 그 학생 것만 만들고(E1 남의 일감 무접촉) draft 를 세운 뒤 벤더 0 으로 착지까지 간다. */
-  console.log('\n■ 배달 — 활성 게이트(임시) 안에서 deliver ?맥락=구제 단건 ×2 (벤더 0 · 워커 0회)');
+  console.log(`\n■ 배달 — 활성 게이트(임시) 안에서 deliver ?맥락=구제 단건 ×${N && N학생.쌍 ? 4 : 2} (벤더 0 · 워커 0회)`);
   {
     const 잔존전 = (await sql(`select to_regprocedure('engine.gen_active_from()') is not null as b`))[0].b;
     if (잔존전) {
@@ -286,11 +402,16 @@ async function main() {
     }
   }
   let 응답A = null, 응답B = null;
+  let 응답NA = null, 응답NB = null;   // --아니야 (N2)
   try {
     // 생성왕복시험.js:853-855 방식 — 과거 시작일로 세워 오늘을 활성으로 만든다.
     await sql(`create or replace function engine.gen_active_from() returns date language sql immutable as $f$ select date '2020-01-01' $f$`);
     응답A = await 호출(`?${new URLSearchParams({ 맥락: '구제', learner_id: id.A })}`);
     응답B = await 호출(`?${new URLSearchParams({ 맥락: '구제', learner_id: id.B })}`);
+    if (N && N학생.쌍) {   // --아니야 — 같은 게이트 창 안에서 아니야A/B 도 구제 단건(게이트를 두 번 세우지 않는다)
+      응답NA = await 호출(`?${new URLSearchParams({ 맥락: '구제', learner_id: id.NA })}`);
+      응답NB = await 호출(`?${new URLSearchParams({ 맥락: '구제', learner_id: id.NB })}`);
+    }
   } finally {
     // 규율 ② — 걷기를 try/finally 로 보장한다. 잔존하면 다른 왕복·라이브 호출자가 400 을 맞는다.
     await sql(`drop function if exists engine.gen_active_from()`);
@@ -323,7 +444,8 @@ async function main() {
            event_draft ->> 'estimator_version' as 드래프트판,
            (event_draft -> 'estimator_confidence') is not null
              and jsonb_typeof(event_draft -> 'estimator_confidence') <> 'null' as 확신실림,
-           jsonb_array_length(coalesce(event_draft -> 'evidence_refs' -> 'axes_used', '[]'::jsonb)) as 축수
+           jsonb_array_length(coalesce(event_draft -> 'evidence_refs' -> 'axes_used', '[]'::jsonb)) as 축수,
+           coalesce(event_draft -> 'evidence_refs' -> 'axes_used', '[]'::jsonb)::text as 축들문자
       from engine.generation_jobs
      where learner_id = '${id[학생]}'::uuid and assign_date = '${오늘}'::date`))[0] || null;
   const A잡 = 배달섰다 ? await 잡읽기('A') : null;
@@ -459,17 +581,102 @@ async function main() {
       !!A잡 && String(A잡.요약 || '').includes('목표: study'), A잡 && A잡.요약);
   }
 
+  /* ══ N2 — 「아니야」 축이 생성 입력(요약)에서 빠진다 (㉡ · 아니야A/B 비교 · --아니야) ══
+   * 정본 = lib/과제요약.js 부정 제외(축 단위 · 원관측·정정 이력은 그대로) ← deliver/생성모드.ts 학생조립이 원신호의
+   * estimate.responded 에서 부정키들을 뽑아 넘긴다(창 = 원신호 창 · 오늘 심은 행은 창 안이다).
+   * B 는 같은 카드에 「맞다」 — 그래야 «확인 축»(정정 이력 계수)이 양쪽에 같이 서고, 다른 것은 부정된 축 하나뿐이다.
+   * deliver 배포판 = 소스는 경성 게이트가 이미 보장했다(낡았으면 여기까지 오지 못한다). */
+  if (N && N학생.쌍) {
+    console.log('\n■ N2 — 「아니야」 받은 축이 요약·axes_used 에서 빠진다 (㉡ · 아니야A/B 비교)');
+    const NA판 = 배달판정(응답NA), NB판 = 배달판정(응답NB);
+    if (NA판.전제 || NB판.전제) {
+      N.못쟀다('N2', NA판.전제 || NB판.전제);
+    } else {
+      const 둘섰다 = N.잰다('N2', '아니야A·B 배달이 «구제착지»로 닫혔다 — 비교할 두 draft 가 같은 회차에 섰다(벤더 0)',
+        NA판.착지 && NB판.착지, { A: NA판.왜 || (응답NA && 응답NA.몸), B: NB판.왜 || (응답NB && 응답NB.몸) });
+      if (둘섰다) {
+        const NA잡 = await 잡읽기('NA'), NB잡 = await 잡읽기('NB');
+        const 축 = N학생.쌍.trait_axis;
+        const 축들 = (잡) => { try { return JSON.parse((잡 && 잡.축들문자) || '[]'); } catch { return []; } };
+        N.잰다('N2', `분모 — 부정 없는 B 의 요약에 「${축}: 」 줄이 실렸다(없으면 「뺐다」와 「원래 없었다」가 같은 초록)`,
+          !!NB잡 && 관통검증.축줄있나(NB잡.요약, 축), NB잡 && NB잡.요약);
+        N.잰다('N2', `A 의 요약에 「${축}: 」 줄이 없다 — 부정된 축이 벤더 입력에서 빠졌다(lib/과제요약.js 부정 제외)`,
+          !!NA잡 && String(NA잡.요약 || '').trim() !== '' && !관통검증.축줄있나(NA잡.요약, 축), NA잡 && NA잡.요약);
+        const 차 = 관통검증.축차이(축들(NB잡), 축들(NA잡));
+        N.잰다('N2', `axes_used 가 정확히 축 하나만 다르다 — B 에 있고 A 에 없는 것 = [${축}] · A 에만 있는 것 = 없음`,
+          차.빠진.length === 1 && 차.빠진[0] === 축 && 차.늘어난.length === 0, { B: 축들(NB잡), A: 축들(NA잡), 차 });
+      }
+    }
+  }
+
+  /* ══ N1 · N3 — progress: 부정 재노출 0 (N1) · 학생 화면 카드 실물 (N3 · ④ 누구에게) ══
+   * 학생 토큰으로 부른다 — progress 는 서비스 토큰을 학생으로 안 친다. 계정은 준비 N 에서 learners insert 에 실었다.
+   * progress 가 낡았으면(연성 게이트) 둘 다 «못쟀다» — 옛 판을 재고 초록·빨강을 말하지 않는다. */
+  if (N && N학생.쌍) {
+    console.log('\n■ N1·N3 — GET /v1/progress (아니야A 학생 토큰 · 연성 배포판 게이트)');
+    const 낡음 = 배포판낡음 && 배포판낡음.progress;
+    if (낡음) {
+      for (const 칸 of ['N1', 'N3']) N.못쟀다(칸, `progress 배포판 ≠ 소스 — ${낡음}`);
+    } else {
+      const 로그인 = await fetch(`https://${ref}.supabase.co/auth/v1/token?grant_type=password`, {
+        method: 'POST', headers: { apikey: anon, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: N학생.이메일, password: N학생.비번 }),
+      });
+      const 학생토큰 = 로그인.ok ? (JSON.parse((await 로그인.text()) || '{}').access_token || null) : null;
+      if (!학생토큰) {
+        for (const 칸 of ['N1', 'N3']) N.못쟀다(칸, `아니야A 학생 토큰을 못 받았다(auth HTTP ${로그인.status})`);
+      } else {
+        const r = await fetch(`https://${ref}.supabase.co/functions/v1/progress`, {
+          headers: { apikey: anon, Authorization: `Bearer ${학생토큰}`, 'X-Contract-Ver': 판 },
+        });
+        let 몸 = null;
+        try { 몸 = JSON.parse((await r.text()) || '{}'); } catch { 몸 = null; }
+        const 확인카드 = (몸 && 몸.오늘의확인) || null, 목표카드 = (몸 && 몸.오늘의목표) || null;
+        N.잰다('N1', 'progress 200 — 학생 토큰으로 자기 것을 읽는다', r.status === 200 && !!몸 && 몸.ok === true, { status: r.status, 몸 });
+        const 쌍 = 관통검증.카드쌍(확인카드);
+        N.잰다('N1', `오늘의확인이 부정된 쌍(${N학생.쌍.trait_axis}:${N학생.쌍.shown_key})이 아니다 — 부정 재노출 0(null 은 다른 후보 없음으로 허용)`,
+          !관통검증.같은쌍(쌍, N학생.쌍), 확인카드);
+        /* «null 허용»은 «null 이 정답»이 아니다 — 같은 행에서 lib 이 파생한 «부정 뒤 다음 카드»와 쌍이 같아야 한다
+         * (둘 다 null 이면 같다). progress 가 카드 계산에 실패해 null 로 접으면(그 함수는 실패를 null 로 낸다 ·
+         * 로그 「오늘의확인 판정 실패」) 여기서 잡힌다 — 그 null 은 «재노출 0»의 얼굴을 한 «카드 0»이다. */
+        const { 카드: 다음카드 } = 관통검증.확인카드파생(await 원행들('NA'),
+          { 기준: new Date().toISOString(), 시간대, 이력: 관통검증.부정뒤이력(N학생.쌍, 오늘) });
+        N.잰다('N1', 'progress 의 카드 쌍 = lib 이 같은 재료로 파생한 «부정 뒤 다음 카드» 쌍(둘 다 null 이면 같다)',
+          관통검증.같은쌍(쌍, 관통검증.카드쌍(다음카드)), { progress: 쌍, lib파생: 관통검증.카드쌍(다음카드) });
+        if (확인카드) {
+          const 빠진 = 관통검증.카드칸빠짐(확인카드, 관통검증.확인카드칸들);
+          N.잰다('N3', '오늘의확인이 다섯 칸(trait_axis·shown_key·shown_text·estimator_version·estimate_as_of)을 다 들고 왔다 — 학생 화면이 상태 유래 카드를 받는다',
+            빠진.length === 0, { 빠진, 카드: 확인카드 });
+        } else {
+          const 빠진 = 관통검증.카드칸빠짐(목표카드, 관통검증.목표카드칸들);
+          N.잰다('N3', '오늘의확인이 null — 대신 오늘의목표 카드가 네 칸(class_date·키·문장·card_version)으로 왔다(둘 다 없으면 학생 화면은 빈 꼬리다)',
+            !!목표카드 && 빠진.length === 0, { 확인: null, 목표: 목표카드, 빠진 });
+        }
+      }
+    }
+  }
+
   /* ══ 관통 판정 ══ — V1~V5 각 ✓/✗/못쟀다. 못쟀다는 ✗ 와 다른 사실이지만 관통의 증명은 아니다
-   * (명세 ④) — 전부 ✓ 일 때만 초록이고, 아래 마지막 확인이 exit code 까지 그 판정에 묶는다. */
+   * (명세 ④) — 전부 ✓ 일 때만 초록이고, 아래 마지막 확인이 exit code 까지 그 판정에 묶는다.
+   * --아니야 면 N1~N3 도 같은 규율로 한 줄 더 — 못쟀다는 ✓ 가 아니므로 exit 0 이 아니다(옛 판을 잰 초록 금지). */
   console.log('\n■ 관통 판정');
-  const 줄 = 칸들.map((k) => ({ '✓': '✓', '✗': '✗', 못쟀다: '?' })[상태(k)]).join('');
-  console.log(`  ${칸들.map((k) => `${k} ${상태(k)}`).join(' · ')}`);
+  const 줄 = V.줄();
+  console.log(`  ${V.요약()}`);
   for (const [칸, 이유] of Object.entries(못쟀다표)) console.log(`  ⚠ ${칸} 못쟀다 — ${이유}`);
   console.log(`  ${줄}`);
   확인('관통 — V1~V5 전부 ✓ (✗ 0 · 못쟀다 0)',
-    칸들.every((k) => 상태(k) === '✓'), 칸들.map((k) => `${k}:${상태(k)}`).join(' '));
+    V.전부초록(), 칸들.map((k) => `${k}:${상태(k)}`).join(' '));
+  let 아니야줄 = '';
+  if (N) {
+    아니야줄 = N.줄();
+    console.log(`  ${N.요약()}`);
+    for (const [칸, 이유] of Object.entries(N.못쟀다표)) console.log(`  ⚠ ${칸} 못쟀다 — ${이유}`);
+    console.log(`  ${아니야줄}`);
+    확인('아니야 — N1~N3 전부 ✓ (✗ 0 · 못쟀다 0)',
+      N.전부초록(), N.칸들.map((k) => `${k}:${N.상태(k)}`).join(' '));
+  }
 
-  보고(`관통 ${줄} · 오늘 ${오늘} · 표식 ${표}`
+  보고(`관통 ${줄}${N ? ` · 아니야 ${아니야줄}` : ''} · 오늘 ${오늘} · 표식 ${표}`
     + (재시도누적 ? ` · ⚠ deliver 5xx 재시도 ${재시도누적}회` : ' · deliver 재시도 0'));
 }
 
