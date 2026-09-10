@@ -5,13 +5,14 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { 코드만 } = require('./lib/소스검사.js');
 
-const 소스 = fs.readFileSync(path.join(__dirname, '..', 'supabase/functions/deliver/index.ts'), 'utf8');
+const 소스 = 코드만(fs.readFileSync(path.join(__dirname, '..', 'supabase/functions/deliver/index.ts'), 'utf8'));
 const 시작 = 소스.indexOf('function 대상질의(');
 const 끝 = 소스.indexOf('\nasync function 배달하기(', 시작);
 assert.ok(시작 >= 0 && 끝 > 시작, '대상질의 실제 함수를 찾지 못했다');
 const 함수 = 소스.slice(시작, 끝).replace(
-  /^function 대상질의[\s\S]*?\{\n(?=  \/\* 단건이면)/,
+  /^function 대상질의[\s\S]*?\) \{/,
   'function 대상질의(스냅기준, 한사람, 쪽 = null) {\n').replace(/ as string\[\]/g, '');
 
 function 질의(기준, 학생 = null, 쪽 = null) {
@@ -27,11 +28,14 @@ function 질의(기준, 학생 = null, 쪽 = null) {
   const 실행 = new Function('sql', '시간대', '걷는사건', '라디오태스크종', '창일수', '종별상한', '시드전부', 'G2재제출앵커들',
     '통로', '재제출의사', '게임챌린지', 'G2챌린지', `${함수}\nreturn 대상질의;`)(
     sql, 'Asia/Ulaanbaatar', ['estimate.responded'], [], 30, 150, [], [], '발화녹음', [], '합성', '합성G2');
-  const query = 실행(기준, 학생, 쪽).sql.replace(/\/\*[\s\S]*?\*\//g, '');
+  // 템플릿 안은 SQL이다. JS 주석 제거기가 들어가지 않는 SQL 주석 두 꼴만 걷는다.
+  const query = SQL주석없이(실행(기준, 학생, 쪽).sql);
   const 부정 = query.match(/left join lateral \(\s*select coalesce\(jsonb_agg\(jsonb_build_object\([\s\S]*?\) 부정응답 on true/);
   assert.ok(부정, '별도 부정 이력 질의가 사라졌다');
   return { query, 부정: 부정[0], 값들 };
 }
+
+const SQL주석없이 = (q) => q.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ');
 
 test('부정 이력은 전원·단건·쪽 조회 모두 활동 창·종별 150건과 독립한다', () => {
   for (const [학생, 쪽] of [[null, null], ['합성학생', null], [null, { 뒤: null, 한도: 16 }]]) {

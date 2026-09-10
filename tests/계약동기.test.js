@@ -20,23 +20,8 @@ const path = require('node:path');
 const ROOT = path.resolve(__dirname, '..');
 const { 표기접기 } = require('./lib/소스검사.js');
 
-/** 워크트리면 주저장소로 푼다 — `.git` 파일의 `gitdir: <주>/.git/worktrees/<이름>` 한 줄이 정본이다. */
-function 주저장소(root) {
-  const 깃 = path.join(root, '.git');
-  try {
-    if (fs.statSync(깃).isFile()) {
-      const m = fs.readFileSync(깃, 'utf8').match(/^gitdir:\s*(.+)\s*$/m);
-      if (m) {
-        const gitdir = path.resolve(root, m[1].trim());
-        const 본체 = gitdir.replace(/[\\/]\.git[\\/]worktrees[\\/][^\\/]+$/, '');
-        if (본체 !== gitdir) return 본체;
-      }
-    }
-  } catch { /* git 체크아웃이 아니면 그대로 — 모름을 새 동작으로 번역하지 않는다 */ }
-  return root;
-}
-
-const 형제 = path.resolve(주저장소(ROOT), '..', 'SYNK-appsscript');
+const { 형제정본 } = require('../lib/형제정본.js');
+const 형제 = 형제정본(ROOT);
 const 이쪽계약 = path.join(ROOT, '계약');
 const 정본계약 = path.join(형제, '계약');
 

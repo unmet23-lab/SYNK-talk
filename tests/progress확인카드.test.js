@@ -5,8 +5,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
-const babel = require('@babel/core');
+const { 세우기 } = require('./lib/서버함수세우기.js');
 const ROOT = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(ROOT, 'supabase/functions/progress/index.ts'), 'utf8');
 const 기준 = '2026-09-11T03:00:00.000Z';
@@ -28,7 +27,7 @@ function 재료() {
 
 async function 호출(원문 = source) {
   const rows = 재료(), queries = [], errors = [];
-  let handler, 전달원행 = null;
+  let 전달원행 = null;
   const sql = async (parts) => {
     const q = parts.join('?'); queries.push(q);
     if (q.includes('최신조각')) return [{ learner_id: 'fixture', 최신조각: '20260907200000_sunday_bundles_c16.sql' }];
@@ -61,12 +60,10 @@ async function 호출(원문 = source) {
     './학습자상태.mjs': { 학습자상태: (행들, 옵션) => { 전달원행 = 행들; return 실제상태.학습자상태(행들, 옵션); } },
     './CORS.mjs': { 예비응답: () => null, 머리: () => ({}) },
   };
-  const { code } = babel.transformSync(원문, { filename: 'progress.ts', babelrc: false, configFile: false,
-    plugins: ['@babel/plugin-transform-typescript', '@babel/plugin-transform-modules-commonjs'] });
   class 고정시각 extends Date { constructor(...a) { super(...(a.length ? a : [기준])); } static now() { return Date.parse(기준); } }
-  vm.runInNewContext(code, { exports: {}, require: (name) => { if (!(name in modules)) throw new Error(`예상 밖 import ${name}`); return modules[name]; },
-    Deno: { env: { get: () => 'synthetic' }, serve: (fn) => { handler = fn; } },
-    Date: 고정시각, Request, Response, URL, console: { error: (...s) => errors.push(s.join(' ')) } });
+  const handler = 세우기(원문, { 파일: 'progress.ts', 모듈: modules,
+    환경: { SUPABASE_DB_URL: 'synthetic' }, Date: 고정시각,
+    console: { error: (...s) => errors.push(s.join(' ')) } });
   const response = await handler(new Request('http://localhost/functions/v1/progress', { headers: { 'X-Contract-Ver': 'c16' } }));
   return { status: response.status, body: await response.json(), 전달원행, queries, errors };
 }

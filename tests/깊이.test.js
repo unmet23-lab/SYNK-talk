@@ -22,10 +22,11 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { 형제정본 } = require('../lib/형제정본.js');
 
 const 뿌리 = path.resolve(__dirname, '..');
 const 사본 = require('../contents/깊이.json');
-const 형제 = path.resolve(뿌리, '..', 'SYNK-appsscript');
+const 형제 = 형제정본(뿌리);
 
 test('반입 — 스키마와 격자 크기(칸 수가 어긋나면 겹선형 읽기가 조용히 딴 데를 짚는다)', () => {
   assert.ok(Number.isInteger(사본.N) && 사본.N > 0, 'N 이 없다 — 격자 칸 수의 주인이 사라졌다');

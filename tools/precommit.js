@@ -18,6 +18,8 @@
 
 const { execFileSync, spawnSync } = require('node:child_process');
 const { inspect } = require('./guard.js');
+const path = require('node:path');
+const { 형제정본 } = require('../lib/형제정본.js');
 
 function git(args, opts = {}) {
   return execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts });
@@ -74,6 +76,7 @@ function main() {
 
   const paths = stagedPaths();
   if (!paths.length) return 0;
+  const 정본 = 형제정본(path.resolve(__dirname, '..'));
 
   /* ── 쓰는 문자는 한글·몽골어·영어 셋뿐 (유호님 확정 2026-08-07) ──────────────
    * 왜 여기인가 (F351 · F379): 이 규칙을 지키던 장치는 형제(SYNK-appsscript)의
@@ -88,7 +91,7 @@ function main() {
    * ⚠ 형제가 없는 기계(폰·클라우드)에서는 **막지 않고 말한다** — 확인 불가를 차단으로 바꾸면
    *   그 세션은 아무것도 커밋 못 한다. 대신 통과와 미실행이 같은 모양이 되지 않게 찍는다. */
   const 옛글자도구 = process.env.SYNK_LEGACY_GLYPH_TOOL
-    || require('node:path').join(__dirname, '..', '..', 'SYNK-appsscript', 'tools', '옛글자검사.js');
+    || path.join(정본, 'tools', '옛글자검사.js');
   if (!require('node:fs').existsSync(옛글자도구)) {
     console.error('[guard] 형제 저장소가 없어 옛 글자(한자·가나) 대조를 **못 했다**.');
   } else {
@@ -115,15 +118,19 @@ function main() {
    * ⚠ 형제가 없는 기계(폰·클라우드)에서는 **막지 않고 말한다** — 확인 불가를 차단으로 바꾸면
    *   그 세션은 아무것도 커밋 못 한다. 대신 통과와 미실행이 같은 모양이 되지 않게 찍는다. */
   if (paths.includes('계약/수집_교정_계약.json')) {
-    // 경로를 주입 가능하게 두는 이유는 **회귀가 이 자리를 실제로 밟게** 하려는 것뿐이다.
-    // 실데이터(계약 파일)를 흔들어 재면 그게 더 위험하다. 운영에서는 기본값으로만 쓴다.
+    // 도구 단위 대역은 회귀용이며, 작업 사본 선택은 SYNK_APPSSCRIPT_ROOT가 진다.
     const 도구 = process.env.SYNK_CONTRACT_TOOL
-      || require('node:path').join(__dirname, '..', '..', 'SYNK-appsscript', 'tools', '계약동기화.js');
+      || path.join(정본, 'tools', '계약동기화.js');
     if (!require('node:fs').existsSync(도구)) {
       console.error('[guard] 형제 저장소가 없어 계약 대조를 **못 했다** — 정본과 갈라졌는지 알 수 없다.');
     } else {
       try {
-        execFileSync(process.execPath, [도구, '--check'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+        const 대상 = git(['rev-parse', '--show-toplevel']).trim();
+        const 결과 = execFileSync(process.execPath, [도구, '--check'], {
+          encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+          env: { ...process.env, SYNK_TALK_ROOT: 대상 },
+        });
+        process.stderr.write(결과);
       } catch (e) {
         problems.push({
           path: '계약/수집_교정_계약.json',

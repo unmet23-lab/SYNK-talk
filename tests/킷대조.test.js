@@ -15,10 +15,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { 형제정본 } = require('../lib/형제정본.js');
 const { 킷색, 코랄소프트 } = require('../tools/테마색.js');
 
 const ROOT = path.resolve(__dirname, '..');
-const 정본경로 = path.join(ROOT, '..', 'SYNK-appsscript', 'docs', '디자인_토큰.json');
+const 정본경로 = path.join(형제정본(ROOT), 'docs', '디자인_토큰.json');
 
 if (fs.existsSync(정본경로)) {
   test('talk 킷 색 일곱이 형제 정본(디자인_토큰.json)과 같다', () => {
