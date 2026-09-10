@@ -126,7 +126,7 @@ test('친구는 셋의 말투로 다르되 교수의 성격과 사실은 같다'
   }
 });
 
-test('세 소품은 기존 API의 선택 ID·라벨을 유지하고 안내와 말투 예문을 구별한다', () => {
+test('세 전략의 선택 ID·현행 문구가 API와 같고 안내와 말투 예문을 구별한다', () => {
   const { 사과전략 } = 세우기(path.join(__dirname, '..', 'lib/게임제출.js'), () => { throw Error('원격 호출 금지'); });
   for (const { seed } of 사례들) {
     const 장면 = 장면만들기({ prompt_seed: seed, 캐릭터: '몽글' });

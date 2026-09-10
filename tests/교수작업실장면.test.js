@@ -43,15 +43,18 @@ test('선택 전에는 다음 행동을, 선택 뒤에는 학생의 말투 예�
   let 확정수 = 0;
   const onConfirm = () => { 확정수++; };
   const 처음 = 그리기(파일, { 선택: null, onConfirm }, '전략미리보기');
-  assert.match(처음, /소품을 하나 고르면/);
+  assert.match(처음, /말씀드릴 방법을 하나 골라 보세요/);
   assert.doesNotMatch(처음, /이 방법으로 편지 쓰기/);
   for (const 선택 of 장면.전략) {
     assert.ok(!처음.includes(선택.예문));
     const 화면 = 그리기(파일, { 선택, 제목: 선택.제목, 가이드: '마린', onConfirm }, '전략미리보기');
     assert.ok(화면.includes(선택.제목));
     assert.ok(화면.includes(선택.예문));
-    assert.match(화면, /말투 예시 · 내가 교수님께 쓰는 말/);
-    assert.match(화면, /내 상황에 맞게 직접 써 보세요/);
+    assert.match(화면, /말투 예시/);
+    assert.match(화면, /교수님께 쓰는 문장/);
+    assert.match(화면, /말투를 참고하고, 상황에 맞게 내 방식대로 직접 써 보세요/);
+    assert.ok(화면.indexOf('말투 예시') < 화면.indexOf('말투를 참고하고'));
+    assert.ok(화면.indexOf('말투를 참고하고') < 화면.indexOf(선택.예문), '안내를 먼저 읽은 뒤 예문을 본다');
     assert.match(화면, /이 방법으로 편지 쓰기/);
     assert.match(화면, /다 쓴 뒤에 보내요/);
   }

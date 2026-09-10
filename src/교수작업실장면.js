@@ -4,6 +4,7 @@ import { 색, 폰트 } from './테마';
 import { 살아있는교수연구실 } from './살아있는교수연구실';
 import { 살아있는가이드 } from './살아있는가이드';
 import { 마린전략장면 } from './마린전략장면';
+import { 말투예시 } from './말투예시';
 import { use줄임 } from '../lib/모션';
 import { 장면만들기, 책갈피말 } from '../contents/교수멘탈장면';
 
@@ -40,21 +41,20 @@ export function 교수작업실장면({ 재료, 가이드, 보기, onConfirm }) 
     <내상황장면 장면={장면} 좁다={width < 570} />
 
     <View style={s.고르기머리}>
-      <Text accessibilityRole="header" style={s.중제목}>어떻게 부탁할까요?</Text>
-      <Text style={s.부제}>소품을 고르면 말하는 방법과 짧은 예문이 보여요. 다른 방법도 살펴볼 수 있어요.</Text>
+      <Text accessibilityRole="header" style={s.중제목}>어떻게 말씀드릴까요?</Text>
+      <Text style={s.부제}>아래에서 말씀드릴 방법을 골라 보세요. 누르면 예시 문장을 볼 수 있어요.</Text>
     </View>
     <View style={[s.책상, width < 570 && s.책상_좁음]}>
       {(보기?.options_shown || []).map(o => {
         const 정보 = 장면.전략.find(v => v.option_id === o.option_id);
         const 고름 = 고른것 === o.option_id;
-        return <Pressable key={o.option_id} accessibilityRole="button" accessibilityLabel={`${정보?.소품 || '소품'}: ${o.label}`}
+        return <Pressable key={o.option_id} accessibilityRole="button" accessibilityLabel={o.label}
           accessibilityState={{ selected: 고름 }} aria-pressed={고름} onPress={() => set고른것(o.option_id)}
           style={({ hovered, focused, pressed }) => [s.소품자리, width < 570 && s.소품자리_좁음, 고름 && s.소품자리_고름,
             !줄임 && s.전환, hovered && !줄임 && s.들기, focused && s.초점, pressed && { opacity: .8, transform: [{ scale: 줄임 ? 1 : .96 }] }]}>
           <Image source={소품그림[o.option_id]} resizeMode="contain" style={[s.소품, width < 570 && s.소품_좁음]} accessibilityElementsHidden />
           <View style={s.소품설명}>
-            <Text style={s.소품이름}>{정보?.소품 || '편지 소품'}</Text>
-            <Text style={s.전략말}>{o.label}</Text>
+            <Text style={s.선택제목}>{o.label}</Text>
             <Text style={s.작은글}>{정보?.설명}</Text>
             <Text style={s.추천}>{고름 ? '지금 살펴보는 방법' : 보기.recommended_option === o.option_id ? '오늘의 추천' : '눌러서 살펴보기'}</Text>
           </View>
@@ -119,11 +119,7 @@ export function 전략미리보기({ 선택, 제목, 가이드, onConfirm, conta
       {가이드 === '마린'
         ? <마린전략장면 optionId={선택.option_id} 말={선택.미리보기} />
         : <친구말 이름={가이드} 말={선택.미리보기} 작게 />}
-      <View style={s.예문종이}>
-        <Text style={s.화자}>말투 예시 · 내가 교수님께 쓰는 말</Text>
-        <Text selectable style={s.예문글}>{선택.예문}</Text>
-        <Text style={s.작은글}>말투를 참고하고, 내 상황에 맞게 직접 써 보세요.</Text>
-      </View>
+      <말투예시 예문={선택.예문} />
       <Text style={s.지시문}>{선택.쓰기힌트}</Text>
       <Pressable accessibilityRole="button" onPress={onConfirm}
         style={({ focused, pressed }) => [s.시작버튼, focused && s.초점, pressed && s.눌림]}>
@@ -132,7 +128,7 @@ export function 전략미리보기({ 선택, 제목, 가이드, onConfirm, conta
       <Text style={s.작은글}>다음 화면에서 직접 쓰고, 다 쓴 뒤에 보내요.</Text>
     </> : <View style={s.빈리허설}>
       <Image source={소품그림['g1-사과-간결']} style={s.단서그림} resizeMode="contain" accessible={false} aria-hidden />
-      <Text style={s.부제}>위에서 소품을 하나 고르면, 예문을 보고 편지 쓰기를 시작할 수 있어요.</Text>
+      <Text style={s.부제}>위에서 말씀드릴 방법을 하나 골라 보세요. 예시 문장을 보고 편지 쓰기를 시작할 수 있어요.</Text>
     </View>}
   </View>;
 }
@@ -213,15 +209,12 @@ const s = StyleSheet.create({
   소품자리_좁음: { flexDirection: 'row', gap: 18 }, 소품자리_고름: { borderColor: 색.실땀, backgroundColor: 색.바탕띄움 },
   소품: { width: '100%', height: 122 }, 소품_좁음: { width: 90, height: 90 },
   소품설명: { gap: 6, alignSelf: 'stretch', flex: 1 },
-  소품이름: { fontFamily: 폰트.강조, fontSize: 17, lineHeight: 25, color: 색.잉크, ...어절 },
-  전략말: { fontFamily: 폰트.본문, fontSize: 14, lineHeight: 24, color: 색.잉크_보조, ...어절 },
+  선택제목: { fontFamily: 폰트.강조, fontSize: 18, lineHeight: 27, color: 색.잉크, ...어절 },
   추천: { fontFamily: 폰트.캡션, fontSize: 11, lineHeight: 19, color: 색.실땀 },
   전환: Platform.select({ web: { transitionProperty: 'transform, opacity', transitionDuration: '160ms', transitionTimingFunction: 'ease-out' }, default: {} }),
   들기: { transform: [{ translateY: -4 }] },
   초점: Platform.select({ web: { outlineStyle: 'solid', outlineWidth: 2, outlineColor: 색.실땀, outlineOffset: 4 }, default: {} }),
   눌림: { opacity: .8 }, 리허설: { backgroundColor: 색.바탕띄움, borderRadius: 22, padding: 24, gap: 14 },
-  예문종이: { backgroundColor: 색.바탕, borderRadius: 14, padding: 20, gap: 10 },
-  예문글: { fontFamily: 폰트.본문, fontSize: 19, lineHeight: 30, color: 색.잉크, ...어절 },
   빈리허설: { flexDirection: 'row', gap: 16, alignItems: 'center', minHeight: 62, flexWrap: 'wrap' },
   시작버튼: { minHeight: 54, paddingHorizontal: 22, paddingVertical: 14, borderRadius: 13, backgroundColor: 색.잉크, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   시작글: { fontFamily: 폰트.강조, fontSize: 16, lineHeight: 24, color: 색.바탕 }, 시작화살: { fontSize: 23, color: 색.바탕 },

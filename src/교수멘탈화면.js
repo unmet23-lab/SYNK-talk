@@ -31,6 +31,7 @@ import { 관측보고 } from './관측';
 /* 수신자 얼굴도 선택 화면의 같은 교수 원본을 쓴다. 눈깜빡임은 입력 평가와 무관하다. */
 import { 살아있는교수얼굴 } from './살아있는교수연구실.js';
 import { LAB로고 } from './브랜드자산.js';
+import { 말투예시 } from './말투예시.js';
 import { 교수작업실장면, 편지책갈피 } from './교수작업실장면.js';
 import { 장면만들기 } from '../contents/교수멘탈장면.js';
 /**
@@ -385,11 +386,7 @@ export function 쓰기말투예시({ 예문 }) {
       <Text style={s.예시단추글}>{펼침 ? '말투 예시 접기' : '말투 예시 다시 보기'}</Text>
       <Text style={s.예시단추글} aria-hidden>{펼침 ? '−' : '+'}</Text>
     </Pressable>
-    {펼침 ? <View style={s.예시내용}>
-      <Text style={s.메모}>내가 교수님께 쓰는 말</Text>
-      <Text selectable style={s.예시글}>{예문}</Text>
-      <Text style={s.메모}>말투를 참고하고, 내 상황에 맞게 직접 써 보세요.</Text>
-    </View> : null}
+    {펼침 ? <말투예시 예문={예문} /> : null}
   </View>;
 }
 
@@ -466,8 +463,6 @@ const s = StyleSheet.create({
   말투예시: { marginTop: 4, borderRadius: 12, borderWidth: 1, borderColor: 색.잉크_희미 },
   예시열기: { minHeight: 44, borderRadius: 11, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   예시단추글: { fontFamily: 폰트.캡션, fontSize: 14, lineHeight: 22, color: 색.잉크_태그 },
-  예시내용: { gap: 7, paddingHorizontal: 14, paddingTop: 3, paddingBottom: 14 },
-  예시글: { ...어절줄바꿈, fontFamily: 폰트.본문, fontSize: 15, lineHeight: 25, color: 색.잉크 },
   본문입력: { fontFamily: 폰트.본문, fontSize: 17, lineHeight: 29, color: 색.잉크, backgroundColor: 색.바탕띄움, borderRadius: 16, padding: 22, minHeight: 250, borderWidth: 1, borderColor: 'rgba(251,247,240,0.13)' },
   쓰기안내: { gap: 12 },
   게이지라벨: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_태그 },
