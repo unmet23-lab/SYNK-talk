@@ -50,6 +50,8 @@ jobs:
   supabase:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      SYNK_MIGRATION_CI: '1'
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -61,6 +63,21 @@ jobs:
       - name: 로컬 Supabase 시작
         run: |
           supabase init
+          # 실제 조각은 검증기가 적용한다. startup에서 Vault 없는 예약을 먼저 만들지 않는다.
+          node <<'NODE'
+          const fs = require('node:fs');
+          const file = 'supabase/config.toml';
+          let section = '', changed = 0;
+          const text = fs.readFileSync(file, 'utf8').split(/\r?\n/).map((line) => {
+            if (line.startsWith('[')) section = line.trim();
+            if (section === '[db.migrations]' && /^enabled\s*=\s*true\s*$/.test(line)) {
+              changed++; return 'enabled = false';
+            }
+            return line;
+          }).join('\n');
+          if (changed !== 1) throw new Error('CI migration bootstrap config not found');
+          fs.writeFileSync(file, text);
+          NODE
           supabase start
       - name: 기준선 마이그레이션 회귀
         run: bash tools/검증_마이그레이션.sh

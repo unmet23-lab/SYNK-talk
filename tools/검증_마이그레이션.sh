@@ -20,27 +20,90 @@ BASE_VERSION="$(basename "${MIGRATIONS[0]}" | cut -c1-14)"
 LATEST_VERSION="$(basename "${MIGRATIONS[-1]}" | cut -c1-14)"
 
 # status의 값은 로컬 스택 자격증명뿐이며 출력하지 않는다.
+[[ "${SYNK_MIGRATION_CI:-}" == '1' && "${GITHUB_ACTIONS:-}" == 'true' ]] \
+  || { echo '이 파괴적 실행층 검증은 GitHub CI 로컬 스택 전용이다' >&2; exit 2; }
 eval "$(supabase status -o env)"
 DATABASE_URL="${DB_URL:?supabase status가 DB_URL을 내지 않았다}"
 SUPABASE_LOCAL_URL="${API_URL:?supabase status가 API_URL을 내지 않았다}"
 
-case "$DATABASE_URL" in
-  postgresql://*@127.0.0.1:*/*|postgresql://*@localhost:*/*) ;;
-  *) echo "원격 DB에는 이 검증기를 실행하지 않는다: $DATABASE_URL" >&2; exit 2 ;;
-esac
+# 비밀번호·전체 주소는 실패 로그에도 싣지 않는다. query/fragment로 host를 덮는 URI도 거절한다.
+[[ "$DATABASE_URL" =~ ^postgresql://[^/@]+(:[^/@]+)?@(127\.0\.0\.1|localhost):54322/postgres$ ]] \
+  || { echo 'CI 기본 포트의 로컬 postgres만 허용한다' >&2; exit 2; }
+[[ "$SUPABASE_LOCAL_URL" =~ ^http://(127\.0\.0\.1|localhost):54321$ ]] \
+  || { echo 'CI 기본 포트의 로컬 Auth만 허용한다' >&2; exit 2; }
 
 PSQL=(psql "$DATABASE_URL" -X -q -v ON_ERROR_STOP=1)
 
 fail() { echo "검증 실패: $*" >&2; exit 1; }
 scalar() { "${PSQL[@]}" -Atc "$1"; }
 run_file() { "${PSQL[@]}" -f "$1" >/dev/null; }
+
+# CI에서만 합성 Vault 선행조건을 세운다. 운영 migration/checksum은 바꾸지 않는다.
+# pg_cron 공식: launch_active_jobs는 SIGHUP 설정이며 pg_reload_conf 뒤 활성 예약도 실행하지 않는다.
+# https://github.com/citusdata/pg_cron#extension-settings
+bootstrap_local_ci() {
+  [[ "$(scalar "select to_regnamespace('engine') is null")" == 't' ]] \
+    || fail 'CI bootstrap 전에 engine이 이미 있다 — startup migration이 꺼졌는지 확인'
+  "${PSQL[@]}" -c 'create extension if not exists pg_cron' >/dev/null
+  [[ "$(scalar 'select count(*) from cron.job')" == '0' ]] || fail '빈 CI DB에 기존 예약이 남았다'
+  "${PSQL[@]}" -c "alter system set cron.launch_active_jobs = 'off'" >/dev/null
+  [[ "$(scalar 'select pg_reload_conf()')" == 't' ]] || fail 'cron 설정 reload 실패'
+  local loaded=''
+  for _ in {1..20}; do
+    loaded="$(scalar "select current_setting('cron.launch_active_jobs')")"
+    [[ "$loaded" == 'off' ]] && break
+    sleep 0.1
+  done
+  [[ "$loaded" == 'off' ]] || fail 'cron launcher가 꺼지지 않았다'
+  "${PSQL[@]}" <<'SQL' >/dev/null
+create extension if not exists supabase_vault with schema vault;
+do $fixture$
+begin
+  if exists (select 1 from vault.secrets where name in ('functions_base_url','service_role_key')) then
+    raise exception 'CI Vault fixture 이름이 이미 있다';
+  end if;
+  -- URL은 실제 migration의 형식 검사에 맞춘 합성값이다. launcher off이므로 요청하지 않는다.
+  perform vault.create_secret('https://cifixture000000000000.supabase.co/functions/v1', 'functions_base_url');
+  perform vault.create_secret('ci-only-not-a-service-token', 'service_role_key');
+end
+$fixture$;
+SQL
+}
+
+assert_cron_quiet() {
+  [[ "$(scalar "select current_setting('cron.launch_active_jobs')")" == 'off' ]] || fail 'cron launcher 켜짐'
+  [[ "$(scalar 'select count(*) from cron.job_run_details')" == '0' ]] || fail 'CI 예약이 실제 실행됐다'
+  [[ "$(scalar 'select count(*) from net.http_request_queue')" == '0' ]] || fail 'CI HTTP 요청이 대기 중이다'
+  [[ "$(scalar 'select count(*) from net._http_response')" == '0' ]] || fail 'CI HTTP 요청 결과가 생겼다'
+}
+
+assert_cron_contract() {
+  [[ "$(scalar "select count(*) from cron.job where active and jobname in
+    ('deliver-daily','deliver-check','transcribe-batch','radio-promote-hourly','ops-harvest')")" == '5' ]] \
+    || fail '기존 예약 5개 활성 계약이 달라졌다'
+  [[ "$(scalar "select count(*) from cron.job where not active and jobname in
+    ('correct-nightly','correct-collect')")" == '2' ]] || fail '신규 교정 예약 2개가 비활성이 아니다'
+  [[ "$(scalar 'select count(*) from cron.job')" == '7' ]] || fail 'CI 예약 개수가 7개가 아니다'
+  assert_cron_quiet
+}
+
+previous_cron_fingerprint() {
+  scalar "select md5(string_agg(row_to_json(j)::text, E'\\n' order by jobname)) from cron.job j
+    where jobname in ('deliver-daily','deliver-check','transcribe-batch','radio-promote-hourly','ops-harvest')"
+}
 # «처음부터 다시»는 합본이 만드는 스키마 **전부**를 지워야 한다 — 이름이 engine 만 말하던
 # 옛 판(drop_engine)은 08-24 실측에서 혼합 상태를 스스로 만들었다: 이력(engine.schema_migrations)은
 # 지워지는데 ops 실물(뷰)은 살아남아, 재건이 옛 판 뷰로 「내려가기」 replace 를 치다
 # `cannot drop columns from view` 로 죽는다(v2 뷰 위에 v1 을 다시 얹는 자리 · run 32717172049).
 # 합본 소유 스키마는 셋이다: engine · ops(20260815080000) · radio. 새 스키마를 만드는 조각이
 # 생기면 여기에도 한 줄 — 안 넣으면 ③④⑥ 이 그 스키마의 잔존을 «전 판 실물»로 들고 돈다.
-drop_synk() { "${PSQL[@]}" -c 'drop schema if exists engine cascade; drop schema if exists ops cascade; drop schema if exists radio cascade' >/dev/null; }
+drop_synk() {
+  assert_cron_quiet
+  # 검증 격리 초기화에만 CI 소유 7개를 제거한다. 실제 migration의 5개 보존 검사는 별도다.
+  "${PSQL[@]}" -c "select cron.unschedule(jobid) from cron.job where jobname in
+    ('deliver-daily','deliver-check','transcribe-batch','radio-promote-hourly','ops-harvest','correct-nightly','correct-collect')" >/dev/null
+  "${PSQL[@]}" -c 'drop schema if exists engine cascade; drop schema if exists ops cascade; drop schema if exists radio cascade' >/dev/null
+}
 
 expect_file_failure() {
   local file="$1" label="$2"
@@ -59,6 +122,7 @@ assert_postcheck() {
   실측 행 전체: $row"
   [[ "$version" == "$LATEST_VERSION" ]] || fail "$label: 현재버전=$version (기대 $LATEST_VERSION)"
   [[ "$checksum" =~ ^[0-9a-f]{64}$ ]] || fail "$label: checksum 형식 오류"
+  assert_cron_contract
 }
 
 fingerprint() { "${PSQL[@]}" -At -f "$1"; }
@@ -162,6 +226,20 @@ assert_lower_survived() {
 }
 
 echo '① 빈 DB 적용 + 사후 확인'
+bootstrap_local_ci
+# startup 대신 **실제 파일 전부**를 적용한다. 새 조각 직전/직후 기존 5개는 jobid·명령까지 불변이다.
+previous_cron=''
+for migration in "${MIGRATIONS[@]}"; do
+  if [[ "$(basename "$migration")" == '20260911070000_correct_automation_c16.sql' ]]; then
+    previous_cron="$(previous_cron_fingerprint)"
+    [[ "$previous_cron" =~ ^[0-9a-f]{32}$ ]] || fail '교정 이행 전 기존 예약 지문 없음'
+  fi
+  run_file "$migration"
+  if [[ "$(basename "$migration")" == '20260911070000_correct_automation_c16.sql' ]]; then
+    [[ "$(previous_cron_fingerprint)" == "$previous_cron" ]] || fail '교정 이행이 기존 5개 예약을 바꿨다'
+    assert_cron_contract
+  fi
+done
 assert_postcheck '빈 DB 적용'
 
 echo '② 같은 DB 연속 재실행 — 이력·구조·데이터 불변'
@@ -250,6 +328,8 @@ expect_file_failure "$BUNDLE" '이력 없는 현행판'
 
 echo '④ Supabase reset이 빈 DB를 복원'
 supabase db reset --local >/dev/null
+bootstrap_local_ci
+run_file "$BUNDLE"
 assert_postcheck 'db reset'
 
 echo '⑤ 실제 Auth 사용자 2명 + JWT sub로 RLS·쓰기 차단·권한 0'
