@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { 색, 폰트, 모노트래킹, 몽골어폰트, 판눈금, 눌림감 } from './테마';
+import { Animated, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { 색, 폰트, 몽골어폰트, 판눈금, 눌림감 } from './테마';
 import {
   사과전략, 오늘추천, 보기세우기, 전략선택사건, 메일제출사건, 이탈사건, 이탈닻,
 } from '../lib/게임제출.js';
@@ -23,7 +23,7 @@ import { 몽골날짜 } from '../lib/오늘과제.js';
 import { 게임큐읽기, 게임사건담기, 게임큐밀기, 게임이탈수거 } from './게임큐.js';
 /* 소리는 전역 게이트 한 문으로만 — expo-audio 를 직접 잡으면 「녹음 중 0」 규칙(게임층 §3-1)이
  * 프로즈로 돌아간다. 이 화면의 소리는 발송 성취음 1회뿐이다(실패음 없음 — 킷 규칙 ②). */
-import { 효과음, bgm재생, bgm정지 } from './소리.js';
+import { 효과음, bgm정지 } from './소리.js';
 /* 판 종료 문장부호(D5-3) — 윗줄은 회귀(tests/감사회귀_R2B2 D5-4)가 원문으로 못박아 따로 들인다. */
 import { 도장햅틱 } from './소리.js';
 import { 관측보고 } from './관측';
@@ -32,10 +32,11 @@ import { 관측보고 } from './관측';
  * 바뀐다(게임층 설계 §4 규격 3) — 입력 중 움직이는 장치는 동시에 하나여야 하고, 그 하나는
  * 이미 이 화면의 게이지가 쥐고 있다. 실시간 3단은 G3(알바변명) 전용이다. */
 import NPC from './NPC.js';
+import { 내부로고 } from './브랜드자산.js';
 import { 전이상태 } from '../lib/NPC연출.js';
 /**
  * G1 「교수님 멘탈 구하기」 — 격식 메일 쓰기 게임 (발주_게임모듈.md G1 · 게임층 설계).
- * 흐름: 상황 카드 + 사과 전략 3장 → 메일 쓰기(멘탈 게이지) → 「교수님이 읽고 있어요」.
+ * 흐름: 상황과 사과 전략 선택 → 메일 쓰기(멘탈 게이지) → 답장 기다리기.
  *
  * ■ 재료는 **라우팅이 편다** (`src/말하기화면.js` → `lib/게임제출.게임재료`)
  *   이 화면은 그 결과(`재료`)를 prop 으로 받는다 — 검수확정 게이트·시드 판정이 그 한 곳에
@@ -58,7 +59,8 @@ import { 전이상태 } from '../lib/NPC연출.js';
  *   화면에 시계·초·숫자·퍼센트 0. 작성 과정은 `작성과정` 조립기가 **경과 시계**로 몰래 잰다.
  *
  * ■ 🔴 즉답 금지 (발주 G1 §4-8 · §8)
- *   제출 후 화면은 「교수님이 읽고 있어요」뿐이다. 답장 = 교정 화면(S1-8)이고 며칠 걸린다.
+ *   제출 후에는 답장을 기다리는 상태만 알린다. 읽음 여부나 사람 검수 완료를 추정하지 않는다.
+ *   답장 = 교정 화면(S1-8)이며 며칠 걸릴 수 있다는 기존 안내를 유지한다.
  *
  * ■ 막힘 prop 이 없다 (M7)
  *   말하기 화면이 막힘 검사 **뒤**에서만 이 화면을 그리므로, 이 화면이 사는 동안 막힘은 늘
@@ -70,9 +72,11 @@ import { 전이상태 } from '../lib/NPC연출.js';
  */
 
 export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null, 시작단계 = '전략', 확인 = null, 확인뒤 = null }) {
-  /* BGM — 판이 사는 동안 밑에 깔린다(인자 없이 = 유호 선정 측정 트랙 · 소리.js 머리말 계약).
-     녹음 게이트가 음소거·복원을 진다(소리게이트 'bgm시작'). */
-  useEffect(() => { bgm재생(); return () => bgm정지(); }, []);
+  // 09-11 사용자 요청: 이 화면의 구 BGM을 제거한다. 새 음원 파일 검증 전에는 무음이다.
+  useEffect(() => { bgm정지(); return () => bgm정지(); }, []);
+  const { width } = useWindowDimensions();
+  const 넓다 = width >= 940;
+  const 좁다 = width < 380;
 
   /* 표시 순서를 마운트 때 한 번 확정한다(`말하기화면` 녹음카드와 같은 규칙) — 매 렌더 섞으면
    * 행에 적힌 자리와 학생이 본 자리가 갈리고, 그 갈림은 증상이 없다. 추천은 시드에서 결정적. */
@@ -269,167 +273,142 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
     if (확인뒤) 확인뒤();
   };
 
+  const 전송실패 = !!(메일항목 && !메일항목.event_id && 메일항목.send_final);
+  const 전송대기 = !!(메일항목 && !메일항목.event_id && !메일항목.send_final);
+  const 소개제목 = 단계 === '전략' ? '어떤 말로\n다가갈까요?'
+    : 단계 === '쓰기' ? '마음을 담아\n써 보세요.'
+    : 전송실패 ? '편지를 아직\n보내지 못했어요.'
+    : 전송대기 ? '편지를\n전하고 있어요.' : '교수님께\n편지를 보냈어요.';
+  const 소개글 = 단계 === '전략' ? '상황을 읽고, 나에게 맞는\n말 건네는 방법을 골라요.'
+    : 단계 === '쓰기' ? '방금 고른 방법으로\n한 통의 메일을 써 볼까요?'
+    : '답장이 도착하면\n「답장」에서 볼 수 있어요.';
+
   return (
-    <ScrollView style={s.wrap} contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
+    <ScrollView style={s.wrap} contentContainerStyle={[s.inner, 넓다 && s.inner_넓음]} keyboardShouldPersistTaps="handled">
       <머리 />
-
-      {/* 교수님 — 판 내내 «한 자리»에 산다(자리를 옮기면 학생 눈이 그 이동을 좇는다).
-          🔴 상태에 숫자·퍼센트를 병기하지 않는다(규격 3 · 모호함이 설계다). */}
-      <View style={s.NPC자리}>
-        {/* 08-31 감사 D4-5 — 「메일을 보내지 못했어요」가 선 동안 교수님이 흡족(완료)하면 화면이
-            자기모순이다. 실패면 calm(시작)으로 되돌린다(흡족만 거둔다 — 기죽는 반응은 금지). */}
-        <NPC 역="prof" 상태={단계 === '대기' ? 전이상태(메일항목 && !메일항목.event_id && 메일항목.send_final ? '시작' : '완료') : 전이상태('시작')} 크기={88} />
-      </View>
-      {오류 && <Text style={s.오류}>{오류}</Text>}
-
-      {단계 === '전략' && (
-        <>
-          <View style={s.카드}>
-            <Text style={s.카드라벨}>오늘의 미션</Text>
-            {/* 전체 그림 한 줄 — 처음 온 학생이 「이 게임이 통째로 뭔지」를 첫 카드에서 안다
-             * (유호 확정 08-22 「기능은 자기를 설명해야 완성 · 숙제는 반드시」 · 말하기 1bce99e 와
-             * 같은 처방 — 첫 걸음에만 · ⚠ 문구 초안, 카피 확정은 유호님 몫). */}
-            <Text style={s.메모}>메일 한 통이에요 — 다가갈 방법을 고르고, 교수님께 메일을 써서 보내요!</Text>
-            <Text style={s.상황글}>{문항.질문}</Text>
-            <Text style={s.본문글}>{문항.지시문}</Text>
+      <View style={[s.지면, 넓다 && s.지면_넓음]}>
+        <View style={[s.소개, 넓다 && s.소개_넓음]}>
+          <View style={s.소개말}>
+            <Text style={s.종류}>교수님 멘탈 구하기</Text>
+            <Text accessibilityRole="header" style={[s.소개제목, 넓다 && s.소개제목_넓음]}>{소개제목}</Text>
+            <Text style={s.소개글}>{소개글}</Text>
           </View>
-          {보기 && (
-            <View style={s.카드}>
-              <Text style={s.카드라벨}>어떻게 다가갈까요? — 한 장을 골라요</Text>
-              {/* 🔴 `options_shown` 순서 그대로 그린다 — 행에 적힌 자리와 학생이 본 자리가
-                  같아야 한다(말하기화면 선택지와 같은 규칙). */}
-              {보기.options_shown.map((o) => (
-                <Pressable
-                  key={o.option_id}
-                  onPress={() => 고르기(o.option_id)}
-                  accessibilityRole="button"
-                  style={({ pressed }) => [s.전략카드, pressed && s.눌림]}
-                >
-                  <Text style={s.전략글}>{o.label}</Text>
-                  {보기.recommended_option === o.option_id && (
-                    <Text style={s.추천표시}>오늘의 추천</Text>
-                  )}
-                </Pressable>
-              ))}
-            </View>
-          )}
-        </>
-      )}
-
-      {단계 === '쓰기' && (
-        <View style={s.카드}>
-          <Text style={s.카드라벨}>받는 사람 · 교수님</Text>
-          {/* 상황문 상주 — 쓰기 중에도 「무슨 상황이었더라」로 안 돌아가게(전략 단계의 헤드층과
-              갈린 캡션 층이라 위계가 안 겹친다). */}
-          {문항.질문 ? <Text style={s.메모}>{문항.질문}</Text> : null}
-          {/* «연결» — 방금 고른 방법이 쓰기 화면에도 산다(고른 카드가 사라지면 연결이 끊긴다). */}
-          {고른전략라벨 && <Text style={s.메모}>내가 고른 방법 · {고른전략라벨}</Text>}
-          <Text style={s.메모}>{문항.지시문}</Text>
-          <TextInput
-            style={s.본문입력}
-            placeholder="교수님께 보낼 메일을 써요"
-            placeholderTextColor={색.잉크_메타}
-            defaultValue=""
-            onChangeText={(t) => { 본문참조.current = t; 입력됨(t); }}
-            multiline
-            textAlignVertical="top"
-          />
-
-          {/* 멘탈 게이지 — 5칸 진행 연출. 채점이 아니고 숫자·퍼센트도 없다(발주 G1 §4-5).
-              칸 채움 체크는 게이지 상승의 원인 표시 — 한 장치의 두 표면이다(게임층 §2). */}
-          <View>
-            <Text style={s.게이지라벨}>교수님 기분 — 문법 점수가 아니라 빠진 부분 안내예요</Text>
-            <View style={s.게이지줄}>
-              {칸이름들.map((이름) => {
-                const 찼다 = !!(게이지 && 게이지.칸별[이름]);
-                return (
-                  <View key={이름} style={s.게이지칸}>
-                    <게이지칸면 찼다={찼다} />
-                    <Text style={[s.게이지이름, 찼다 && s.게이지이름_참]}>{이름}</Text>
-                  </View>
-                );
-              })}
-            </View>
-            {/* 힌트는 빠진 칸의 **이름까지**다 — 모범 문형은 화면에 내지 않는다(팩 §2). */}
-            <Text style={s.게이지힌트}>
-              {빠진칸.length ? `아직 비어 있는 칸: ${빠진칸.join(' · ')}` : '다섯 칸이 다 찼어요 — 이제 보내 볼까요?'}
-            </Text>
+          <View style={[s.NPC자리, 좁다 && s.NPC자리_좁음, 넓다 && s.NPC자리_넓음]}>
+            <NPC 역="prof" 상태={전이상태(단계 === '대기' && !전송실패 ? '완료' : '시작')} 크기={넓다 ? 252 : 좁다 ? 102 : 132} />
           </View>
-
-          <Pressable
-            onPress={보내기}
-            disabled={!본문있음}
-            accessibilityRole="button"
-            style={({ pressed }) => [s.보내기버튼, !본문있음 && s.보내기_대기, pressed && s.눌림]}
-          >
-            <Text style={s.보내기글}>보내기</Text>
-          </Pressable>
         </View>
-      )}
 
-      {단계 === '대기' && (
-        <>
-          <View style={s.카드}>
-            <Text style={s.카드라벨}>보냈어요</Text>
-            <Text style={s.대기제목}>교수님이 읽고 있어요</Text>
-            {/* 즉답처럼 보이게 하지 않는다 — 답장은 사람이 확인한 뒤에 온다(며칠). */}
-            <Text style={s.본문글}>답장은 며칠 걸릴 수 있어요. 답장이 오면 「답장」에서 볼 수 있어요.</Text>
-            {메일항목 && !메일항목.event_id && !메일항목.send_final && (
-              <Text style={s.메모}>메일은 보내는 중이에요 — 앱을 다시 열면 이어서 보내요.</Text>
-            )}
-            {메일항목 && !메일항목.event_id && 메일항목.send_final && (
-              <Text style={s.오류}>메일을 보내지 못했어요. 선생님께 알려 주세요.</Text>
-            )}
-          </View>
-          {/* 🔑 관찰 한 줄 — 화면을 늘리지 않고 이미 보는 자리에 얹는다(철학 Ⅱ-8 「형태 규칙」).
-              점수도 채점도 아니라 카드 밖 한 줄로 조용히 둔다. **없으면 안 그린다** — 빈 자리를
-              남기면 「관찰이 없다」와 「관찰을 못 잰다」가 같은 모양이 된다. */}
-          {관찰 ? <Text style={s.관찰}>{관찰.글}</Text> : null}
-          {/* Ⅲ⑥ 성향 확인 — 같은 「이미 보는 자리」 규칙(새 화면 0 · 하루 1회는 서버가 진다).
-              답하면 즉시 반응 한 줄이 서고(반영이 «보이는» 상호작용), 사건은 게임큐로 나간다.
-              카드가 null 이면 아무것도 안 그린다 — 확인은 «없어도 되는» 꼬리다. */}
-          {확인 && !확인답 ? (
+        <View style={s.내용}>
+          {오류 ? <View accessibilityLiveRegion="polite" style={s.오류판}><Text style={s.오류}>{오류}</Text></View> : null}
+
+          {단계 === '전략' && (
             <View style={s.카드}>
-              <Text style={s.카드라벨}>몽글의 관찰</Text>
-              <Text style={s.본문글}>{String(확인.shown_text || '')}</Text>
-              <View style={s.확인줄}>
-                {[['맞다', '맞아요'], ['아니다', '아니에요']].map(([값, 라벨]) => (
-                  <Pressable
-                    key={값}
-                    onPress={() => 확인답하기(값)}
-                    accessibilityRole="button"
-                    hitSlop={{ top: 4, bottom: 4 }}
-                    style={({ pressed }) => [s.확인단추, pressed && s.눌림]}
-                  >
-                    <Text style={s.확인단추글}>{라벨}</Text>
+              <View style={s.상황}>
+                <Text style={s.카드라벨}>지금 상황</Text>
+                <Text style={s.상황글}>{문항.질문}</Text>
+                <Text style={s.본문글}>{문항.지시문}</Text>
+              </View>
+              {보기 ? <View style={s.전략목록}>
+                <Text style={s.선택라벨}>어떻게 다가갈까요?</Text>
+                {보기.options_shown.map((o) => (
+                  <Pressable key={o.option_id} onPress={() => 고르기(o.option_id)} accessibilityRole="button"
+                    style={({ pressed, hovered, focused }) => [s.전략카드, hovered && s.단추호버, focused && s.단추초점, pressed && s.눌림]}>
+                    <View style={s.선택말}>
+                      <Text style={s.전략글}>{o.label}</Text>
+                      {보기.recommended_option === o.option_id ? <Text style={s.추천표시}>오늘의 추천</Text> : null}
+                    </View>
+                    <선아이콘 종류="다음" />
                   </Pressable>
                 ))}
-              </View>
+                <Text style={s.메모}>방법을 고른 다음, 직접 메일을 써요.</Text>
+              </View> : null}
             </View>
-          ) : null}
-          {확인답 ? (반응안내(확인답) || []).map((줄, i) => (
-            <Text key={i} style={i === 0 ? s.관찰 : s.관찰_병기}>{줄}</Text>
-          )) : null}
-          {/* 산출물 렌더 — 「보냈다」의 기록이지 「맞았다」의 전시가 아니다(게임층 §2 한 수 더). */}
-          {보낸메일 ? (
+          )}
+
+          {단계 === '쓰기' && (
             <View style={s.카드}>
-              <Text style={s.카드라벨}>내가 보낸 편지</Text>
-              <Text style={s.편지글} selectable>{보낸메일}</Text>
+              <View style={s.받는줄}>
+                <View style={s.편지표식}><선아이콘 종류="편지" /></View>
+                <View style={s.선택말}><Text style={s.카드라벨}>받는 사람</Text><Text style={s.수신자}>교수님</Text></View>
+              </View>
+              {문항.질문 ? <Text style={s.본문글}>{문항.질문}</Text> : null}
+              {고른전략라벨 ? <View style={s.고른방법}><Text style={s.메모}>내가 고른 방법</Text><Text style={s.방법글}>{고른전략라벨}</Text></View> : null}
+              <Text style={s.메모}>{문항.지시문}</Text>
+              <TextInput style={s.본문입력} placeholder="교수님께 보낼 메일을 써요"
+                accessibilityLabel="교수님께 보낼 메일 본문" placeholderTextColor={색.잉크_메타}
+                defaultValue="" onChangeText={(t) => { 본문참조.current = t; 입력됨(t); }} multiline textAlignVertical="top" />
+              <View style={s.쓰기안내}>
+                <Text style={s.게이지라벨}>편지에 담긴 것</Text>
+                <View style={s.게이지줄}>
+                  {칸이름들.map((이름) => {
+                    const 찼다 = !!(게이지 && 게이지.칸별[이름]);
+                    return <View key={이름} style={s.게이지칸}><게이지칸면 찼다={찼다} /><Text style={[s.게이지이름, 찼다 && s.게이지이름_참]}>{이름}</Text></View>;
+                  })}
+                </View>
+                <Text style={s.게이지힌트}>{빠진칸.length ? `아직 비어 있는 칸: ${빠진칸.join(' · ')}` : '다섯 칸이 다 찼어요 — 이제 보내 볼까요?'}</Text>
+                <Text style={s.메모}>문법 점수가 아니라, 빠진 부분을 알려 주는 안내예요.</Text>
+              </View>
+              <Pressable onPress={보내기} disabled={!본문있음} accessibilityRole="button" accessibilityState={{ disabled: !본문있음 }}
+                style={({ pressed, focused }) => [s.보내기버튼, !본문있음 && s.보내기_대기, focused && s.단추초점, pressed && s.눌림]}>
+                <Text style={s.보내기글}>편지 보내기</Text><선아이콘 종류="다음" 어둡다 />
+              </Pressable>
             </View>
-          ) : null}
-        </>
-      )}
+          )}
+
+          {단계 === '대기' && (
+            <>
+              <View style={s.도착판}>
+                <View style={s.도착머리}><View style={s.도착표식}><선아이콘 종류="편지" /></View><Text style={s.카드라벨}>{전송실패 ? '전송을 확인해 주세요' : 전송대기 ? '전송 대기' : '보냈어요'}</Text></View>
+                <Text accessibilityRole="header" style={s.대기제목}>{전송실패 ? '메일을 보내지 못했어요' : 전송대기 ? '연결되면 이어서 보내요' : '답장을 기다리고 있어요'}</Text>
+                <Text style={s.본문글}>{전송실패 ? '메일을 보내지 못했어요. 선생님께 알려 주세요.' : 전송대기 ? '메일은 기기에 남아 있어요. 앱을 다시 열면 이어서 보내요.' : '답장은 며칠 걸릴 수 있어요. 답장이 오면 「답장」에서 볼 수 있어요.'}</Text>
+                <View style={s.편지길}><Text style={s.길글}>내 편지</Text><View style={s.잇는실} /><Text style={s.길글}>답장 준비</Text><View style={s.잇는실} /><Text style={s.길글}>답장</Text></View>
+              </View>
+
+              {관찰 ? <Text style={s.관찰}>{관찰.글}</Text> : null}
+              {확인 && !확인답 ? (
+                <View style={s.확인판}>
+                  <View style={s.확인머리}><Text style={s.확인제목}>나에 대한 관찰</Text><Text style={s.선택사항}>선택 사항</Text></View>
+                  <Text style={s.확인질문}>{String(확인.shown_text || '')}</Text>
+                  <View style={s.확인줄}>
+                    {[['맞다', '맞아요'], ['아니다', '아니에요']].map(([값, 라벨]) => (
+                      <Pressable key={값} onPress={() => 확인답하기(값)} accessibilityRole="button"
+                        style={({ pressed, hovered, focused }) => [s.확인단추, hovered && s.단추호버, focused && s.단추초점, pressed && s.눌림]}>
+                        <선아이콘 종류={값 === '맞다' ? '맞음' : '아님'} /><Text style={s.확인단추글}>{라벨}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <Text style={s.메모}>지금 답하지 않아도 괜찮아요.</Text>
+                </View>
+              ) : null}
+              {확인답 ? <View style={s.응답판} accessibilityLiveRegion="polite">
+                <View style={s.확인머리}><Text style={s.확인제목}>나에 대한 관찰</Text><Text style={s.선택사항}>{확인답 === '아니다' ? '아니에요' : '맞아요'}</Text></View>
+                {(반응안내(확인답) || []).map((줄, i) => <Text key={i} style={i === 0 ? s.응답글 : s.관찰_병기}>{줄}</Text>)}
+              </View> : null}
+              {보낸메일 ? <View style={s.보낸편지}><Text style={s.카드라벨}>내가 보낸 편지</Text><Text style={s.편지글} selectable>{보낸메일}</Text></View> : null}
+            </>
+          )}
+        </View>
+      </View>
     </ScrollView>
   );
 }
 
 function 머리() {
-  return (
-    <View style={s.머리}>
-      <Text style={s.브랜드}>SYNK TALK</Text>
-      <Text style={s.제목}>교수님 멘탈 구하기</Text>
-    </View>
-  );
+  return <View style={s.머리}>
+    <Image source={내부로고} style={s.브랜드} resizeMode="contain" accessibilityLabel="SYNK" />
+    <View style={s.머리구분} /><Text style={s.머리말}>말을 건네는 연습</Text>
+  </View>;
+}
+
+// 선으로 그리는 조작 아이콘. 비트맵 확대 없이 모든 화면 배율에서 같은 굵기를 유지한다.
+function 선아이콘({ 종류, 어둡다 = false }) {
+  const 선 = { borderColor: 어둡다 ? 색.바탕 : 색.잉크_태그 };
+  return <View style={s.아이콘} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" pointerEvents="none">
+    {종류 === '다음' ? <View style={[s.화살표, 선]} />
+      : 종류 === '편지' ? <View style={[s.봉투, 선]}><View style={[s.봉투접힘, 선]} /></View>
+      : 종류 === '맞음' ? <View style={[s.확인표식, 선]} />
+      : <View style={[s.가로실, 선]} />}
+  </View>;
 }
 
 /* 게이지 칸의 면 — 채울 때도 빠질 때도 같은 200ms 로 스며든다(채점 아님 · 안내 설계 유지).
@@ -446,62 +425,88 @@ function 게이지칸면({ 찼다 }) {
   return <View style={s.게이지면}><Animated.View style={[s.게이지면_덮개, { opacity: 덮개 }]} /></View>;
 }
 
+const 어절줄바꿈 = Platform.select({ web: { wordBreak: 'keep-all', overflowWrap: 'anywhere' }, default: {} });
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: 색.바탕 },
-  /* NPC 한 자리 — 고정이다(옮기면 «움직임»이 되어 검사 ① 의 장치가 하나 더 생긴다). */
-  NPC자리: { alignItems: 'center', marginBottom: 4 },
-  inner: { padding: 24, paddingTop: 68, paddingBottom: 48, gap: 20 },
-
-  머리: { gap: 6 },
-  브랜드: { fontFamily: 폰트.모노, fontSize: 11, letterSpacing: 모노트래킹.라벨, color: 색.잉크_태그 },
-  제목: { fontFamily: 폰트.헤드, fontSize: 27, color: 색.잉크 },
-
-  오류: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크, lineHeight: 19 },
-  메모: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조, lineHeight: 18 },
-
-  카드: { backgroundColor: 색.바탕띄움, borderRadius: 판눈금.반경, padding: 판눈금.여백, gap: 16 },
-  카드라벨: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_태그 },
-  상황글: { fontFamily: 폰트.헤드, fontSize: 21, lineHeight: 32, color: 색.잉크 },
-  본문글: { fontFamily: 폰트.본문, fontSize: 15, lineHeight: 24, color: 색.잉크_서브 },
-
-  전략카드: {
-    borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12,
-    paddingVertical: 14, paddingHorizontal: 16, gap: 4,
-  },
-  전략글: { fontFamily: 폰트.본문, fontSize: 16, color: 색.잉크 },
-  /* 추천 표시 — 색을 새로 안 쓴다(신호 1점은 보내기 버튼) · 글자 층으로만 선다. */
-  추천표시: { fontFamily: 폰트.강조, fontSize: 12, color: 색.잉크_태그 },
-
-  본문입력: {
-    fontFamily: 폰트.본문, fontSize: 16, lineHeight: 26, color: 색.잉크,
-    borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12, padding: 12, minHeight: 180,
-  },
-
-  게이지라벨: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_메타, marginBottom: 8 },
+  inner: { width: '100%', maxWidth: 1184, alignSelf: 'center', padding: 22, paddingTop: 24, paddingBottom: 64 },
+  inner_넓음: { padding: 44, paddingTop: 32, paddingBottom: 88 },
+  머리: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingBottom: 23, borderBottomWidth: 1, borderBottomColor: 'rgba(251,247,240,0.10)' },
+  브랜드: { width: 83, height: 30 },
+  머리구분: { width: 1, height: 15, backgroundColor: 색.잉크_희미 },
+  머리말: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_보조 },
+  지면: { paddingTop: 30, gap: 26 },
+  지면_넓음: { flexDirection: 'row', alignItems: 'flex-start', paddingTop: 52, gap: 56 },
+  소개: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  소개_넓음: { width: 302, flexDirection: 'column', alignItems: 'stretch', gap: 20, paddingTop: 4 },
+  소개말: { flex: 1, gap: 12 },
+  종류: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조, letterSpacing: 0.2 },
+  소개제목: { ...어절줄바꿈, fontFamily: 폰트.강조, fontSize: 27, lineHeight: 37, letterSpacing: -0.9, color: 색.잉크 },
+  소개제목_넓음: { fontSize: 39, lineHeight: 52, letterSpacing: -1.4, marginTop: 4 },
+  소개글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 22, color: 색.잉크_보조 },
+  NPC자리: { width: 122, alignItems: 'center', justifyContent: 'center' },
+  NPC자리_좁음: { width: 92 },
+  NPC자리_넓음: { width: '100%', marginTop: 10, paddingBottom: 10 },
+  내용: { flex: 1, minWidth: 0, gap: 24 },
+  카드: { backgroundColor: 색.바탕띄움, borderRadius: 판눈금.반경, padding: 26, gap: 20 },
+  상황: { gap: 15, paddingBottom: 8 },
+  카드라벨: { fontFamily: 폰트.캡션, fontSize: 12, lineHeight: 18, color: 색.잉크_태그 },
+  상황글: { ...어절줄바꿈, fontFamily: 폰트.강조, fontSize: 23, lineHeight: 34, letterSpacing: -0.5, color: 색.잉크 },
+  본문글: { ...어절줄바꿈, fontFamily: 폰트.캡션, fontSize: 15, lineHeight: 25, color: 색.잉크_보조 },
+  선택라벨: { fontFamily: 폰트.강조, fontSize: 15, color: 색.잉크, marginBottom: 2 },
+  전략목록: { gap: 12, paddingTop: 22, borderTopWidth: 1, borderTopColor: 'rgba(251,247,240,0.12)' },
+  전략카드: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 18, padding: 17, minHeight: 70, borderWidth: 1, borderColor: 'rgba(251,247,240,0.20)', borderRadius: 12 },
+  선택말: { flex: 1, gap: 6 },
+  전략글: { ...어절줄바꿈, fontFamily: 폰트.본문, fontSize: 16, lineHeight: 25, color: 색.잉크 },
+  추천표시: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조 },
+  받는줄: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: 'rgba(251,247,240,0.12)' },
+  편지표식: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: 색.바탕 },
+  수신자: { fontFamily: 폰트.강조, fontSize: 19, color: 색.잉크 },
+  고른방법: { gap: 5, paddingVertical: 2 },
+  방법글: { fontFamily: 폰트.본문, fontSize: 14, lineHeight: 22, color: 색.잉크 },
+  본문입력: { fontFamily: 폰트.본문, fontSize: 17, lineHeight: 29, color: 색.잉크, backgroundColor: 색.바탕, borderWidth: 1, borderColor: 'rgba(251,247,240,0.20)', borderRadius: 12, padding: 20, minHeight: 240 },
+  쓰기안내: { gap: 10, paddingVertical: 2 },
+  게이지라벨: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_태그 },
   게이지줄: { flexDirection: 'row', gap: 8 },
-  게이지칸: { flex: 1, alignItems: 'center', gap: 5 },
-  게이지면: { alignSelf: 'stretch', height: 8, borderRadius: 4, backgroundColor: 색.잉크_희미 },
-  게이지면_덮개: { ...StyleSheet.absoluteFillObject, borderRadius: 4, backgroundColor: 색.잉크 },
-  게이지이름: { fontFamily: 폰트.캡션, fontSize: 11, color: 색.잉크_메타 },
+  게이지칸: { flex: 1, alignItems: 'center', gap: 8 },
+  게이지면: { alignSelf: 'stretch', height: 5, borderRadius: 3, backgroundColor: 색.잉크_희미 },
+  게이지면_덮개: { ...StyleSheet.absoluteFillObject, borderRadius: 3, backgroundColor: 색.잉크 },
+  게이지이름: { fontFamily: 폰트.캡션, fontSize: 11, color: 색.잉크_보조 },
   게이지이름_참: { fontFamily: 폰트.강조, color: 색.잉크 },
-  게이지힌트: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조, lineHeight: 18, marginTop: 8 },
-
-  /* 신호 1점 — 코랄 면 위 글자는 Ink Deep(색.바탕)만 쓴다(테마 규칙 그대로). */
-  보내기버튼: { backgroundColor: 색.신호, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
-  /* 잠기면 색을 빼고 밝기로 낮춘다 — 검수 확정·강사 저장 버튼과 같은 무늬. */
+  게이지힌트: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조, lineHeight: 19 },
+  보내기버튼: { backgroundColor: 색.신호, borderRadius: 12, minHeight: 54, padding: 16, flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center' },
   보내기_대기: { backgroundColor: 색.잉크_희미 },
-  보내기글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.바탕 },
-  눌림: { opacity: 눌림감.면 },
-
-  대기제목: { fontFamily: 폰트.헤드, fontSize: 24, color: 색.잉크 },
-  /* 관찰 한 줄 — 카드 밖 · 신호(코랄) 없음. 이 화면의 코랄은 게이지 자리라 여기 쓰면 그 뜻이
-   * 흐려지고, 관찰이 «성적»으로 읽힌다. 위계는 색이 아니라 밀도로 준다(`어제의나` 와 같은 규칙). */
-  관찰: { fontFamily: 폰트.캡션, fontSize: 14, lineHeight: 22, color: 색.잉크_보조, paddingHorizontal: 4 },
-  /* 몽골어 병기 줄 — 키릴은 몽골어폰트만(막힘카드 병기 눈금: 폰트짝 유지 · 크기·색 한 단 아래). */
-  관찰_병기: { fontFamily: 몽골어폰트.캡션, fontSize: 13, lineHeight: 21, color: 색.잉크_메타, paddingHorizontal: 4 },
-  편지글: { fontFamily: 폰트.본문, fontSize: 16, lineHeight: 27, color: 색.잉크 },
-  /* Ⅲ⑥ 확인 단추 — 신호색 0(확신 토글과 같은 결) · 두 단추는 같은 무게다(어느 답도 밀지 않는다). */
-  확인줄: { flexDirection: 'row', gap: 8 },
-  확인단추: { flex: 1, borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
-  확인단추글: { fontFamily: 폰트.강조, fontSize: 14, color: 색.잉크 },
+  보내기글: { fontFamily: 폰트.강조, fontSize: 16, color: 색.바탕 },
+  눌림: { opacity: 눌림감.면, transform: [{ scale: 0.96 }] },
+  단추호버: { backgroundColor: 'rgba(251,247,240,0.05)' },
+  단추초점: Platform.select({ web: { outlineStyle: 'solid', outlineWidth: 2, outlineColor: 색.실땀, outlineOffset: 4 }, default: {} }),
+  도착판: { borderRadius: 판눈금.반경, padding: 28, gap: 18, backgroundColor: 색.바탕띄움 },
+  도착머리: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  도착표식: { width: 36, height: 36, borderRadius: 10, backgroundColor: 색.바탕, alignItems: 'center', justifyContent: 'center' },
+  대기제목: { ...어절줄바꿈, fontFamily: 폰트.강조, fontSize: 24, lineHeight: 34, letterSpacing: -0.5, color: 색.잉크 },
+  편지길: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 22, marginTop: 4, borderTopWidth: 1, borderTopColor: 'rgba(251,247,240,0.12)' },
+  길글: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조 },
+  잇는실: { flex: 1, height: 1, backgroundColor: 'rgba(251,247,240,0.20)' },
+  확인판: { gap: 20, padding: 26, paddingTop: 12 },
+  확인머리: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
+  확인제목: { fontFamily: 폰트.강조, fontSize: 14, color: 색.잉크_태그 },
+  선택사항: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조 },
+  확인질문: { ...어절줄바꿈, fontFamily: 폰트.본문, fontSize: 20, lineHeight: 32, letterSpacing: -0.4, color: 색.잉크 },
+  확인줄: { flexDirection: 'row', gap: 12 },
+  확인단추: { flex: 1, minHeight: 54, borderWidth: 1, borderColor: 'rgba(251,247,240,0.28)', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 9 },
+  확인단추글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.잉크 },
+  응답판: { padding: 26, paddingTop: 12, gap: 19 },
+  응답글: { fontFamily: 폰트.본문, fontSize: 19, lineHeight: 31, color: 색.잉크 },
+  관찰: { fontFamily: 폰트.캡션, fontSize: 14, lineHeight: 23, color: 색.잉크_보조, paddingHorizontal: 26 },
+  관찰_병기: { fontFamily: 몽골어폰트.캡션, fontSize: 14, lineHeight: 23, color: 색.잉크_보조 },
+  보낸편지: { padding: 26, gap: 16, borderTopWidth: 1, borderTopColor: 'rgba(251,247,240,0.12)' },
+  편지글: { fontFamily: 폰트.본문, fontSize: 16, lineHeight: 28, color: 색.잉크 },
+  오류판: { padding: 18, borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12 },
+  오류: { fontFamily: 폰트.강조, fontSize: 14, color: 색.잉크, lineHeight: 23 },
+  메모: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조, lineHeight: 20 },
+  아이콘: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
+  화살표: { width: 7, height: 7, borderTopWidth: 1.5, borderRightWidth: 1.5, transform: [{ rotate: '45deg' }] },
+  봉투: { width: 18, height: 13, borderWidth: 1.5, borderRadius: 3, overflow: 'hidden', alignItems: 'center' },
+  봉투접힘: { width: 11, height: 11, borderBottomWidth: 1.5, borderRightWidth: 1.5, transform: [{ rotate: '45deg' }, { translateX: -4 }, { translateY: -4 }] },
+  확인표식: { width: 11, height: 6, borderBottomWidth: 1.5, borderLeftWidth: 1.5, transform: [{ rotate: '-45deg' }, { translateY: -1 }] },
+  가로실: { width: 11, borderTopWidth: 1.5 },
 });

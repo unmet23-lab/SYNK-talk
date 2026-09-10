@@ -1,0 +1,62 @@
+{
+  "prof-calm": {
+    "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\Loom_자산\\구움\\prof-calm_4K.avif",
+    "sourceSize": [
+      2261,
+      2925
+    ],
+    "sourceSha256": "f488b6c6486562200333ac8e0eda682ad09b7cbe87d1a5e59a11f35f94d1d758",
+    "output": "assets/npc/prof-calm.webp",
+    "outputSize": [
+      1024,
+      1024
+    ],
+    "outputSha256": "1f8f5ad7471b33a8617e5d08dad2c15e3b3824c303c01be0707af21aac2a0740",
+    "transform": "alpha crop; square padding 6%; LANCZOS; WebP quality=92; alpha preserved"
+  },
+  "prof-lean": {
+    "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\Loom_자산\\구움\\prof-lean_4K.avif",
+    "sourceSize": [
+      2557,
+      3265
+    ],
+    "sourceSha256": "5ab782d71a3f9ca3dd80c229a1d7b5df59b4a07d07d56a1381844bfa44cc1697",
+    "output": "assets/npc/prof-lean.webp",
+    "outputSize": [
+      1024,
+      1024
+    ],
+    "outputSha256": "b4cb92b67662349519fe30d4af2f73d911fb7e911548ed0671ec64b92857a03e",
+    "transform": "alpha crop; square padding 6%; LANCZOS; WebP quality=92; alpha preserved"
+  },
+  "prof-back": {
+    "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\Loom_자산\\구움\\prof-back_4K.avif",
+    "sourceSize": [
+      2290,
+      3155
+    ],
+    "sourceSha256": "89a23916f502d3be6605ed391959aa67fe058fc3e9cf9b0fa13e2e5a1549ec17",
+    "output": "assets/npc/prof-back.webp",
+    "outputSize": [
+      1024,
+      1024
+    ],
+    "outputSha256": "a6cb61889bbb0785914c7cf9e018dc90e8c5ba2c61de6386eb7c4bd02f93b9fa",
+    "transform": "alpha crop; square padding 6%; LANCZOS; WebP quality=92; alpha preserved"
+  },
+  "prof-win": {
+    "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\Loom_자산\\구움\\prof-win_4K.avif",
+    "sourceSize": [
+      2345,
+      3027
+    ],
+    "sourceSha256": "d7b6b6f7d4f253dee10d2689ae86d2f0bfe20213ce47da6f6a0644122bc3e85d",
+    "output": "assets/npc/prof-win.webp",
+    "outputSize": [
+      1024,
+      1024
+    ],
+    "outputSha256": "fbbc75a677ff0a32ebdbc1e0f9a5ac6ab9fe7bd06353acc654d1384a6c866942",
+    "transform": "alpha crop; square padding 6%; LANCZOS; WebP quality=92; alpha preserved"
+  }
+}

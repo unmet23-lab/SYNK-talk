@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="2703" viewBox="-14 -8 194 128" role="img" aria-label="SYNK">
+<defs>
+  <path id="sl-syn" d="M35.8 57.9 25.9 58.5Q25.5 56.6 23.8 55.3Q22.1 53.9 19.3 53.9Q16.7 53.9 15.0 55.0Q13.3 56.0 13.3 57.8Q13.3 59.2 14.4 60.2Q15.5 61.2 18.2 61.8L25.4 63.2Q31.1 64.3 33.9 66.9Q36.7 69.5 36.7 73.8Q36.7 77.7 34.5 80.6Q32.2 83.5 28.3 85.1Q24.4 86.8 19.3 86.8Q11.5 86.8 6.8 83.5Q2.2 80.2 1.4 74.6L12.1 74.1Q12.6 76.5 14.5 77.7Q16.3 78.9 19.3 78.9Q22.1 78.9 23.9 77.8Q25.7 76.7 25.7 75.0Q25.7 72.0 20.6 71.0L13.8 69.6Q8.1 68.5 5.3 65.6Q2.5 62.8 2.5 58.4Q2.5 54.6 4.5 51.9Q6.6 49.2 10.4 47.7Q14.1 46.2 19.1 46.2Q26.6 46.2 30.8 49.3Q35.1 52.5 35.8 57.9Z M44.0 100.7Q41.9 100.7 40.1 100.4Q38.3 100.1 37.1 99.6L39.6 91.5L39.9 91.6Q42.7 92.4 44.6 91.9Q46.6 91.5 47.6 88.8L48.2 87.1L34.1 46.7H45.6L53.7 75.6H54.1L62.3 46.7H73.8L58.6 90.3Q57.5 93.4 55.6 95.8Q53.7 98.1 50.9 99.4Q48.0 100.7 44.0 100.7Z M84.0 63.3V86.0H73.1V46.7H83.8V53.7H84.2Q85.5 50.2 88.4 48.2Q91.4 46.2 95.7 46.2Q99.8 46.2 102.9 48.0Q105.9 49.8 107.6 53.1Q109.3 56.4 109.3 61.0V86.0H98.4V62.9Q98.4 59.4 96.6 57.3Q94.7 55.2 91.4 55.2Q89.2 55.2 87.6 56.2Q85.9 57.2 84.9 59.0Q84.0 60.8 84.0 63.3Z"/><path id="sl-k" d="M117.3046875 86.0V33.6171875H126.55078125V62.48046875H127.21875L141.31640625 46.6953125H152.14453125L136.91339111328125 63.68389129638672L153.0234375 86.0H141.94921875L129.9180908203125 69.20931243896484L126.55078125 72.82667541503906V86.0Z"/><path id="sl-chev" d="M146 46.7 L112 66.35 L146 86 L166 86 L132 66.35 L166 46.7 Z"/>
+  <filter id="sl-felt-paper" x="-18%" y="-22%" width="136%" height="144%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.16" numOctaves="3" seed="7" result="w"/>
+    <feDisplacementMap in="SourceGraphic" in2="w" scale="2.2" result="shape"/>
+    <feTurbulence type="fractalNoise" baseFrequency="1.15 0.5" numOctaves="2" seed="13" result="n1"/>
+    <feColorMatrix in="n1" type="matrix" values="0 0 0 0 0.9843  0 0 0 0 0.9686  0 0 0 0 0.9412  0 0 0 0.8 -0.46" result="lf"/>
+    <feComposite in="lf" in2="shape" operator="in" result="lfc"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.8 0.45" numOctaves="3" seed="29" result="n2"/>
+    <feColorMatrix in="n2" type="matrix" values="0 0 0 0 0.7804  0 0 0 0 0.7490  0 0 0 0 0.6980  0 0 0 0.8 -0.37" result="df"/>
+    <feComposite in="df" in2="shape" operator="in" result="dfc"/>
+    <feMerge><feMergeNode in="shape"/><feMergeNode in="dfc"/><feMergeNode in="lfc"/></feMerge>
+  </filter>
+  <filter id="sl-felt-ink" x="-18%" y="-22%" width="136%" height="144%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.16" numOctaves="3" seed="7" result="w"/>
+    <feDisplacementMap in="SourceGraphic" in2="w" scale="2.2" result="shape"/>
+    <feTurbulence type="fractalNoise" baseFrequency="1.15 0.5" numOctaves="2" seed="13" result="n1"/>
+    <feColorMatrix in="n1" type="matrix" values="0 0 0 0 0.3412  0 0 0 0 0.3137  0 0 0 0 0.2745  0 0 0 0.8 -0.46" result="lf"/>
+    <feComposite in="lf" in2="shape" operator="in" result="lfc"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.8 0.45" numOctaves="3" seed="29" result="n2"/>
+    <feColorMatrix in="n2" type="matrix" values="0 0 0 0 0.0314  0 0 0 0 0.0235  0 0 0 0 0.0196  0 0 0 0.8 -0.37" result="df"/>
+    <feComposite in="df" in2="shape" operator="in" result="dfc"/>
+    <feMerge><feMergeNode in="shape"/><feMergeNode in="dfc"/><feMergeNode in="lfc"/></feMerge>
+  </filter>
+  <filter id="sl-felt-coral" x="-18%" y="-22%" width="136%" height="144%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.16" numOctaves="3" seed="7" result="w"/>
+    <feDisplacementMap in="SourceGraphic" in2="w" scale="2.2" result="shape"/>
+    <feTurbulence type="fractalNoise" baseFrequency="1.15 0.5" numOctaves="2" seed="13" result="n1"/>
+    <feColorMatrix in="n1" type="matrix" values="0 0 0 0 0.9843  0 0 0 0 0.7176  0 0 0 0 0.6392  0 0 0 0.8 -0.46" result="lf"/>
+    <feComposite in="lf" in2="shape" operator="in" result="lfc"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.8 0.45" numOctaves="3" seed="29" result="n2"/>
+    <feColorMatrix in="n2" type="matrix" values="0 0 0 0 0.6824  0 0 0 0 0.1961  0 0 0 0 0.1647  0 0 0 0.8 -0.37" result="df"/>
+    <feComposite in="df" in2="shape" operator="in" result="dfc"/>
+    <feMerge><feMergeNode in="shape"/><feMergeNode in="dfc"/><feMergeNode in="lfc"/></feMerge>
+  </filter>
+  <filter id="sl-felt-butter" x="-18%" y="-22%" width="136%" height="144%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.16" numOctaves="3" seed="7" result="w"/>
+    <feDisplacementMap in="SourceGraphic" in2="w" scale="2.2" result="shape"/>
+    <feTurbulence type="fractalNoise" baseFrequency="1.15 0.5" numOctaves="2" seed="13" result="n1"/>
+    <feColorMatrix in="n1" type="matrix" values="0 0 0 0 1.0000  0 0 0 0 0.9216  0 0 0 0 0.6902  0 0 0 0.8 -0.46" result="lf"/>
+    <feComposite in="lf" in2="shape" operator="in" result="lfc"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.8 0.45" numOctaves="3" seed="29" result="n2"/>
+    <feColorMatrix in="n2" type="matrix" values="0 0 0 0 0.4941  0 0 0 0 0.3529  0 0 0 0 0.0627  0 0 0 0.8 -0.37" result="df"/>
+    <feComposite in="df" in2="shape" operator="in" result="dfc"/>
+    <feMerge><feMergeNode in="shape"/><feMergeNode in="dfc"/><feMergeNode in="lfc"/></feMerge>
+  </filter>
+  <filter id="sl-felt-meadow" x="-18%" y="-22%" width="136%" height="144%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.16" numOctaves="3" seed="7" result="w"/>
+    <feDisplacementMap in="SourceGraphic" in2="w" scale="2.2" result="shape"/>
+    <feTurbulence type="fractalNoise" baseFrequency="1.15 0.5" numOctaves="2" seed="13" result="n1"/>
+    <feColorMatrix in="n1" type="matrix" values="0 0 0 0 0.8275  0 0 0 0 0.9098  0 0 0 0 0.7451  0 0 0 0.8 -0.46" result="lf"/>
+    <feComposite in="lf" in2="shape" operator="in" result="lfc"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.8 0.45" numOctaves="3" seed="29" result="n2"/>
+    <feColorMatrix in="n2" type="matrix" values="0 0 0 0 0.2471  0 0 0 0 0.4196  0 0 0 0 0.1804  0 0 0 0.8 -0.37" result="df"/>
+    <feComposite in="df" in2="shape" operator="in" result="dfc"/>
+    <feMerge><feMergeNode in="shape"/><feMergeNode in="dfc"/><feMergeNode in="lfc"/></feMerge>
+  </filter>
+  <filter id="sl-felt-pop" x="-18%" y="-22%" width="136%" height="144%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.16" numOctaves="3" seed="7" result="w"/>
+    <feDisplacementMap in="SourceGraphic" in2="w" scale="2.2" result="shape"/>
+    <feTurbulence type="fractalNoise" baseFrequency="1.15 0.5" numOctaves="2" seed="13" result="n1"/>
+    <feColorMatrix in="n1" type="matrix" values="0 0 0 0 0.9725  0 0 0 0 0.7804  0 0 0 0 0.8706  0 0 0 0.8 -0.46" result="lf"/>
+    <feComposite in="lf" in2="shape" operator="in" result="lfc"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.8 0.45" numOctaves="3" seed="29" result="n2"/>
+    <feColorMatrix in="n2" type="matrix" values="0 0 0 0 0.6000  0 0 0 0 0.1608  0 0 0 0 0.3647  0 0 0 0.8 -0.37" result="df"/>
+    <feComposite in="df" in2="shape" operator="in" result="dfc"/>
+    <feMerge><feMergeNode in="shape"/><feMergeNode in="dfc"/><feMergeNode in="lfc"/></feMerge>
+  </filter>
+  <filter id="sl-cut" x="-14%" y="-18%" width="128%" height="136%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.16" numOctaves="3" seed="7" result="w"/>
+    <feDisplacementMap in="SourceGraphic" in2="w" scale="2.2"/>
+  </filter>
+  <filter id="sl-soft" x="-14%" y="-18%" width="128%" height="136%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.2" numOctaves="2" seed="5" result="w"/>
+    <feDisplacementMap in="SourceGraphic" in2="w" scale="1.2"/>
+  </filter>
+  <filter id="sl-fuzz1" x="-20%" y="-25%" width="140%" height="150%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.55 0.75" numOctaves="2" seed="11" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="6.5"/><feGaussianBlur stdDeviation="0.35"/>
+  </filter>
+  <filter id="sl-fuzz2" x="-24%" y="-30%" width="148%" height="160%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.28 0.4" numOctaves="2" seed="23" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="11"/><feGaussianBlur stdDeviation="0.5"/>
+  </filter>
+  <filter id="sl-contact" x="-20%" y="-25%" width="140%" height="150%"><feGaussianBlur stdDeviation="1.2"/></filter>
+  <linearGradient id="sl-core" x1="0" y1="1" x2="0" y2="0">
+    <stop offset="0" stop-color="#C7BFB2" stop-opacity="0.32"/>
+    <stop offset="0.5" stop-color="#C7BFB2" stop-opacity="0"/>
+  </linearGradient>
+  <radialGradient id="sl-cushion-hi" cx="50%" cy="26%" r="68%">
+    <stop offset="0" stop-color="#FBF7F0" stop-opacity="0.20"/>
+    <stop offset="0.55" stop-color="#FBF7F0" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="sl-cushion-lo" cx="50%" cy="88%" r="72%">
+    <stop offset="0" stop-color="#941F19" stop-opacity="0.30"/>
+    <stop offset="0.6" stop-color="#941F19" stop-opacity="0"/>
+  </radialGradient>
+</defs>
+  <g>
+    <use href="#sl-syn" fill="#080605" opacity="0.5" transform="translate(0.8,1.6)" filter="url(#sl-contact)"/>
+    <use href="#sl-syn" fill="#FBF7F0" opacity="0.13" filter="url(#sl-fuzz2)"/>
+    <use href="#sl-syn" fill="#FBF7F0" opacity="0.28" filter="url(#sl-fuzz1)"/>
+    <g filter="url(#sl-cut)"><use href="#sl-syn" fill="#C7BFB2" transform="translate(0.4,2.0)"/></g>
+    <g filter="url(#sl-cut)"><use href="#sl-syn" fill="#C7BFB2" opacity="0.55" transform="translate(0,1.2)"/></g>
+    <g filter="url(#sl-felt-paper)"><use href="#sl-syn" fill="#FBF7F0"/><use href="#sl-syn" fill="url(#sl-core)"/></g>
+    <g filter="url(#sl-soft)">
+      <use href="#sl-syn" fill="none" stroke="#080605" stroke-width="1.1"
+        stroke-dasharray="3.4 2.7 2.9 3.3 2.5 3.1" stroke-linecap="round" opacity="0.4" transform="translate(0.5,0.8)"/>
+      <use href="#sl-syn" fill="none" stroke="#FBCAAB" stroke-width="1"
+        stroke-dasharray="3.1 2.8 3.4 2.5 2.9 3.2" stroke-linecap="round" opacity="0.6"/>
+      <use href="#sl-syn" fill="none" stroke="#FBCAAB" stroke-width="0.7"
+        stroke-dasharray="2.9 3.2 3.3 2.6 3.0 2.8" stroke-dashoffset="1.5" stroke-linecap="round" opacity="0.28"/>
+    </g>
+    <use href="#sl-chev" fill="#080605" opacity="0.5" transform="translate(0.8,1.6)" filter="url(#sl-contact)"/>
+    <use href="#sl-chev" fill="#F96859" opacity="0.13" filter="url(#sl-fuzz2)"/>
+    <use href="#sl-chev" fill="#F96859" opacity="0.28" filter="url(#sl-fuzz1)"/>
+    <g filter="url(#sl-cut)"><use href="#sl-chev" fill="#AE322A" transform="translate(0.4,2.0)"/></g>
+    <g filter="url(#sl-cut)"><use href="#sl-chev" fill="#AE322A" opacity="0.55" transform="translate(0,1.2)"/></g>
+    <g filter="url(#sl-felt-coral)"><use href="#sl-chev" fill="#F96859"/></g>
+    <g filter="url(#sl-soft)">
+      <use href="#sl-chev" fill="none" stroke="#080605" stroke-width="1.6"
+        stroke-dasharray="3.4 2.7 2.9 3.3 2.5 3.1" stroke-linecap="round" opacity="0.55" transform="translate(0.5,0.8)"/>
+      <use href="#sl-chev" fill="none" stroke="#FBCAAB" stroke-width="1.55"
+        stroke-dasharray="3.1 2.8 3.4 2.5 2.9 3.2" stroke-linecap="round" opacity="0.92"/>
+      <use href="#sl-chev" fill="none" stroke="#FBCAAB" stroke-width="1.1"
+        stroke-dasharray="2.9 3.2 3.3 2.6 3.0 2.8" stroke-dashoffset="1.5" stroke-linecap="round" opacity="0.4"/>
+    </g></g>
+</svg>

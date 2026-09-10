@@ -1,0 +1,78 @@
+{
+  "내부로고": {
+    "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\tools\\lib\\로고정본.js",
+    "sourceSha256": "f89707799dc900582048e7da69448acd4847062186fe406b44d6f9cf7cdd1b34",
+    "tokens": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\디자인_토큰.json",
+    "tokensSha256": "3bd08216ed6885490112daa5c8f4bb295cfbd6b407b828720c5d5cc08b608b44",
+    "options": {
+      "판": "다크",
+      "신호": "꺾쇠",
+      "표현": "펠트"
+    },
+    "master": "assets/브랜드/내부로고_4K.png",
+    "masterSize": [
+      4096,
+      2703
+    ],
+    "masterSha256": "b1980e776054b629ba00cf083bb9343066d7de2d43b34e8ad3f15bcc0bdc99ce",
+    "output": "assets/브랜드/내부로고.webp",
+    "outputSize": [
+      1024,
+      383
+    ],
+    "alphaBounds": {
+      "left": 277,
+      "top": 1092,
+      "width": 3581,
+      "height": 1293
+    },
+    "paddingAtMasterScale": 36,
+    "outputSha256": "a331c44d76d4547eb694097c9d9728006583e38b36e2bff37e6a0d963d367dcc",
+    "transform": "canonical SVG rasterized at 4096px; derivative trimmed to nonzero alpha plus 1% width padding; proportional WebP; no shape edits"
+  },
+  "몽글": {
+    "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\몽글_본체.png",
+    "sourceSize": [
+      4096,
+      4096
+    ],
+    "sourceSha256": "6fd4e6b3946006d54d7059e60cc135b27874128bd8e7dfa6e6a62f1a1532f56c",
+    "output": "assets/브랜드/몽글_본체.webp",
+    "outputSize": [
+      1024,
+      1024
+    ],
+    "outputSha256": "6abf284e6079a9d26f5a161a921e9c5897d643442e155d4d21ba7f00990826b5",
+    "transform": "LANCZOS3; WebP quality=96; source frame and alpha preserved"
+  },
+  "까몽": {
+    "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\까몽_본체.png",
+    "sourceSize": [
+      4096,
+      4096
+    ],
+    "sourceSha256": "fea5f2b66db16a1089f4475492c59fb8273bfcf80b18fbcde4909a950e3796ab",
+    "output": "assets/브랜드/까몽_본체.webp",
+    "outputSize": [
+      1024,
+      1024
+    ],
+    "outputSha256": "4f1c3bac51e1df447dff1dd487173e6eec8dc4a7ecf4e5e91a39569df88f1131",
+    "transform": "LANCZOS3; WebP quality=96; source frame and alpha preserved"
+  },
+  "마린": {
+    "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\마린_본체.png",
+    "sourceSize": [
+      4096,
+      4096
+    ],
+    "sourceSha256": "8beed3a55c33c39ad6a28bb7c98338853c356529ea2b68f30fd4908b65e9df13",
+    "output": "assets/브랜드/마린_본체.webp",
+    "outputSize": [
+      1024,
+      1024
+    ],
+    "outputSha256": "fa930ca8dc4d60f4974a205c5db90564a7da97313927f6bb8b6e92a28a73f3b5",
+    "transform": "LANCZOS3; WebP quality=96; source frame and alpha preserved"
+  }
+}

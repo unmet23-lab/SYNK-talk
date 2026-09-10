@@ -64,7 +64,7 @@ test('D5-9 게이지 칸은 덮개 opacity 로만 스며든다 — 바닥(잉크
   assert.match(교수소스, /<Animated\.View style=\{\[s\.게이지면_덮개, \{ opacity: 덮개 \}\]\} \/>/u,
     '덮개가 opacity 밖을 만진다 — useNativeDriver 가 못 미는 속성은 채점처럼 뚝 끊긴다');
   assert.match(교수소스, /useNativeDriver: true/u, '네이티브 드라이버가 꺼졌다 — 타이핑 리렌더에 스밈이 끊긴다');
-  assert.match(교수소스, /게이지면: \{ alignSelf: 'stretch', height: 8, borderRadius: 4, backgroundColor: 색\.잉크_희미 \}/u,
+  assert.match(교수소스, /게이지면: \{[^}\n]*backgroundColor: 색\.잉크_희미 \}/u,
     '게이지 바닥이 잉크_희미가 아니다 — 스밈은 덮개의 몫이고 바닥은 불변이어야 한다');
   assert.ok(!/게이지면_참/u.test(교수소스), '옛 즉시 교체 스타일(게이지면_참)이 남았다 — 두 통로가 갈린다');
 });
