@@ -5,23 +5,54 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const { createHash } = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const { 스냅샷, 몽골날짜 } = require('../lib/오늘과제.js');
+const { 표정컷 } = require('../lib/마스코트생명.js');
 const { 인자게이트 } = require('../lib/플래그.js');
+const 마스코트컷 = [...new Set(Object.values(표정컷).flatMap(Object.values))];
+
+// 남은 구 파일의 존재만 보지 않고, 현재 HTML의 번들이 실제 참조하는 그림을 대조한다.
+function 마스코트빌드일치(root, dir, 컷들 = 마스코트컷) {
+  try {
+    const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
+    const scripts = [...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/g)];
+    if (!scripts.length || !컷들.length) return false;
+    const bundle = scripts.map(([, src]) => {
+      const p = path.resolve(dir, '.' + new URL(src, 'http://localhost/').pathname);
+      if (!p.startsWith(dir + path.sep)) throw new Error('미리보기 밖의 번들');
+      return fs.readFileSync(p, 'utf8');
+    }).join('\n');
+    const images = [...bundle.matchAll(/(?:\buri|"uri")\s*:\s*("(?:\\.|[^"\\])*")/g)]
+      .map(([, value]) => JSON.parse(value))
+      .filter((uri) => uri.startsWith('/assets/assets/마스코트/'));
+    const sha = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+    return 컷들.every((컷) => {
+      const sourceSha = sha(path.join(root, 'assets', '마스코트', `${컷}.webp`));
+      const refs = images.filter((uri) => path.basename(uri).startsWith(`${컷}.`) && uri.endsWith('.webp'));
+      return refs.length > 0 && refs.every((uri) => sha(path.join(dir, uri)) === sourceSha);
+    });
+  } catch (_) {
+    return false; // 누락·손상된 빌드는 서비스 전에 기존 export로 다시 만든다.
+  }
+}
+
+function 미리보기시작() {
 const 아는플래그 = ['--빌드'];
 const 플래그오류 = 인자게이트('첫흐름미리보기', process.argv.slice(2), 아는플래그);
 if (플래그오류) { console.error(플래그오류); process.exit(1); }
 const root = path.resolve(__dirname, '..');
 const dir = path.join(root, 'dist', 'first-flow-preview');
 const base = 'http://127.0.0.1:18769';
-if (process.argv.includes('--빌드')) {
+if (process.argv.includes('--빌드') || !마스코트빌드일치(root, dir)) {
+  console.log('현행 마스코트 자산으로 첫 흐름 미리보기를 생성합니다.');
   const r = spawnSync(process.execPath, ['tools/앱시작.js', 'export', '--clear', '--platform', 'web', '--output-dir', 'dist/first-flow-preview'], {
     cwd: root, stdio: 'inherit', env: { ...process.env,
       EXPO_PUBLIC_SUPABASE_URL: base, EXPO_PUBLIC_SUPABASE_ANON_KEY: 'synthetic-preview' },
   });
   if (r.status !== 0) process.exit(r.status || 1);
 }
-if (!fs.existsSync(path.join(dir, 'index.html'))) throw new Error('먼저 --빌드로 실행하세요.');
+if (!마스코트빌드일치(root, dir)) throw new Error('빌드의 마스코트가 현재 자산과 다릅니다. 미리보기를 시작하지 않습니다.');
 const id = '11111111-2222-4333-8444-555555555555';
 let 답장있음 = false;
 const counts = { corrections: 0, events: 0 };
@@ -73,3 +104,7 @@ http.createServer(async (req, res) => {
   res.writeHead(200, { 'Content-Type': mime[ext] || 'application/octet-stream', 'Cache-Control': 'no-store' });
   res.end(ext === '.html' ? fs.readFileSync(file, 'utf8').replace('</body>', controls + '</body>') : fs.readFileSync(file));
 }).listen(18769, '127.0.0.1', () => console.log('합성 자료 미리보기: ' + base));
+}
+
+if (require.main === module) 미리보기시작();
+module.exports = { 마스코트빌드일치 };
