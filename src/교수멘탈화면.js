@@ -28,13 +28,11 @@ import { 효과음, bgm정지 } from './소리.js';
 import { 도장햅틱 } from './소리.js';
 import { 관측보고 } from './관측';
 
-/* NPC 교수님 — 상대역. 이 모듈의 NPC 는 «상태 전이 자리»(판 시작·완료)에서만
- * 바뀐다(게임층 설계 §4 규격 3) — 입력 중 움직이는 장치는 동시에 하나여야 하고, 그 하나는
- * 이미 이 화면의 게이지가 쥐고 있다. 실시간 3단은 G3(알바변명) 전용이다. */
-import NPC from './NPC.js';
+/* 수신자 얼굴도 선택 화면의 같은 교수 원본을 쓴다. 눈깜빡임은 입력 평가와 무관하다. */
+import { 살아있는교수얼굴 } from './살아있는교수연구실.js';
 import { LAB로고 } from './브랜드자산.js';
 import { 교수작업실장면, 편지책갈피 } from './교수작업실장면.js';
-import { 전이상태 } from '../lib/NPC연출.js';
+import { 장면만들기 } from '../contents/교수멘탈장면.js';
 /**
  * G1 「교수님 멘탈 구하기」 — 격식 메일 쓰기 게임 (발주_게임모듈.md G1 · 게임층 설계).
  * 흐름: 상황과 사과 전략 선택 → 메일 쓰기(멘탈 게이지) → 답장 기다리기.
@@ -91,6 +89,7 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
   /* 고른 전략의 «라벨» — 쓰기 단계에 재표시(자기 설명 «연결» 축: 고른 카드가 사라지면 「내가 뭘
    * 골랐더라」가 끊긴다 · 유호 확정 08-22). 행 재료가 아니라 화면 전용이다(사건은 고르기가 이미 낸다). */
   const [고른전략라벨, set고른전략라벨] = useState(null);
+  const [고른전략예문, set고른전략예문] = useState(null);
   const [로그, set로그] = useState([]);
   const [오류, set오류] = useState(null);
   const [게이지, set게이지] = useState(null);
@@ -170,6 +169,7 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
   const 고르기 = async (option_id) => {
     상태참조.current = { ...상태참조.current, 단계: '쓰기' };
     set고른전략라벨(보기?.options_shown?.find((o) => o.option_id === option_id)?.label ?? null);
+    set고른전략예문(장면만들기({ ...재료, 캐릭터: 가이드 }).전략.find((o) => o.option_id === option_id)?.예문 ?? null);
     set단계('쓰기');
     const 사건 = 전략선택사건(재료, {
       보기, 고른것: option_id, 시작: 보기뜬때.current, 끝: 경과시계(),
@@ -311,13 +311,16 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
 
       {단계 === '쓰기' && <View style={s.내용}>
         <View style={s.받는줄}>
-          <NPC 역="prof" 상태={전이상태('시작')} 크기={52} />
+          <살아있는교수얼굴 size={52} />
           <View style={s.선택말}><Text style={s.카드라벨}>받는 사람</Text><Text style={s.수신자}>교수님</Text></View>
           <View style={s.편지표식}><선아이콘 종류="편지" /></View>
         </View>
         <View style={s.쓰기상황}>
           <Text style={s.본문글}>{문항.질문}</Text>
-          {고른전략라벨 ? <View style={s.고른방법}><Text style={s.메모}>내가 고른 방법</Text><Text style={s.방법글}>{고른전략라벨}</Text></View> : null}
+          {고른전략라벨 ? <View style={s.고른방법}>
+            <Text style={s.메모}>내가 고른 방법</Text><Text style={s.방법글}>{고른전략라벨}</Text>
+            <쓰기말투예시 예문={고른전략예문} />
+          </View> : null}
           <Text style={s.메모}>{문항.지시문}</Text>
         </View>
         <편지책갈피 가이드={가이드} 칸이름들={칸이름들} />
@@ -369,6 +372,25 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
       </View>}
     </ScrollView>
   );
+}
+
+// 예문을 접고 펴는 상태는 이 자리만 가진다. 본문·계측이나 선택 사건에는 닿지 않는다.
+export function 쓰기말투예시({ 예문 }) {
+  const [펼침, set펼침] = useState(false);
+  if (!예문) return null;
+  return <View style={s.말투예시}>
+    <Pressable accessibilityRole="button" accessibilityState={{ expanded: 펼침 }} aria-expanded={펼침}
+      onPress={() => set펼침((열림) => !열림)}
+      style={({ pressed, hovered, focused }) => [s.예시열기, hovered && s.단추호버, focused && s.단추초점, pressed && s.눌림]}>
+      <Text style={s.예시단추글}>{펼침 ? '말투 예시 접기' : '말투 예시 다시 보기'}</Text>
+      <Text style={s.예시단추글} aria-hidden>{펼침 ? '−' : '+'}</Text>
+    </Pressable>
+    {펼침 ? <View style={s.예시내용}>
+      <Text style={s.메모}>내가 교수님께 쓰는 말</Text>
+      <Text selectable style={s.예시글}>{예문}</Text>
+      <Text style={s.메모}>말투를 참고하고, 내 상황에 맞게 직접 써 보세요.</Text>
+    </View> : null}
+  </View>;
 }
 
 function 머리() {
@@ -441,6 +463,11 @@ const s = StyleSheet.create({
   쓰기상황: { gap: 12 },
   고른방법: { gap: 4 },
   방법글: { fontFamily: 폰트.본문, fontSize: 14, lineHeight: 23, color: 색.잉크 },
+  말투예시: { marginTop: 4, borderRadius: 12, borderWidth: 1, borderColor: 색.잉크_희미 },
+  예시열기: { minHeight: 44, borderRadius: 11, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  예시단추글: { fontFamily: 폰트.캡션, fontSize: 14, lineHeight: 22, color: 색.잉크_태그 },
+  예시내용: { gap: 7, paddingHorizontal: 14, paddingTop: 3, paddingBottom: 14 },
+  예시글: { ...어절줄바꿈, fontFamily: 폰트.본문, fontSize: 15, lineHeight: 25, color: 색.잉크 },
   본문입력: { fontFamily: 폰트.본문, fontSize: 17, lineHeight: 29, color: 색.잉크, backgroundColor: 색.바탕띄움, borderRadius: 16, padding: 22, minHeight: 250, borderWidth: 1, borderColor: 'rgba(251,247,240,0.13)' },
   쓰기안내: { gap: 12 },
   게이지라벨: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_태그 },

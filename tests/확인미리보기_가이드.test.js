@@ -76,6 +76,8 @@ test('제품과 미리보기 — 현재 선택값이 G1 prop까지 이어지고 
 });
 
 test('PC 가이드 선택 — 실제 radio DOM에 미선택과 현재 선택을 전달한다', () => {
+  // 공용 SSR 통로가 React Native→Web·JSX·실제 이미지 import를 함께 처리한다.
+  require('./lib/화면세우기.js');
   const React = require('react');
   const { renderToStaticMarkup } = require('react-dom/server');
   const { Image, Pressable, Text, View } = require('react-native-web');
@@ -89,6 +91,7 @@ test('PC 가이드 선택 — 실제 radio DOM에 미선택과 현재 선택을 
     module: { exports: {} }, require,
     useRef: React.useRef, useEffect: React.useEffect,
     Image, Pressable, Text, View, 혼잣말캐릭터들,
+    살아있는가이드: require('../src/살아있는가이드.js').살아있는가이드,
     표시배: require('../lib/마스코트생명.js').표시배,
     가이드그림: Object.fromEntries(혼잣말캐릭터들.map((이름) => [이름, `/${이름}.webp`])), s: {},
   };

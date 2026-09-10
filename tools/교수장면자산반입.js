@@ -24,6 +24,8 @@ const preservedScene = path.join(root, 'tmp/교수작업실소스/research-sourc
 const sceneSource = args.length ? path.resolve(args[1]) : fs.existsSync(preservedScene) ? preservedScene : originalScene;
 const originalCutout = 'C:/Users/q1212/.codex/generated_images/01a08bec-1f1d-7903-b772-c36f94a712f1/exec-f237abae-15b7-434e-85e8-42fd66c779a0.png';
 const preservedCutout = path.join(root, 'tmp/교수작업실소스/notebook-cutout-source.png');
+const originalBlink = 'C:/Users/q1212/.codex/generated_images/01a08bec-1f1d-7903-b772-c36f94a712f1/exec-2448cc7d-01b7-45c1-9142-b0791b90fbcb.png';
+const preservedBlink = path.join(root, 'tmp/교수작업실소스/research-blink-source.png');
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const slash = value => value.replace(/\\/g, '/');
 
@@ -32,9 +34,14 @@ const sources = [
     preserved: 'tmp/교수작업실소스/research-source.png',
     sha256: 'd584cc1d7cabb48e06e22ba1fbfd8f93b3dffa857bab96b8a2803408eef0c55d', width: 1672, height: 941,
     usage: 'PC G1 교수 연구실의 장면 배경. 원본 전체 화폭을 유지한다.' },
+  { name: 'research-blink', source: fs.existsSync(preservedBlink) ? preservedBlink : originalBlink,
+    original: originalBlink, native: true, preserved: 'tmp/교수작업실소스/research-blink-source.png',
+    sha256: 'fcb0426f8224d4088b3dbb7114c48f54c0503d8636f98ad14a64269c6516878e', width: 1672, height: 941,
+    usage: '교수 눈감음 참조. 안경 안쪽 두 눈만 국소 표시하며 전체 장면은 교체하지 않는다.',
+    generation: {"tool":"Codex built-in ImageGen","operation":"교수 눈감음 국소 그림 생성","prompt":"Precise eye-only edit of this exact felt professor studio photograph. Keep the entire image composition, camera, all fibers, lighting, desk, books, glasses frames, colors and character silhouette identical. Change ONLY the two small black bead eyes INSIDE the round eyeglasses: the professor is briefly blinking, so replace each black bead with a tiny relaxed closed-eye stitched curved line against the same pale lavender felt. The glasses themselves stay completely unchanged and do NOT close. Preserve the exact eye centers and perspective: screen-left eye near (981,437) and screen-right eye near (1108,469) on the 1672 by 941 canvas. No mouth, no nose, no other expression change, no head shift, no fur regeneration beyond the small eye beads, no new props. Same 1672 by 941 full frame, maximum native detail.","usage_note":"생성된 전체 장면을 전환하지 않는다. 화면은 안경 안 두 눈의 타원 영역만 잘라 원본 위에 겹친다. 나머지 몸·털·방은 원래 research.webp 그대로 유지한다."} },
   { name: 'envelope', canonical: 'docs/Loom_자산/구움/공방_편지봉투.avif',
-    sha256: 'f21077b69183b25d1222db18c0b4c9b1cd938679d6289be1613b772911a9c27b', width: 3176, height: 2680,
-    usage: '편지 전달·열기 동작에 사용하는 펠트 봉투 소품.' },
+    canonicalManifest: 'docs/Loom_자산/구움/공방_편지봉투.출처.json',
+    usage: '현재 정본의 온전한 펠트 봉투. 간결한 부탁·편지 책갈피에 사용한다.' },
   { name: 'notebook', canonical: 'docs/Loom_자산/구움/공방_공책과연필.avif',
     sha256: '4d5b4df9ec676c4d0bec63269d70e4f3a78bc8708dd75abfac725a285fa079d4', width: 4096, height: 4096,
     usage: '배경 제거 ImageGen의 참조 전용. 불투명 사각 이미지이며 현재 UI에서는 사용하지 않는다.' },
@@ -64,16 +71,36 @@ const referenceSources = [
 
 (async () => {
   const canonicalRoot = 형제정본(root);
+  const currentSources = sources.map(entry => {
+    if (!entry.canonicalManifest) return entry;
+    const manifestBytes = fs.readFileSync(path.join(canonicalRoot, entry.canonicalManifest));
+    const record = JSON.parse(manifestBytes.toString('utf8'));
+    const canonical = record.canonical;
+    if (record.id !== '공방_편지봉투' || record.status !== 'current' ||
+        !canonical || canonical.path !== entry.canonical ||
+        !/^[a-f0-9]{64}$/.test(canonical.sha256) ||
+        !Number.isInteger(canonical.width) || canonical.width <= 0 ||
+        !Number.isInteger(canonical.height) || canonical.height <= 0 ||
+        !Number.isInteger(canonical.bytes) || canonical.bytes <= 0 || canonical.has_alpha !== true ||
+        !record.generation || typeof record.generation.prompt !== 'string' ||
+        typeof record.generation.cleanup_prompt !== 'string') {
+      throw new Error('봉투의 현재 정본 출처가 유효하지 않습니다. 과거 봉투로 대체하지 않습니다.');
+    }
+    return { ...entry, sha256: canonical.sha256, width: canonical.width, height: canonical.height,
+      expectedBytes: canonical.bytes, requireAlpha: true, generation: record.generation,
+      canonicalRecord: { manifest_sha256: sha(manifestBytes), encoding: record.encoding, source: record.source } };
+  });
   const references = await Promise.all(referenceSources.map(async entry => {
     const bytes = fs.readFileSync(path.join(root, entry.path));
     if (sha(bytes) !== entry.sha256) throw new Error(`참조 자산 지문이 다릅니다: ${entry.path}`);
     const meta = await sharp(bytes).metadata();
     return { ...entry, width: meta.width, height: meta.height };
   }));
-  const prepared = await Promise.all(sources.map(async entry => {
+  const prepared = await Promise.all(currentSources.map(async entry => {
     const sourcePath = entry.source || path.join(canonicalRoot, entry.canonical);
     const bytes = fs.readFileSync(sourcePath);
     if (sha(bytes) !== entry.sha256) throw new Error(`선택된 원본 지문이 다릅니다: ${entry.name}`);
+    if (entry.expectedBytes && bytes.length !== entry.expectedBytes) throw new Error(`원본 바이트 수가 다릅니다: ${entry.name}`);
     const meta = await sharp(bytes).metadata();
     if (meta.width !== entry.width || meta.height !== entry.height) throw new Error(`원본 치수가 다릅니다: ${entry.name}`);
     if (entry.requireAlpha && !meta.hasAlpha) throw new Error(`투명 원본이 아닙니다: ${entry.name}`);
@@ -89,7 +116,11 @@ const referenceSources = [
       usage: entry.usage,
       source: { path: slash(entry.original || sourcePath), canonical_path: entry.canonical || null,
         sha256: entry.sha256, width: meta.width, height: meta.height, bytes: bytes.length,
-        format: meta.format, has_alpha: meta.hasAlpha },
+        format: meta.format, has_alpha: meta.hasAlpha,
+        ...(entry.canonicalRecord ? {
+          canonical_manifest: { path: entry.canonicalManifest, sha256: entry.canonicalRecord.manifest_sha256 },
+          canonical_encoding: entry.canonicalRecord.encoding, generated_source: entry.canonicalRecord.source,
+        } : {}) },
       preserved_source: entry.preserved || null,
       ...(entry.generation ? { generation: entry.generation } : {}),
       output: { path: `assets/교수작업실/${entry.name}.webp`, sha256: sha(output),
@@ -127,7 +158,9 @@ const referenceSources = [
     '# 교수 작업실 자산', '',
     'PC G1 펠트 게임용 장면과 소품. 출처·지문·치수·인코더 판은 [출처.json](출처.json)에 있다.', '',
     '- 연구실: 내장 ImageGen이 만든 1672×941 원본 PNG를 그대로 보존하고 같은 크기의 WebP 품질 96으로 변환했다. 4K 원본이 아니다.',
-    '- 기존 소품: Apps Script의 Loom AVIF를 긴 변 최대 1536px로만 축소했다. 봉투·달력은 알파를 보존한다.',
+    '- 교수 눈감음: research-blink.webp는 실제 1672×941. 살아있는교수연구실은 안경 안 두 눈만 좁은 타원으로 잘라 표시한다. 몸·털·책상·방 전체는 기존 research.webp 그대로이며 눈감음 때 전체 장면을 갈아끼우지 않는다. 생성 원본은 tmp/교수작업실소스/research-blink-source.png에 보존한다.',
+    '- 봉투는 Apps Script의 `docs/Loom_자산/구움/공방_편지봉투.출처.json`이 current로 지정한 AVIF를 읽는다. 지문·치수·바이트 수·알파를 확인하고 무확대 WebP로 변환한다. 출처가 없거나 실물과 다르면 쓰기 전에 멈추며, 거부된 봉투의 옛 사본으로 대체하지 않는다.',
+    '- 공책 참조·달력은 기존 Loom AVIF를 긴 변 최대 1536px로만 축소했다. 봉투·달력의 알파는 보존한다.',
     '- 현재 UI는 notebook-cutout.webp를 사용한다. 내장 ImageGen이 notebook.webp의 밝은 천 배경을 제거한 RGBA 원본을 1254×1254 그대로 WebP 품질 96으로 변환했다. 원본 알파를 보존한다.',
     '- notebook.webp는 그 편집의 참조 전용이다. 원래 불투명한 4096×4096 소품을 1536×1536으로 변환한 파일이며 현재 UI에서는 사용하지 않는다.',
     '- 연구실·투명 공책의 원본 PNG 바이트 사본은 Git 제외 경로 `tmp/교수작업실소스/research-source.png`와 `notebook-cutout-source.png`에 보존한다. 1MB를 넘는 이 원본은 커밋하지 않으며 원래 생성 파일도 보존한다.',
@@ -137,5 +170,24 @@ const referenceSources = [
     '재생성: `node tools/교수장면자산반입.js`. 보존 PNG가 없으면 원래 생성 경로를 읽는다. 다른 위치의 동일 연구실 PNG는 `--원본 <경로>`로 지정한다. 투명 공책 PNG를 옮겼다면 기록된 `tmp/교수작업실소스/notebook-cutout-source.png` 위치에 동일 바이트를 둔다. Apps Script 정본 위치는 기존 `SYNK_APPSSCRIPT_ROOT`를 따른다.', '',
     '이 도구는 새 이미지 생성·의미 편집을 호출하지 않는다. 실제 화면 배치·상호작용 검증은 화면 담당이 수행한다.', '',
   ].join('\n'));
+  const envelope = prepared.find(item => item.record.name === 'envelope').record;
+  const promptPath = path.join(outputDir, '제작프롬프트.md');
+  const promptStart = '<!-- current-envelope:start -->';
+  const promptEnd = '<!-- current-envelope:end -->';
+  const promptSection = [promptStart, '## 현재 봉투 교체', '',
+    '찢긴 가장자리를 지적받은 봉투를 온전한 윤곽의 새 원본으로 교체했다. 이전 봉투는 현재 참조·반입 목록에서 사용하지 않는다.', '',
+    `현재 원천: Apps Script \`${envelope.source.canonical_path}\`. 담당 출처: \`${envelope.source.canonical_manifest.path}\`. 아래 요청은 그 출처의 generation에서 읽는다.`, '',
+    `실제 반입 원천 ${envelope.source.width}×${envelope.source.height} AVIF, SHA-256 \`${envelope.source.sha256}\`. Talk 출력은 ${envelope.output.width}×${envelope.output.height} WebP 품질 96이다. 확대·크롭·추가 이미지 편집은 하지 않는다.`, '',
+    '### 생성 요청', '', '```text', envelope.generation.prompt, '```', '',
+    '### 외곽 교정 요청', '', '```text', envelope.generation.cleanup_prompt, '```', '',
+    '새 생성·교정은 내장 ImageGen으로 수행했다. 이 반입 도구는 위 AI 호출을 반복하지 않으며, 현재 정본 파일의 형식 변환만 수행한다.',
+    promptEnd].join('\n');
+  const previousPrompts = fs.existsSync(promptPath) ? fs.readFileSync(promptPath, 'utf8') : '# 교수 작업실 · 실제 ImageGen 요청\n';
+  const startAt = previousPrompts.indexOf(promptStart);
+  const endAt = previousPrompts.indexOf(promptEnd);
+  if ((startAt < 0) !== (endAt < 0) || (startAt >= 0 && endAt < startAt)) throw new Error('봉투 제작 프롬프트 구간 표식이 잘못됐습니다.');
+  fs.writeFileSync(promptPath, startAt >= 0
+    ? previousPrompts.slice(0, startAt) + promptSection + previousPrompts.slice(endAt + promptEnd.length)
+    : previousPrompts.trimEnd() + '\n\n' + promptSection + '\n');
   console.log(JSON.stringify({ preserved_source_sha256: sha(fs.readFileSync(preservedScene)), assets: manifest.assets }, null, 2));
 })().catch(error => { console.error(error.message); process.exitCode = 1; });

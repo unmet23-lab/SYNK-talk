@@ -67,25 +67,94 @@
       }
     },
     {
+      "name": "research-blink",
+      "usage": "교수 눈감음 참조. 안경 안쪽 두 눈만 국소 표시하며 전체 장면은 교체하지 않는다.",
+      "source": {
+        "path": "C:/Users/q1212/.codex/generated_images/01a08bec-1f1d-7903-b772-c36f94a712f1/exec-2448cc7d-01b7-45c1-9142-b0791b90fbcb.png",
+        "canonical_path": null,
+        "sha256": "fcb0426f8224d4088b3dbb7114c48f54c0503d8636f98ad14a64269c6516878e",
+        "width": 1672,
+        "height": 941,
+        "bytes": 2148349,
+        "format": "png",
+        "has_alpha": false
+      },
+      "preserved_source": "tmp/교수작업실소스/research-blink-source.png",
+      "generation": {
+        "tool": "Codex built-in ImageGen",
+        "operation": "교수 눈감음 국소 그림 생성",
+        "prompt": "Precise eye-only edit of this exact felt professor studio photograph. Keep the entire image composition, camera, all fibers, lighting, desk, books, glasses frames, colors and character silhouette identical. Change ONLY the two small black bead eyes INSIDE the round eyeglasses: the professor is briefly blinking, so replace each black bead with a tiny relaxed closed-eye stitched curved line against the same pale lavender felt. The glasses themselves stay completely unchanged and do NOT close. Preserve the exact eye centers and perspective: screen-left eye near (981,437) and screen-right eye near (1108,469) on the 1672 by 941 canvas. No mouth, no nose, no other expression change, no head shift, no fur regeneration beyond the small eye beads, no new props. Same 1672 by 941 full frame, maximum native detail.",
+        "usage_note": "생성된 전체 장면을 전환하지 않는다. 화면은 안경 안 두 눈의 타원 영역만 잘라 원본 위에 겹친다. 나머지 몸·털·방은 원래 research.webp 그대로 유지한다."
+      },
+      "output": {
+        "path": "assets/교수작업실/research-blink.webp",
+        "sha256": "71530d0ecac2e79a51a169d81afde249f04b625624316a1e9a1575fb4108359f",
+        "width": 1672,
+        "height": 941,
+        "bytes": 355600,
+        "format": "webp",
+        "has_alpha": false
+      },
+      "transform": {
+        "webp_quality": 96,
+        "alpha_quality": 100,
+        "effort": 6,
+        "resize": null,
+        "crop": false,
+        "recolor": false,
+        "background_removal": false,
+        "upscale": false
+      }
+    },
+    {
       "name": "envelope",
-      "usage": "편지 전달·열기 동작에 사용하는 펠트 봉투 소품.",
+      "usage": "현재 정본의 온전한 펠트 봉투. 간결한 부탁·편지 책갈피에 사용한다.",
       "source": {
         "path": "C:/Users/q1212/Documents/SYNK-appsscript/docs/Loom_자산/구움/공방_편지봉투.avif",
         "canonical_path": "docs/Loom_자산/구움/공방_편지봉투.avif",
-        "sha256": "f21077b69183b25d1222db18c0b4c9b1cd938679d6289be1613b772911a9c27b",
-        "width": 3176,
-        "height": 2680,
-        "bytes": 754847,
+        "sha256": "7f0a23c1354fa989f373be2e54c27c649160735dbedc2a9fd202e6521769e3aa",
+        "width": 1536,
+        "height": 1024,
+        "bytes": 260664,
         "format": "heif",
-        "has_alpha": true
+        "has_alpha": true,
+        "canonical_manifest": {
+          "path": "docs/Loom_자산/구움/공방_편지봉투.출처.json",
+          "sha256": "b99a230532b7ddbfb36f5ef9d894774af334a6392bc577f96ad06336c3824ae0"
+        },
+        "canonical_encoding": {
+          "tool": "sharp",
+          "format": "avif",
+          "quality": 90,
+          "effort": 7,
+          "chromaSubsampling": "4:4:4",
+          "crop": false,
+          "resize": false,
+          "background_removal": false
+        },
+        "generated_source": {
+          "path": "docs/Loom_자산/구움/공방_편지봉투.png",
+          "sha256": "d9de6f031081593b0befb535a2e902aa9a03bfe816a4f63ec4d72b45a4285794",
+          "width": 1536,
+          "height": 1024,
+          "generated_path": "C:/Users/q1212/.codex/generated_images/01a08bec-1f1d-7903-b772-c36f94a712f1/exec-18e67bf3-9e00-4c62-91cd-2fbe1b8b2b1d.png",
+          "git_note": "원본 PNG는 기존 Git 제외 정책을 따른다. 배포·반입 원천은 함께 커밋하는 canonical AVIF."
+        }
       },
       "preserved_source": null,
+      "generation": {
+        "tool": "Codex built-in ImageGen",
+        "model": "도구가 정확한 모델명을 제공하지 않음",
+        "prompt": "Transparent background. One single handcrafted cream wool felt closed envelope game inventory sprite, coral round stitched seal. Premium stop motion felt miniature, rich soft short wool texture, neat sewn hems, continuous straight softly rounded intact edges and four whole corners, gentle counterclockwise angle. Full object centered with generous clear space. Only the envelope isolated. RGBA alpha transparency.",
+        "cleanup_prompt": "This is an isolated felt envelope sprite on transparent background. Make a clean production cutout: remove the entire blurry pale halo/glow outside the envelope. Keep the envelope itself fully opaque, its cream wool felt and coral seal unchanged. Everything outside the neat sewn envelope contour must be fully transparent. Preserve a smooth unbroken sewn outline and all four full corners. No drop shadow, no light bloom, no translucent plume, no vignette, no backdrop. Transparent PNG.",
+        "reference_path": "C:/Users/q1212/.codex/generated_images/01a08bec-1f1d-7903-b772-c36f94a712f1/exec-d822e14c-be26-4808-a35a-bdbab8c12e09.png"
+      },
       "output": {
         "path": "assets/교수작업실/envelope.webp",
-        "sha256": "60e6d9d1a642ee43a66b779581eeb1217e59f7594f4ab0ad041097ec85878491",
+        "sha256": "da51561fcc774a20ffe3277de62c93065238238ec745fb0a72db77956c75a73d",
         "width": 1536,
-        "height": 1296,
-        "bytes": 611734,
+        "height": 1024,
+        "bytes": 302718,
         "format": "webp",
         "has_alpha": true
       },

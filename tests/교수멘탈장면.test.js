@@ -123,18 +123,50 @@ test('친구는 셋의 말투로 다르되 교수의 성격과 사실은 같다'
   }
 });
 
-test('세 소품은 기존 API의 선택 ID·라벨과 일치하고 정답 문형을 노출하지 않는다', () => {
+test('세 소품은 기존 API의 선택 ID·라벨을 유지하고 안내와 말투 예문을 구별한다', () => {
   const { 사과전략 } = 세우기(path.join(__dirname, '..', 'lib/게임제출.js'), () => { throw Error('원격 호출 금지'); });
   for (const { seed } of 사례들) {
     const 장면 = 장면만들기({ prompt_seed: seed, 캐릭터: '몽글' });
     assert.deepEqual(장면.전략.map(({ option_id, 제목 }) => ({ option_id, label: 제목 })),
       JSON.parse(JSON.stringify(사과전략.보기들)));
     assert.equal(new Set(장면.전략.map((전략) => 전략.소품)).size, 3);
+    const 안내 = { ...장면, 전략: 장면.전략.map(({ 예문, ...나머지 }) => 나머지) };
+    assert.doesNotMatch(JSON.stringify(안내), /요구문형|정답|죄송합니다|주시면 감사하겠습니다|○○○ 올림/);
     const 직렬 = JSON.stringify(장면);
-    assert.doesNotMatch(직렬, /요구문형|정답|죄송합니다|주시면 감사하겠습니다|○○○ 올림/);
+    assert.doesNotMatch(직렬, /요구문형|정답|주시면 감사하겠습니다|○○○ 올림/);
     assert.doesNotMatch(직렬, /승낙했|허락했|연장됐|읽었어요|합격/);
   }
   assert.equal(검수확정, false);
+});
+
+test('45개 상황의 말투 예문은 현재 사유·세부를 지키고 짧은 세 방법으로 갈린다', () => {
+  for (const { seed, 사유, 세부, 원천 } of 사례들) {
+    const 장면 = 장면만들기({ prompt_seed: seed, 캐릭터: '마린' });
+    const 찾기 = (갈래) => 장면.전략.find(s => s.option_id === `g1-사과-${갈래}`);
+    assert.ok(찾기('솔직').예문.includes(사유), seed);
+    if (원천.문항id === 'g1t03') assert.ok(찾기('솔직').예문.includes(세부), seed);
+    else assert.ok(찾기('간결').예문.includes(세부), seed);
+    assert.equal(new Set(장면.전략.map(s => s.예문)).size, 3);
+    for (const 전략 of 장면.전략) {
+      assert.ok(전략.설명 && 전략.예문.length > 10 && 전략.예문.length <= 100, seed);
+      assert.ok(전략.예문.split(/[.?!]+/).filter(Boolean).length <= 2, seed);
+      assert.doesNotMatch(전략.예문, /안녕하십니까|감사합니다|올림|승낙했|허락했|연장됐|합격/);
+    }
+    if (원천.문항id === 'g1t03') assert.doesNotMatch(찾기('솔직').예문, /기한을|제출하지 못/);
+    if (원천.문항id === 'g1t04' || 원천.문항id === 'g1t05') {
+      assert.doesNotMatch(장면.전략.map(s => s.예문).join(' '), /과제|잘못|몸이 아파/);
+    }
+  }
+});
+
+test('면담 대안 예문은 오전·오후·수업 후에 맞는 조사로 시간과 면담을 잇는다', () => {
+  const 면담들 = 사례들.filter(({ 원천 }) => 원천.문항id === 'g1t04');
+  assert.equal(면담들.length, 9);
+  for (const { seed, 세부 } of 면담들) {
+    const { 예문 } = 장면만들기({ prompt_seed: seed, 캐릭터: '마린' }).전략.find(s => s.option_id === 'g1-사과-대안');
+    assert.ok(예문.includes(`${세부}에 면담`), `${seed}: ${예문}`);
+    assert.doesNotMatch(예문, /오전가/, seed);
+  }
 });
 
 test('장면은 결정적이고 깊게 동결되며 호출자가 원문을 바꿔도 앞선 결과는 바뀌지 않는다', () => {

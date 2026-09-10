@@ -2,18 +2,13 @@
 import { registerRootComponent } from 'expo';
 import { useFonts } from 'expo-font';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { 살아있는가이드 } from '../src/살아있는가이드.js';
 import 교수멘탈화면 from '../src/교수멘탈화면.js';
 import { 색, 폰트 } from '../src/테마.js';
 import { 진행받기 } from '../src/어제의나.js';
 import { 펴기 } from '../contents/교수멘탈문항.js';
 import { 표시배, 혼잣말캐릭터들 } from '../lib/마스코트생명.js';
-
-const 가이드그림 = {
-  몽글: require('../assets/마스코트/몽글_본체.webp'),
-  까몽: require('../assets/마스코트/까몽_본체.webp'),
-  마린: require('../assets/마스코트/마린_본체.webp'),
-};
 
 export function 미리보기초기(판번호) {
   return { 가이드: null, 단계: '전략', 판번호, 세대: 0 };
@@ -56,8 +51,8 @@ function 가이드선택({ 값, 고르기, 작게 = false }) {
       style={({ pressed, focused }) => [s.가이드단추, 작게 && s.가이드단추_작게,
         값 === 이름 && s.가이드단추_선택, focused && s.가이드단추_초점, pressed && s.가이드단추_눌림]}>
       <View style={작게 ? s.가이드그림틀_작게 : s.가이드그림틀}>
-        <Image source={가이드그림[이름]} accessible={false} resizeMode="contain"
-          style={[작게 ? s.가이드그림_작게 : s.가이드그림, { transform: [{ scale: 표시배(이름) }] }]} />
+        <살아있는가이드 이름={이름} size={작게 ? 28 : 56}
+          style={{ transform: [{ scale: 표시배(이름) }] }} />
       </View>
       <Text style={[s.가이드이름, 값 === 이름 && s.가이드이름_선택]}>{이름}</Text>
       {값 === 이름 ? <Text style={s.고름표시}>선택</Text> : null}
