@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { 색, 폰트, 몽골어폰트, 판눈금, 눌림감 } from './테마';
+import { 색, 폰트, 몽골어폰트, 눌림감 } from './테마';
 import {
   사과전략, 오늘추천, 보기세우기, 전략선택사건, 메일제출사건, 이탈사건, 이탈닻,
 } from '../lib/게임제출.js';
@@ -32,7 +32,7 @@ import { 관측보고 } from './관측';
  * 바뀐다(게임층 설계 §4 규격 3) — 입력 중 움직이는 장치는 동시에 하나여야 하고, 그 하나는
  * 이미 이 화면의 게이지가 쥐고 있다. 실시간 3단은 G3(알바변명) 전용이다. */
 import NPC from './NPC.js';
-import { 내부로고 } from './브랜드자산.js';
+import { LAB로고 } from './브랜드자산.js';
 import { 전이상태 } from '../lib/NPC연출.js';
 /**
  * G1 「교수님 멘탈 구하기」 — 격식 메일 쓰기 게임 (발주_게임모듈.md G1 · 게임층 설계).
@@ -72,11 +72,13 @@ import { 전이상태 } from '../lib/NPC연출.js';
  */
 
 export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null, 시작단계 = '전략', 확인 = null, 확인뒤 = null }) {
-  // 09-11 사용자 요청: 이 화면의 구 BGM을 제거한다. 새 음원 파일 검증 전에는 무음이다.
+  // 09-11 사용자 요청: 이 화면의 구 BGM을 제거한다. 읽기와 쓰기에 집중하도록 무음으로 둔다.
   useEffect(() => { bgm정지(); return () => bgm정지(); }, []);
-  const { width } = useWindowDimensions();
-  const 넓다 = width >= 940;
+  const { width, height } = useWindowDimensions();
+  const 넓다 = width >= 700;
   const 좁다 = width < 380;
+  const 장면너비 = Math.min(width - (좁다 ? 40 : 48), 넓다 ? Math.min(500, height * 0.28 * 1672 / 941) : 460);
+  const 문서스크롤 = useRef(null);
 
   /* 표시 순서를 마운트 때 한 번 확정한다(`말하기화면` 녹음카드와 같은 규칙) — 매 렌더 섞으면
    * 행에 적힌 자리와 학생이 본 자리가 갈리고, 그 갈림은 증상이 없다. 추천은 시드에서 결정적. */
@@ -84,6 +86,7 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
   const 보기뜬때 = useRef(경과시계());
 
   const [단계, set단계] = useState(시작단계); // 전략 | 쓰기 | 대기
+  useEffect(() => { 문서스크롤.current?.scrollTo({ y: 0, animated: false }); }, [단계]);
   /* 고른 전략의 «라벨» — 쓰기 단계에 재표시(자기 설명 «연결» 축: 고른 카드가 사라지면 「내가 뭘
    * 골랐더라」가 끊긴다 · 유호 확정 08-22). 행 재료가 아니라 화면 전용이다(사건은 고르기가 이미 낸다). */
   const [고른전략라벨, set고른전략라벨] = useState(null);
@@ -94,6 +97,7 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
   const [본문있음, set본문있음] = useState(false);
   const 본문있음참조 = useRef(false);
   const [보낸메일, set보낸메일] = useState(null);
+  const [편지펼침, set편지펼침] = useState(false);
   /* Ⅲ⑥ — 이 앉음에서 성향 확인에 답했나(즉시 반응용 · 값 = '맞다'|'아니다'). 답 자체는 게임큐로
    * 나가고(오프라인 안전·멱등), 다음 노출 게이트(하루 1회)는 서버가 행을 읽어 진다. */
   const [확인답, set확인답] = useState(null);
@@ -275,132 +279,121 @@ export default function 교수멘탈화면({ 재료, 토큰, 학생번호 = null
 
   const 전송실패 = !!(메일항목 && !메일항목.event_id && 메일항목.send_final);
   const 전송대기 = !!(메일항목 && !메일항목.event_id && !메일항목.send_final);
-  const 소개제목 = 단계 === '전략' ? '어떤 말로\n다가갈까요?'
-    : 단계 === '쓰기' ? '마음을 담아\n써 보세요.'
-    : 전송실패 ? '편지를 아직\n보내지 못했어요.'
-    : 전송대기 ? '편지를\n전하고 있어요.' : '교수님께\n편지를 보냈어요.';
-  const 소개글 = 단계 === '전략' ? '상황을 읽고, 나에게 맞는\n말 건네는 방법을 골라요.'
-    : 단계 === '쓰기' ? '방금 고른 방법으로\n한 통의 메일을 써 볼까요?'
-    : '답장이 도착하면\n「답장」에서 볼 수 있어요.';
 
   return (
-    <ScrollView style={s.wrap} contentContainerStyle={[s.inner, 넓다 && s.inner_넓음]} keyboardShouldPersistTaps="handled">
+    <ScrollView ref={문서스크롤} style={s.wrap} contentContainerStyle={[s.inner, 좁다 && s.inner_좁음]} keyboardShouldPersistTaps="handled">
       <머리 />
-      <View style={[s.지면, 넓다 && s.지면_넓음]}>
-        <View style={[s.소개, 넓다 && s.소개_넓음]}>
-          <View style={s.소개말}>
-            <Text style={s.종류}>교수님 멘탈 구하기</Text>
-            <Text accessibilityRole="header" style={[s.소개제목, 넓다 && s.소개제목_넓음]}>{소개제목}</Text>
-            <Text style={s.소개글}>{소개글}</Text>
-          </View>
-          <View style={[s.NPC자리, 좁다 && s.NPC자리_좁음, 넓다 && s.NPC자리_넓음]}>
-            <NPC 역="prof" 상태={전이상태(단계 === '대기' && !전송실패 ? '완료' : '시작')} 크기={넓다 ? 252 : 좁다 ? 102 : 132} />
-          </View>
-        </View>
-
-        <View style={s.내용}>
-          {오류 ? <View accessibilityLiveRegion="polite" style={s.오류판}><Text style={s.오류}>{오류}</Text></View> : null}
-
-          {단계 === '전략' && (
-            <View style={s.카드}>
-              <View style={s.상황}>
-                <Text style={s.카드라벨}>지금 상황</Text>
-                <Text style={s.상황글}>{문항.질문}</Text>
-                <Text style={s.본문글}>{문항.지시문}</Text>
-              </View>
-              {보기 ? <View style={s.전략목록}>
-                <Text style={s.선택라벨}>어떻게 다가갈까요?</Text>
-                {보기.options_shown.map((o) => (
-                  <Pressable key={o.option_id} onPress={() => 고르기(o.option_id)} accessibilityRole="button"
-                    style={({ pressed, hovered, focused }) => [s.전략카드, hovered && s.단추호버, focused && s.단추초점, pressed && s.눌림]}>
-                    <View style={s.선택말}>
-                      <Text style={s.전략글}>{o.label}</Text>
-                      {보기.recommended_option === o.option_id ? <Text style={s.추천표시}>오늘의 추천</Text> : null}
-                    </View>
-                    <선아이콘 종류="다음" />
-                  </Pressable>
-                ))}
-                <Text style={s.메모}>방법을 고른 다음, 직접 메일을 써요.</Text>
-              </View> : null}
-            </View>
-          )}
-
-          {단계 === '쓰기' && (
-            <View style={s.카드}>
-              <View style={s.받는줄}>
-                <View style={s.편지표식}><선아이콘 종류="편지" /></View>
-                <View style={s.선택말}><Text style={s.카드라벨}>받는 사람</Text><Text style={s.수신자}>교수님</Text></View>
-              </View>
-              {문항.질문 ? <Text style={s.본문글}>{문항.질문}</Text> : null}
-              {고른전략라벨 ? <View style={s.고른방법}><Text style={s.메모}>내가 고른 방법</Text><Text style={s.방법글}>{고른전략라벨}</Text></View> : null}
-              <Text style={s.메모}>{문항.지시문}</Text>
-              <TextInput style={s.본문입력} placeholder="교수님께 보낼 메일을 써요"
-                accessibilityLabel="교수님께 보낼 메일 본문" placeholderTextColor={색.잉크_메타}
-                defaultValue="" onChangeText={(t) => { 본문참조.current = t; 입력됨(t); }} multiline textAlignVertical="top" />
-              <View style={s.쓰기안내}>
-                <Text style={s.게이지라벨}>편지에 담긴 것</Text>
-                <View style={s.게이지줄}>
-                  {칸이름들.map((이름) => {
-                    const 찼다 = !!(게이지 && 게이지.칸별[이름]);
-                    return <View key={이름} style={s.게이지칸}><게이지칸면 찼다={찼다} /><Text style={[s.게이지이름, 찼다 && s.게이지이름_참]}>{이름}</Text></View>;
-                  })}
-                </View>
-                <Text style={s.게이지힌트}>{빠진칸.length ? `아직 비어 있는 칸: ${빠진칸.join(' · ')}` : '다섯 칸이 다 찼어요 — 이제 보내 볼까요?'}</Text>
-                <Text style={s.메모}>문법 점수가 아니라, 빠진 부분을 알려 주는 안내예요.</Text>
-              </View>
-              <Pressable onPress={보내기} disabled={!본문있음} accessibilityRole="button" accessibilityState={{ disabled: !본문있음 }}
-                style={({ pressed, focused }) => [s.보내기버튼, !본문있음 && s.보내기_대기, focused && s.단추초점, pressed && s.눌림]}>
-                <Text style={s.보내기글}>편지 보내기</Text><선아이콘 종류="다음" 어둡다 />
-              </Pressable>
-            </View>
-          )}
-
-          {단계 === '대기' && (
-            <>
-              <View style={s.도착판}>
-                <View style={s.도착머리}><View style={s.도착표식}><선아이콘 종류="편지" /></View><Text style={s.카드라벨}>{전송실패 ? '전송을 확인해 주세요' : 전송대기 ? '전송 대기' : '보냈어요'}</Text></View>
-                <Text accessibilityRole="header" style={s.대기제목}>{전송실패 ? '메일을 보내지 못했어요' : 전송대기 ? '연결되면 이어서 보내요' : '답장을 기다리고 있어요'}</Text>
-                <Text style={s.본문글}>{전송실패 ? '메일을 보내지 못했어요. 선생님께 알려 주세요.' : 전송대기 ? '메일은 기기에 남아 있어요. 앱을 다시 열면 이어서 보내요.' : '답장은 며칠 걸릴 수 있어요. 답장이 오면 「답장」에서 볼 수 있어요.'}</Text>
-                <View style={s.편지길}><Text style={s.길글}>내 편지</Text><View style={s.잇는실} /><Text style={s.길글}>답장 준비</Text><View style={s.잇는실} /><Text style={s.길글}>답장</Text></View>
-              </View>
-
-              {관찰 ? <Text style={s.관찰}>{관찰.글}</Text> : null}
-              {확인 && !확인답 ? (
-                <View style={s.확인판}>
-                  <View style={s.확인머리}><Text style={s.확인제목}>나에 대한 관찰</Text><Text style={s.선택사항}>선택 사항</Text></View>
-                  <Text style={s.확인질문}>{String(확인.shown_text || '')}</Text>
-                  <View style={s.확인줄}>
-                    {[['맞다', '맞아요'], ['아니다', '아니에요']].map(([값, 라벨]) => (
-                      <Pressable key={값} onPress={() => 확인답하기(값)} accessibilityRole="button"
-                        style={({ pressed, hovered, focused }) => [s.확인단추, hovered && s.단추호버, focused && s.단추초점, pressed && s.눌림]}>
-                        <선아이콘 종류={값 === '맞다' ? '맞음' : '아님'} /><Text style={s.확인단추글}>{라벨}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                  <Text style={s.메모}>지금 답하지 않아도 괜찮아요.</Text>
-                </View>
-              ) : null}
-              {확인답 ? <View style={s.응답판} accessibilityLiveRegion="polite">
-                <View style={s.확인머리}><Text style={s.확인제목}>나에 대한 관찰</Text><Text style={s.선택사항}>{확인답 === '아니다' ? '아니에요' : '맞아요'}</Text></View>
-                {(반응안내(확인답) || []).map((줄, i) => <Text key={i} style={i === 0 ? s.응답글 : s.관찰_병기}>{줄}</Text>)}
-              </View> : null}
-              {보낸메일 ? <View style={s.보낸편지}><Text style={s.카드라벨}>내가 보낸 편지</Text><Text style={s.편지글} selectable>{보낸메일}</Text></View> : null}
-            </>
-          )}
-        </View>
+      <View style={s.단계줄} accessibilityLabel={`지금은 ${단계 === '전략' ? '방법 고르기' : 단계 === '쓰기' ? '편지 쓰기' : '답장 기다리기'} 단계`}>
+        {['방법 고르기', '편지 쓰기', '답장 기다리기'].map((말, i) => <View key={말} style={s.단계항목}>
+          {i > 0 ? <View style={s.단계실} /> : null}
+          <Text style={[s.단계글, i === ['전략', '쓰기', '대기'].indexOf(단계) && s.단계글_현재]}>{말}</Text>
+        </View>)}
       </View>
+
+      {단계 !== '쓰기' ? <View style={s.작업실}>
+        <Image source={require('../assets/장면/편지작업실.webp')} resizeMode="contain"
+          style={[s.장면, { width: 장면너비, height: 장면너비 * 941 / 1672 }]}
+          accessibilityLabel="몽글, 까몽, 마린이 함께 편지를 준비하는 작업실" />
+        <Text style={s.종류}>교수님 멘탈 구하기</Text>
+        <Text accessibilityRole="header" style={[s.제목, 넓다 && s.제목_넓음]}>
+          {단계 === '전략' ? '어떤 말로 시작할까요?' : 전송실패 ? '메일을 보내지 못했어요' : 전송대기 ? '연결되면 이어서 보내요' : '답장을 기다리고 있어요'}
+        </Text>
+        <Text style={s.소개글}>{단계 === '전략' ? '마음을 전하는 방법은 하나가 아니니까요.' : 전송실패 ? '메일을 보내지 못했어요. 선생님께 알려 주세요.' : 전송대기 ? '메일은 기기에 남아 있어요. 앱을 다시 열면 이어서 보내요.' : '답장은 며칠 걸릴 수 있어요.\n답장이 오면 「답장」에서 볼 수 있어요.'}</Text>
+      </View> : <View style={s.쓰기머리}>
+        <Text style={s.종류}>교수님 멘탈 구하기</Text>
+        <Text accessibilityRole="header" style={[s.제목, 넓다 && s.제목_넓음]}>이제, 나의 말로.</Text>
+      </View>}
+
+      {오류 ? <View accessibilityLiveRegion="polite" style={s.오류판}><Text style={s.오류}>{오류}</Text></View> : null}
+
+      {단계 === '전략' && <View style={s.내용}>
+        <View style={s.상황}>
+          <Text style={s.카드라벨}>오늘의 상황</Text>
+          <Text style={s.상황글}>{문항.질문}</Text>
+          <Text style={s.본문글}>{문항.지시문}</Text>
+        </View>
+        {보기 ? <View style={s.전략목록}>
+          <Text style={s.선택라벨}>나는 이렇게 말할래요</Text>
+          {보기.options_shown.map((o) => <Pressable key={o.option_id} onPress={() => 고르기(o.option_id)} accessibilityRole="button"
+            style={({ pressed, hovered, focused }) => [s.전략카드, hovered && s.단추호버, focused && s.단추초점, pressed && s.눌림]}>
+            <View style={s.선택말}>
+              <Text style={s.전략글}>{o.label}</Text>
+              {보기.recommended_option === o.option_id ? <Text style={s.추천표시}>오늘의 추천</Text> : null}
+            </View>
+            <View style={s.다음자리}><선아이콘 종류="다음" /></View>
+          </Pressable>)}
+          <Text style={s.메모}>방법을 고른 다음, 직접 메일을 써요.</Text>
+        </View> : null}
+      </View>}
+
+      {단계 === '쓰기' && <View style={s.내용}>
+        <View style={s.받는줄}>
+          <NPC 역="prof" 상태={전이상태('시작')} 크기={52} />
+          <View style={s.선택말}><Text style={s.카드라벨}>받는 사람</Text><Text style={s.수신자}>교수님</Text></View>
+          <View style={s.편지표식}><선아이콘 종류="편지" /></View>
+        </View>
+        <View style={s.쓰기상황}>
+          <Text style={s.본문글}>{문항.질문}</Text>
+          {고른전략라벨 ? <View style={s.고른방법}><Text style={s.메모}>내가 고른 방법</Text><Text style={s.방법글}>{고른전략라벨}</Text></View> : null}
+          <Text style={s.메모}>{문항.지시문}</Text>
+        </View>
+        <TextInput style={s.본문입력} placeholder="교수님께 보낼 메일을 써요"
+          accessibilityLabel="교수님께 보낼 메일 본문" placeholderTextColor={색.잉크_메타}
+          defaultValue="" onChangeText={(t) => { 본문참조.current = t; 입력됨(t); }} multiline textAlignVertical="top" />
+        <View style={s.쓰기안내}>
+          <Text style={s.게이지라벨}>편지에 담긴 것</Text>
+          <View style={s.게이지줄}>
+            {칸이름들.map((이름) => {
+              const 찼다 = !!(게이지 && 게이지.칸별[이름]);
+              return <View key={이름} style={s.게이지칸}><게이지칸면 찼다={찼다} /><Text style={[s.게이지이름, 찼다 && s.게이지이름_참]}>{이름}</Text></View>;
+            })}
+          </View>
+          <Text style={s.게이지힌트}>{빠진칸.length ? `아직 비어 있는 칸: ${빠진칸.join(' · ')}` : '다섯 칸이 다 찼어요 — 이제 보내 볼까요?'}</Text>
+          <Text style={s.메모}>문법 점수가 아니라, 빠진 부분을 알려 주는 안내예요.</Text>
+        </View>
+        <Pressable onPress={보내기} disabled={!본문있음} accessibilityRole="button" accessibilityState={{ disabled: !본문있음 }}
+          style={({ pressed, focused }) => [s.보내기버튼, !본문있음 && s.보내기_대기, focused && s.단추초점, pressed && s.눌림]}>
+          <Text style={s.보내기글}>편지 보내기</Text><선아이콘 종류="다음" 어둡다 />
+        </Pressable>
+      </View>}
+
+      {단계 === '대기' && <View style={s.내용}>
+        {보낸메일 ? <View style={s.보낸편지}>
+          <Pressable onPress={() => set편지펼침(!편지펼침)} accessibilityRole="button" accessibilityState={{ expanded: 편지펼침 }}
+            style={({ pressed, hovered, focused }) => [s.편지열기, hovered && s.단추호버, focused && s.단추초점, pressed && s.눌림]}>
+            <View style={s.편지제목}><선아이콘 종류="편지" /><Text style={s.방법글}>내가 보낸 편지</Text></View>
+            <Text style={s.메모}>{편지펼침 ? '접기' : '펼쳐 보기'}</Text>
+          </Pressable>
+          {편지펼침 ? <Text style={s.편지글} selectable>{보낸메일}</Text> : null}
+        </View> : null}
+        {관찰 ? <Text style={s.관찰}>{관찰.글}</Text> : null}
+        {확인 && !확인답 ? <View style={s.확인판}>
+          <View style={s.확인머리}><Text style={s.확인제목}>나에 대한 관찰</Text><Text style={s.선택사항}>선택 사항</Text></View>
+          <Text style={s.확인질문}>{String(확인.shown_text || '')}</Text>
+          <View style={s.확인줄}>
+            {[['맞다', '맞아요'], ['아니다', '아니에요']].map(([값, 라벨]) => <Pressable key={값} onPress={() => 확인답하기(값)} accessibilityRole="button"
+              style={({ pressed, hovered, focused }) => [s.확인단추, hovered && s.단추호버, focused && s.단추초점, pressed && s.눌림]}>
+              <선아이콘 종류={값 === '맞다' ? '맞음' : '아님'} /><Text style={s.확인단추글}>{라벨}</Text>
+            </Pressable>)}
+          </View>
+          <Text style={s.메모}>지금 답하지 않아도 괜찮아요.</Text>
+        </View> : null}
+        {확인답 ? <View style={s.응답판} accessibilityLiveRegion="polite">
+          <View style={s.확인머리}><Text style={s.확인제목}>나에 대한 관찰</Text><Text style={s.선택사항}>{확인답 === '아니다' ? '아니에요' : '맞아요'}</Text></View>
+          {(반응안내(확인답) || []).map((줄, i) => <Text key={i} style={i === 0 ? s.응답글 : s.관찰_병기}>{줄}</Text>)}
+        </View> : null}
+      </View>}
     </ScrollView>
   );
 }
 
 function 머리() {
   return <View style={s.머리}>
-    <Image source={내부로고} style={s.브랜드} resizeMode="contain" accessibilityLabel="SYNK" />
-    <View style={s.머리구분} /><Text style={s.머리말}>말을 건네는 연습</Text>
+    <Image source={LAB로고} style={s.브랜드} resizeMode="contain" accessibilityLabel="SYNK LAB" />
+    <Text style={s.머리말}>편지 작업실</Text>
   </View>;
 }
 
-// 선으로 그리는 조작 아이콘. 비트맵 확대 없이 모든 화면 배율에서 같은 굵기를 유지한다.
 function 선아이콘({ 종류, 어둡다 = false }) {
   const 선 = { borderColor: 어둡다 ? 색.바탕 : 색.잉크_태그 };
   return <View style={s.아이콘} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" pointerEvents="none">
@@ -411,8 +404,7 @@ function 선아이콘({ 종류, 어둡다 = false }) {
   </View>;
 }
 
-/* 게이지 칸의 면 — 채울 때도 빠질 때도 같은 200ms 로 스며든다(채점 아님 · 안내 설계 유지).
- * 덮개는 opacity 하나만 만진다 — 바닥(잉크_희미)은 불변이다. 줄임이면 즉시 최종값. */
+/* 게이지 칸의 면 — 안내 변화만 200ms로 스며들며 줄임이면 즉시 최종값이다. */
 function 게이지칸면({ 찼다 }) {
   const 줄임 = use줄임();
   const 덮개 = useRef(new Animated.Value(찼다 ? 1 : 0)).current;
@@ -428,43 +420,44 @@ function 게이지칸면({ 찼다 }) {
 const 어절줄바꿈 = Platform.select({ web: { wordBreak: 'keep-all', overflowWrap: 'anywhere' }, default: {} });
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: 색.바탕 },
-  inner: { width: '100%', maxWidth: 1184, alignSelf: 'center', padding: 22, paddingTop: 24, paddingBottom: 64 },
-  inner_넓음: { padding: 44, paddingTop: 32, paddingBottom: 88 },
-  머리: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingBottom: 23, borderBottomWidth: 1, borderBottomColor: 'rgba(251,247,240,0.10)' },
-  브랜드: { width: 83, height: 30 },
-  머리구분: { width: 1, height: 15, backgroundColor: 색.잉크_희미 },
+  inner: { width: '100%', maxWidth: 736, alignSelf: 'center', paddingHorizontal: 24, paddingTop: 24, paddingBottom: 88 },
+  inner_좁음: { paddingHorizontal: 20 },
+  머리: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 24, marginBottom: 28 },
+  브랜드: { width: 150, height: 47 },
   머리말: { fontFamily: 폰트.캡션, fontSize: 13, color: 색.잉크_보조 },
-  지면: { paddingTop: 30, gap: 26 },
-  지면_넓음: { flexDirection: 'row', alignItems: 'flex-start', paddingTop: 52, gap: 56 },
-  소개: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  소개_넓음: { width: 302, flexDirection: 'column', alignItems: 'stretch', gap: 20, paddingTop: 4 },
-  소개말: { flex: 1, gap: 12 },
-  종류: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조, letterSpacing: 0.2 },
-  소개제목: { ...어절줄바꿈, fontFamily: 폰트.강조, fontSize: 27, lineHeight: 37, letterSpacing: -0.9, color: 색.잉크 },
-  소개제목_넓음: { fontSize: 39, lineHeight: 52, letterSpacing: -1.4, marginTop: 4 },
-  소개글: { fontFamily: 폰트.캡션, fontSize: 13, lineHeight: 22, color: 색.잉크_보조 },
-  NPC자리: { width: 122, alignItems: 'center', justifyContent: 'center' },
-  NPC자리_좁음: { width: 92 },
-  NPC자리_넓음: { width: '100%', marginTop: 10, paddingBottom: 10 },
-  내용: { flex: 1, minWidth: 0, gap: 24 },
-  카드: { backgroundColor: 색.바탕띄움, borderRadius: 판눈금.반경, padding: 26, gap: 20 },
-  상황: { gap: 15, paddingBottom: 8 },
+  단계줄: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  단계항목: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  단계실: { width: 20, height: 1, backgroundColor: 색.잉크_희미, marginLeft: 14 },
+  단계글: { fontFamily: 폰트.캡션, fontSize: 11, lineHeight: 18, color: 색.잉크_메타 },
+  단계글_현재: { fontFamily: 폰트.강조, color: 색.잉크 },
+  작업실: { alignItems: 'center', paddingBottom: 32, gap: 9 },
+  장면: { marginVertical: 6 },
+  종류: { fontFamily: 폰트.캡션, fontSize: 12, lineHeight: 19, color: 색.잉크_태그, marginTop: 4 },
+  제목: { ...어절줄바꿈, fontFamily: 폰트.강조, fontSize: 27, lineHeight: 37, letterSpacing: -0.9, color: 색.잉크 },
+  제목_넓음: { fontSize: 34, lineHeight: 46, letterSpacing: -1.2 },
+  소개글: { ...어절줄바꿈, fontFamily: 폰트.캡션, fontSize: 14, lineHeight: 24, color: 색.잉크_보조, textAlign: 'center' },
+  쓰기머리: { gap: 8, paddingVertical: 26 },
+  내용: { gap: 22 },
+  카드: { paddingVertical: 30, gap: 20 },
+  상황: { gap: 12, borderLeftWidth: 2, borderLeftColor: 색.실땀, paddingLeft: 18, marginVertical: 6 },
   카드라벨: { fontFamily: 폰트.캡션, fontSize: 12, lineHeight: 18, color: 색.잉크_태그 },
-  상황글: { ...어절줄바꿈, fontFamily: 폰트.강조, fontSize: 23, lineHeight: 34, letterSpacing: -0.5, color: 색.잉크 },
-  본문글: { ...어절줄바꿈, fontFamily: 폰트.캡션, fontSize: 15, lineHeight: 25, color: 색.잉크_보조 },
-  선택라벨: { fontFamily: 폰트.강조, fontSize: 15, color: 색.잉크, marginBottom: 2 },
-  전략목록: { gap: 12, paddingTop: 22, borderTopWidth: 1, borderTopColor: 'rgba(251,247,240,0.12)' },
-  전략카드: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 18, padding: 17, minHeight: 70, borderWidth: 1, borderColor: 'rgba(251,247,240,0.20)', borderRadius: 12 },
-  선택말: { flex: 1, gap: 6 },
-  전략글: { ...어절줄바꿈, fontFamily: 폰트.본문, fontSize: 16, lineHeight: 25, color: 색.잉크 },
-  추천표시: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조 },
-  받는줄: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: 'rgba(251,247,240,0.12)' },
-  편지표식: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: 색.바탕 },
+  상황글: { ...어절줄바꿈, fontFamily: 폰트.본문, fontSize: 18, lineHeight: 29, color: 색.잉크 },
+  본문글: { ...어절줄바꿈, fontFamily: 폰트.캡션, fontSize: 14, lineHeight: 24, color: 색.잉크_보조 },
+  선택라벨: { fontFamily: 폰트.강조, fontSize: 14, lineHeight: 22, color: 색.잉크, marginBottom: 4 },
+  전략목록: { gap: 10, paddingTop: 8 },
+  전략카드: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingVertical: 18, paddingHorizontal: 20, minHeight: 68, backgroundColor: 색.바탕띄움, borderRadius: 16 },
+  선택말: { flex: 1, gap: 5 },
+  전략글: { ...어절줄바꿈, fontFamily: 폰트.본문, fontSize: 16, lineHeight: 24, color: 색.잉크 },
+  추천표시: { fontFamily: 폰트.캡션, fontSize: 11, color: 색.잉크_태그 },
+  다음자리: { width: 30, height: 30, borderRadius: 15, backgroundColor: 색.바탕, alignItems: 'center', justifyContent: 'center' },
+  받는줄: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: 색.잉크_희미 },
   수신자: { fontFamily: 폰트.강조, fontSize: 19, color: 색.잉크 },
-  고른방법: { gap: 5, paddingVertical: 2 },
-  방법글: { fontFamily: 폰트.본문, fontSize: 14, lineHeight: 22, color: 색.잉크 },
-  본문입력: { fontFamily: 폰트.본문, fontSize: 17, lineHeight: 29, color: 색.잉크, backgroundColor: 색.바탕, borderWidth: 1, borderColor: 'rgba(251,247,240,0.20)', borderRadius: 12, padding: 20, minHeight: 240 },
-  쓰기안내: { gap: 10, paddingVertical: 2 },
+  편지표식: { width: 42, height: 42, borderRadius: 21, backgroundColor: 색.바탕띄움, alignItems: 'center', justifyContent: 'center' },
+  쓰기상황: { gap: 12 },
+  고른방법: { gap: 4 },
+  방법글: { fontFamily: 폰트.본문, fontSize: 14, lineHeight: 23, color: 색.잉크 },
+  본문입력: { fontFamily: 폰트.본문, fontSize: 17, lineHeight: 29, color: 색.잉크, backgroundColor: 색.바탕띄움, borderRadius: 16, padding: 22, minHeight: 250, borderWidth: 1, borderColor: 'rgba(251,247,240,0.13)' },
+  쓰기안내: { gap: 12 },
   게이지라벨: { fontFamily: 폰트.강조, fontSize: 13, color: 색.잉크_태그 },
   게이지줄: { flexDirection: 'row', gap: 8 },
   게이지칸: { flex: 1, alignItems: 'center', gap: 8 },
@@ -473,34 +466,29 @@ const s = StyleSheet.create({
   게이지이름: { fontFamily: 폰트.캡션, fontSize: 11, color: 색.잉크_보조 },
   게이지이름_참: { fontFamily: 폰트.강조, color: 색.잉크 },
   게이지힌트: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조, lineHeight: 19 },
-  보내기버튼: { backgroundColor: 색.신호, borderRadius: 12, minHeight: 54, padding: 16, flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center' },
+  보내기버튼: { backgroundColor: 색.신호, borderRadius: 16, minHeight: 56, padding: 16, flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center' },
   보내기_대기: { backgroundColor: 색.잉크_희미 },
   보내기글: { fontFamily: 폰트.강조, fontSize: 16, color: 색.바탕 },
-  눌림: { opacity: 눌림감.면, transform: [{ scale: 0.96 }] },
-  단추호버: { backgroundColor: 'rgba(251,247,240,0.05)' },
+  눌림: { opacity: 눌림감.면, transform: [{ scale: 0.99 }] },
+  단추호버: { backgroundColor: 'rgba(251,247,240,0.10)' },
   단추초점: Platform.select({ web: { outlineStyle: 'solid', outlineWidth: 2, outlineColor: 색.실땀, outlineOffset: 4 }, default: {} }),
-  도착판: { borderRadius: 판눈금.반경, padding: 28, gap: 18, backgroundColor: 색.바탕띄움 },
-  도착머리: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  도착표식: { width: 36, height: 36, borderRadius: 10, backgroundColor: 색.바탕, alignItems: 'center', justifyContent: 'center' },
-  대기제목: { ...어절줄바꿈, fontFamily: 폰트.강조, fontSize: 24, lineHeight: 34, letterSpacing: -0.5, color: 색.잉크 },
-  편지길: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 22, marginTop: 4, borderTopWidth: 1, borderTopColor: 'rgba(251,247,240,0.12)' },
-  길글: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조 },
-  잇는실: { flex: 1, height: 1, backgroundColor: 'rgba(251,247,240,0.20)' },
-  확인판: { gap: 20, padding: 26, paddingTop: 12 },
+  확인판: { gap: 20, padding: 24, borderRadius: 20, backgroundColor: 'rgba(77,82,119,0.24)', borderWidth: 1, borderColor: 'rgba(171,175,207,0.14)' },
   확인머리: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
-  확인제목: { fontFamily: 폰트.강조, fontSize: 14, color: 색.잉크_태그 },
-  선택사항: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조 },
-  확인질문: { ...어절줄바꿈, fontFamily: 폰트.본문, fontSize: 20, lineHeight: 32, letterSpacing: -0.4, color: 색.잉크 },
+  확인제목: { fontFamily: 폰트.강조, fontSize: 12, lineHeight: 18, color: 색.잉크_태그 },
+  선택사항: { fontFamily: 폰트.캡션, fontSize: 11, color: 색.잉크_보조 },
+  확인질문: { ...어절줄바꿈, fontFamily: 폰트.본문, fontSize: 19, lineHeight: 30, letterSpacing: -0.3, color: 색.잉크 },
   확인줄: { flexDirection: 'row', gap: 12 },
-  확인단추: { flex: 1, minHeight: 54, borderWidth: 1, borderColor: 'rgba(251,247,240,0.28)', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 9 },
+  확인단추: { flex: 1, minHeight: 50, borderWidth: 1, borderColor: 'rgba(251,247,240,0.26)', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 9 },
   확인단추글: { fontFamily: 폰트.강조, fontSize: 15, color: 색.잉크 },
-  응답판: { padding: 26, paddingTop: 12, gap: 19 },
+  응답판: { padding: 24, borderRadius: 20, backgroundColor: 'rgba(77,82,119,0.24)', gap: 19 },
   응답글: { fontFamily: 폰트.본문, fontSize: 19, lineHeight: 31, color: 색.잉크 },
-  관찰: { fontFamily: 폰트.캡션, fontSize: 14, lineHeight: 23, color: 색.잉크_보조, paddingHorizontal: 26 },
+  관찰: { fontFamily: 폰트.캡션, fontSize: 14, lineHeight: 23, color: 색.잉크_보조 },
   관찰_병기: { fontFamily: 몽골어폰트.캡션, fontSize: 14, lineHeight: 23, color: 색.잉크_보조 },
-  보낸편지: { padding: 26, gap: 16, borderTopWidth: 1, borderTopColor: 'rgba(251,247,240,0.12)' },
-  편지글: { fontFamily: 폰트.본문, fontSize: 16, lineHeight: 28, color: 색.잉크 },
-  오류판: { padding: 18, borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12 },
+  보낸편지: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: 색.잉크_희미 },
+  편지열기: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 64, gap: 14, paddingHorizontal: 4 },
+  편지제목: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  편지글: { fontFamily: 폰트.본문, fontSize: 16, lineHeight: 28, color: 색.잉크, paddingTop: 10, paddingBottom: 24 },
+  오류판: { padding: 18, borderWidth: 1, borderColor: 색.잉크_희미, borderRadius: 12, marginBottom: 24 },
   오류: { fontFamily: 폰트.강조, fontSize: 14, color: 색.잉크, lineHeight: 23 },
   메모: { fontFamily: 폰트.캡션, fontSize: 12, color: 색.잉크_보조, lineHeight: 20 },
   아이콘: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },

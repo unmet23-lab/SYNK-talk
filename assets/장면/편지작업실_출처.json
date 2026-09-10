@@ -1,0 +1,30 @@
+{
+  "date": "2026-09-11",
+  "source": "C:/Users/q1212/.codex/generated_images/01a08bec-1f1d-7903-b772-c36f94a712f1/exec-f8fe02f1-a9b8-450b-8db6-1f30a5205c7d.png",
+  "source_sha256": "e6a1cceabe43ba9e93a3646daa289f588e20cdca371f1019512abf728322ce06",
+  "output": "assets/장면/편지작업실.webp",
+  "output_sha256": "f638c65421a3057d20e7dda0bb3c4d517c1ffd90a8c1fc6a29bcdba5434a5461",
+  "width": 1672,
+  "height": 941,
+  "generation": "Codex imagegen builtin",
+  "resolution": "Native generated size. No upscaling; not a 4K original.",
+  "correction": "User noticed four arms on Marin. Edited with imagegen to exactly two arms holding the postcard; removed extra dangling arms, retaining two legs and the flower pocket. Other scene features preserved.",
+  "original_generation": "C:/Users/q1212/.codex/generated_images/01a08bec-1f1d-7903-b772-c36f94a712f1/exec-aec50a12-cf11-4694-8ea6-6ee1d43ba4fc.png",
+  "usage": "G1 letter studio environment; three friends together, no inferred individual guide selection.",
+  "references": [
+    {
+      "path": "assets/브랜드/몽글_본체.webp",
+      "sha256": "6abf284e6079a9d26f5a161a921e9c5897d643442e155d4d21ba7f00990826b5"
+    },
+    {
+      "path": "assets/브랜드/까몽_본체.webp",
+      "sha256": "4f1c3bac51e1df447dff1dd487173e6eec8dc4a7ecf4e5e91a39569df88f1131"
+    },
+    {
+      "path": "assets/브랜드/마린_본체.webp",
+      "sha256": "fa930ca8dc4d60f4974a205c5db90564a7da97313927f6bb8b6e92a28a73f3b5"
+    }
+  ],
+  "generation_prompt": "Create a high-quality wide 16:9 miniature photographed felt diorama asset for a colorful Korean-learning 'letter studio' app. This is an environment illustration, NOT a UI mockup: NO letters, typography, words, logos or frames anywhere. Reference images are the approved character identity references, preserve their exact recognizable silhouettes, colors, fur/felt materials, eyes, stitch rules and outfits. Ref1 is Mongle the rounded coral felt ghost with glossy black bead eyes and cream hem stitch, no legs or added mouth. Ref2 is Kkamong the chocolate-brown furry cat, green eyes, coral stitched tail-tip patch. Ref3 is Marin with dark indigo felt rounded helmet and yellow felt eyes, oatmeal body and tiny flower pocket. Show all THREE characters together as peers preparing a letter in a beautifully art-directed tangible creative studio. A single paper envelope with a coral circular felt seal is the main prop on an oatmeal desk: Mongle gently pushing it towards center, Kkamong curiously peeking from behind a short stack of blank paper, Marin holding a small unmarked postcard. Characters fill a generous 60 percent of the scene; warm sociable energy, focused and gentle, not baby nursery cartoon. Ground every object with contact shadows. Enclose the scene in a deep indigo felt curved alcove with an oatmeal floor and a narrow coral felt stripe, a few precise useful stationery pieces. Premium macro product photography, miniature handcrafted wool fiber detail, quiet soft studio key light from upper left, clean sculptural forms, gentle shadow depth, saturated but restrained brand colors coral #F96859, indigo #4D5277, oatmeal #EDE7DC and ink #2B2320. Intimate eye-level three-quarter view, visually clear at a wide 500x280px display. Keep all silhouettes within frame with breathing space, no cropped ears or ghost hem, avoid floating duplicate fingers, no extra characters, no lamps with words, no glassy plastic, no gradients on fur, no confetti, no sparkles, no background text. Make the left and right outer edges dark #080605 so the wide artwork can sit naturally within a dark app. Request 4K output if supported; maximize actual detail, do not label it 4K in the artwork.",
+  "edit_prompt": "Make a very narrow anatomy correction to the RIGHTMOST character Marin in this image. Preserve this beautiful entire felt letter studio scene, all other characters, lighting, textures, colors, props, composition, framing and resolution. Marin accidentally has extra arms: two little hands holding the blank postcard PLUS extra dangling arms on the sides of the oatmeal torso. Correct Marin to have EXACTLY TWO ARMS TOTAL, one left arm and one right arm, and exactly two hands total, both naturally holding the same postcard. Remove the extra dangling arm on the outside/right side of the torso and any duplicate additional arm or hand near the pocket. Reconstruct just those tiny regions with matching continuous oatmeal felt torso. Keep the two short legs at the bottom clearly distinct from arms; keep flower pocket, indigo helmet, yellow eyes and identity unchanged. The two arms holding the postcard must connect naturally to the two shoulders, with no other arms. Do not redraw or change any other part of the scene. Do not change Mongle or Kkamong. No text or added design. Final visual check: Marin has two arms holding one card, two legs on the desk, one flower pocket, no dangling third or fourth arm."
+}
