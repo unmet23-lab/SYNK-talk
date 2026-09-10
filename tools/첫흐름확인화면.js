@@ -52,7 +52,7 @@ function 확인합성화면() {
           <Pressable accessibilityRole="link" onPress={() => Linking.openURL('https://suno.com/song/eb92cc58-f4d3-4d09-9816-378fac6ab2cf')} style={s.도구단추}><Text style={s.도구글}>새 음악 A · Suno에서 듣기</Text></Pressable>
           <Pressable accessibilityRole="link" onPress={() => Linking.openURL('https://suno.com/song/450a4e1a-42a6-426c-b639-c244f31fabc3')} style={s.도구단추}><Text style={s.도구글}>새 음악 B · Suno에서 듣기</Text></Pressable>
         </View>
-        <Text style={s.설명}>새 곡은 생성됐습니다. 계정의 다운로드 한도가 없어 앱 음원 반입은 미완료입니다.</Text>
+        <Text style={s.설명}>BGM이 필요하면 보유 곡에서 고릅니다. 현재 읽기·쓰기 화면은 무음입니다.</Text>
         {오류 ? <Text style={s.설명}>{오류}</Text> : null}
       </View> : null}
     </View>
