@@ -36,6 +36,51 @@ assert.ok(fs.existsSync(동봉경로), 'functions/companion/동봉.json 이 없�
 const 원문 = fs.readFileSync(본체경로, 'utf8');
 const 소스 = 코드만(원문);
 
+test('실제 핸들러의 최종 지시문과 기록판 — 환불은 인계하고 중복 FAQ를 빼며 v1로 기록한다', async () => {
+  const { 세우기 } = require('./lib/서버함수세우기.js');
+  let 요청몸, 기록값;
+  const sql = async () => [{ staff_id: 'fixture-staff', 최신조각: '20260907200000_sunday_bundles_c16.sql' }];
+  sql.begin = async (fn) => fn(async (parts, ...values) => {
+    if (parts.join('?').includes('insert into engine.companion_qa')) {
+      기록값 = values;
+      return [{ qa_id: 'fixture-qa' }];
+    }
+    return [];
+  });
+  const handler = 세우기(원문, { 파일: 'companion.ts',
+    환경: { SUPABASE_DB_URL: 'synthetic', ANTHROPIC_API_KEY: 'synthetic' },
+    모듈: {
+      'npm:postgres@3.4.4': () => sql,
+      './토큰.mjs': { 토큰주체: () => 'fixture', 발급시각: () => 1, 살아있는직원: () => true },
+      './계약판.mjs': require('../lib/계약판.js'),
+      './옛글자.mjs': require('../lib/옛글자.js'),
+      './교정엔진.mjs': { 모델: 'synthetic', 메시지경로: 'http://fixture.invalid', 벤더헤더: () => ({}), 왕복제한밀리: 1000 },
+      './강사지식.mjs': require('../contents/강사지식.js'),
+      './CORS.mjs': { 예비응답: () => null, 머리: () => ({}) },
+    }, console: { error: () => {} },
+    fetch: async (_url, init) => {
+      요청몸 = JSON.parse(init.body);
+      return Response.json({ content: [{ type: 'text', text: JSON.stringify({
+        reply: '', cited_refs: [], handoff: true, handoff_reason: '원장 확인 필요',
+      }) }] });
+    },
+  });
+  const response = await handler(new Request('http://localhost/companion/ask', {
+    method: 'POST', headers: { 'X-Contract-Ver': 'c16', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question: '중간에 그만두면 환불되나요?' }),
+  }));
+  assert.equal(response.status, 200);
+  const 지시문 = 요청몸.system[0].text;
+  assert.ok(지시문.includes('⛔ 현재 봇 답변 보류'));
+  assert.ok(지시문.includes('보류 사유를 정책 미확정으로 단정하지 않는다'));
+  assert.ok(!지시문.includes('SYNK FAQ(대외 완성 문장)'));
+  const 환불 = 지시문.match(/### [^\n]*Q14\.[\s\S]*?(?=\n#{1,6}\s|$)/)?.[0];
+  assert.ok(환불?.includes('원장에게 넘긴다'));
+  assert.equal(환불.trim().split('\n').length, 2);
+  assert.ok(기록값.includes('companion-v1'));
+  assert.ok(!기록값.includes('companion-v0'));
+});
+
 /* ── ① 허용 목록 (급소) ──────────────────────────────────────────── */
 
 test('① 강사역할은 허용 목록이고 teacher·director 둘뿐이다', () => {

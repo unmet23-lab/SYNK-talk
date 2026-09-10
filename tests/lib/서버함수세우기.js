@@ -5,7 +5,7 @@
 const babel = require('@babel/core');
 const vm = require('node:vm');
 
-function 세우기(소스, { 파일, 모듈, 환경 = {}, fetch, console }) {
+function 세우기(소스, { 파일, 모듈, 환경 = {}, fetch, console, Date: 시계 = Date }) {
   const { code } = babel.transformSync(소스, {
     filename: 파일,
     babelrc: false,
@@ -26,7 +26,7 @@ function 세우기(소스, { 파일, 모듈, 환경 = {}, fetch, console }) {
         핸들러 = handler;
       },
     },
-    console, fetch, Request, Response, URL, Blob, FormData, Uint8Array, AbortSignal,
+    console, fetch, Date: 시계, Request, Response, URL, Blob, FormData, Uint8Array, AbortSignal,
   }, { filename: 파일 });
   if (!핸들러) throw new Error('Deno.serve 핸들러가 없다');
   return 핸들러;

@@ -127,6 +127,67 @@
       "fold_date", "promote_ver"
     ],
     "payload_허용필드_왜": "c12 신설 — 검증기(`lib/이벤트검증.js`)가 payload 목록 밖 이름을 거절하는 화이트리스트의 **기계 원천**. 지금까지 그 목록은 C0 §177 산문뿐이었고 검증기에 전수 루프가 0이라(설계 §11-2 D5 실측 — `choice_dimension`·시험 5종이 실물인데 §177 에 0회) 거절은 c12 의 «신규» 동작이다 — 이 배열이 정본이고 §177 은 사본이다. ■ 등재 기준은 «계약 요구»가 아니라 «실물 통과 자격»이다: `compose_meta` 는 c9 등재 «되돌림» 그대로다(반쪽 방지는 계약이 못 하고 조립기 `lib/작성과정.js` 가 진다 — 여기 있는 것은 「이 이름이 유효하다」까지다) · `round_id` 는 라디오 승격기(`lib/라디오승격.js`)가 `quiz.answered` 에 싣는 원장 참조다. 실물이 목록 밖이면 화이트리스트를 켜는 날 그 통로가 깨진다(08-21 저장소 전수 실측으로 세웠다). ■ 새 이름이 필요하면 **다음 판 개정**이지 자유 추가가 아니다.",
+    "c17_ⓐ_어휘예약": {
+      "표식": "c17 ⓐ 어휘만 · 생산자 0 · ⓑ 쌍 커밋은 별도",
+      "상태": "예약만(문서) — 이 판의 버전은 c16 그대로이고, 아래 등재_payload_키·등재_값목록은 «아직» 위 payload_허용필드·값목록에 없다(검증기는 이 블록을 읽지 않는다 · 강제 0). c17 판올림(버전·payload_허용필드 +42·값목록 +6·판 핀·판 선언 문서)은 가지 발전안/20260911 의 7c79ec8 이 들고 있고, 합류는 ⓑ 물리 조각·형제(appsscript) 정본 동기(node tools/계약동기화.js)와 한 벌로 한다 — 어휘만 먼저 올리면 tests/계약.test.js:363·L0스키마 다섯이 빨개진다(그 커밋의 의도된 빨강 8).",
+      "정본": "appsscript docs/엔진7종_상향설계_v3.md §12 D1(첫 주 소급 불가 18 + 나중 문 동승 6 + 도장 넷) · 부록 「D1 의 그릇 표 둘」 표 2 · docs/_ops/결정.md 09-05 §4-⑥ · 09-05 도장 넷",
+      "읽는_법": "이 블록은 검증기(lib/이벤트검증.js)가 «읽지 않는» 장부다 — 어휘의 «이름»을 한 자리에 닫아 둔다. 실제 강제는 위 `payload_허용필드`(검증 ⑧ 화이트리스트)와 `값목록`(조립기·검증 ⑨ 계열)이 지고, event_type 은 ⓑ 에서 값목록·DDL·장부에 함께 올린다.",
+      "등재_payload_키": {
+        "intervention.delivered v2 · 판 넷(D4 ⓐ)": ["arm_id", "loom_ver", "expected_ver", "shadow"],
+        "intervention.delivered v2 · 개입 종류(⑦) · 기준시각 짝": ["intervention_kind", "intervention_choice", "ingested_as_of"],
+        "goal.stated(⑧ · 예약 사건)": ["goal_tag", "goal_text", "channel", "origin_goal_id"],
+        "맞아? 카드(⑨ corrected_value · ⑪ self_explain · ⑫ ai_assist)": ["corrected_value", "self_explain", "ai_assist"],
+        "topic.engaged(⑬ · 예약 사건)": ["topic", "line_id", "speaker", "engagement", "shown_at", "lang", "readable"],
+        "mascot.touched(⑭ · 예약 사건)": ["tap_n", "stroke_ms", "press_n", "wake_n", "first_at", "last_at"],
+        "Amber(⑯ ⑰) · 처방 시드(⑱) · 산문 판 지문(⑲)": ["moment_id", "first_kind", "seed", "summary_ver", "summary_hash"],
+        "나중 문 동승 6 중 payload 인 것": ["goal_outcome", "doc_verify_no", "verify_status", "verified_at", "announced_at", "trail_ref"],
+        "도장 넷(09-05 · AI 초안을 사람이 확정하는 모든 행)": ["confirmed_by", "confirmed_at", "confirm_result", "draft_ref"]
+      },
+      "등재_값목록": ["intervention_kind", "engagement", "first_kind", "confirm_result", "ai_assist", "channel"],
+      "event_type_예약": {
+        "mascot.touched": "observed · 세션 1행(tap_n=0 도 1행 · 안 열었으면 null) · 쓰는 주체 = 화면 층 src/사건통로.js(D3 A) → Core 학습자상태 «만짐» 갈래 · Loom Patina",
+        "topic.engaged": "observed · 노출도 한 행 = 분모 · Vellum U1 → Core 관심축 soliloquy_topic 차원 · 성과계기판",
+        "goal.stated": "explicit · Core U2(teach observe 경로 · D6 ⓓ 학생 앱 1탭) → 목표축 · progress 오늘목표 · M2 · Trail",
+        "atlas.excluded": "explicit · 「이건 나에 대해 기억하지 마」 1탭(맞아? 카드) · 원천 삭제 0 → 요약 인코더 재생성 · 동의율 · Trail",
+        "learner_account.linked": "나중 문 동승 · Core U9(2027-08 게임 앱 연결) → 회고 «실현» 칸 · Trail"
+      },
+      "예약인_까닭": "값목록.event_type 등재 = ①DDL CHECK 값 추가(tests/L0스키마.test.js — CHECK 와 값목록이 같아야 한다) ②lib/사건출처.js 출처(tests/사건출처.test.js) ③lib/이벤트검증.js 앱사건/서버사건(tests/사건위조.test.js)·생산자·엔진도달 장부(tests/이벤트검증.test.js) ④`도달0상한 = 3` 래칫 — 소비자 0 인 사건 다섯을 올리면 3→8 로 오르고 래칫은 내리기만 한다. 어휘만 여는 판이 그 넷을 다 세우면 ⓐ 가 아니고, 래칫을 올리면 유호 상시 지시(08-08)를 어긴다. 이름만 예약해 두면 ⓑ 가 «다른 이름»을 짓는 일이 없고, 첫 주 «전»에 닫아야 하는 것(이름)은 닫힌다 — 값·행은 ⓑ 가 서야 생기므로 소급 손실은 0 이다(첫 학생 전).",
+      "중첩키_메모": {
+        "reads.picker_version · reads.picker_reason(②)": "task.assigned payload.reads «안»의 키 — 모양 정본은 lib/읽기기록.js(읽기판 2 · picker·filter). 검증 ⑧ 은 최상위 키만 재므로 여기 등재만 하고, 판 3 은 ⓑ 가 올린다.",
+        "self_explain.choice(⑪)": "범용 보기 셋 · text 키 없음 — 보기 값 셋은 미확정.",
+        "corrected_value{항목 참조 · 학생 값}(⑨)": "객체 모양은 ⓑ 조립기(맞아? 카드 «이거야») 몫.",
+        "ai_assist(⑫)": "값목록 「ai_assist」 셋 또는 null(안 고름 = 미표식) — 표 2 의 하위 키 `declared` 로 싸는지 낱값인지는 ⓑ 조립기가 닫는다(제출 사건 payload 에 같이 싣는다 · 보내기 «직전» 1탭).",
+        "shadow{policy_ver, choice_ref}(⑥)": "객체 — 「냈다면 무엇을 골랐나」."
+      },
+      "미확정_이름(D1 확정 때 · 지어내지 않는다)": [
+        "mascot.touched «어디를» 만졌나 — 사분면 넷 수(quadrant_n[4] 꼴)",
+        "intervention.delivered guide_ref(참조한 AI 가이드의 생성 id·prompt_ver)",
+        "intervention.delivered policy_trace{candidates, probs, branch}(확률 정책 활성 «전»엔 null)",
+        "report.delivered(D25 ① A 일 때만) — intervention_id·recipe_ver·loom_ver + 전달 증거 셋(delivery_channel·confirm_kind·report_ver)",
+        "«대상 집합 스냅샷» 서버사건(rule_ver · as_of · learner_set_hash · n)",
+        "«화용 기회»(opportunity_kind · expected_act · response{했다·안 했다·못 봤다} · source{app·teacher}) · 화용 축 표식",
+        "세 힘 태그(D6 ⑤ A · observation.noted 접힌 칸 · 닫힌 값 셋 · 기본 없음 — 키·값 미확정)",
+        "과정 그림자 «추가 칸»(①) — 이탈 «시점까지 시간» ms 한 칸의 키(compose_meta 안인지 최상위인지 · 기본 칸 compose_meta 는 c12)",
+        "intervention_choice 값목록 6종(D6 개입 6종)",
+        "self_explain 보기 셋 값",
+        "atlas.excluded 의 근거 «문장» 참조 키",
+        "moment_id 값목록(첫 벌 셋 밖) · 「학습개입 ○/✗」 열 — c18"
+      ],
+      "후보_미등재(수는 D1 · 09-05)": [
+        "diary.opened · diary.written · diary.acknowledged(학생일기 §6 · 계약 아홉 자리)",
+        "purchase.settled · choice.selected 값 넷(outfit·purchase·gift·background)·«당시 제약» 칸 · submission.created task_type=흥정",
+        "content.viewed{correction_ref} · reads.heard_ref",
+        "absence.reported(부모 앱사건)",
+        "companion 노출 앱사건 · 손 카드 «탭» 앱사건 · 쪽지 «꽂기» 앱사건"
+      ],
+      "물리_별건(어휘 아님 · 표 1)": [
+        "살아 있는 CHECK 접미 _c16→_c17 이름째 교체 조각(판올림의 물리 짝 — 이 커밋에 없다)",
+        "season_review 확정 열 1 + 도장 열 넷(AI 초안이 앉는 그릇마다)",
+        "ingest_heartbeat 열 2(stream_started_at · pack_ver)",
+        "engine.atlas_summary(파생 캐시) · engine.prism_delivery(원장)",
+        "시트층 열·탭(hw_feedback·voice_log 끝 «반 스냅샷»·«저작신뢰 등급» 등) · 버킷 폴더 prism/"
+      ]
+    },
     "왜_task_format이_따로인가": "c5 신설. `task_type`은 **어느 통로로 들어왔나**(숙제제출·발화녹음), `task_format`은 **그 과제가 무슨 형식이었나**(낭독·자유발화·모의면접)다. 같은 `발화녹음` 통로로 낭독과 자유발화가 함께 들어오는데, 섀도잉(모범 발음 따라읽기)과 자유발화는 **엔진이 배워야 할 것이 정반대**다 — 낭독은 발음, 자유발화는 문장 생성. 한 칸에 담으면 그 둘을 나중에 못 가르고, 낭독 데이터로 회화 모델을 학습시키는 사고가 조용히 성립한다. 🔴이름이 비슷해 실제로 한 번 섞였다(발주 §1이 `task_type`에 낭독·자유를 넣었다 · 2026-08-06 정정).",
     "왜_task_type과_event_type_둘인가": "`event_type`은 **무슨 일이 일어났나**(제출됐다·골랐다·답했다), `task_type`은 **어느 과업이었나**(숙제·다시쓰기·발화)다. 둘을 합치면 숙제 제출과 다시쓰기 제출이 똑같이 `submission.created`가 되어 구분이 사라진다. `skill_ids`·`content_id`로는 대신 못 센다 — 그건 「무엇을 재는가」지 「어느 통로로 들어왔는가」가 아니다. ⚠ L0 초안 v1에는 `task_type`이 없다(합류 항목).",
     "라이브_대응": {

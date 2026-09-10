@@ -199,10 +199,11 @@ Deno.serve(async (req: Request) => {
        * 통째로 걷으면 학생 글 본문까지 서버 메모리에 실린다: 필요한 칸만이 이 파일의 걷기 규율이다.
        * compose_meta 없는 행은 payload null → 작성과정축이 「잴 것 없던 제출(음성 등)」로 정확히 접는다). */
       const 원행들 = await sql`
-        select e.event_id, e.event_type, e.occurred_at, e.due_at, e.task_type, e.task_schema_ver,
+        select e.event_id, e.event_type, e.occurred_at, s.due_at, e.task_type, s.task_schema_ver,
                case when e.payload ? 'compose_meta'
                     then jsonb_build_object('compose_meta', e.payload->'compose_meta') end as payload
           from engine.learning_events e
+          left join engine.submissions s on s.event_id = e.event_id
          where e.learner_id = ${행.learner_id}::uuid
            and e.event_type in ('task.assigned', 'submission.created', 'session.abandoned')
            and e.occurred_at >= now() - interval '40 days'`;

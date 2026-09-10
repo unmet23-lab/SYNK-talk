@@ -14,7 +14,22 @@ const {
   migrationFiles,
   validateChecksum,
   멱등화,
+  deriveCheckQuery,
 } = require('../tools/마이그레이션_합본');
+
+test('사후 검사는 주석의 낡은 판번호 대신 최신 파일명을 사용하며 적용 이력 원문은 보존한다', () => {
+  const file = migrationFiles().at(-1);
+  const original = fs.readFileSync(file);
+  const query = deriveCheckQuery(file);
+  const version = path.basename(file).slice(0, 14);
+  assert.ok(query.includes(`(select version from 현재이력)='${version}'`));
+  assert.ok(query.includes(`(select checksum from 현재이력)='${validateChecksum(original).declared}'`));
+  assert.deepEqual(fs.readFileSync(file), original, '이미 적용한 migration 바이트를 바꾸면 안 된다');
+  const start = original.toString('utf8').indexOf('with 기대열(');
+  const tail = original.toString('utf8').slice(start).split('*/')[0];
+  const withoutVersion = (sql) => sql.replace(/(\(select version from 현재이력\)\s*=\s*)'\d{14}'/, "$1'<version>'");
+  assert.equal(withoutVersion(query), withoutVersion(tail), '구조·권한·checksum 판정 조건은 바꾸지 않는다');
+});
 
 test('파일명 정렬이 실행 순서이고 모든 조각이 명명 규칙을 따른다', () => {
   const files = migrationFiles();

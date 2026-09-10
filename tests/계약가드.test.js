@@ -67,6 +67,18 @@ test('계약이 같으면 막지 않는다 (거짓 차단은 곧 꺼지는 가�
   assert.strictEqual(검사(dir, 가짜도구(dir, 0)).막혔나, false, '도구가 0을 냈는데 막혔다');
 });
 
+test('작업 사본 훅은 검사 중인 Talk 경로를 계약 도구에 넘긴다 — 상속된 다른 대상은 쓰지 않는다', () => {
+  const dir = 픽스처(계약경로);
+  const p = path.join(dir, '대상검사.js');
+  fs.writeFileSync(p, `const path = require('node:path');
+if (path.resolve(process.env.SYNK_TALK_ROOT) !== path.resolve(process.cwd())) process.exit(1);
+console.log('대상 일치');\n`, 'utf8');
+  const r = 띄우기(훅, { cwd: dir,
+    env: { ...process.env, SYNK_CONTRACT_TOOL: p, SYNK_TALK_ROOT: path.dirname(dir) }, 통과코드: [0, 1] });
+  assert.equal(r.status, 0);
+  assert.match(r.stderr, /대상 일치/);
+});
+
 test('계약과 무관한 파일에는 도구를 아예 안 부른다 (매 커밋 세금이 되면 안 된다)', (t) => {
   let dir;
   try { dir = 픽스처('docs/아무거나.md'); } catch (_) { return t.skip('git 을 못 돌린다'); }

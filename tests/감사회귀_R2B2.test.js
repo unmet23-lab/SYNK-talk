@@ -4,7 +4,7 @@
  * 전부 **소스로 못박는다** — 재는 자리가 effect·핸들러 «뒤»라 첫 렌더가 원리상 못 닿는다
  * (`tests/감사회귀_R1B2.test.js` 와 같은 규율 — 못 재는 검사를 초록으로 두지 않는다).
  * 🔑 이미 다른 파일이 진 판정은 다시 재지 않는다(한 판정 한 자) — G3(알바변명)의 BGM 금지는
- *   `tests/알바변명화면.test.js` 가 진다. 여기서는 «켠 세 판»만 잰다. */
+ *   `tests/알바변명화면.test.js` 가 진다. 여기서는 G1 구곡 제거와 G2·G4의 기존 재생을 잰다. */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -87,9 +87,16 @@ for (const [파일, 게임, 자리수] of 게임화면들) {
   });
 }
 
-// ── D5-4 — 게임 세 판에 BGM 이 깔린다 (마운트 재생 · 언마운트 정지 한 벌) ─────
+// ── D5-4 — G1 구곡 제거(09-11 사용자 요청), G2·G4 기존 재생 보존 ─────────────
 
-for (const [파일] of 게임화면들) {
+test('D5-4 교수멘탈화면.js — 구곡을 재생하지 않고 진입·퇴장 때 남은 BGM을 정지한다', () => {
+  const 코드 = 소스('교수멘탈화면.js');
+  assert.doesNotMatch(코드, /bgm재생\s*\(/, 'G1이 제거된 구곡을 다시 자동 재생한다');
+  assert.match(코드, /useEffect\(\(\) => \{ bgm정지\(\); return \(\) => bgm정지\(\); \}, \[\]\);/,
+    'G1 진입·퇴장 때 앞 화면에 남은 BGM을 정지하지 않는다');
+});
+
+for (const [파일] of 게임화면들.filter(([, 게임]) => 게임 !== 'G1')) {
   test(`D5-4 ${파일} — bgm재생 마운트 + bgm정지 언마운트가 한 벌로 선다 (인자 없이 = 유호 선정 트랙)`, () => {
     const 코드 = 소스(파일);
     assert.match(코드, /import \{ 효과음, bgm재생, bgm정지 \} from '\.\/소리\.js';/,

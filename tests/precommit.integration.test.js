@@ -15,6 +15,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { 형제정본 } = require('../lib/형제정본.js');
 const { execFileSync } = require('node:child_process');
 const { 띄우기 } = require('./lib/띄우기');
 
@@ -127,7 +128,7 @@ test('SYNK_SKIP_GUARD=1 이면 검사를 건너뛴다(끄는 통로가 실제로
  * 아니라 **모델 입력 오염**이었다. 커밋은 조용히 지나갔고 한참 뒤 남이 발견했다.
  * 🔑 판정은 형제의 `tools/lib/옛글자.js` 하나가 진다. 여기서 재는 것은 **배선이 실제로 도는가**다.
  * ⚠ 이 파일에도 그 글자를 적지 않는다 — `String.fromCodePoint` 로 조립한다. */
-const 옛글자도구 = path.resolve(__dirname, '..', '..', 'SYNK-appsscript', 'tools', '옛글자검사.js');
+const 옛글자도구 = path.join(형제정본(path.resolve(__dirname, '..')), 'tools', '옛글자검사.js');
 const 옛글자 = String.fromCodePoint(0x683C);       // 실제로 새 나갔던 그 자리(U+683C)
 
 test('차단: 옛 글자(한자·가나)가 스테이징되면 막는다', (t) => {

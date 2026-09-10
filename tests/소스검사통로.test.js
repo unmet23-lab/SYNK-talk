@@ -32,6 +32,13 @@ const 계수기 = require('../tools/가드계수.js');
 const ROOT = path.join(__dirname, '..');
 const 픽스처뿌리 = path.join(__dirname, 'fixtures', '가드계수');
 
+test('JSX 미리보기도 분모에 남고 원문 존재 단언을 실제로 센다', () => {
+  const r = 계수기.재기(path.join(__dirname, 'fixtures', '가드계수JSX'));
+  assert.deepEqual(r.못읽은파일, []);
+  assert.equal(r.훑은파일, 1);
+  assert.equal(r.존재위험.length, 1);
+});
+
 /* ── ① 공용 통로의 힘 — 값으로 못박는다 ─────────────────────────────────────── */
 
 test('옛 픽스처가 그대로 통과한다 — 상위집합으로 갈아도 옛 보장은 안 잃는다', () => {

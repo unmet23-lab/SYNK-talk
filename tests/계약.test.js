@@ -17,6 +17,7 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
+const { 형제정본 } = require('../lib/형제정본.js');
 
 const { 코드만 } = require('./lib/소스검사.js');
 
@@ -323,7 +324,7 @@ test('계약 파일이 비지 않았다 (빈 계약은 모든 검사를 통과�
 });
 
 test('형제 저장소 SYNK-appsscript의 계약 파일이 이것과 같다 (줄바꿈만 제외)', (t) => {
-  const 형제 = path.join(ROOT, '..', 'SYNK-appsscript', '계약', '수집_교정_계약.json');
+  const 형제 = path.join(형제정본(ROOT), '계약', '수집_교정_계약.json');
   if (!fs.existsSync(형제)) {
     return t.skip('형제 저장소 SYNK-appsscript가 이 기계에 없다 — 실물 대조는 로컬에서만');
   }

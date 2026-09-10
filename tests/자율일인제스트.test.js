@@ -14,6 +14,7 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
+const { 형제정본 } = require('../lib/형제정본.js');
 
 const { 코드만 } = require('./lib/소스검사.js');
 
@@ -247,7 +248,7 @@ test('되돌리는 값에 학생 식별자를 안 싣는다 — 배정ID 로 충
 });
 
 test('보내는 쪽(appsscript)이 그 열쇠를 들고 온다 — 형제 저장소가 있을 때만 잰다', () => {
-  const 엔진 = path.resolve(ROOT, '..', 'SYNK-appsscript', '엔진_자율일.js');
+  const 엔진 = path.join(형제정본(ROOT), '엔진_자율일.js');
   if (!fs.existsSync(엔진)) return;   // 형제 저장소 없음 — 이 검사는 건너뛴다(F296 과 같은 꼴)
   const 소스 = fs.readFileSync(엔진, 'utf8');
   const i = 소스.indexOf('function 자율일말하기제출_');

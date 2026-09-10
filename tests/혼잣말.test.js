@@ -17,6 +17,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { 형제정본 } = require('../lib/형제정본.js');
 
 const 뿌리 = path.resolve(__dirname, '..');
 const 사본 = require('../contents/혼잣말.json');
@@ -43,7 +44,7 @@ test('반입 — 사본이 스키마를 갖췄고 id 가 안 겹친다(§8 수�
 });
 
 test('반입 — 형제 저장소가 있으면 정본과 문구 전량이 같다(사본 드리프트 탐지)', (t) => {
-  const 정본경로 = path.resolve(뿌리, '..', 'SYNK-appsscript', 'docs', '캐릭터', '혼잣말_정본.json');
+  const 정본경로 = path.join(형제정본(뿌리), 'docs', '캐릭터', '혼잣말_정본.json');
   if (!fs.existsSync(정본경로)) return t.skip('형제 저장소 부재 — 정본 대조는 로컬에서만');
   const 정본 = JSON.parse(fs.readFileSync(정본경로, 'utf8'));
   assert.equal(정본.문구.length, 사본.문구.length,

@@ -102,7 +102,7 @@ function assertByteIdentical(actual, expected, label = '합본') {
  * 한 번은 옮기는 걸 잊어 **정상 DB 가 ❌ 로 보고**됐다(기대 checksum 이 낡아서). 손으로 옮기는
  * 자리는 다음번에 빠뜨리는 자리라, 합본을 만드는 그 자리에서 함께 파생시킨다.
  * `tests/L0스키마.test.js` 의 대조는 그대로 둔다 — 파생이 죽어도 검사가 남아야 한다. */
-function syncCheckFile(bundle) {
+function deriveCheckQuery(마지막 = migrationFiles().at(-1)) {
   /* 🔴 **「마지막 조각에서」라고 말하면서 합본 «전체»를 뒤지고 있었다**(08-26 실측 · 다섯 번째 재발).
    *   `bundle.lastIndexOf('with 기대열')` 은 마지막 조각에 그 블록이 «없으면» 조용히 **앞 조각의
    *   블록**으로 후퇴한다 — 그러면 `확인_적용후상태.sql` 의 체인 끝이 낡은 채로 파생되고,
@@ -111,9 +111,8 @@ function syncCheckFile(bundle) {
    *   같은 병에 걸려 있었다.
    * 🔑 그래서 **마지막 «조각 파일»에서 찾고, 없으면 죽는다.** 후퇴가 없으면 다음 사람은 조각에
    *   블록을 안 단 그 순간 알게 된다(조용한 오답 → 시끄러운 실패). */
-  const 조각들 = migrationFiles();
-  const 마지막 = 조각들[조각들.length - 1];
   const 조각원문 = fs.readFileSync(마지막, 'utf8');
+  validateChecksum(Buffer.from(조각원문, 'utf8'), path.basename(마지막));
   /* 🔴 **닻에 여는 괄호를 붙인다** — 이게 「설명이 자기 검사를 깨뜨리는」 자리를 구조로 없앤다.
    *   [08-26 · 80 세션 지적] 조각 머리말이 이 코드를 인용하면(`lastIndexOf('with 기대열') 로 …`)
    *   그 인용이 «두 번째 후보»가 된다. 지금은 `lastIndexOf` 라 뒤엣것(진짜 블록)을 집어 옳게 돌지만,
@@ -130,8 +129,19 @@ function syncCheckFile(bundle) {
     ];
     throw new Error(안내.join(String.fromCharCode(10)));
   }
-  const 머리 = fs.readFileSync(CHECK_FILE, 'utf8').split('with 기대열(')[0];   // 닻은 위와 같은 것 하나다
-  const 새것 = 머리 + 조각원문.slice(시작, 끝);
+  // 적용된 조각은 고치지 않는다. 09-07 조각의 주석에는 앞 판번호가 남아 있어
+  // 정상 DB도 거절했다. 판번호만 파일명에서 파생하고 구조·checksum 조건은 그대로 둔다.
+  const 버전조건 = /(\(select version from 현재이력\)\s*=\s*)'\d{14}'/g;
+  const 쿼리 = 조각원문.slice(시작, 끝);
+  if ([...쿼리.matchAll(버전조건)].length !== 1) {
+    throw new Error(`마지막 조각의 확인 버전 조건은 정확히 1개여야 한다: ${path.basename(마지막)}`);
+  }
+  return 쿼리.replace(버전조건, (_조건, 앞) => `${앞}'${path.basename(마지막).slice(0, 14)}'`);
+}
+
+function syncCheckFile() {
+  const 머리 = fs.readFileSync(CHECK_FILE, 'utf8').split('with 기대열(')[0];
+  const 새것 = 머리 + deriveCheckQuery();
   fs.writeFileSync(CHECK_FILE, 새것);
   return 새것;
 }
@@ -207,6 +217,9 @@ function generate({ check = false } = {}) {
   if (check) {
     if (!fs.existsSync(OUTPUT)) throw new Error('생성된 supabase/L0_스키마.sql이 없다');
     assertByteIdentical(fs.readFileSync(OUTPUT), bundle, 'supabase/L0_스키마.sql');
+    const 사후 = fs.readFileSync(CHECK_FILE, 'utf8');
+    const 머리 = 사후.split('with 기대열(')[0];
+    assertByteIdentical(Buffer.from(사후), Buffer.from(머리 + deriveCheckQuery()), 'supabase/확인_적용후상태.sql');
     return bundle;
   }
 
@@ -245,6 +258,7 @@ module.exports = {
   MIGRATIONS_DIR,
   OUTPUT,
   syncCheckFile,
+  deriveCheckQuery,
   assertByteIdentical,
   checksumInfo,
   concatenate,

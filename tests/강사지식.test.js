@@ -6,7 +6,7 @@
  *   ㉡ **실저장소는 거짓양성만 검사한다** — 멀쩡한 매니페스트가 통과하는가, 생성물이 최신인가.
  *
  * ■ 형제 저장소(appsscript)가 없는 CI 에서는 **skip 으로 드러낸다**(F296)
- *   `as:` 항목 9벌이 형제 저장소에서 온다. 없는 것을 fail 로 적으면 남의 배포가 막히고,
+ *   `as:` 항목 8벌이 형제 저장소에서 온다. 없는 것을 fail 로 적으면 남의 배포가 막히고,
  *   조용히 통과시키면 초록이 분모 없이 읽힌다. skip 은 「안 쟀다」를 말하는 유일한 모양이다.
  */
 'use strict';
@@ -14,6 +14,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const { 형제정본 } = require('../lib/형제정본.js');
 const { 코드만 } = require('./lib/소스검사.js');
 
 const 뿌리 = path.resolve(__dirname, '..');
@@ -21,7 +22,7 @@ const 빌더경로 = path.join(뿌리, 'tools', '강사지식빌드.js');
 const 매니페스트경로 = path.join(뿌리, 'contents', '강사지식_목록.json');
 const 생성물경로 = path.join(뿌리, 'contents', '강사지식.js');
 const 계약경로 = path.join(뿌리, 'docs', '컴패니언_내부계약.md');
-const 형제뿌리 = path.resolve(뿌리, '..', 'SYNK-appsscript');
+const 형제뿌리 = 형제정본(뿌리);
 
 assert.ok(fs.existsSync(빌더경로), 'tools/강사지식빌드.js 가 없다 — 이 검사가 통째로 미실행이다');
 assert.ok(fs.existsSync(매니페스트경로), 'contents/강사지식_목록.json 이 없다 — 미실행이다');
@@ -86,15 +87,48 @@ test('픽스처: ⛔ 하나가 뒤 문서를 삼키지 않는다 (버리기가 �
   assert.ok(결과.includes('이것도'));
 });
 
+test('픽스처: ⚠ 제목이어도 본문의 명시 봇 답변 금지는 절 전체를 인계하며 다른 답변은 보존한다', () => {
+  const 환불픽스처 = ['### ⚠ Q14. 환불되나요?', '규정은 섰다. **아직 봇이 이 답을 하지 않는다.**',
+    '현재 원장 검토용 규정: 환불 41.7%', '### ⚠ Q15. 요금은 얼마인가요?',
+    '기준을 붙여 월 요금을 안내한다.', '> 옛 판에서는 봇도 못 답해 상담이 막혔다.'].join('\n');
+  const 결과 = 주제만걸기(환불픽스처);
+  assert.ok(결과.includes('Q14. 환불되나요?'));
+  assert.ok(결과.includes('원장에게 넘긴다'));
+  assert.ok(!결과.includes('41.7%'));
+  assert.ok(!결과.includes('원장 검토용 규정'));
+  assert.ok(결과.includes('기준을 붙여 월 요금을 안내한다.'));
+});
+
+test('실제 동봉 지식의 환불 항목은 제목과 인계만 남는다 — 표와 검토 중 문안은 싣지 않는다', () => {
+  const { 강사지식 } = require(생성물경로);
+  const 절 = 강사지식.match(/### [^\n]*Q14\.[\s\S]*?(?=\n#{1,6}\s|$)/)?.[0];
+  assert.ok(절, '동봉 지식에서 환불 주제를 잃었다');
+  assert.ok(절.includes('원장에게 넘긴다'));
+  assert.ok(!절.includes('손님에게 드리는 말'));
+  assert.ok(!절.includes('252만'));
+  assert.equal(절.trim().split('\n').length, 2, '환불 항목에 답변용 몸이 남았다');
+});
+
+test('현행 약속과 어긋난 대외 FAQ는 AI 원천과 동봉 출처에서 제외되고 현행 FAQ 답변은 보존된다', () => {
+  const { 강사지식, 문서이름, 출처대장 } = require(생성물경로);
+  assert.ok(!문서이름.includes('SYNK FAQ(대외 완성 문장)'));
+  assert.ok(!출처대장.some((r) => r.경로 === 'docs/정본/SYNK/SYNK FAQ.txt'));
+  assert.ok(강사지식.includes('열두 달 과정을 마치고 처음 보는 TOPIK'));
+  assert.ok(강사지식.includes('6개월을 더 무료로 이어감'));
+  const 가격 = 강사지식.match(/### [^\n]*Q1\.[\s\S]*?(?=\n#{1,6}\s|$)/)?.[0];
+  assert.ok(가격?.includes('6개월권'));
+  assert.ok(가격?.includes('42만'));
+});
+
 /* ── ㉡ 실저장소 — 계약과 매니페스트가 갈라졌나 ─────────────────── */
 
-test('매니페스트는 12벌이고 계약 §3 도 12벌이라고 말한다', () => {
-  assert.equal(매니페스트.항목.length, 12,
-    `매니페스트가 ${매니페스트.항목.length}벌이다 — 계약 §3 은 「12벌이 v0 의 전부」다`);
+test('매니페스트는 11벌이고 계약 §3 도 11벌이라고 말한다', () => {
+  assert.equal(매니페스트.항목.length, 11,
+    `매니페스트가 ${매니페스트.항목.length}벌이다 — 계약 §3 은 「11벌이 v0 의 전부」다`);
   assert.ok(fs.existsSync(계약경로), 'docs/컴패니언_내부계약.md 가 없다 — 이 검사가 미실행이다');
   const 계약 = fs.readFileSync(계약경로, 'utf8');
-  assert.ok(/\*\*12벌이 v0 의 전부\*\*/.test(계약),
-    '계약 §3 의 「12벌이 v0 의 전부」 문구가 없다 — 계약을 고쳤으면 이 검사와 매니페스트도 함께 고친다');
+  assert.ok(/\*\*11벌이 v0 의 전부\*\*/.test(계약),
+    '계약 §3 의 「11벌이 v0 의 전부」 문구가 없다 — 계약을 고쳤으면 이 검사와 매니페스트도 함께 고친다');
 });
 
 test('계약 §3 이 «제외 확정»한 문서가 매니페스트에 없다', () => {
@@ -139,7 +173,7 @@ test('생성물이 손으로 안 고쳐졌다 — 「손으로 안 고친다」 
 
 test('생성물이 원본과 같다 (형제 저장소 없으면 skip · F296)', (t) => {
   if (!형제있나) {
-    t.skip(`형제 저장소가 없다(${형제뿌리}) — as: 9벌을 못 읽는다. 낡음은 «안 쟀다».`);
+    t.skip(`형제 저장소가 없다(${형제뿌리}) — as: 8벌을 못 읽는다. 낡음은 «안 쟀다».`);
     return;
   }
   const { execFileSync } = require('child_process');

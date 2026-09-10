@@ -20,6 +20,7 @@ import 갈래모듈 from './갈래판정.mjs';
 import 기술모듈 from './기술선택.mjs';
 import 요약모듈 from './과제요약.mjs';
 import 읽기모듈 from './읽기기록.mjs';
+import 성향확인모듈 from './성향확인.mjs';
 import 상태모듈 from './학습자상태.mjs';
 import 검문모듈 from './과제검문.mjs';
 import 상수모듈 from './생성상수.mjs';
@@ -51,8 +52,12 @@ const { 읽기기록 } = 읽기모듈 as {
 };
 const { 과제요약 } = 요약모듈 as {
   과제요약: (상태: Record<string, unknown>, 조각: Record<string, unknown>) =>
-    { 요약: string; 쓸축수: number; axes_used: string[]; evidence_refs: Record<string, unknown> };
+    { 요약: string; 쓸축수: number; axes_used: string[]; 제외축: string[];
+      제외키: string[]; 제외지표: string[]; 미처리부정키: string[]; evidence_refs: Record<string, unknown> };
 };
+/* 「아니야」 제외 — 전 이력에서 부정키를 받고 그 짐작의 지표만 뺀다.
+ * 추출은 progress 의 부정키 형식과 같은 파일에 산다. */
+const { 부정키들 } = 성향확인모듈 as { 부정키들: (행들: unknown[]) => string[] };
 const { 학습자상태 } = 상태모듈 as {
   학습자상태: (행들: unknown[], 옵션: Record<string, unknown>) => Record<string, unknown>;
 };
@@ -111,11 +116,17 @@ function 학생조립(학생: Record<string, unknown>, 재료: {
      *   «상태오류» 폴백으로 착지시킨다 — 학생은 그날 과제를 받고 사고는 값으로 행에 남는다.
      *   evidence_refs 는 §6-1 모양(5키) 그대로 빈 값 — 오류 문구는 로그·계수 몫이다. */
     let 상태: Record<string, unknown> | null = null;
-    let 요약산출: { 요약: string; 쓸축수: number; axes_used: string[]; evidence_refs: Record<string, unknown> };
+    let 요약산출: { 요약: string; 쓸축수: number; axes_used: string[]; 제외축: string[];
+      제외키: string[]; 제외지표: string[]; 미처리부정키: string[]; evidence_refs: Record<string, unknown> };
     try {
       상태 = 학습자상태(((학생.원신호 ?? []) as unknown[]),
         { as_of: 스냅기준, ingested_as_of: 스냅기준, 시간대 }) as Record<string, unknown>;
+      /* 대상조회가 활동 창·종별 상한과 별도로 읽은 부정 이력이다. 재료 누락을 빈 부정으로
+       * 간주하면 과거 정정이 부활하므로 상태오류 폴백으로 내린다. 미래·늦적재는 SQL이 자른다. */
+      if (!Array.isArray(학생.부정이력)) throw new TypeError('생성 조립: 부정이력 조회 결과가 필요합니다');
+      const 부정 = 부정키들(학생.부정이력);
       요약산출 = 과제요약(상태, {
+        부정키들: 부정,
         목표: (학생.goal_track ?? null) as string | null, 급수: 원급수,
         /* ㉢ 나침반(경로 A) — 대상조회가 배정 날짜의 시즌에서 걷어 온 season_goal.
          * 없으면 null → 요약에 안 실린다(널 규칙 · 나침반 0행이 개원 전 정상 상태). */
@@ -126,10 +137,17 @@ function 학생조립(학생: Record<string, unknown>, 재료: {
         왜배우나: (학생.왜배우나 ?? null) as string | null,
         토픽쓸곳: (학생.토픽쓸곳 ?? null) as string | null,
       });
+      if (요약산출.제외지표.length) {
+        console.log(`[deliver/생성] 「아니야」 제외 지표 ${요약산출.제외지표.join('·')}(부정 ${부정.length})`);
+      }
+      if (요약산출.미처리부정키.length) {
+        console.error(`[deliver/생성] 해석하지 못한 부정 키 ${요약산출.미처리부정키.length}개 — 지표 연결 확인 필요`);
+      }
     } catch (e) {
       console.error('[deliver/생성] 상태오류 강등(폴백으로 간다)', learner_id, String((e as Error)?.message ?? e).slice(0, 200));
       상태 = null;
-      요약산출 = { 요약: '', 쓸축수: 0, axes_used: [], evidence_refs: { events: [], as_of: 스냅기준, window_days: 0, axes_used: [], truncated: 0 } };
+      요약산출 = { 요약: '', 쓸축수: 0, axes_used: [], 제외축: [], 제외키: [], 제외지표: [], 미처리부정키: [],
+        evidence_refs: { events: [], as_of: 스냅기준, window_days: 0, axes_used: [], truncated: 0 } };
     }
 
     /* 겨냥(§6-0) — 대상만. 비대상은 빈 배열(A11 ⑦ 존재 대조는 빈 배열 면제). */

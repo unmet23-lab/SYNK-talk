@@ -13,6 +13,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
+const { 형제정본 } = require('../lib/형제정본.js');
 
 const ROOT = path.join(__dirname, '..');
 const { 옛글자, 찾기, 짚기, 첫걸림 } = require('../lib/옛글자.js');
@@ -132,7 +133,7 @@ test('🔴 배포 동봉 표에 옛글자 가 올라 있다 — 없으면 `원�
 test('🔴 형제(SYNK-appsscript)의 문자 클래스와 갈라지지 않았다', (t) => {
   /* ⚠ 형제가 없는 기계에서는 **skip 이지 fail 이 아니다**(F207·F364) — 못 잰 것을 「깨끗함」으로
    *   접으면 이 대조는 가장 필요한 날 사라지고, fail 로 두면 CI 가 남의 저장소를 요구한다. */
-  const 형제 = path.join(ROOT, '..', 'SYNK-appsscript', '.claude', 'hooks', 'lib', '옛글자.js');
+  const 형제 = path.join(형제정본(ROOT), '.claude', 'hooks', 'lib', '옛글자.js');
   if (!fs.existsSync(형제)) return t.skip('형제 저장소가 없다 — 대조 «못 했다»');
   assert.equal(옛글자.source, require(형제).옛글자.source,
     '런타임 사본이 형제의 정본과 갈라졌다 — 갈라지는 방향은 언제나 「통과」다');

@@ -16,6 +16,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { 형제정본 } = require('../lib/형제정본.js');
 const { 띄우기 } = require('./lib/띄우기.js');
 const { 코드만, 코드만픽스처 } = require('./lib/소스검사.js');
 
@@ -65,7 +66,7 @@ test('SFX ③ — 21종이 있고, 형제 저장소가 있으면 사운드킷과
   for (const 이름 of 이름들) {
     assert.ok(fs.existsSync(path.join(뿌리, 'assets', 'sfx', 이름)), `assets/sfx/${이름} 이 없다`);
   }
-  const 형제 = path.resolve(뿌리, '..', 'SYNK-appsscript', 'docs', '브랜드_사운드킷');
+  const 형제 = path.join(형제정본(뿌리), 'docs', '브랜드_사운드킷');
   if (!fs.existsSync(형제)) return t.skip('형제 저장소 부재 — 바이트 대조는 로컬에서만');
   for (const 이름 of 이름들) {
     const a = fs.readFileSync(path.join(형제, 이름));

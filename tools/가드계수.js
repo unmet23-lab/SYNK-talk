@@ -49,6 +49,16 @@ let acorn = null;
 try { acorn = require('acorn'); } catch (_) { /* 아래 `잴수있나()` 가 진다 */ }
 function 잴수있나() { return acorn !== null; }
 
+// 미리보기 엔트리도 검사 분모다. JSX는 기존 Expo 파서로 ESTree를 만들어 같은 판정을 거친다.
+function 구문읽기(소스) {
+  try { return acorn.parse(소스, { ecmaVersion: 'latest', sourceType: 'module', allowReturnOutsideFunction: true }); }
+  catch (_) {
+    return require('@babel/parser').parse(소스, {
+      sourceType: 'unambiguous', allowReturnOutsideFunction: true, plugins: ['estree', 'jsx'],
+    }).program;
+  }
+}
+
 /* ── 훑을 자리 ────────────────────────────────────────────────────────────────
  * `tests/` 와 `tools/` 둘 다 본다 — 소스 원문을 검사 대상으로 삼는 코드는 회귀에만
  * 있는 것이 아니다(precommit·배포대조 계열이 같은 모양을 쓴다). */
@@ -426,7 +436,7 @@ function 내보내는생산자(파일) {
   let ast;
   try {
     소스 = fs.readFileSync(파일, 'utf8');
-    ast = acorn.parse(소스, { ecmaVersion: 'latest', sourceType: 'module', allowReturnOutsideFunction: true });
+    ast = 구문읽기(소스);
   } catch (_) {
     try { ast = acorn.parse(소스, { ecmaVersion: 'latest', sourceType: 'script', allowReturnOutsideFunction: true }); }
     catch (_2) { return 결과; }   // ③ 못 읽으면 아무것도 안 더한다
@@ -503,7 +513,7 @@ for (const 파일 of 파일들(뿌리)) {
   let ast;
   try {
     소스 = fs.readFileSync(파일, 'utf8');
-    ast = acorn.parse(소스, { ecmaVersion: 'latest', sourceType: 'module', allowReturnOutsideFunction: true });
+    ast = 구문읽기(소스);
   } catch (e) {
     /* CJS·JSX·문법 미래형 — 못 읽은 것을 「깨끗하다」로 접지 않는다. */
     try {
