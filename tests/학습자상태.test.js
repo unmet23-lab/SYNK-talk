@@ -306,10 +306,9 @@ test('배선 — 동봉 표에 있다(없으면 배포는 성공하고 함수가
 
 test('배선 — 사건 목록·창을 deliver 가 다시 적지 않았다(lib 에서 파생시킨다)', () => {
   const { 쓰는사건 } = require('../lib/학습자상태.js');
-  /* deliver 가 **자기 일로** 쓰는 셋을 뺀 나머지는 나올 이유가 없다 — 배정·제출 조인 둘에
-   * ④가 H3 재제출 조인(`correction.responded` · 발주 §6-6 ⑪)을 더했다. 원신호 목록의 사본이
-   * 아니라 자기 술어다 — 여기 더 늘어나면 정말 베낀 것인지부터 의심하라. */
-  const 베낀것 = 쓰는사건.filter((t) => !['task.assigned', 'submission.created', 'correction.responded'].includes(t))
+  /* 배정·제출·재제출 조인과 전 이력 부정 조회는 각자 고유 술어다. 부정 조회는 활동 창 밖에서
+   * 정정을 보존하며 tests/부정이력조회.test.js가 경계를 따로 잰다. 원신호 목록의 사본은 아니다. */
+  const 베낀것 = 쓰는사건.filter((t) => !['task.assigned', 'submission.created', 'correction.responded', 'estimate.responded'].includes(t))
     .filter((t) => 배달본체.includes(`'${t}'`));
   assert.deepEqual(베낀것, [], `질의가 사건 목록을 베꼈다(${베낀것}) — 축을 늘린 날 조용히 갈라진다`);
   assert.ok(배달본체.includes('창일수'), '창을 숫자로 박았다 — lib 과 갈라지면 축이 조용히 죽는다');

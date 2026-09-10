@@ -21,6 +21,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
 const { 인자게이트 } = require('../lib/플래그.js');
+const { 요약지문 } = require('./판재료원천.js');
 
 const 플래그오류 = 인자게이트('판재료굽기', process.argv.slice(2), ['--확인']);
 if (플래그오류) { console.error(플래그오류); process.exit(1); }
@@ -49,7 +50,9 @@ function 굽기() {
       console.error(`[판재료] 재료 파일이 없다: ${상대} — §5-1 재료 «${이름}» 의 원천이다`);
       process.exit(1);
     }
-    해시들[이름] = hex(fs.readFileSync(p));   // 원문 UTF-8 바이트 그대로(v5.9 표)
+    해시들[이름] = 이름 === '요약조립'
+      ? 요약지문((상대경로) => fs.readFileSync(path.join(ROOT, 상대경로)))
+      : hex(fs.readFileSync(p));   // 나머지는 원문 UTF-8 바이트 그대로(v5.9 표)
   }
   const { 갈래순서 } = require('../lib/갈래판정.js');
   let 커밋 = '(git 없음)';

@@ -301,8 +301,25 @@ function 대상질의(스냅기준: string, 한사람: string | null,
            교정.corrected_text as 교정문, 교정.correction_id as 교정id, 교정.원사건,
            동의.consent_ver, 동의.consent_id,
            재제출.원제출사건, 재제출.원시드, 재제출.원챌린지,
-           원신호.행들 as 원신호
+           원신호.행들 as 원신호, 부정응답.행들 as 부정이력
       from engine.learners l
+      left join lateral (
+        /* 부정은 행동 통계의 30일 창과 별개다. 한 번이라도 부정한 쌍을 스냅 기준까지
+         * 전 이력에서 읽고 중복 쌍만 접는다. 글 본문·학생 식별정보는 봉투에 넣지 않는다. */
+        select coalesce(jsonb_agg(jsonb_build_object(
+                 'event_type', 'estimate.responded',
+                 'payload', jsonb_build_object('response', '아니다', 'trait_axis', b.축, 'shown_key', b.키))
+                 order by b.축, b.키), '[]'::jsonb) as 행들
+          from (
+            select distinct e.payload->>'trait_axis' as 축, e.payload->>'shown_key' as 키
+              from engine.learning_events e
+             where e.learner_id = l.learner_id
+               and e.event_type = 'estimate.responded'
+               and e.payload->>'response' = '아니다'
+               and e.occurred_at <= ${스냅기준}::timestamptz
+               and e.ingested_at <= ${스냅기준}::timestamptz
+          ) b
+      ) 부정응답 on true
       left join lateral (
         /* ㉢ 입학 회차 나침반(2026-09-05 · 유호 픽 ㉮) — 「왜 배우나」·「토픽 쓸 곳」.
          *   바로 위 시즌목표와 **다른 행**을 본다: 그쪽은 「오늘을 덮는 시즌」이고 여기는
