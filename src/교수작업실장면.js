@@ -3,6 +3,7 @@ import { Image, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions
 import { 색, 폰트 } from './테마';
 import { 살아있는교수연구실 } from './살아있는교수연구실';
 import { 살아있는가이드 } from './살아있는가이드';
+import { 마린전략장면 } from './마린전략장면';
 import { use줄임 } from '../lib/모션';
 import { 장면만들기, 책갈피말 } from '../contents/교수멘탈장면';
 
@@ -90,7 +91,7 @@ export function 내상황장면({ 장면, 좁다 = false }) {
     <Text accessibilityRole="header" style={s.중제목}>지금 내 상황</Text>
     <View style={[s.내상황본문, 좁다 && s.내상황본문_좁음]}>
       {이름 ? <View style={[s.안내캐릭터, 좁다 && s.안내캐릭터_좁음]}>
-        <살아있는가이드 이름={이름} size={좁다 ? 76 : 118} />
+        <살아있는가이드 이름={이름} 표정={장면.친구?.표정} size={좁다 ? 128 : 176} />
         <Text style={s.화자}>내 친구 · {이름}</Text>
       </View> : null}
       <View style={s.내상황정보}>
@@ -115,7 +116,9 @@ export function 전략미리보기({ 선택, 제목, 가이드, onConfirm, conta
     {선택 ? <>
       <Text style={s.작은글}>내가 고른 방법</Text>
       <Text style={s.중제목}>{제목}</Text>
-      <친구말 이름={가이드} 말={선택.미리보기} 작게 />
+      {가이드 === '마린'
+        ? <마린전략장면 optionId={선택.option_id} 말={선택.미리보기} />
+        : <친구말 이름={가이드} 말={선택.미리보기} 작게 />}
       <View style={s.예문종이}>
         <Text style={s.화자}>말투 예시 · 내가 교수님께 쓰는 말</Text>
         <Text selectable style={s.예문글}>{선택.예문}</Text>
@@ -189,7 +192,7 @@ const s = StyleSheet.create({
   교수덧말: { fontFamily: 폰트.캡션, fontSize: 14, lineHeight: 24, color: 색.잉크_보조, ...어절 },
   학생장면: { gap: 18, paddingTop: 24, borderTopWidth: 1, borderColor: 색.잉크_희미 },
   내상황본문: { flexDirection: 'row', gap: 24 }, 내상황본문_좁음: { flexDirection: 'column', gap: 14 },
-  안내캐릭터: { width: 142, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  안내캐릭터: { width: 176, flexShrink: 0, alignItems: 'center', justifyContent: 'center', gap: 8 },
   안내캐릭터_좁음: { width: 'auto', flexDirection: 'row', justifyContent: 'flex-start', gap: 12 },
   내상황정보: { flex: 1, minWidth: 0, gap: 14 },
   상황글: { fontFamily: 폰트.본문, fontSize: 18, lineHeight: 29, color: 색.잉크, ...어절 },

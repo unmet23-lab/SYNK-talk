@@ -1,4 +1,4 @@
-// 몸은 현행 1024 본체로 고정한다. 표정은 각 눈·렌즈 안에서만 바뀐다.
+// 몸은 현행 1024 본체로 고정한다. 표정은 각 눈·렌즈와 지정된 눈물 영역에서만 바뀐다.
 // 좌표·출처: assets/브랜드/가이드눈마스크.json · 생명감 설계 §1-a.
 import { useEffect, useRef, useState } from 'react';
 import { Animated, AppState, Easing, Image, Platform, View } from 'react-native';
@@ -11,6 +11,10 @@ const 감은눈 = Object.freeze({
   몽글: require('../assets/마스코트/몽글_눈감음.webp'),
   까몽: require('../assets/마스코트/까몽_눈감음.webp'),
   마린: require('../assets/마스코트/마린_눈감음.webp'),
+});
+// 장면 정본의 슬픈 렌즈·눈물만 역할극에 사용한다. 전역 감정 어휘는 바꾸지 않는다.
+const 장면표정 = Object.freeze({
+  마린: Object.freeze({ 속상함: require('../assets/브랜드/마린_속상함_눈물.webp') }),
 });
 
 function 문서보임() {
@@ -69,7 +73,7 @@ export function use장면깜빡임({ 멈춤 = false, 지연 = 2400 } = {}) {
   return !정지 && !지금녹음중() && 깜빡중;
 }
 
-function 가이드몸({ 이름, size, style, 멈춤 }) {
+function 가이드몸({ 이름, size, style, 멈춤, 표정 }) {
   const 정지 = use장면정지(멈춤);
   const 깜빡중 = use장면깜빡임({ 멈춤, 지연: { 몽글: 2600, 까몽: 2800, 마린: 3000 }[이름] });
   const 숨 = useRef(new Animated.Value(0)).current;
@@ -84,10 +88,13 @@ function 가이드몸({ 이름, size, style, 멈춤 }) {
     return () => { 들숨.stop(); 숨.setValue(0); };
   }, [정지, 숨]);
   const 비율 = size / 1024;
+  const 표정그림 = Object.hasOwn(장면표정, 이름) && Object.hasOwn(장면표정[이름], 표정)
+    ? 장면표정[이름][표정] : null;
   return (
     <View style={[{ width: size, height: size, pointerEvents: 'none' }, style]} accessible={false}>
       <Animated.View style={{ width: size, height: size, transform: [{ translateY: 숨.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.008] }) }] }}>
         <Image source={가이드그림[이름]} style={{ width: size, height: size }} resizeMode="contain" fadeDuration={0} accessible={false} />
+        {표정그림 && <Image source={표정그림} style={{ position: 'absolute', left: 0, top: 0, width: size, height: size }} resizeMode="contain" fadeDuration={0} accessible={false} />}
         {마스크.characters[이름].eyes.map(({ target, offset, scale = 1 }, i) => (
           <View key={i} style={{ position: 'absolute', left: target[0] * 비율, top: target[1] * 비율, width: target[2] * 비율, height: target[3] * 비율, borderRadius: '50%', overflow: 'hidden', opacity: 깜빡중 ? 1 : 0 }}>
             <Image source={감은눈[이름]} style={{ position: 'absolute', left: (-target[0] + offset[0]) * 비율, top: (-target[1] + offset[1]) * 비율, width: size * scale, height: size * scale }} resizeMode="stretch" fadeDuration={0} accessible={false} />
@@ -99,8 +106,8 @@ function 가이드몸({ 이름, size, style, 멈춤 }) {
 }
 
 /** 선택하지 않은 가이드는 만들지 않는다. 이름 변경은 이전 깜빡임·호흡을 정리한다. */
-export function 살아있는가이드({ 이름, size = 88, style, 멈춤 = false }) {
+export function 살아있는가이드({ 이름, size = 88, style, 멈춤 = false, 표정 = '기본' }) {
   if (!Object.prototype.hasOwnProperty.call(가이드그림, 이름)) return null;
   const 크기 = Number.isFinite(size) && size > 0 ? size : 88;
-  return <가이드몸 key={이름} 이름={이름} size={크기} style={style} 멈춤={멈춤} />;
+  return <가이드몸 key={이름} 이름={이름} size={크기} style={style} 멈춤={멈춤} 표정={표정} />;
 }

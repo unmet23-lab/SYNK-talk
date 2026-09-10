@@ -28,6 +28,7 @@ test('45개 실제 문항 × 선택 친구 셋: 원문·사유·요청 세부가
 
 test('몸이 아팠던 5일 부탁은 어제 마감·몸 아픔·5일로 따로 드러난다', () => {
   const 장면 = 장면만들기({ prompt_seed: 'g1t01.s0d1', 캐릭터: '마린' });
+  assert.equal(장면.친구.표정, '속상함');
   assert.deepEqual(장면.단서, [
     { 이름: '원래 마감', 값: '어제' },
     { 이름: '사정', 값: '갑자기 몸이 아파서' },
@@ -71,6 +72,7 @@ test('미확인 시드와 시드 없는 원문은 그대로 보존하고 일반 
   for (const seed of [undefined, '', 'g1t99.s0d0', 'g1t01.s9d9', 42]) {
     const 장면 = 장면만들기({ prompt_seed: seed, 문항, 캐릭터: '마린' });
     assert.equal(장면.확인된시드, false);
+    assert.equal(장면.친구.표정, '기본', '알 수 없는 상황에 속상한 얼굴을 덧씌우지 않는다');
     assert.deepEqual(장면.원문, { 이름: 문항.이름, 질문: 문항.질문, 지시문: 문항.지시문 });
     assert.deepEqual(장면.단서, []);
     assert.match(장면.교수.대사[0], /편지를 쓰려는구나/);
@@ -89,6 +91,7 @@ test('유효 시드라도 제공 원문이 다른 판이면 그 원문에 옛 �
     const 문항 = { ...원본, ...변경 };
     const 장면 = 장면만들기({ prompt_seed: 'g1t01.s0d1', 문항, 캐릭터: '몽글' });
     assert.equal(장면.확인된시드, false);
+    assert.equal(장면.친구.표정, '기본');
     assert.equal(장면.원문.질문, 문항.질문);
     assert.equal(장면.원문.지시문, 문항.지시문);
     assert.deepEqual(장면.단서, []);

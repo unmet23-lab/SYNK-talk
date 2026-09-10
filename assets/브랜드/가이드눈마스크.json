@@ -8,6 +8,96 @@
   "expressionNote": "Existing app frames visually compared with the current 4096 canonical expressions. Lossy WebP derivations are not byte-identical to their PNG sources. Only the existing eye/lens contours are clipped at runtime; body pixels and complete outer alpha stay in the fixed current base.",
   "visualCheck": "Chrome, Paper #fbf7f0 and Ink #2b2320, 88px and 176px: open/closed and repeating eye-only layer checked on 2026-09-11. Mongle bead edge mask corrected after visual review. This checks the chosen mask geometry; integration Expo playback is a separate check.",
   "rasterBoundary": "CSS elliptical clipping may antialias the immediate subpixel boundary. No blur, whole-face blend, original asset mutation or new generated expression.",
+  "sceneExpressions": {
+    "마린_속상함": {
+      "source": "docs/캐릭터/편지전략장면/marin-sad.png",
+      "sceneUsage": "확인된 g1t01 역할극에서 내가 마감을 놓쳐 속상한 얼굴. 실제 학생의 제출 여부·오류에 대한 평가 반응이 아니다.",
+      "generator": "tools/가이드장면표정반입.js",
+      "frame": "assets/브랜드/마린_속상함_눈물.webp",
+      "frameSize": [
+        1024,
+        1024
+      ],
+      "regions": [
+        {
+          "shape": "ellipse",
+          "rect": [
+            320,
+            433,
+            141,
+            158
+          ]
+        },
+        {
+          "shape": "ellipse",
+          "rect": [
+            570,
+            431,
+            141,
+            160
+          ]
+        },
+        {
+          "shape": "ellipse",
+          "rect": [
+            339,
+            565,
+            39,
+            63
+          ]
+        },
+        {
+          "shape": "ellipse",
+          "rect": [
+            651,
+            566,
+            38,
+            59
+          ]
+        }
+      ],
+      "transform": "Scene-only generated sad lens reference. Per-eye sourceRect to targetRect registration, LANCZOS3. Keep only declared lens and tear ellipses; no source body or checkerboard background. Lossless 1024 WebP overlay on unchanged current body. Blink covers lenses while tears remain.",
+      "sourceSha256": "4b1b54f83fb6532443b62a0a1c40221a2559fefd157cf0aa881109b437eab6f7",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "frameSha256": "5ec70d3a2f300169b82a6775522057a888d3759f31d3f799481551f48532a1c9",
+      "sourceManifest": "docs/캐릭터/편지전략장면/정본.json",
+      "sceneExpressionId": "marinSad",
+      "patches": [
+        {
+          "sourceRect": [
+            342,
+            484,
+            194,
+            234
+          ],
+          "targetRect": [
+            318,
+            428,
+            146,
+            198
+          ]
+        },
+        {
+          "sourceRect": [
+            723,
+            484,
+            194,
+            234
+          ],
+          "targetRect": [
+            564,
+            425,
+            149,
+            201
+          ]
+        }
+      ],
+      "sourceManifestSha256": "e2b62e96a9a988bc1c1509a02e9ea38d38f981cca6ae3647145d2e8d8fdd19fb"
+    }
+  },
   "characters": {
     "몽글": {
       "source": "SYNK-appsscript/docs/캐릭터/정본_4K/몽글_눈감음.png",

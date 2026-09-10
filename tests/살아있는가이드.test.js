@@ -42,6 +42,7 @@ function 세우기() {
     ['../lib/모션.js', { use줄임: () => 줄임 }], ['./소리.js', { 지금녹음중: () => 녹음 }],
     ['./브랜드자산.js', { 가이드그림: Object.fromEntries(['몽글', '까몽', '마린'].map(n => [n, `브랜드/${n}_본체.webp`])) }],
     ['../assets/브랜드/가이드눈마스크.json', 마스크],
+    ['../assets/브랜드/마린_속상함_눈물.webp', '브랜드/마린_속상함_눈물.webp'],
     ...['몽글', '까몽', '마린'].map(n => { const file = `../assets/마스코트/${n}_눈감음.webp`; return [file, file]; }),
   ]);
   const exports = 앱세우기(path.join(ROOT, 'src/살아있는가이드.js'), () => { throw new Error('원격 호출 금지'); }, {
@@ -120,7 +121,7 @@ test('선택 없는 가이드는 null이며 유효한 가이드의 몸은 깜빡
     const after = h.tick({ 몽글: 2600, 까몽: 2800, 마린: 3000 }[이름]).props.children;
     assert.equal(before.props.children[0].props.source, after.props.children[0].props.source);
     assert.equal(after.props.children[0].props.source, `브랜드/${이름}_본체.webp`);
-    const eyes = after.props.children[1];
+    const eyes = after.props.children[2];
     assert.equal(eyes.length, 2);
     for (const eye of eyes) {
       assert.equal(eye.props.style.opacity, 1);
@@ -134,6 +135,60 @@ test('선택 없는 가이드는 null이며 유효한 가이드의 몸은 깜빡
     assert.equal(h.stats().timers, 0);
     h.unmount(); assert.equal(h.stats().appListeners, 0);
   }
+});
+
+test('역할극 속상함은 마린의 좁은 표정 층이며 깜빡임·동작 멈춤 중에도 눈물이 남는다', () => {
+  const h = 세우기(); let 표정 = '속상함';
+  const render = () => h.exports.살아있는가이드({ 이름: '마린', size: 176, 표정 });
+  const children = tree => tree.props.children.props.children;
+  const before = children(h.render(render));
+  assert.equal(before[0].props.source, '브랜드/마린_본체.webp');
+  assert.equal(before[1].props.source, '브랜드/마린_속상함_눈물.webp');
+  const closed = children(h.tick(3000));
+  assert.equal(closed[1].props.source, before[1].props.source);
+  assert.equal(closed[1].props.style.opacity, undefined, '눈물 층 전체를 깜빡이지 않는다');
+  assert.ok(closed[2].every(eye => eye.props.style.opacity === 1));
+  for (const gate of ['reduced', 'background', 'hidden', 'recording']) {
+    const paused = children(h[gate](true));
+    assert.equal(paused[1].props.source, before[1].props.source, gate);
+    assert.ok(paused[2].every(eye => eye.props.style.opacity === 0), gate);
+    h[gate](false);
+  }
+  표정 = '기본';
+  assert.equal(children(h.render(render))[1], null);
+  h.unmount();
+  for (const 이름 of ['몽글', '까몽']) {
+    const other = 세우기();
+    assert.equal(children(other.render(() => other.exports.살아있는가이드({ 이름, 표정: '속상함' })))[1], null);
+    other.unmount();
+  }
+});
+
+test('속상함 파생은 렌즈·눈물 외부가 투명하고 현재 몸의 알파를 늘리지 않는다', async () => {
+  const sharp = require('sharp');
+  const spec = 마스크.sceneExpressions.마린_속상함;
+  const bytes = fs.readFileSync(path.join(ROOT, spec.frame));
+  assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'), spec.frameSha256);
+  const overlay = await sharp(bytes).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  assert.deepEqual([overlay.info.width, overlay.info.height], [1024, 1024]);
+  const body = await sharp(path.join(ROOT, 'assets/브랜드/마린_본체.webp')).ensureAlpha().raw().toBuffer();
+  const composed = await sharp(body, { raw: { width: 1024, height: 1024, channels: 4 } })
+    .composite([{ input: bytes }]).raw().toBuffer();
+  let visible = 0, tears = 0;
+  for (let y = 0; y < 1024; y++) for (let x = 0; x < 1024; x++) {
+    const i = (y * 1024 + x) * 4;
+    const inside = spec.regions.some(({ rect: [l, t, w, h] }) =>
+      ((x + 0.5 - l - w / 2) / (w / 2)) ** 2 + ((y + 0.5 - t - h / 2) / (h / 2)) ** 2 < 1);
+    if (!inside) {
+      assert.equal(overlay.data[i + 3], 0, `표정 밖 알파 ${x},${y}`);
+      // libvips가 반투명 외곽 RGB를 왕복 반올림하므로 불투명한 본체 재질을 그대로 대조한다.
+      if (body[i + 3] === 255) assert.deepEqual(composed.subarray(i, i + 4), body.subarray(i, i + 4));
+    }
+    assert.equal(composed[i + 3], body[i + 3], `본체 알파 보존 ${x},${y}`);
+    if (overlay.data[i + 3]) { visible++; if (y > 591) tears++; }
+  }
+  assert.ok(visible < 1024 * 1024 * 0.04, '얼굴 전체를 바꾸지 않는다');
+  assert.ok(tears > 500, '깜빡임 타원 아래에도 실제 눈물 영역이 남는다');
 });
 
 test('마스크가 참조하는 기존 눈감음 원본 지문과 앱 파일 크기가 유효하다', async () => {

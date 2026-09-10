@@ -2,6 +2,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { 그리기 } = require('./lib/화면세우기.js');
+const React = require('react');
+const { renderToStaticMarkup } = require('react-dom/server');
 const { 장면만들기 } = require('../contents/교수멘탈장면.js');
 const { 펴기 } = require('../contents/교수멘탈문항.js');
 const { 혼잣말캐릭터들 } = require('../lib/마스코트생명.js');
@@ -54,4 +56,48 @@ test('선택 전에는 다음 행동을, 선택 뒤에는 학생의 말투 예�
     assert.match(화면, /다 쓴 뒤에 보내요/);
   }
   assert.equal(확정수, 0, '예문을 그리는 것만으로 방법을 확정하면 안 된다');
+});
+
+test('마린의 선택을 바꾸면 행동 그림과 말풍선이 같은 전략을 설명한다', () => {
+  const { 전략미리보기 } = require('../src/교수작업실장면.js');
+  const 장면 = 장면만들기({ ...재료, 캐릭터: '마린' });
+  const 기대 = {
+    'g1-사과-대안': '할 수 있는 일을 찾고 있어요',
+    'g1-사과-솔직': '사정을 하나씩 정리하고 있어요',
+    'g1-사과-간결': '중요한 부탁과 마음을 담고 있어요',
+  };
+  for (const 선택 of 장면.전략) {
+    const 화면 = renderToStaticMarkup(React.createElement(전략미리보기, {
+      선택, 제목: 선택.제목, 가이드: '마린', onConfirm() {},
+    }));
+    const 설명 = 기대[선택.option_id];
+    assert.ok(화면.includes(설명), '그림에서 하는 행동을 읽을 수 있다');
+    assert.ok(화면.includes(선택.미리보기));
+    assert.ok(화면.includes(선택.예문));
+    for (const 다른설명 of Object.values(기대)) {
+      assert.equal(화면.includes(다른설명), 다른설명 === 설명);
+    }
+  }
+});
+
+test('마린의 전략 장면이 다른 친구나 미선택 화면에 섞이지 않는다', () => {
+  const { 전략미리보기 } = require('../src/교수작업실장면.js');
+  for (const 캐릭터 of [null, '몽글', '까몽']) {
+    const 선택 = 장면만들기({ ...재료, 캐릭터 }).전략[0];
+    const 화면 = renderToStaticMarkup(React.createElement(전략미리보기, {
+      선택, 제목: 선택.제목, 가이드: 캐릭터, onConfirm() {},
+    }));
+    assert.doesNotMatch(화면, /마린이 여러 방법|마린이 노트에|마린이 편지에/);
+    assert.ok(화면.includes(캐릭터 || '편지 길잡이'));
+    assert.ok(화면.includes(선택.미리보기));
+  }
+});
+
+test('지원하지 않는 전략에는 아무 마린 장면도 대신 보여 주지 않는다', () => {
+  const { 마린전략장면 } = require('../src/마린전략장면.js');
+  for (const optionId of [null, undefined, '', 'g1-없는방법', 'toString']) {
+    assert.equal(renderToStaticMarkup(React.createElement(마린전략장면, {
+      optionId, 말: '이 말이 잘못된 장면에 실리면 안 된다.',
+    })), '');
+  }
 });
