@@ -15,6 +15,7 @@ const 판재료 = require('../contents/판재료.js');
 const 상수 = require('../lib/생성상수.js');
 const { 정책지문, 품질지문, 재료이름 } = require('../lib/판독기.js');
 const { 갈래순서 } = require('../lib/갈래판정.js');
+const { 요약원천, 요약지문 } = require('../tools/판재료원천.js');
 const 마이그 = fs.readFileSync(path.join(ROOT, 'supabase', 'migrations',
   '20260821120000_generation_c12.sql'), 'utf8');
 
@@ -24,16 +25,44 @@ test('생성물이 원본과 같다 — 드리프트는 「다시 굽는다」�
   assert.match(String(r.stdout), /같다/);
 });
 
-test('파일 해시 7 이 실물 재계산과 같다 (원문 UTF-8 바이트 · v5.9 표)', () => {
+test('파일 해시 7이 실물과 같다 — 요약은 의존성 묶음, 나머지는 원본 바이트', () => {
   const 원천 = {
     요약조립: 'lib/과제요약.js', 검문: 'lib/과제검문.js', 갈래판정: 'lib/갈래판정.js',
     기술선택: 'lib/기술선택.js', 오류분류: 'lib/과제생성.js', 폴백조립: 'lib/오늘과제.js',
     추정기: 'lib/학습자상태.js',
   };
   for (const [이름, 상대] of Object.entries(원천)) {
-    const 실물 = crypto.createHash('sha256')
-      .update(fs.readFileSync(path.join(ROOT, 상대))).digest('hex');
+    const 실물 = 이름 === '요약조립'
+      ? 요약지문((p) => fs.readFileSync(path.join(ROOT, p)))
+      : crypto.createHash('sha256').update(fs.readFileSync(path.join(ROOT, 상대))).digest('hex');
     assert.equal(판재료.파일해시[이름], 실물, `${이름}(${상대}) 해시가 낡았다`);
+  }
+});
+
+test('요약 원천 목록은 실제 로컬 require의 전이 의존성 전량이다', () => {
+  const 본 = new Set();
+  function 읽기(p) {
+    if (본.has(p)) return;
+    본.add(p);
+    const s = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    for (const m of s.matchAll(/\brequire\(\s*['"]([^'"]+)['"]\s*\)/g)) {
+      if (!m[1].startsWith('.')) continue;
+      읽기(path.posix.normalize(path.posix.join(path.posix.dirname(p), m[1])));
+    }
+  }
+  읽기('lib/과제요약.js');
+  assert.deepEqual([...요약원천].sort(), [...본].sort(), '추가된 요약 의존성이 policy_ver 재료에서 빠졌다');
+});
+
+test('성향 매핑·시즌 맥락 등 의존 파일 하나만 바뀌어도 정책 지문이 달라진다', () => {
+  const 원본 = new Map(요약원천.map((p) => [p, fs.readFileSync(path.join(ROOT, p))]));
+  const 원해시 = 요약지문((p) => 원본.get(p));
+  const 기본재료 = Object.fromEntries(재료이름.map((k) => [k, `합성:${k}`]));
+  const 원판 = 정책지문({ ...기본재료, 요약조립: 원해시 });
+  for (const 대상 of 요약원천) {
+    const 바뀐 = 요약지문((p) => p === 대상 ? Buffer.concat([원본.get(p), Buffer.from('\n// 합성 변경')]) : 원본.get(p));
+    assert.notEqual(바뀐, 원해시, `${대상} 변경이 요약 지문에 닿지 않았다`);
+    assert.notEqual(정책지문({ ...기본재료, 요약조립: 바뀐 }), 원판, `${대상} 변경이 policy_ver에 닿지 않았다`);
   }
 });
 

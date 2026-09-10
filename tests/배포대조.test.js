@@ -184,6 +184,73 @@ test('⑦ 왕복전게이트 — 다르다에서 실제로 죽고(1) 처방을 �
   } finally { console.error = 원래오류; console.log = 원래출력; }
 });
 
+/* 연성 목록(2026-09-11 · 관통왕복 `--아니야` 의 progress) — 선택 갈래의 함수는 낡아도 죽지 않고 «연성낡음»으로
+ * 돌아온다(호출자가 그 갈래를 못쟀다로 접는다). 경성 목록은 그대로 죽는다 — 이 둘이 갈리면 새는 방향은 «통과»다. */
+test('⑦-b 연성 목록 — 다르다여도 죽지 않고 «연성낡음» 으로 돌려주며 소리 낸다 · 경성은 그대로 죽는다', async () => {
+  const 잡음 = [];
+  const 원래오류 = console.error, 원래출력 = console.log;
+  console.error = (...a) => 잡음.push(a.join(' '));
+  console.log = (...a) => 잡음.push(a.join(' '));
+  try {
+    let 코드 = null;
+    const env = { SUPABASE_PROJECT_REF: 'ref0', SUPABASE_ACCESS_TOKEN: 't' };
+    // ⓐ 연성만 낡았다(빈 배포본) — 죽지 않고 slug 별 상세가 돌아오며, 못쟀다로 접힌다는 말이 줄로 남는다.
+    const 낡음 = await 왕복전게이트('시험', env, {
+      목록: [], 연성목록: [실제slug], 가져오기: async () => 배포응답({}), 나가기: (c) => { 코드 = c; },
+    });
+    assert.equal(코드, null, '연성 목록의 낡음으로 죽였다 — 그 플래그를 빼고 도는 것이 정상 통로가 된다(F103)');
+    assert.ok(낡음 && 낡음.연성낡음 && typeof 낡음.연성낡음[실제slug] === 'string' && 낡음.연성낡음[실제slug].length,
+      `연성낡음에 ${실제slug} 의 상세가 없다 — 호출자가 못쟀다의 사유를 적을 수 없다`);
+    assert.deepEqual(낡음.연성미측정, {});
+    assert.ok(잡음.some((줄) => 줄.includes(실제slug) && 줄.includes('못쟀다')),
+      '연성 낡음이 조용하다 — 그 갈래가 왜 안 재졌는지 출력에 없다');
+    assert.ok(잡음.some((줄) => 줄.includes('원격배포.js') && 줄.includes(실제slug)), '재배포 처방이 없다');
+
+    // ⓑ 연성이 같다 — 빈 낡음.
+    잡음.length = 0; 코드 = null;
+    const 묶음 = 나갈것(path.join(FN뿌리, 실제slug));
+    const 같음 = await 왕복전게이트('시험', env, {
+      목록: [실제slug], 연성목록: [실제slug], 가져오기: async () => 배포응답(묶음), 나가기: (c) => { 코드 = c; },
+    });
+    assert.equal(코드, null);
+    assert.deepEqual(같음, { 연성낡음: {}, 연성미측정: {} });
+    assert.ok(잡음.some((줄) => /연성 배포판=소스 1\/1함수/.test(줄)), '연성 통과가 분모 없이 조용하다');
+
+    // ⓒ 연성 미측정(HTTP 503) — 경성과 같은 규율: 죽이지 않고 «확인 없이 돈다»를 남기며 연성미측정으로 돌아온다.
+    잡음.length = 0; 코드 = null;
+    const 미측 = await 왕복전게이트('시험', env, {
+      목록: [], 연성목록: [실제slug], 가져오기: async () => ({ ok: false, status: 503 }), 나가기: (c) => { 코드 = c; },
+    });
+    assert.equal(코드, null);
+    assert.deepEqual(미측.연성낡음, {});
+    assert.ok(typeof 미측.연성미측정[실제slug] === 'string');
+    assert.ok(잡음.some((줄) => 줄.includes('미측정') && 줄.includes(실제slug)));
+
+    // ⓓ 경성이 낡았으면 연성이 무엇이든 그대로 죽는다(옛 규율 불변 · 연성 대조까지 안 간다).
+    잡음.length = 0; 코드 = null;
+    const 죽음 = await 왕복전게이트('시험', env, {
+      목록: [실제slug], 연성목록: [실제slug], 가져오기: async () => 배포응답({}), 나가기: (c) => { 코드 = c; },
+    });
+    assert.equal(코드, 1, '경성 낡음인데 안 죽었다 — 연성 갈래가 경성의 게이트를 약하게 했다');
+    assert.equal(죽음, undefined);
+
+    // ⓔ 연성 목록이 비면 옛 판과 같은 반환·같은 출력이다(연성 대조 0회).
+    잡음.length = 0; 코드 = null;
+    let 부른횟수 = 0;
+    const 옛 = await 왕복전게이트('시험', env, {
+      목록: [실제slug], 가져오기: async () => { 부른횟수 += 1; return 배포응답(묶음); }, 나가기: (c) => { 코드 = c; },
+    });
+    assert.deepEqual(옛, { 연성낡음: {}, 연성미측정: {} });
+    assert.ok(!잡음.some((줄) => 줄.includes('연성')), '연성 목록이 없는데 연성 줄이 찍혔다');
+    const 경성만횟수 = 부른횟수;
+    부른횟수 = 0;
+    await 왕복전게이트('시험', env, {
+      목록: [실제slug], 연성목록: [], 가져오기: async () => { 부른횟수 += 1; return 배포응답(묶음); }, 나가기: (c) => { 코드 = c; },
+    });
+    assert.equal(부른횟수, 경성만횟수, '빈 연성 목록이 관리 API 를 더 부른다 — 플래그 없는 도구의 행동이 바뀌었다');
+  } finally { console.error = 원래오류; console.log = 원래출력; }
+});
+
 /* ── 본체(F274) ──────────────────────────────────────────────────────────────
  * 리허설 `corrections` 는 몽골어 해설이 빠진 옛 판인데 이 도구가 「✅ 같다(파일 1)」로 통과시켰다.
  * 원인은 두 겹이었다: ⓐ 조립이 `동봉묶기` 라 본체가 **목록에 아예 없었다**(목록에 없는 파일은

@@ -1,0 +1,66 @@
+{
+  "LAB로고": {
+    "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\홍보물\\마케팅실행_20260909\\브랜드킷\\배치용\\SYNK-LAB-Paper.png",
+    "sourceSize": [
+      3468,
+      1082
+    ],
+    "sourceSha256": "d6a033898e123c30c7109483e6508bfc13668352588b9d431c713ec7c5759e2a",
+    "placementManifest": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\홍보물\\마케팅실행_20260909\\브랜드킷\\배치명세.json",
+    "placementManifestSha256": "df28bd6ca648457f99546804e41a1a3a145f0bb816baf4c3fb0069184de87ee2",
+    "variant": "LAB Paper; SYNK without stitches; original coral LAB with stitches",
+    "output": "assets/브랜드/SYNK-LAB-Paper.webp",
+    "outputSize": [
+      1024,
+      319
+    ],
+    "outputSha256": "07761e5750b7127b2f943f4d42747cb589cf97eb392d6a2f92d18623f31baea9",
+    "transform": "approved photographic LAB composition; proportional LANCZOS3; WebP quality=96; original frame, alpha, spacing, colors and shapes preserved; no upscaling",
+    "sourceResolutionNote": "Placement composition is 3468x1082; kit documents edited surface inputs of 1804x872 and 1788x880. Canvas size does not establish native 4K surface detail."
+  },
+  "몽글": {
+    "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\몽글_본체.png",
+    "sourceSize": [
+      4096,
+      4096
+    ],
+    "sourceSha256": "6fd4e6b3946006d54d7059e60cc135b27874128bd8e7dfa6e6a62f1a1532f56c",
+    "output": "assets/브랜드/몽글_본체.webp",
+    "outputSize": [
+      1024,
+      1024
+    ],
+    "outputSha256": "6abf284e6079a9d26f5a161a921e9c5897d643442e155d4d21ba7f00990826b5",
+    "transform": "LANCZOS3; WebP quality=96; source frame and alpha preserved"
+  },
+  "까몽": {
+    "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\까몽_본체.png",
+    "sourceSize": [
+      4096,
+      4096
+    ],
+    "sourceSha256": "fea5f2b66db16a1089f4475492c59fb8273bfcf80b18fbcde4909a950e3796ab",
+    "output": "assets/브랜드/까몽_본체.webp",
+    "outputSize": [
+      1024,
+      1024
+    ],
+    "outputSha256": "4f1c3bac51e1df447dff1dd487173e6eec8dc4a7ecf4e5e91a39569df88f1131",
+    "transform": "LANCZOS3; WebP quality=96; source frame and alpha preserved"
+  },
+  "마린": {
+    "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\마린_본체.png",
+    "sourceSize": [
+      4096,
+      4096
+    ],
+    "sourceSha256": "8beed3a55c33c39ad6a28bb7c98338853c356529ea2b68f30fd4908b65e9df13",
+    "output": "assets/브랜드/마린_본체.webp",
+    "outputSize": [
+      1024,
+      1024
+    ],
+    "outputSha256": "fa930ca8dc4d60f4974a205c5db90564a7da97313927f6bb8b6e92a28a73f3b5",
+    "transform": "LANCZOS3; WebP quality=96; source frame and alpha preserved"
+  }
+}

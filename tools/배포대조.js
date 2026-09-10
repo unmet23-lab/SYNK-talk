@@ -331,9 +331,10 @@ function 집계문(판, 수, 판들 = 배포빚.판들) {
 async function 왕복전게이트(도구, e, opt = {}) {
   const ref = e && e.SUPABASE_PROJECT_REF, 토큰 = e && e.SUPABASE_ACCESS_TOKEN;
   const 나가기 = opt.나가기 || process.exit;
+  const 연성목록 = Array.isArray(opt.연성목록) ? opt.연성목록.filter(Boolean) : [];
   if (!ref || !토큰) {   // 기존 5종은 이 앞에서 이미 죽는다 — 새 호출자를 위한 정직한 폴백
     console.error(`[${도구}] ⚠ 배포판 대조를 못 한다(REF·ACCESS_TOKEN 없음) — 배포판=소스 미확인인 채 돈다`);
-    return;
+    return { 연성낡음: {}, 연성미측정: Object.fromEntries(연성목록.map((s) => [s, 'REF·ACCESS_TOKEN 없음'])) };
   }
   const 결과 = await 대조(ref, 토큰, opt.목록, opt.가져오기);
   const 판정 = 게이트판정(결과);
@@ -349,6 +350,32 @@ async function 왕복전게이트(도구, e, opt = {}) {
   }
   console.log(`[${도구}] 배포판=소스 ✅ ${결과.length - 판정.못잼.length}/${결과.length}함수` +
     (판정.못잼.length ? ` (미측정 ${판정.못잼.length})` : ''));
+
+  /* ── 연성 목록(2026-09-11 · 관통왕복 `--아니야` 의 progress) ─────────────────────────
+   * «선택 갈래»에서만 부르는 함수는 여기서 **죽이지 않고 돌려준다**: 경성 목록(위)의 함수는 시험 전체의
+   * 전제라 낡으면 죽는 것이 맞지만, 선택 갈래의 함수가 낡았다고 본 시험(V1~V5)까지 막으면 그 플래그를
+   * 빼고 도는 것이 정상 통로가 된다(F103). 대신 그 갈래의 초록은 **원리상 못 나온다** — 호출자는
+   * `연성낡음` 에 든 함수의 검증점을 «못쟀다»로 접어야 한다(✓ 도 ✗ 도 아니다 · 명세 ④). 미측정은
+   * 경성과 같은 규율(소리 내고 진행 · «확인 없이 돈다»가 보고에 남는다)이고 `연성미측정` 으로 돌아간다. */
+  const 연성낡음 = {}, 연성미측정 = {};
+  if (연성목록.length) {
+    const 연성결과 = await 대조(ref, 토큰, 연성목록, opt.가져오기);
+    const 연성판정 = 게이트판정(연성결과);
+    for (const r of 연성판정.다름) {
+      연성낡음[r.slug] = r.상세;
+      console.error(`[${도구}] ⚠ ${r.slug} 배포판 ≠ 소스(연성) — 그 함수를 부르는 갈래는 «못쟀다»로 접힌다: ${r.상세}`);
+      console.error(`     재배포: SUPABASE_PROJECT_REF=${ref} node tools/원격배포.js supabase/functions/${r.slug} --적용`);
+    }
+    for (const r of 연성판정.못잼) {
+      연성미측정[r.slug] = r.상세;
+      console.error(`[${도구}] ⚠ ${r.slug} 배포판 대조 미측정(연성 · ${r.상세}) — 그 함수는 배포판=소스 확인 없이 돈다`);
+    }
+    const 같음 = 연성결과.length - 연성판정.다름.length - 연성판정.못잼.length;
+    console.log(`[${도구}] 연성 배포판=소스 ${같음}/${연성결과.length}함수`
+      + (연성판정.다름.length ? ` (낡음 ${연성판정.다름.length} → 못쟀다)` : '')
+      + (연성판정.못잼.length ? ` (미측정 ${연성판정.못잼.length})` : ''));
+  }
+  return { 연성낡음, 연성미측정 };
 }
 
 /* 아는 플래그 — 여기 없는 `--` 인자는 오타이거나 **다른 도구의 낱말**이다.

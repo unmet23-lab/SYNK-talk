@@ -123,3 +123,109 @@ test('재료 결함은 던진다 — 상태 객체 없이 부르면 조용히 �
   assert.throws(() => 과제요약(null), /학습자상태/);
   assert.throws(() => 과제요약({}), /학습자상태/);
 });
+
+/* ── 「아니야」 제외 (철학 적용기준 「관측과 성향」 · 09-05 「아니야」= 빼기 · 2026-09-11) ────────────
+ * 학생이 맞아? 카드에서 부정한 추정의 «축»은 생성 요약에서 빠지고 axes_used 에도 안 센다. 원관측·정정
+ * 이력은 이 층 밖(행 · 학습자상태 확인축)에 그대로 산다 — 여기는 벤더에게 가는 «재료»만 가른다.
+ * 🔴 분모를 먼저 잰다 — 뺄 것이 애초에 없는 픽스처면 「뺐다」와 「아무 일도 없었다」가 같은 초록이다(F207). */
+const { 부정키, 부정키들 } = require('../lib/성향확인.js');
+
+test('「여유제출 아니다」는 마감 여유만 빼고 같은 축의 제출률·표본을 보존한다', () => {
+  const 상태 = 실물상태();
+  const 앞 = 과제요약(상태, { 목표: 'study' });
+  // 분모 — 빼기 전에 리듬이 «실제로» 실려 있다. 이것이 거짓이면 아래 단언은 전부 공허하다.
+  assert.ok(앞.axes_used.includes('리듬') && /^리듬: /m.test(앞.요약), `분모 소실 — 리듬이 애초에 안 실렸다: ${앞.요약}`);
+
+  const 뒤 = 과제요약(상태, { 목표: 'study', 부정키들: [부정키('리듬', '여유제출')] });
+  assert.ok(/^리듬: 제출률=1 지각=0 n=5 여유n=5$/m.test(뒤.요약), 뒤.요약);
+  assert.ok(!뒤.요약.includes('마감여유분_중앙='));
+  assert.deepEqual(뒤.제외축, []);
+  assert.deepEqual(뒤.제외키, ['리듬:여유제출']);
+  assert.deepEqual(뒤.제외지표, ['리듬.마감여유분_중앙']);
+  assert.deepEqual(뒤.axes_used, 앞.axes_used, '다른 지표가 남은 축은 계속 읽는다');
+  assert.equal(뒤.쓸축수, 앞.쓸축수);
+  assert.equal(뒤.evidence_refs.axes_used, 뒤.axes_used, '같은 배열이어야 한다 — 사본이면 갈라진다');
+  // 나머지 줄은 한 글자도 안 바뀐다 — 제외는 «그 축 줄 하나»만 뺀다(재정렬·재렌더 금지).
+  assert.deepEqual(뒤.요약.split('\n').filter((l) => !l.startsWith('리듬: ')),
+    앞.요약.split('\n').filter((l) => !l.startsWith('리듬: ')));
+  // 원관측은 이 층 밖이다 — 상태 객체는 그대로다(여기서 지우거나 고치지 않는다).
+  assert.ok(상태.축.리듬 && 상태.축.리듬.n > 0, '상태 객체의 원관측을 건드렸다');
+});
+
+test('「아니야」 가 없으면 산출이 한 글자도 안 바뀐다 (빈 목록·null·미지정이 같은 모양)', () => {
+  const 상태 = 실물상태();
+  const 기준산출 = 과제요약(상태, { 목표: 'study', 급수: 'Lv4' });
+  assert.deepEqual(과제요약(상태, { 목표: 'study', 급수: 'Lv4', 부정키들: [] }), 기준산출);
+  assert.deepEqual(과제요약(상태, { 목표: 'study', 급수: 'Lv4', 부정키들: null }), 기준산출);
+  assert.deepEqual(기준산출.제외축, [], '부정이 없는데 제외축이 비지 않았다');
+});
+
+test('부정된 축이 상태에 없으면(널 축) 뺀 것이 아니다 — 제외축은 «실렸을 축»만 센다', () => {
+  const 상태 = 실물상태();   // 관심 축은 널이다(픽스처 머리말)
+  assert.equal(상태.축.관심, null, '픽스처 전제 — 관심 축이 널이어야 이 검사가 뜻이 있다');
+  const r = 과제요약(상태, { 부정키들: [부정키('관심', '아무키')] });
+  assert.deepEqual(r.제외축, [], '안 실릴 축을 「뺐다」로 셌다 — 빈 축은 뺀 게 아니다');
+  assert.deepEqual(r.axes_used, 과제요약(상태).axes_used);
+});
+
+test('같은 축의 별개 키를 확인한 뒤에도 그 확인·다른 관측은 보존한다', () => {
+  const 행 = [];
+  for (let d = 5; d >= 1; d -= 1) {
+    행.push(사건('task.assigned', 전(d * 일), { due_at: 전(d * 일 - 12 * 3600000) }));
+    행.push(사건('submission.created', 전(d * 일 - 3600000)));
+  }
+  행.push(사건('estimate.responded', 전(일 / 2), {
+    payload: { ver: 1, trait_axis: '리듬', shown_key: '여유제출', shown_text: '요즘 여유 있게 내시네요?', response: '아니다', estimator_version: 'v', estimate_as_of: 기준 },
+  }));
+  행.push(사건('estimate.responded', 전(일 / 4), {
+    payload: { ver: 1, trait_axis: '리듬', shown_key: '반복제출', shown_text: '빠짐없이 하시네요?', response: '맞다', estimator_version: 'v', estimate_as_of: 기준 },
+  }));
+  const 상태 = 학습자상태(행, { as_of: 기준, ingested_as_of: 기준, 시간대: 'Asia/Ulaanbaatar' });
+  const 키들 = 부정키들(행);
+  assert.deepEqual(키들, ['리듬:여유제출'], '분모 — 부정 키가 정확히 하나여야 아래가 실측이다');
+
+  const 앞 = 과제요약(상태);
+  assert.ok(앞.axes_used.includes('리듬') && 앞.axes_used.includes('확인'), `분모 소실: ${앞.axes_used.join(',')}`);
+  const 뒤 = 과제요약(상태, { 부정키들: 키들 });
+  assert.deepEqual(뒤.제외축, []);
+  assert.deepEqual(뒤.제외지표, ['리듬.마감여유분_중앙']);
+  assert.ok(/^리듬: 제출률=1 /m.test(뒤.요약), '확인한 반복제출의 관측이 빠졌다');
+  assert.ok(뒤.axes_used.includes('확인'), '확인 축(정정 이력 계수)까지 빠졌다 — 여기는 «부정된 추정»만 뺀다');
+  assert.ok(/^확인: /m.test(뒤.요약) && /아니다수=1/.test(뒤.요약), `정정 이력 줄이 안 실렸다: ${뒤.요약}`);
+  assert.ok(/맞다수=1/.test(뒤.요약));
+  assert.equal(뒤.쓸축수, 앞.쓸축수);
+});
+
+test('활동 창을 넘은 옛 부정도 별도 이력으로 유지한다 — 새 관측은 같은 채 기준일만 넘긴다', () => {
+  const at = '2026-09-29T00:00:00Z', later = '2026-10-01T00:00:00Z';
+  const 부정이력 = [{ event_type: 'estimate.responded', occurred_at: '2026-08-31T00:00:00Z',
+    payload: { trait_axis: '리듬', shown_key: '여유제출', response: '아니다' } }];
+  const 행 = [];
+  for (let d = 25; d <= 27; d++) {
+    행.push(사건('task.assigned', `2026-09-${d}T00:00:00Z`, { due_at: `2026-09-${d}T12:00:00Z` }));
+    행.push(사건('submission.created', `2026-09-${d}T01:00:00Z`));
+  }
+  const 요약 = (시점) => 과제요약(학습자상태(행, { as_of: 시점, ingested_as_of: 시점, 시간대: 'Asia/Ulaanbaatar' }),
+    { 부정키들: 부정키들(부정이력) });
+  assert.ok(Date.parse(later) - Date.parse(부정이력[0].occurred_at) > 30 * 일);
+  assert.deepEqual(요약(later).제외지표, ['리듬.마감여유분_중앙']);
+  assert.equal(요약(later).요약, 요약(at).요약);
+});
+
+test('모르는 부정 키는 명시하고 관측을 임의로 지우지 않는다', () => {
+  const 상태 = 실물상태();
+  const 앞 = 과제요약(상태);
+  const 뒤 = 과제요약(상태, { 부정키들: ['리듬:새키', '없는축:여유제출'] });
+  assert.equal(뒤.요약, 앞.요약);
+  assert.deepEqual(뒤.미처리부정키, ['리듬:새키', '없는축:여유제출']);
+  assert.deepEqual(뒤.제외지표, []);
+});
+
+test('집중띠 부정은 그 시간대 하나만 제외하며 다른 띠·원래 분모를 유지한다', () => {
+  const 상태 = 실물상태();
+  상태.축.집중띠 = { 띠: { 오전: { 완주율: 1, n: 8 }, 저녁: { 완주율: 0.5, n: 2 } }, 띠수: 2, n: 10, 못읽음: 0 };
+  const 뒤 = 과제요약(상태, { 부정키들: ['집중띠:주로오전'] });
+  assert.deepEqual(뒤.제외지표, ['집중띠.띠.오전']);
+  assert.ok(/집중띠: 띠\(저녁\(완주율=0.5 n=2\)\) 띠수=2 n=10 못읽음=0/.test(뒤.요약), 뒤.요약);
+  assert.equal(상태.축.집중띠.띠.오전.n, 8, '원관측을 수정했다');
+});
