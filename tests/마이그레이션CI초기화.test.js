@@ -80,6 +80,59 @@ test('cron launcher off를 재조회한 뒤에만 고정 합성 Vault 값을 만
   assert.match(shell, /net.http_request_queue/);
   assert.match(shell, /net._http_response/);
 });
+test('실제 bootstrap은 관리자에서 설정 두 명령만 실행하며 권한/리로드 실패면 fixture 전에 멈춘다', () => {
+  const bootstrap = shell.slice(shell.indexOf('bootstrap_local_ci()'), shell.indexOf('assert_cron_quiet()'));
+  const script = `set -e
+DATABASE_URL='postgresql://postgres:synthetic-local@127.0.0.1:54322/postgres'
+PSQL=(psql "$DATABASE_URL" -X -q -v ON_ERROR_STOP=1)
+fail() { echo 'blocked' >&2; exit 1; }
+scalar() { "\u0024{PSQL[@]}" -Atc "$1"; }
+sleep() { :; }
+psql() {
+  local connection="$1" query="\u0024{!#}"
+  local role='postgres'
+  [[ "$connection" == postgresql://supabase_admin:* ]] && role='admin'
+  case "$query" in
+    *"to_regnamespace('engine')"*) printf t ;;
+    'create extension if not exists pg_cron') [[ "$role" == postgres ]] ;;
+    'select count(*) from cron.job') printf 0 ;;
+    *"select current_user = 'supabase_admin'"*)
+      [[ "$role" == admin ]] || return 20
+      printf '%s' "$TEST_ROLE_CHECK" ;;
+    "alter system set cron.launch_active_jobs = 'off'")
+      [[ "$role" == admin ]] || return 21
+      printf 'admin-setting\\n' >&2 ;;
+    'select pg_reload_conf()')
+      [[ "$role" == admin ]] || return 22
+      printf 'admin-reload\\n' >&2
+      printf '%s' "$TEST_RELOAD" ;;
+    *"current_setting('cron.launch_active_jobs')"*)
+      [[ "$role" == postgres ]] || return 23
+      printf '%s' "$TEST_LOADED" ;;
+    ON_ERROR_STOP=1)
+      [[ "$role" == postgres ]] || return 24
+      local body
+      body="$(</dev/stdin)"
+      [[ "$body" == *vault.create_secret* ]] || return 25
+      printf 'fixture\\n' >&2 ;;
+    *) return 26 ;;
+  esac
+}
+${bootstrap}
+bootstrap_local_ci
+printf completed`;
+  for (const [ok, env] of [[true, {}], [false, { TEST_ROLE_CHECK: 'f' }],
+    [false, { TEST_RELOAD: 'f' }], [false, { TEST_LOADED: 'on' }]]) {
+    const r = spawnSync(bash, ['-c', script], { encoding: 'utf8', env: {
+      ...process.env, TEST_ROLE_CHECK: 't', TEST_RELOAD: 't', TEST_LOADED: 'off', ...env,
+    } });
+    assert.equal(r.status === 0, ok, r.stderr);
+    assert.equal(r.stderr.includes('fixture'), ok, '실패하면 합성 설정조차 만들지 않는다');
+    if (ok) assert.match(r.stderr, /admin-setting\r?\nadmin-reload\r?\nfixture/);
+    assert.equal((r.stdout + r.stderr).includes('synthetic-local'), false);
+  }
+  assert.doesNotMatch(bootstrap, /grant\s+|alter\s+role\s+/i);
+});
 test('빈 DB와 reset 모두 원문 마이그레이션을 실제 적용하고 5개 보존/2개 비활성을 잰다', () => {
   assert.match(shell, /for migration in "\$\{MIGRATIONS\[@\]\}"; do[\s\S]*run_file "\$migration"/);
   assert.match(shell, /previous_cron="\$\(previous_cron_fingerprint\)"/);

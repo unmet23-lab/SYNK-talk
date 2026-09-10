@@ -46,8 +46,16 @@ bootstrap_local_ci() {
     || fail 'CI bootstrap 전에 engine이 이미 있다 — startup migration이 꺼졌는지 확인'
   "${PSQL[@]}" -c 'create extension if not exists pg_cron' >/dev/null
   [[ "$(scalar 'select count(*) from cron.job')" == '0' ]] || fail '빈 CI DB에 기존 예약이 남았다'
-  "${PSQL[@]}" -c "alter system set cron.launch_active_jobs = 'off'" >/dev/null
-  [[ "$(scalar 'select pg_reload_conf()')" == 't' ]] || fail 'cron 설정 reload 실패'
+  # CLI의 postgres는 제한 역할이다. 로컬 클러스터 설정 두 명령만 공식 관리자 연결로 수행한다.
+  # 같은 로컬 DB 암호를 쓰는 근거: CLI v2.84.2 internal/start/start.go의 SUPERUSER_ROLE 연결.
+  # postgres에 권한을 부여/승격하지 않으며 이후 migration/RLS 검증은 원래 PSQL을 그대로 쓴다.
+  [[ "$DATABASE_URL" == postgresql://postgres:* ]] || fail 'CI 기본 postgres 연결 형식이 아니다'
+  local admin_url="postgresql://supabase_admin:${DATABASE_URL#postgresql://postgres:}"
+  local -a admin_psql=(psql "$admin_url" -X -q -v ON_ERROR_STOP=1)
+  [[ "$("${admin_psql[@]}" -Atc "select current_user = 'supabase_admin' and
+    (select rolsuper from pg_roles where rolname = current_user)")" == 't' ]] || fail 'CI 로컬 관리자 역할 확인 실패'
+  "${admin_psql[@]}" -c "alter system set cron.launch_active_jobs = 'off'" >/dev/null
+  [[ "$("${admin_psql[@]}" -Atc 'select pg_reload_conf()')" == 't' ]] || fail 'cron 설정 reload 실패'
   local loaded=''
   for _ in {1..20}; do
     loaded="$(scalar "select current_setting('cron.launch_active_jobs')")"
