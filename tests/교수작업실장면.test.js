@@ -124,13 +124,13 @@ test('선택 카드와 미리보기가 읽는 아홉 행동 그림은 서로 다
   assert.equal(그림들.size, 9);
 });
 
-test('몽글과 까몽의 아픈 그림은 실제 아픈 문항에만 나타나고 다른 사유는 원래 친구를 유지한다', () => {
+test('세 친구의 아픈 그림은 실제 아픈 문항에만 나타나고 다른 사유는 원래 친구를 유지한다', () => {
   const { 내상황장면 } = require('../src/교수작업실장면.js');
   for (const 캐릭터 of ['몽글', '까몽', '마린']) {
     for (const [seed, 아픔] of [['g1t01.s0d1', true], ['g1t01.s1d1', false], ['g1t01.s2d1', false], ['g1t02.s0d0', false]]) {
       const 장면 = 장면만들기({ prompt_seed: seed, 캐릭터 });
       const 화면 = renderToStaticMarkup(React.createElement(내상황장면, { 장면 }));
-      assert.equal(화면.includes(`${캐릭터}이 아파서 쉬며`), 아픔 && 캐릭터 !== '마린');
+      assert.equal(화면.includes(`${캐릭터}이 아파서 쉬며`), 아픔);
       assert.ok(화면.includes(장면.원문.질문));
       assert.ok(화면.includes(`내 친구 · ${캐릭터}`));
       assert.ok(화면.includes(장면.친구.대사[0]));

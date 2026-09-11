@@ -18,9 +18,9 @@ async function main() {
   const manifest = JSON.parse(manifestBytes);
   const expected = ['marin', 'mongle', 'kkamong'].flatMap(name =>
     ['plan', 'notes', 'letter'].map(action => `${name}-${action}`));
-  expected.push('mongle-sick', 'kkamong-sick');
+  expected.push('marin-sick', 'mongle-sick', 'kkamong-sick');
   if (manifest.assets.length !== expected.length || expected.some(name => !manifest.assets.some(a => a.name === name))) {
-    throw new Error('세 친구의 전략 장면 9장과 몽글·까몽의 아픈 상황 장면 2장이 필요합니다.');
+    throw new Error('몽글·까몽·마린의 전략 장면 9장과 아픈 상황 장면 3장이 필요합니다.');
   }
   const prepared = await Promise.all(manifest.assets.map(async asset => {
     const source = path.resolve(canonicalRoot, asset.source.path);
@@ -46,7 +46,7 @@ async function main() {
   fs.writeFileSync(path.join(outputDir, '가이드장면출처.json'), JSON.stringify({
     date: '2026-09-11', generator: 'tools/가이드장면자산반입.js',
     canonical: { path: manifestPath, sha256: sha(manifestBytes) },
-    scope: '세 친구의 편지 전략별 행동과 몽글·까몽의 아픈 학생 역할. 상황과 선택을 확인해 해당 장면을 표시하며 전역 본체와 구별한다.',
+    scope: '몽글·까몽·마린의 편지 전략별 행동 9장과 아픈 학생 역할 3장. 상황과 선택을 확인해 해당 장면을 표시하며 전역 본체와 구별한다.',
     encoder: { sharp: sharp.versions.sharp, webp: sharp.versions.webp },
     assets: prepared.map(a => a.record),
   }, null, 2) + '\n');

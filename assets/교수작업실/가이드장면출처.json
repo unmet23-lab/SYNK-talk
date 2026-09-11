@@ -3,9 +3,9 @@
   "generator": "tools/가이드장면자산반입.js",
   "canonical": {
     "path": "docs/캐릭터/편지전략장면/정본.json",
-    "sha256": "5f7c91dd8aa23c99af2074169533053b3740972dfb0f7b37bfa85306df501a9f"
+    "sha256": "11b57e6d15bc81f00363f06796d4d1ec89cd40f5f710f405348eb3bdaa82c1d6"
   },
-  "scope": "세 친구의 편지 전략별 행동과 몽글·까몽의 아픈 학생 역할. 상황과 선택을 확인해 해당 장면을 표시하며 전역 본체와 구별한다.",
+  "scope": "몽글·까몽·마린의 편지 전략별 행동 9장과 아픈 학생 역할 3장. 상황과 선택을 확인해 해당 장면을 표시하며 전역 본체와 구별한다.",
   "encoder": {
     "sharp": "0.35.3",
     "webp": "1.6.0"
@@ -306,6 +306,36 @@
         "width": 1536,
         "height": 1024,
         "bytes": 394774
+      },
+      "transform": {
+        "upscale": false,
+        "crop": false,
+        "recolor": false,
+        "webp_quality": 96
+      }
+    },
+    {
+      "name": "marin-sick",
+      "character": "마린",
+      "kind": "situation",
+      "scenario": {
+        "task": "g1t01",
+        "reason": "갑자기 몸이 아파서"
+      },
+      "meaning": "마린: 담요를 덮고 쉬면서 과제를 내지 못한 상황을 걱정한다. 처진 노란 렌즈·눈물·기울인 자세로 속상함과 아픔을 드러낸다.",
+      "source": {
+        "path": "docs/캐릭터/편지전략장면/marin-sick.png",
+        "sha256": "1fdf6fee3c498d79eeec22ec480462ee04dfc574114eb4b44834960ffeb60735",
+        "width": 1536,
+        "height": 1024,
+        "bytes": 2351862
+      },
+      "output": {
+        "path": "assets/교수작업실/marin-sick.webp",
+        "sha256": "0b7af5a87cbce8c3d97b2933a2cce54006c606e2a85ec5ed6d0f8c16c2821e62",
+        "width": 1536,
+        "height": 1024,
+        "bytes": 395858
       },
       "transform": {
         "upscale": false,

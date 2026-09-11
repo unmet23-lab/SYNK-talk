@@ -27,6 +27,7 @@ const 행동설명 = Object.freeze({
 const 아픈그림들 = Object.freeze({
   몽글: require('../assets/교수작업실/mongle-sick.webp'),
   까몽: require('../assets/교수작업실/kkamong-sick.webp'),
+  마린: require('../assets/교수작업실/marin-sick.webp'),
 });
 
 export function 전략그림찾기(이름, optionId) {
