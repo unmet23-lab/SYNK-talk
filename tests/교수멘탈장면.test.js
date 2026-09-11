@@ -13,7 +13,7 @@ const 사례들 = 문항들.flatMap((원천) => 원천.사유.flatMap((사유, s
 test('45개 실제 문항 × 선택 친구 셋: 원문·사유·요청 세부가 뒤바뀌지 않는다', () => {
   assert.equal(사례들.length, 45);
   assert.deepEqual([...혼잣말캐릭터들], ['몽글', '까몽', '마린']);
-  for (const { seed, 사유, 세부 } of 사례들) for (const 캐릭터 of 혼잣말캐릭터들) {
+  for (const { seed, 사유, 세부, 원천 } of 사례들) for (const 캐릭터 of 혼잣말캐릭터들) {
     const 문항 = 펴기(seed);
     const 장면 = 장면만들기({ prompt_seed: seed, 문항, 캐릭터 });
     assert.equal(장면.확인된시드, true, seed);
@@ -22,6 +22,8 @@ test('45개 실제 문항 × 선택 친구 셋: 원문·사유·요청 세부가
     assert(장면.단서.some((단서) => 단서.값 === 세부), seed);
     assert.equal(장면.캐릭터, 캐릭터);
     assert.equal(장면.친구.이름, 캐릭터);
+    assert.equal(장면.친구.상황장면, 원천.문항id === 'g1t01' && 사유 === '갑자기 몸이 아파서' ? '아픔' : null,
+      '실제 문항에 없는 아픈 상황을 다른 변주에 덧씌우지 않는다');
     assert(장면.교수.대사[0].startsWith(`${캐릭터}아, `));
   }
 });
@@ -73,6 +75,7 @@ test('미확인 시드와 시드 없는 원문은 그대로 보존하고 일반 
     const 장면 = 장면만들기({ prompt_seed: seed, 문항, 캐릭터: '마린' });
     assert.equal(장면.확인된시드, false);
     assert.equal(장면.친구.표정, '기본', '알 수 없는 상황에 속상한 얼굴을 덧씌우지 않는다');
+    assert.equal(장면.친구.상황장면, null);
     assert.deepEqual(장면.원문, { 이름: 문항.이름, 질문: 문항.질문, 지시문: 문항.지시문 });
     assert.deepEqual(장면.단서, []);
     assert.match(장면.교수.대사[0], /편지를 쓰려는구나/);
@@ -92,6 +95,7 @@ test('유효 시드라도 제공 원문이 다른 판이면 그 원문에 옛 �
     const 장면 = 장면만들기({ prompt_seed: 'g1t01.s0d1', 문항, 캐릭터: '몽글' });
     assert.equal(장면.확인된시드, false);
     assert.equal(장면.친구.표정, '기본');
+    assert.equal(장면.친구.상황장면, null);
     assert.equal(장면.원문.질문, 문항.질문);
     assert.equal(장면.원문.지시문, 문항.지시문);
     assert.deepEqual(장면.단서, []);

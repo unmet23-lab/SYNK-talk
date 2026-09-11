@@ -3,7 +3,7 @@ import { Image, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions
 import { 색, 폰트 } from './테마';
 import { 살아있는교수연구실 } from './살아있는교수연구실';
 import { 살아있는가이드 } from './살아있는가이드';
-import { 마린전략장면 } from './마린전략장면';
+import { 가이드전략장면, 전략그림찾기, 상황그림찾기 } from './가이드전략장면';
 import { 말투예시 } from './말투예시';
 import { use줄임 } from '../lib/모션';
 import { 장면만들기, 책갈피말 } from '../contents/교수멘탈장면';
@@ -47,12 +47,17 @@ export function 교수작업실장면({ 재료, 가이드, 보기, onConfirm }) 
     <View style={[s.책상, width < 570 && s.책상_좁음]}>
       {(보기?.options_shown || []).map(o => {
         const 정보 = 장면.전략.find(v => v.option_id === o.option_id);
+        const 그림장면 = 전략그림찾기(장면.친구?.이름, o.option_id);
         const 고름 = 고른것 === o.option_id;
         return <Pressable key={o.option_id} accessibilityRole="button" accessibilityLabel={o.label}
           accessibilityState={{ selected: 고름 }} aria-pressed={고름} onPress={() => set고른것(o.option_id)}
           style={({ hovered, focused, pressed }) => [s.소품자리, width < 570 && s.소품자리_좁음, 고름 && s.소품자리_고름,
             !줄임 && s.전환, hovered && !줄임 && s.들기, focused && s.초점, pressed && { opacity: .8, transform: [{ scale: 줄임 ? 1 : .96 }] }]}>
-          <Image source={소품그림[o.option_id]} resizeMode="contain" style={[s.소품, width < 570 && s.소품_좁음]} accessibilityElementsHidden />
+          {그림장면 ? <View style={[s.전략그림틀, width < 570 && s.전략그림틀_좁음]}>
+            <Image source={그림장면.그림} resizeMode="contain" style={s.틀안그림}
+              accessible={false} accessibilityElementsHidden />
+          </View> : <Image source={소품그림[o.option_id]} resizeMode="contain"
+            style={[s.소품, width < 570 && s.소품_좁음]} accessible={false} accessibilityElementsHidden />}
           <View style={s.소품설명}>
             <Text style={s.선택제목}>{o.label}</Text>
             <Text style={s.작은글}>{정보?.설명}</Text>
@@ -87,11 +92,19 @@ export function 교수생각장면({ 장면, 넓다 = false, 사진너비 = 600 
 
 export function 내상황장면({ 장면, 좁다 = false }) {
   const 이름 = 장면.친구?.이름;
+  const { width } = useWindowDimensions();
+  const 그림장면 = 상황그림찾기(이름, 장면.친구?.상황장면);
+  const 세로 = 좁다 || (!!그림장면 && width < 820);
   return <View style={s.학생장면}>
     <Text accessibilityRole="header" style={s.중제목}>지금 내 상황</Text>
-    <View style={[s.내상황본문, 좁다 && s.내상황본문_좁음]}>
-      {이름 ? <View style={[s.안내캐릭터, 좁다 && s.안내캐릭터_좁음]}>
-        <살아있는가이드 이름={이름} 표정={장면.친구?.표정} size={좁다 ? 128 : 176} />
+    <View style={[s.내상황본문, 세로 && s.내상황본문_좁음]}>
+      {이름 ? <View style={그림장면
+        ? [s.상황그림캐릭터, 세로 && s.상황그림캐릭터_좁음]
+        : [s.안내캐릭터, 좁다 && s.안내캐릭터_좁음]}>
+        {그림장면
+          ? <View style={s.상황그림틀}><Image source={그림장면.그림} accessibilityLabel={그림장면.설명}
+              resizeMode="contain" fadeDuration={0} style={s.틀안그림} /></View>
+          : <살아있는가이드 이름={이름} 표정={장면.친구?.표정} size={좁다 ? 128 : 176} />}
         <Text style={s.화자}>내 친구 · {이름}</Text>
       </View> : null}
       <View style={s.내상황정보}>
@@ -116,8 +129,8 @@ export function 전략미리보기({ 선택, 제목, 가이드, onConfirm, conta
     {선택 ? <>
       <Text style={s.작은글}>내가 고른 방법</Text>
       <Text style={s.중제목}>{제목}</Text>
-      {가이드 === '마린'
-        ? <마린전략장면 optionId={선택.option_id} 말={선택.미리보기} />
+      {전략그림찾기(가이드, 선택.option_id)
+        ? <가이드전략장면 이름={가이드} optionId={선택.option_id} 말={선택.미리보기} />
         : <친구말 이름={가이드} 말={선택.미리보기} 작게 />}
       <말투예시 예문={선택.예문} />
       <Text style={s.지시문}>{선택.쓰기힌트}</Text>
@@ -190,6 +203,11 @@ const s = StyleSheet.create({
   내상황본문: { flexDirection: 'row', gap: 24 }, 내상황본문_좁음: { flexDirection: 'column', gap: 14 },
   안내캐릭터: { width: 176, flexShrink: 0, alignItems: 'center', justifyContent: 'center', gap: 8 },
   안내캐릭터_좁음: { width: 'auto', flexDirection: 'row', justifyContent: 'flex-start', gap: 12 },
+  상황그림캐릭터: { width: 320, maxWidth: '100%', flexShrink: 0, gap: 8, alignItems: 'center' },
+  상황그림캐릭터_좁음: { width: '100%', maxWidth: 360, alignSelf: 'center' },
+  // Image에 aspectRatio만 주면 웹에서 원본의 1024px 높이가 남는다. 틀이 크기를 정한다.
+  상황그림틀: { width: '100%', aspectRatio: 1.5, borderRadius: 18, overflow: 'hidden' },
+  틀안그림: { width: '100%', height: '100%' },
   내상황정보: { flex: 1, minWidth: 0, gap: 14 },
   상황글: { fontFamily: 폰트.본문, fontSize: 18, lineHeight: 29, color: 색.잉크, ...어절 },
   부탁영역: { gap: 6 }, 친구한마디: { gap: 5, paddingLeft: 16, borderLeftWidth: 2, borderColor: 색.실땀 },
@@ -208,6 +226,8 @@ const s = StyleSheet.create({
   소품자리: { flex: 1, borderRadius: 20, borderWidth: 1, borderColor: 색.잉크_희미, padding: 18, alignItems: 'center', gap: 12 },
   소품자리_좁음: { flexDirection: 'row', gap: 18 }, 소품자리_고름: { borderColor: 색.실땀, backgroundColor: 색.바탕띄움 },
   소품: { width: '100%', height: 122 }, 소품_좁음: { width: 90, height: 90 },
+  전략그림틀: { width: '100%', aspectRatio: 1.5, borderRadius: 12, overflow: 'hidden' },
+  전략그림틀_좁음: { width: 120, height: 80, flexShrink: 0 },
   소품설명: { gap: 6, alignSelf: 'stretch', flex: 1 },
   선택제목: { fontFamily: 폰트.강조, fontSize: 18, lineHeight: 27, color: 색.잉크, ...어절 },
   추천: { fontFamily: 폰트.캡션, fontSize: 11, lineHeight: 19, color: 색.실땀 },

@@ -1,0 +1,127 @@
+{
+  "generator": "tools/마스코트변환.py",
+  "character": "몽글",
+  "sourceCanon": "SYNK-appsscript/docs/캐릭터/정본_4K",
+  "files": [
+    {
+      "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\몽글_본체.png",
+      "sourceSha256": "2f431fb6de4f47bdba18c131ba0378dbd52d4bb478288f3f86105eeab498a2e6",
+      "sourceSize": [
+        4096,
+        4096
+      ],
+      "output": "assets/마스코트/몽글_본체.webp",
+      "outputSha256": "035653ea9a8c511e3302bf8bbe6e35a00af044e05c3e55c5efd75f332813637d",
+      "outputSize": [
+        336,
+        336
+      ],
+      "transform": "LANCZOS, WebP quality92; current canonical alpha preserved"
+    },
+    {
+      "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\몽글_놀람.png",
+      "sourceSha256": "067b8ea022027472ae722ba312db652e6bd14c8bdeae2990605c90bef6254cc0",
+      "sourceSize": [
+        4096,
+        4096
+      ],
+      "output": "assets/마스코트/몽글_놀람.webp",
+      "outputSha256": "e1128c8f0e1fbc23d21a915a1811c79a027ab693b267daeb15a66fbcc3698634",
+      "outputSize": [
+        336,
+        336
+      ],
+      "transform": "LANCZOS, WebP quality92; current canonical alpha preserved"
+    },
+    {
+      "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\몽글_눈웃음.png",
+      "sourceSha256": "04d75b8053667dc94fb708d04f73c36aa7a20ecb407c5364ed47d988488955f3",
+      "sourceSize": [
+        4096,
+        4096
+      ],
+      "output": "assets/마스코트/몽글_눈웃음.webp",
+      "outputSha256": "d5cafb51e42c79621c32f3815983594082c6707586ea2d4b086387d676b34ff6",
+      "outputSize": [
+        336,
+        336
+      ],
+      "transform": "LANCZOS, WebP quality92; current canonical alpha preserved"
+    },
+    {
+      "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\몽글_눈감음.png",
+      "sourceSha256": "0749de8eaeaaca9ea224547fd19ca22cc642a9b9bddaf20d3d218213d869ac86",
+      "sourceSize": [
+        4096,
+        4096
+      ],
+      "output": "assets/마스코트/몽글_눈감음.webp",
+      "outputSha256": "93362640b0aadba4c565a7c2989509234f8d9b848d190bb81dab319509bc8313",
+      "outputSize": [
+        336,
+        336
+      ],
+      "transform": "LANCZOS, WebP quality92; current canonical alpha preserved"
+    },
+    {
+      "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\몽글_윙크.png",
+      "sourceSha256": "e86ab0bbdf9182f0c8803dc76ae64b1999fc54fa69d01b52dee03780eb9eb87a",
+      "sourceSize": [
+        4096,
+        4096
+      ],
+      "output": "assets/마스코트/몽글_윙크.webp",
+      "outputSha256": "c2179740726b2038a47ec4e9218cec42aa561cbcfc244c7414c5bdea92a44652",
+      "outputSize": [
+        336,
+        336
+      ],
+      "transform": "LANCZOS, WebP quality92; current canonical alpha preserved"
+    },
+    {
+      "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\몽글_으쓱.png",
+      "sourceSha256": "bd2e815a84d5ed72280ed9d88130213d68c9df02d2fdef49cba2452e694c5c92",
+      "sourceSize": [
+        4096,
+        4096
+      ],
+      "output": "assets/마스코트/몽글_으쓱.webp",
+      "outputSha256": "d1b62ef728f1cd659c9b6c3fe86fadaf7f4f44594c7822105aa59ba997628b00",
+      "outputSize": [
+        336,
+        336
+      ],
+      "transform": "LANCZOS, WebP quality92; current canonical alpha preserved"
+    },
+    {
+      "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\몽글_졸림.png",
+      "sourceSha256": "af5b715e67282e7a96209a868c54153287164b1ae7f967f79ed7017fd8253ba4",
+      "sourceSize": [
+        4096,
+        4096
+      ],
+      "output": "assets/마스코트/몽글_졸림.webp",
+      "outputSha256": "f45efd955515af62cfe53d4e2e6f751d8aa6ff517dc71df9a2b159d6d58d7afc",
+      "outputSize": [
+        336,
+        336
+      ],
+      "transform": "LANCZOS, WebP quality92; current canonical alpha preserved"
+    },
+    {
+      "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\몽글_민망.png",
+      "sourceSha256": "ff2ec1fe5e25eb4fd28b09e8295f7a3eb7f07a826894811bde68b422b5650084",
+      "sourceSize": [
+        4096,
+        4096
+      ],
+      "output": "assets/마스코트/몽글_민망.webp",
+      "outputSha256": "c6e474fc8db3971218c649439fdc93391f3c53ff3b11b3530b5b42613a2d3ea3",
+      "outputSize": [
+        336,
+        336
+      ],
+      "transform": "LANCZOS, WebP quality92; current canonical alpha preserved"
+    }
+  ]
+}

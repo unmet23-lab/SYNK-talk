@@ -24,14 +24,21 @@
       4096,
       4096
     ],
-    "sourceSha256": "6fd4e6b3946006d54d7059e60cc135b27874128bd8e7dfa6e6a62f1a1532f56c",
+    "sourceSha256": "2f431fb6de4f47bdba18c131ba0378dbd52d4bb478288f3f86105eeab498a2e6",
     "output": "assets/브랜드/몽글_본체.webp",
     "outputSize": [
       1024,
       1024
     ],
-    "outputSha256": "6abf284e6079a9d26f5a161a921e9c5897d643442e155d4d21ba7f00990826b5",
-    "transform": "LANCZOS3; WebP quality=96; source frame and alpha preserved"
+    "outputSha256": "b4ccae0bba6204dab4ccb71a02da2765a48ec73dbb87e3bb2d39fca86347e621",
+    "transform": "LANCZOS3; WebP quality=96; source frame and alpha preserved",
+    "edgeCorrection": {
+      "manifest": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\외곽교정_정본.json",
+      "manifestSha256": "973f49a293a1bdb98aebaa92d6c8153d461a858eb943a63817f0407cd7611aaf",
+      "generator": "tools/몽글외곽정리.cjs --세트 INPUT_DIR OUTPUT_DIR 몽글|까몽",
+      "resolutionNote": "기존 4096x4096 RGBA 원본에서 외곽만 후처리했다. 새 native 4K 생성으로 주장하지 않는다.",
+      "method": "Current source already contains verified exterior white-matte RGB and alpha repair; import keeps that contour."
+    }
   },
   "까몽": {
     "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\까몽_본체.png",
@@ -39,14 +46,21 @@
       4096,
       4096
     ],
-    "sourceSha256": "fea5f2b66db16a1089f4475492c59fb8273bfcf80b18fbcde4909a950e3796ab",
+    "sourceSha256": "2115c644b50d981ac693edb75cf0a78fda307e95b41c01afb41968472ab8f845",
     "output": "assets/브랜드/까몽_본체.webp",
     "outputSize": [
       1024,
       1024
     ],
-    "outputSha256": "4f1c3bac51e1df447dff1dd487173e6eec8dc4a7ecf4e5e91a39569df88f1131",
-    "transform": "LANCZOS3; WebP quality=96; source frame and alpha preserved"
+    "outputSha256": "e35508d9ac5d32a90f90caaa3cd15f1d9e472c1de60b5bc4ae6f6d5384201d9a",
+    "transform": "LANCZOS3; WebP quality=96; source frame and alpha preserved",
+    "edgeCorrection": {
+      "manifest": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\외곽교정_정본.json",
+      "manifestSha256": "973f49a293a1bdb98aebaa92d6c8153d461a858eb943a63817f0407cd7611aaf",
+      "generator": "tools/몽글외곽정리.cjs --세트 INPUT_DIR OUTPUT_DIR 몽글|까몽",
+      "resolutionNote": "기존 4096x4096 RGBA 원본에서 외곽만 후처리했다. 새 native 4K 생성으로 주장하지 않는다.",
+      "method": "Current source already contains verified exterior white-matte RGB and alpha repair; import keeps that contour."
+    }
   },
   "마린": {
     "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\마린_본체.png",

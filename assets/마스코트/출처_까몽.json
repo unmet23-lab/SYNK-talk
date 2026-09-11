@@ -1,0 +1,127 @@
+{
+  "generator": "tools/마스코트변환.py",
+  "character": "까몽",
+  "sourceCanon": "SYNK-appsscript/docs/캐릭터/정본_4K",
+  "files": [
+    {
+      "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\까몽_본체.png",
+      "sourceSha256": "2115c644b50d981ac693edb75cf0a78fda307e95b41c01afb41968472ab8f845",
+      "sourceSize": [
+        4096,
+        4096
+      ],
+      "output": "assets/마스코트/까몽_본체.webp",
+      "outputSha256": "83449f6430e28b6d5215fd3bf13450919ff5199245dbdcb785682a8b53538747",
+      "outputSize": [
+        336,
+        336
+      ],
+      "transform": "LANCZOS, WebP quality92; current canonical alpha preserved"
+    },
+    {
+      "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\까몽_놀람.png",
+      "sourceSha256": "f18daf5807b677060880e0bad716edadebb9418cfe88378fa12d81694fad4600",
+      "sourceSize": [
+        4096,
+        4096
+      ],
+      "output": "assets/마스코트/까몽_놀람.webp",
+      "outputSha256": "bfee12cedceecf80ee740f68171cdecdf3d912ee12a3171ffa126f7797298973",
+      "outputSize": [
+        336,
+        336
+      ],
+      "transform": "LANCZOS, WebP quality92; current canonical alpha preserved"
+    },
+    {
+      "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\까몽_눈웃음.png",
+      "sourceSha256": "a2d13f2f4c57af6444a02118256b7cb4a7ac5f5434506a43a3b115761003555f",
+      "sourceSize": [
+        4096,
+        4096
+      ],
+      "output": "assets/마스코트/까몽_눈웃음.webp",
+      "outputSha256": "843a1c18bcc6535d47fe406a7a97e8ec514b30b0a4aa3f4fadc51cf9f5b02c15",
+      "outputSize": [
+        336,
+        336
+      ],
+      "transform": "LANCZOS, WebP quality92; current canonical alpha preserved"
+    },
+    {
+      "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\까몽_눈감음.png",
+      "sourceSha256": "3ce903be3f5d7120bda66aa9bc5c5a2195cebb03128469730e7019d6dae36dea",
+      "sourceSize": [
+        4096,
+        4096
+      ],
+      "output": "assets/마스코트/까몽_눈감음.webp",
+      "outputSha256": "76113a93654fbc5929fb5ac762d5de88dad8131ea8180c8101bbb99bf9c66e40",
+      "outputSize": [
+        336,
+        336
+      ],
+      "transform": "LANCZOS, WebP quality92; current canonical alpha preserved"
+    },
+    {
+      "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\까몽_윙크.png",
+      "sourceSha256": "392559d3ef86603f41e72661d6aaade1dfb56cf6f2c91bfadaebff48cfb0a7dc",
+      "sourceSize": [
+        4096,
+        4096
+      ],
+      "output": "assets/마스코트/까몽_윙크.webp",
+      "outputSha256": "c756278cf78c8e20ee36823d2a8f0196f568a1b0c808c4a607a8153151168a9a",
+      "outputSize": [
+        336,
+        336
+      ],
+      "transform": "LANCZOS, WebP quality92; current canonical alpha preserved"
+    },
+    {
+      "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\까몽_졸림.png",
+      "sourceSha256": "f03587b941e4414c0ff4fbeb933733d96d988e7d8d917b602536b8eef08f1a07",
+      "sourceSize": [
+        4096,
+        4096
+      ],
+      "output": "assets/마스코트/까몽_졸림.webp",
+      "outputSha256": "d3b82ade764fcd9ea13a053934bb0e79940b904f535fdbaf7d52a9544471e319",
+      "outputSize": [
+        336,
+        336
+      ],
+      "transform": "LANCZOS, WebP quality92; current canonical alpha preserved"
+    },
+    {
+      "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\까몽_으쓱.png",
+      "sourceSha256": "f5776fda05c56b996232610fd8d5c00e33d81a92b43e68e89b5323382eb9fca5",
+      "sourceSize": [
+        4096,
+        4096
+      ],
+      "output": "assets/마스코트/까몽_으쓱.webp",
+      "outputSha256": "a04b644848b57d2480b533ea75bd90d754d6bf3331a5a19cba96975a8605f406",
+      "outputSize": [
+        336,
+        336
+      ],
+      "transform": "LANCZOS, WebP quality92; current canonical alpha preserved"
+    },
+    {
+      "source": "C:\\Users\\q1212\\Documents\\SYNK-appsscript\\docs\\캐릭터\\정본_4K\\까몽_민망.png",
+      "sourceSha256": "8d308f600024e92fde717ae74e79c9e8893ca7945a14f562ee50d97811a3abd4",
+      "sourceSize": [
+        4096,
+        4096
+      ],
+      "output": "assets/마스코트/까몽_민망.webp",
+      "outputSha256": "a110e2645e6ee45b5d32b74b5a1ac60ee9f9d0e4e4b8f83e743598aff3c80233",
+      "outputSize": [
+        336,
+        336
+      ],
+      "transform": "LANCZOS, WebP quality92; current canonical alpha preserved"
+    }
+  ]
+}

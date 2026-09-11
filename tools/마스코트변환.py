@@ -22,6 +22,8 @@
 # 산출:  assets/마스코트/<컷>.webp + 캐릭터별 눈검수 시트(마스코트_시트*.png) + 실측 로그
 import os
 import sys
+import json
+import hashlib
 import numpy as np
 from PIL import Image
 
@@ -56,8 +58,10 @@ def 시트경로(캐릭터):
 
 def 변환(캐릭터):
     낱장들 = []
+    출처들 = []
     for 이름 in 컷들[캐릭터]:
-        원본 = Image.open(os.path.join(SRC[캐릭터], f"{이름}.png")).convert("RGBA")
+        원본길 = os.path.join(SRC[캐릭터], f"{이름}.png")
+        원본 = Image.open(원본길).convert("RGBA")
         assert 원본.size == (4096, 4096), f"{이름}: 정본 크기가 아니다 {원본.size}"
         작게 = 원본.resize((크기, 크기), Image.LANCZOS)
         나갈길 = os.path.join(DST, f"{이름}.webp")
@@ -72,6 +76,13 @@ def 변환(캐릭터):
         kb = os.path.getsize(나갈길) / 1024
         print(f"  · {이름}.webp  {크기}px · {kb:.0f}KB · 모서리α 0 · 중심α {중심}")
         낱장들.append(작게)
+        with open(원본길, "rb") as f:
+            원본지문 = hashlib.sha256(f.read()).hexdigest()
+        with open(나갈길, "rb") as f:
+            파생지문 = hashlib.sha256(f.read()).hexdigest()
+        출처들.append({"source": 원본길, "sourceSha256": 원본지문, "sourceSize": list(원본.size),
+                    "output": f"assets/마스코트/{이름}.webp", "outputSha256": 파생지문,
+                    "outputSize": [크기, 크기], "transform": "LANCZOS, WebP quality92; current canonical alpha preserved"})
 
     # 눈검수 시트 — 어두운 지면(앱 바탕 #080605)에 나란히. 라이트에 얹으면 알파 구멍이 안 보인다
     # (누끼 README 「구슬 하이라이트 114px 구멍」이 정확히 그렇게 숨었다).
@@ -80,6 +91,10 @@ def 변환(캐릭터):
         판.paste(im, (20 + i * 크기, 20), im)
     판.convert("RGB").save(시트경로(캐릭터), "PNG")
     print(f"  · 시트 → {os.path.relpath(시트경로(캐릭터), os.path.join(DST, '..', '..'))}")
+    with open(os.path.join(DST, f"출처_{캐릭터}.json"), "w", encoding="utf-8") as f:
+        json.dump({"generator": "tools/마스코트변환.py", "character": 캐릭터,
+                   "sourceCanon": "SYNK-appsscript/docs/캐릭터/정본_4K", "files": 출처들}, f, ensure_ascii=False, indent=2)
+        f.write("\n")
 
 
 if __name__ == "__main__":

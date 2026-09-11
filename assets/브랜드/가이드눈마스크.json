@@ -1,10 +1,16 @@
 {
   "date": "2026-09-11",
   "canon": "SYNK-appsscript/docs/캐릭터/캐릭터_생명감_설계.md §1-a",
-  "coordinateSpace": [1024, 1024],
+  "coordinateSpace": [
+    1024,
+    1024
+  ],
   "mask": "ellipse; target=[left,top,width,height]; scale and offset=[x,y] register each existing eye curve inside the current bead contour on the 1024 body canvas. Curve-only local scale keeps the complete eyelid arc in the narrow mask; no face rectangle, no full-body expression swap",
   "bodyProvenance": "assets/브랜드/출처.json",
-  "expressionResolution": [336, 336],
+  "expressionResolution": [
+    336,
+    336
+  ],
   "expressionNote": "Existing app frames visually compared with the current 4096 canonical expressions. Lossy WebP derivations are not byte-identical to their PNG sources. Only the existing eye/lens contours are clipped at runtime; body pixels and complete outer alpha stay in the fixed current base.",
   "visualCheck": "Chrome, Paper #fbf7f0 and Ink #2b2320, 88px and 176px: open/closed and repeating eye-only layer checked on 2026-09-11. Mongle bead edge mask corrected after visual review. This checks the chosen mask geometry; integration Expo playback is a separate check.",
   "rasterBoundary": "CSS elliptical clipping may antialias the immediate subpixel boundary. No blur, whole-face blend, original asset mutation or new generated expression.",
@@ -95,28 +101,76 @@
           ]
         }
       ],
-      "sourceManifestSha256": "e2b62e96a9a988bc1c1509a02e9ea38d38f981cca6ae3647145d2e8d8fdd19fb"
+      "sourceManifestSha256": "5f7c91dd8aa23c99af2074169533053b3740972dfb0f7b37bfa85306df501a9f"
     }
   },
   "characters": {
     "몽글": {
       "source": "SYNK-appsscript/docs/캐릭터/정본_4K/몽글_눈감음.png",
-      "sourceSha256": "5b1c4840462dc87781241f0983a7aa5dba3b8a0498357427e99218fee7ab2c14",
+      "sourceSha256": "0749de8eaeaaca9ea224547fd19ca22cc642a9b9bddaf20d3d218213d869ac86",
       "frame": "assets/마스코트/몽글_눈감음.webp",
-      "frameSha256": "2e32869d127194dc88d49770bb40c301cce46433d3ecca8b7abe6985809c6c40",
+      "frameSha256": "93362640b0aadba4c565a7c2989509234f8d9b848d190bb81dab319509bc8313",
       "eyes": [
-        { "target": [337, 317, 91, 94], "scale": 0.7, "offset": [122, 106] },
-        { "target": [596, 314, 98, 103], "scale": 0.7, "offset": [189, 107] }
+        {
+          "target": [
+            337,
+            317,
+            91,
+            94
+          ],
+          "scale": 0.7,
+          "offset": [
+            122,
+            106
+          ]
+        },
+        {
+          "target": [
+            596,
+            314,
+            98,
+            103
+          ],
+          "scale": 0.7,
+          "offset": [
+            189,
+            107
+          ]
+        }
       ]
     },
     "까몽": {
       "source": "SYNK-appsscript/docs/캐릭터/정본_4K/까몽_눈감음.png",
-      "sourceSha256": "231de9068093ea3d3f2d897253f8bfaaa363c3e74f40ccf8e15312ac886a0582",
+      "sourceSha256": "3ce903be3f5d7120bda66aa9bc5c5a2195cebb03128469730e7019d6dae36dea",
       "frame": "assets/마스코트/까몽_눈감음.webp",
-      "frameSha256": "91dfaebbc17f0afa7c4da2b5f04afdab3f37cd95aa8a04486fc64ada5b91256f",
+      "frameSha256": "76113a93654fbc5929fb5ac762d5de88dad8131ea8180c8101bbb99bf9c66e40",
       "eyes": [
-        { "target": [332, 330, 72, 77], "scale": 0.76, "offset": [91, 88] },
-        { "target": [508, 331, 73, 78], "scale": 0.76, "offset": [135, 89] }
+        {
+          "target": [
+            332,
+            330,
+            72,
+            77
+          ],
+          "scale": 0.76,
+          "offset": [
+            91,
+            88
+          ]
+        },
+        {
+          "target": [
+            508,
+            331,
+            73,
+            78
+          ],
+          "scale": 0.76,
+          "offset": [
+            135,
+            89
+          ]
+        }
       ]
     },
     "마린": {
@@ -126,8 +180,30 @@
       "frameSha256": "51d6911ea0ac3e711dae7d1ba276e34180afd0d038ef7690e9f85e165a9ebc55",
       "meaning": "Existing darkened lenses, no invented eyelids",
       "eyes": [
-        { "target": [325, 437, 132, 151], "offset": [0, 0] },
-        { "target": [570, 434, 136, 151], "offset": [0, 0] }
+        {
+          "target": [
+            325,
+            437,
+            132,
+            151
+          ],
+          "offset": [
+            0,
+            0
+          ]
+        },
+        {
+          "target": [
+            570,
+            434,
+            136,
+            151
+          ],
+          "offset": [
+            0,
+            0
+          ]
+        }
       ]
     }
   }

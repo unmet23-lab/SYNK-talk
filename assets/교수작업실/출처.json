@@ -9,11 +9,60 @@
   },
   "generation": {
     "tool": "Codex built-in ImageGen",
+    "operation": "기존 교수 얼굴에 펠트 콧수염만 추가",
+    "prompt": "Use case: precise-object-edit. Edit target: the supplied exact 1672 by 941 felt professor research studio. Add ONLY a small elegant ivory/oatmeal wool-felt moustache to the lavender professor's face, directly underneath the two round black eyeglasses. It consists of two soft modest curved tufts connected at center, gently swept outwards, following the face perspective. Center approximately x1045 y542, total width about 150 pixels and height about 44 pixels on this canvas, with visible wool fibers and natural contact shadow. Friendly distinguished professor, charming and premium. This is only a moustache, NO chin beard, NO added nose, NO added mouth, NO eyebrows. Preserve professor head silhouette, all existing felt fibers, bead eyes and glasses EXACTLY, original room/books/desk/lamp/lighting/colors/camera/frame/canvas with zero other changes. Keep existing open-eyed expression. Do not make moustache huge or touch eyeglass lenses. Full original wide scene, same 1672 by 941 composition, maximum native detail.",
+    "original_path": "C:/Users/q1212/.codex/generated_images/01a08d56-b2fe-7501-97e5-0484ff2af77a/exec-ee1be296-9e5f-4221-904c-3abdc7fb5e87.png",
+    "resolution_note": "실제 생성 1672×941. 4K 생성이나 확대가 아니다. 생성 전체 장면은 편집 재료이며 아래 국소 합성 결과가 현재 원천이다.",
+    "composite": {
+      "generator": "SYNK-talk/tools/교수콧수염반영.js",
+      "mask": {
+        "rect": [
+          895,
+          491,
+          268,
+          109
+        ],
+        "feather": 8,
+        "excludedGlasses": [
+          [
+            977,
+            433,
+            65,
+            66
+          ],
+          [
+            1112,
+            471,
+            67,
+            67
+          ]
+        ]
+      },
+      "blinkEyes": [
+        [
+          945,
+          400,
+          70,
+          74
+        ],
+        [
+          1075,
+          434,
+          70,
+          74
+        ]
+      ],
+      "method": "생성된 콧수염 영역만 동일 좌표로 8px 경계 혼합. 안경은 제외하며 나머지 원본 픽셀·프레임을 보존한다. 눈감음은 새 연구실 위에 기존 두 눈 타원만 반영한다. 교수 몸·방을 다시 생성한 전체 후보로 교체하지 않는다.",
+      "validation": {
+        "changed_pixels": 23866,
+        "changed_outside_mask": 0,
+        "blink_outside_eye_regions": 0,
+        "original_frame_preserved": true
+      }
+    },
     "model_label": "정확한 모델명은 이 반입 작업에서 확인하지 않음",
-    "original_path": "C:/Users/q1212/.codex/generated_images/01a08bec-1f1d-7903-b772-c36f94a712f1/exec-e89f0125-1492-4e53-ae95-b8e4206428f2.png",
     "native_width": 1672,
     "native_height": 941,
-    "resolution_note": "생성 원본 실제 1672×941. 확대하지 않았으며 4K 원본이 아니다.",
     "references": [
       {
         "path": "assets/장면/편지작업실.webp",
@@ -34,24 +83,89 @@
   "assets": [
     {
       "name": "research",
-      "usage": "PC G1 교수 연구실의 장면 배경. 원본 전체 화폭을 유지한다.",
+      "usage": "PC G1 교수 연구실의 현재 장면. 작은 펠트 콧수염을 추가하고 원본 전체 화폭을 유지한다.",
       "source": {
-        "path": "C:/Users/q1212/.codex/generated_images/01a08bec-1f1d-7903-b772-c36f94a712f1/exec-e89f0125-1492-4e53-ae95-b8e4206428f2.png",
-        "canonical_path": null,
-        "sha256": "d584cc1d7cabb48e06e22ba1fbfd8f93b3dffa857bab96b8a2803408eef0c55d",
+        "path": "C:/Users/q1212/Documents/SYNK-appsscript/docs/캐릭터/교수연구실/research.png",
+        "canonical_path": "docs/캐릭터/교수연구실/research.png",
+        "sha256": "d874a8fd3e84ea442676fac1784865980f32a0ae4be4bed94e312e2b758d71f1",
         "width": 1672,
         "height": 941,
-        "bytes": 2248792,
+        "bytes": 3703763,
         "format": "png",
-        "has_alpha": false
+        "has_alpha": false,
+        "canonical_manifest": {
+          "path": "docs/캐릭터/교수연구실/정본.json",
+          "sha256": "2eaf7a735d5c78206c05164406bac65ec1249834c85a0af3b6cb57179e1fd282"
+        },
+        "canonical_encoding": "PNG lossless; native 1672×941",
+        "generated_source": {
+          "path": "docs/캐릭터/교수연구실/입력/콧수염생성.png",
+          "origin": "C:/Users/q1212/.codex/generated_images/01a08d56-b2fe-7501-97e5-0484ff2af77a/exec-ee1be296-9e5f-4221-904c-3abdc7fb5e87.png",
+          "sha256": "20012e86be79b6532ae536a40a9ee0f1791e17f3ef9ff4aa8e4e8f0b8b3df736",
+          "usage": "콧수염과 접촉 그림자 영역만 사용하는 ImageGen 편집 재료."
+        }
       },
-      "preserved_source": "tmp/교수작업실소스/research-source.png",
+      "preserved_source": null,
+      "generation": {
+        "tool": "Codex built-in ImageGen",
+        "operation": "기존 교수 얼굴에 펠트 콧수염만 추가",
+        "prompt": "Use case: precise-object-edit. Edit target: the supplied exact 1672 by 941 felt professor research studio. Add ONLY a small elegant ivory/oatmeal wool-felt moustache to the lavender professor's face, directly underneath the two round black eyeglasses. It consists of two soft modest curved tufts connected at center, gently swept outwards, following the face perspective. Center approximately x1045 y542, total width about 150 pixels and height about 44 pixels on this canvas, with visible wool fibers and natural contact shadow. Friendly distinguished professor, charming and premium. This is only a moustache, NO chin beard, NO added nose, NO added mouth, NO eyebrows. Preserve professor head silhouette, all existing felt fibers, bead eyes and glasses EXACTLY, original room/books/desk/lamp/lighting/colors/camera/frame/canvas with zero other changes. Keep existing open-eyed expression. Do not make moustache huge or touch eyeglass lenses. Full original wide scene, same 1672 by 941 composition, maximum native detail.",
+        "original_path": "C:/Users/q1212/.codex/generated_images/01a08d56-b2fe-7501-97e5-0484ff2af77a/exec-ee1be296-9e5f-4221-904c-3abdc7fb5e87.png",
+        "resolution_note": "실제 생성 1672×941. 4K 생성이나 확대가 아니다. 생성 전체 장면은 편집 재료이며 아래 국소 합성 결과가 현재 원천이다.",
+        "composite": {
+          "generator": "SYNK-talk/tools/교수콧수염반영.js",
+          "mask": {
+            "rect": [
+              895,
+              491,
+              268,
+              109
+            ],
+            "feather": 8,
+            "excludedGlasses": [
+              [
+                977,
+                433,
+                65,
+                66
+              ],
+              [
+                1112,
+                471,
+                67,
+                67
+              ]
+            ]
+          },
+          "blinkEyes": [
+            [
+              945,
+              400,
+              70,
+              74
+            ],
+            [
+              1075,
+              434,
+              70,
+              74
+            ]
+          ],
+          "method": "생성된 콧수염 영역만 동일 좌표로 8px 경계 혼합. 안경은 제외하며 나머지 원본 픽셀·프레임을 보존한다. 눈감음은 새 연구실 위에 기존 두 눈 타원만 반영한다. 교수 몸·방을 다시 생성한 전체 후보로 교체하지 않는다.",
+          "validation": {
+            "changed_pixels": 23866,
+            "changed_outside_mask": 0,
+            "blink_outside_eye_regions": 0,
+            "original_frame_preserved": true
+          }
+        }
+      },
       "output": {
         "path": "assets/교수작업실/research.webp",
-        "sha256": "02a6898155d05b878a974daf4d92a84588fed1282b9b822b3f76f290158821e2",
+        "sha256": "ca0c05e8a194f7fafee83fcc16720bf4a3fb0ab50fa38260be9294c672b41b1a",
         "width": 1672,
         "height": 941,
-        "bytes": 401104,
+        "bytes": 399808,
         "format": "webp",
         "has_alpha": false
       },
@@ -68,30 +182,89 @@
     },
     {
       "name": "research-blink",
-      "usage": "교수 눈감음 참조. 안경 안쪽 두 눈만 국소 표시하며 전체 장면은 교체하지 않는다.",
+      "usage": "같은 콧수염을 가진 교수 눈감음 참조. 안경 안쪽 두 눈만 국소 표시하며 전체 장면은 교체하지 않는다.",
       "source": {
-        "path": "C:/Users/q1212/.codex/generated_images/01a08bec-1f1d-7903-b772-c36f94a712f1/exec-2448cc7d-01b7-45c1-9142-b0791b90fbcb.png",
-        "canonical_path": null,
-        "sha256": "fcb0426f8224d4088b3dbb7114c48f54c0503d8636f98ad14a64269c6516878e",
+        "path": "C:/Users/q1212/Documents/SYNK-appsscript/docs/캐릭터/교수연구실/research-blink.png",
+        "canonical_path": "docs/캐릭터/교수연구실/research-blink.png",
+        "sha256": "f923094b3abdbd4d6b14b938e6de342dedf0f5ff63af819203412002020ca484",
         "width": 1672,
         "height": 941,
-        "bytes": 2148349,
+        "bytes": 3705263,
         "format": "png",
-        "has_alpha": false
+        "has_alpha": false,
+        "canonical_manifest": {
+          "path": "docs/캐릭터/교수연구실/정본.json",
+          "sha256": "2eaf7a735d5c78206c05164406bac65ec1249834c85a0af3b6cb57179e1fd282"
+        },
+        "canonical_encoding": "PNG lossless; native 1672×941",
+        "generated_source": {
+          "path": "docs/캐릭터/교수연구실/입력/콧수염생성.png",
+          "origin": "C:/Users/q1212/.codex/generated_images/01a08d56-b2fe-7501-97e5-0484ff2af77a/exec-ee1be296-9e5f-4221-904c-3abdc7fb5e87.png",
+          "sha256": "20012e86be79b6532ae536a40a9ee0f1791e17f3ef9ff4aa8e4e8f0b8b3df736",
+          "usage": "콧수염과 접촉 그림자 영역만 사용하는 ImageGen 편집 재료."
+        }
       },
-      "preserved_source": "tmp/교수작업실소스/research-blink-source.png",
+      "preserved_source": null,
       "generation": {
         "tool": "Codex built-in ImageGen",
-        "operation": "교수 눈감음 국소 그림 생성",
-        "prompt": "Precise eye-only edit of this exact felt professor studio photograph. Keep the entire image composition, camera, all fibers, lighting, desk, books, glasses frames, colors and character silhouette identical. Change ONLY the two small black bead eyes INSIDE the round eyeglasses: the professor is briefly blinking, so replace each black bead with a tiny relaxed closed-eye stitched curved line against the same pale lavender felt. The glasses themselves stay completely unchanged and do NOT close. Preserve the exact eye centers and perspective: screen-left eye near (981,437) and screen-right eye near (1108,469) on the 1672 by 941 canvas. No mouth, no nose, no other expression change, no head shift, no fur regeneration beyond the small eye beads, no new props. Same 1672 by 941 full frame, maximum native detail.",
-        "usage_note": "생성된 전체 장면을 전환하지 않는다. 화면은 안경 안 두 눈의 타원 영역만 잘라 원본 위에 겹친다. 나머지 몸·털·방은 원래 research.webp 그대로 유지한다."
+        "operation": "기존 교수 얼굴에 펠트 콧수염만 추가",
+        "prompt": "Use case: precise-object-edit. Edit target: the supplied exact 1672 by 941 felt professor research studio. Add ONLY a small elegant ivory/oatmeal wool-felt moustache to the lavender professor's face, directly underneath the two round black eyeglasses. It consists of two soft modest curved tufts connected at center, gently swept outwards, following the face perspective. Center approximately x1045 y542, total width about 150 pixels and height about 44 pixels on this canvas, with visible wool fibers and natural contact shadow. Friendly distinguished professor, charming and premium. This is only a moustache, NO chin beard, NO added nose, NO added mouth, NO eyebrows. Preserve professor head silhouette, all existing felt fibers, bead eyes and glasses EXACTLY, original room/books/desk/lamp/lighting/colors/camera/frame/canvas with zero other changes. Keep existing open-eyed expression. Do not make moustache huge or touch eyeglass lenses. Full original wide scene, same 1672 by 941 composition, maximum native detail.",
+        "original_path": "C:/Users/q1212/.codex/generated_images/01a08d56-b2fe-7501-97e5-0484ff2af77a/exec-ee1be296-9e5f-4221-904c-3abdc7fb5e87.png",
+        "resolution_note": "실제 생성 1672×941. 4K 생성이나 확대가 아니다. 생성 전체 장면은 편집 재료이며 아래 국소 합성 결과가 현재 원천이다.",
+        "composite": {
+          "generator": "SYNK-talk/tools/교수콧수염반영.js",
+          "mask": {
+            "rect": [
+              895,
+              491,
+              268,
+              109
+            ],
+            "feather": 8,
+            "excludedGlasses": [
+              [
+                977,
+                433,
+                65,
+                66
+              ],
+              [
+                1112,
+                471,
+                67,
+                67
+              ]
+            ]
+          },
+          "blinkEyes": [
+            [
+              945,
+              400,
+              70,
+              74
+            ],
+            [
+              1075,
+              434,
+              70,
+              74
+            ]
+          ],
+          "method": "생성된 콧수염 영역만 동일 좌표로 8px 경계 혼합. 안경은 제외하며 나머지 원본 픽셀·프레임을 보존한다. 눈감음은 새 연구실 위에 기존 두 눈 타원만 반영한다. 교수 몸·방을 다시 생성한 전체 후보로 교체하지 않는다.",
+          "validation": {
+            "changed_pixels": 23866,
+            "changed_outside_mask": 0,
+            "blink_outside_eye_regions": 0,
+            "original_frame_preserved": true
+          }
+        }
       },
       "output": {
         "path": "assets/교수작업실/research-blink.webp",
-        "sha256": "71530d0ecac2e79a51a169d81afde249f04b625624316a1e9a1575fb4108359f",
+        "sha256": "47930688c8f2e119eb758f6570d408e03a07343dce66617a32535521916f4175",
         "width": 1672,
         "height": 941,
-        "bytes": 355600,
+        "bytes": 400078,
         "format": "webp",
         "has_alpha": false
       },

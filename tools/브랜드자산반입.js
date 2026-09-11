@@ -36,6 +36,8 @@ async function main() {
     throw new Error('LAB source dimensions or alpha differ from the current placement manifest');
   }
   const mascot = require(path.join(canonical, 'tools', 'lib', '마스코트자산.js'));
+  const edgePath = path.join(canonical, 'docs/캐릭터/정본_4K/외곽교정_정본.json');
+  const edgeManifest = fs.existsSync(edgePath) ? JSON.parse(fs.readFileSync(edgePath, 'utf8')) : null;
   const mascotSources = {
     몽글: mascot.절대경로('본체'),
     까몽: path.join(canonical, mascot.까몽경로('본체')),
@@ -68,6 +70,14 @@ async function main() {
       output: `assets/브랜드/${character}_본체.webp`, outputSize: [1024, 1024],
       outputSha256: sha(fs.readFileSync(output)), transform: 'LANCZOS3; WebP quality=96; source frame and alpha preserved',
     };
+    const edge = edgeManifest?.files.find(item => item.path.endsWith(`/${character}_본체.png`));
+    if (edge?.outputSha256 === sources[character].sourceSha256) {
+      sources[character].edgeCorrection = {
+        manifest: edgePath, manifestSha256: sha(fs.readFileSync(edgePath)),
+        generator: edgeManifest.generator, resolutionNote: edgeManifest.resolutionNote,
+        method: 'Current source already contains verified exterior white-matte RGB and alpha repair; import keeps that contour.',
+      };
+    }
   }
   fs.writeFileSync(path.join(out, '출처.json'), JSON.stringify(sources, null, 2) + '\n');
   console.log('Current canonical sources imported: approved LAB Paper composition, Mongle, Kkamong, Marin. See assets/브랜드/출처.json.');
