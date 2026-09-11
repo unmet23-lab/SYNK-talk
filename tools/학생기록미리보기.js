@@ -4,6 +4,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
 const { spawnSync } = require('node:child_process');
+const { 인자게이트 } = require('../lib/플래그.js');
+const args = process.argv.slice(2);
+const 아는플래그 = ['--빌드'];
+const 플래그오류 = 인자게이트('학생기록미리보기', args, 아는플래그);
+if (플래그오류) { console.error(플래그오류); process.exit(1); }
 const root = path.resolve(__dirname, '..');
 const dir = path.join(root, 'dist/student-records-preview');
 const base = 'http://127.0.0.1:18782';
@@ -12,7 +17,7 @@ const ids = ['정상 기록', '아직 기록 없음', '동의 확인 필요', '�
   student_code: `DEMO-${i + 1}`, class_name: '합성 반', class_key: 'DEMO', level_current: 'Lv2',
 }));
 fs.mkdirSync(dir, { recursive: true });
-if (process.argv.includes('--빌드') || !fs.existsSync(path.join(dir, 'records.js'))) {
+if (args.includes('--빌드') || !fs.existsSync(path.join(dir, 'records.js'))) {
   const result = spawnSync(process.execPath, ['tools/앱시작.js', 'export:embed', '--platform', 'web', '--dev', 'false', '--reset-cache',
     '--entry-file', 'tools/학생기록미리보기화면.js', '--bundle-output', 'dist/student-records-preview/records.js',
     '--assets-dest', 'dist/student-records-preview'], { cwd: root, stdio: 'inherit', env: { ...process.env,

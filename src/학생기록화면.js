@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { 색, 폰트, 모노트래킹, 눌림감 } from './테마';
 import { 학생목록받기, 학생기록받기 } from './학생기록API.js';
+import { 시간대 } from '../lib/몽골날짜.js';
 
 const 갈래 = [
   ['observations', '교실 관찰', '강사가 남긴 관찰'],
@@ -12,7 +13,7 @@ const 갈래 = [
 export function 기록시각(값) {
   if (!값 || !Number.isFinite(Date.parse(값))) return '기록 시각 미확인';
   return new Intl.DateTimeFormat('ko-KR', {
-    timeZone: 'Asia/Ulaanbaatar', month: 'numeric', day: 'numeric', year: 'numeric',
+    timeZone: 시간대, month: 'numeric', day: 'numeric', year: 'numeric',
     hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(new Date(값));
 }
