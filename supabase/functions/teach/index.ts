@@ -179,8 +179,9 @@ const { 라디오태스크종 } = 라디오태스크모듈 as { 라디오태스�
 const 회고종별상한 = 400;
 
 const { 지금유효, 그때유효, 거절몸통 } = 동의모듈 as {
-  지금유효: (질의: unknown, learner_id: string) => Promise<Array<{ consent_id: string }>>;
-  그때유효: (질의: unknown, learner_id: string, occurred_at: string) => Promise<Array<{ consent_id: string }>>;
+  지금유효: (질의: unknown, learner_id: string) => ReturnType<typeof sql>;
+  // 동의 모듈은 async 래퍼가 아닌 postgres 질의를 돌려준다. 행 시각을 상관 질의로도 넘긴다.
+  그때유효: (질의: unknown, learner_id: string, occurred_at: string | ReturnType<typeof sql>) => ReturnType<typeof sql>;
   거절몸통: { code: string; field: string; retryable: boolean };
 };
 
@@ -224,6 +225,9 @@ const 경로표 = {
   'observe/roster': 'GET',
   'observe/draft': 'POST',
   'observe/note': 'POST',
+  // 관찰 입력과 분리된 읽기 화면. 원장도 기존 담당 반 범위를 그대로 따른다.
+  'records/roster': 'GET',
+  'records/student': 'GET',
 } as const;
 type 아는경로 = keyof typeof 경로표;
 const 안내 = Object.entries(경로표).map(([p, m]) => `${m} /v1/teach/${p}`).join(' · ');
@@ -349,6 +353,8 @@ Deno.serve(async (req: Request) => {
     if (경로 === 'feedback/classes') return await 내반목록(staff_id, ver);
     if (경로 === 'feedback/queue') return await 반큐읽기(url, staff_id, ver);
     if (경로 === 'observe/roster') return await 관찰로스터(staff_id, ver);
+    if (경로 === 'records/roster') return await 관찰로스터(staff_id, ver, 'teach.records.roster');
+    if (경로 === 'records/student') return await 학생기록읽기(url, staff_id, ver);
     const 본문 = await 본문읽기(req);
     if (본문 === undefined) {
       return 실패(400, { code: 'CONTRACT_VIOLATION', message: 'JSON 이 아닙니다', retryable: false }, ver);
@@ -1497,7 +1503,7 @@ async function 한마디주기(본문: unknown, staff_id: string, ver: string) {
  * ══════════════════════════════════════════════════════════════════════════════════════ */
 
 /** 관찰을 적을 학생 목록 — 내 담당 반 전원. */
-async function 관찰로스터(staff_id: string, ver: string) {
+async function 관찰로스터(staff_id: string, ver: string, 감사종류 = 'teach.observe.roster') {
   const 결과 = await sql.begin(async (tx) => {
     /* 권한은 라우트가 아니라 `staff_classes` 가 건다(:1123 과 같은 길). 담당이 없으면 빈 목록이지
      * 403 이 아니다 — 「아직 반이 안 배정됐다」와 「강사가 아니다」는 다른 사실이다. */
@@ -1515,7 +1521,7 @@ async function 관찰로스터(staff_id: string, ver: string) {
     const ids = 행들.map((r: Record<string, unknown>) => String(r.learner_id));
     await tx`
       insert into engine.staff_access_log (staff_id, action, target_ids)
-      values (${staff_id}::uuid, 'teach.observe.roster', ${ids}::uuid[])`;
+      values (${staff_id}::uuid, ${감사종류}, ${ids}::uuid[])`;
 
     return 행들.map((r: Record<string, unknown>) => ({
       learner_id: String(r.learner_id),
@@ -1529,6 +1535,96 @@ async function 관찰로스터(staff_id: string, ver: string) {
     }));
   });
   return 봉투(200, { ok: true, roster: 결과 }, ver);
+}
+
+/** 학생 기록 조회 — 담당 학생의 서로 다른 근거를 함께 읽는다.
+ * 학생 원문·음성 경로·연락처·위험 신호는 선택하지 않는다. 각 묶음 최신 10건이며 전체 기록을
+ * 대표하지 않는다. 관찰 입력의 독립성은 별도 화면으로 보존한다. 쓰기는 접근 감사뿐이다. */
+async function 학생기록읽기(url: URL, staff_id: string, ver: string) {
+  const learner_id = uuid읽기(url.searchParams.get('learner_id'));
+  if (!learner_id || url.searchParams.getAll('learner_id').length !== 1
+      || [...url.searchParams.keys()].some((k) => k !== 'learner_id')) {
+    return 실패(400, { code: 'CONTRACT_VIOLATION', message: '학생 선택을 다시 확인해 주세요', retryable: false }, ver);
+  }
+  const 상한 = 10;
+  let 발화시각들: string[] = [];
+  const 결과 = await sql.begin(async (tx) => {
+    const [학생] = await tx`
+      select l.learner_id, l.display_name, l.student_code, l.level_current,
+             c.class_key, c.display_name as class_name
+        from engine.staff_classes sc
+        join engine.classes c on c.class_id = sc.class_id and c.active
+        join engine.learners l on l.class_id = c.class_id and l.active
+       where sc.staff_id = ${staff_id}::uuid and l.learner_id = ${learner_id}::uuid`;
+    // 존재하지 않는 학생과 담당 밖 학생을 같은 응답으로 닫는다.
+    if (!학생) return null;
+    const 관찰 = await tx`
+      select e.occurred_at, e.payload->>'area' as area,
+             e.payload->>'note_text' as note_text
+        from engine.learning_events e
+       where e.learner_id = ${learner_id}::uuid and e.event_type = 'observation.noted'
+         and e.actor_kind = 'teacher'
+       order by e.occurred_at desc, e.event_id desc limit ${상한 + 1}`;
+    let 동의있음 = (await 지금유효(tx, learner_id)).length > 0;
+    let 제출: Array<Record<string, unknown>> = [];
+    let 피드백: Array<Record<string, unknown>> = [];
+    if (동의있음) {
+      제출 = await tx`
+        select s.occurred_at, s.task_format
+          from engine.submissions s
+          join engine.learning_events e on e.event_id = s.event_id
+         where e.learner_id = ${learner_id}::uuid and e.event_type = 'submission.created'
+           and exists (${그때유효(tx, learner_id, tx`s.occurred_at`)})
+         order by s.occurred_at desc, s.submission_id desc limit ${상한 + 1}`;
+      피드백 = await tx`
+        select n.created_at, n.updated_at, n.body, n.disposition, s.occurred_at as submitted_at
+          from engine.teacher_notes n
+          join engine.submissions s on s.submission_id = n.submission_id
+          join engine.learning_events e on e.event_id = s.event_id
+         where e.learner_id = ${learner_id}::uuid and e.event_type = 'submission.created'
+           and exists (${그때유효(tx, learner_id, tx`s.occurred_at`)})
+         order by n.created_at desc, n.note_id desc limit ${상한 + 1}`;
+    }
+    await tx`
+      insert into engine.staff_access_log (staff_id, action, target_ids)
+      values (${staff_id}::uuid, 'teach.records.student', array[${learner_id}::uuid])`;
+    // 응답에 실제 실을 학습의 시각만 내부에 보관한다. DB 식별자나 이 내부 칸은 응답에 싣지 않는다.
+    발화시각들 = [...new Set([...제출.slice(0, 상한).map((r) => r.occurred_at),
+      ...피드백.slice(0, 상한).map((r) => r.submitted_at)]
+      .map((v) => new Date(String(v)).toISOString()))];
+    const 묶기 = (행들: Array<Record<string, unknown>>, 필드: string[]) => ({
+      items: 행들.slice(0, 상한).map((r) => Object.fromEntries(필드.map((k) => [k, r[k] ?? null]))),
+      has_more: 행들.length > 상한,
+    });
+    return {
+      student: { learner_id: String(학생.learner_id), display_name: 학생.display_name ?? null,
+        student_code: 학생.student_code ?? null, level_current: 학생.level_current ?? null,
+        class_key: 학생.class_key ?? null, class_name: 학생.class_name ?? null },
+      observations: 묶기(관찰, ['occurred_at', 'area', 'note_text']),
+      submissions: 묶기(제출, ['occurred_at', 'task_format']),
+      feedback: 묶기(피드백, ['created_at', 'updated_at', 'body', 'disposition']),
+      learning_access: 동의있음 ? 'available' : 'consent_required',
+      limit: 상한,
+    };
+  });
+  if (!결과) return 실패(403, { code: 'NOT_ASSIGNED', message: '현재 담당 학생의 기록만 볼 수 있습니다', retryable: false }, ver);
+  // PostgreSQL now()는 tx 시작에 고정된다. 감사 tx 뒤 새 statement 한 번에서 현재 동의와
+  // 모든 발화시점 조건을 함께 재검사한다. 철회→재동의도 과거 기록을 다시 유효하게 만들지 않는다.
+  // 실패하면 상위 catch의 500으로 닫으며, 마지막 확인과 응답 사이의 짧은 경쟁 구간은 남는다.
+  if (결과.learning_access === 'available') {
+    const [마지막동의] = await sql`
+      select exists (${지금유효(sql, learner_id)})
+         and not exists (
+           select 1 from unnest(${발화시각들}::timestamptz[]) as t(occurred_at)
+            where not exists (${그때유효(sql, learner_id, sql`t.occurred_at`)})
+         ) as valid`;
+    if (마지막동의?.valid !== true) {
+      결과.learning_access = 'consent_required';
+      결과.submissions = { items: [], has_more: false };
+      결과.feedback = { items: [], has_more: false };
+    }
+  }
+  return 봉투(200, { ok: true, ...결과, retrieved_at: new Date().toISOString() }, ver);
 }
 
 /**

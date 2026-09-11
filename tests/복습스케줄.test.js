@@ -73,6 +73,31 @@ test('④ 🔴 상한 가둠 — Easy 연타에도 간격이 60일을 절대 안
   assert.ok(간격일 <= 60 + 1e-9, `due 간격 ${간격일}일 — 계약 상한 60을 넘었다(시즌을 넘는 약속은 뜻이 없다)`);
 });
 
+test('④-b due 상한 적용이 다음 복습의 기억 상태를 바꾸지 않는다 (ts-fsrs 5.4.2)', () => {
+  const { fsrs, generatorParameters, createEmptyCard } = require('ts-fsrs');
+  const 계산기 = fsrs(generatorParameters(복습설정));
+  const 시작 = Date.parse('2026-08-22T10:00:00Z');
+  let 원카드 = createEmptyCard(new Date(시작));
+  const 리뷰들 = [];
+  for (let i = 0; i < 100; i += 1) {
+    const 때 = new Date(시작 + i * 55 * 86400000);
+    if (리뷰들.length) {
+      const 가둔상태 = 카드접기(리뷰들);
+      const 가둔카드 = { ...원카드, due: 가둔상태.due,
+        scheduled_days: (가둔상태.due - 가둔상태.last_review) / 86400000 };
+      for (const 등급 of [Rating.Again, Rating.Hard, Rating.Good, Rating.Easy]) {
+        const 원다음 = 계산기.next(원카드, 때, 등급).card;
+        const 가둔다음 = 계산기.next(가둔카드, 때, 등급).card;
+        for (const 키 of ['stability', 'difficulty', 'reps', 'lapses', 'elapsed_days']) {
+          assert.equal(가둔다음[키], 원다음[키], `${i}번째 복습 등급 ${등급}: due 절단이 ${키}를 바꿨다`);
+        }
+      }
+    }
+    리뷰들.push({ at: 때.toISOString(), 정답: true, 확신도: null });
+    원카드 = 계산기.next(원카드, 때, Rating.Good).card;
+  }
+});
+
 test('⑤ due카드들 — 흐려진 순 · 동률은 card_id 순 · 기준 시각은 호출자가 든다', () => {
   const 리뷰들 = [
     리뷰('2026-08-01T10:00:00Z', true, null, '조사:은는'),
@@ -141,9 +166,9 @@ test('⑧ 정오 미상은 Again 이 아니라 버림이다 (S2) · ts-fsrs 판�
   assert.equal(s.버린수, 2, '미상을 버렸으면 세어 드러나야 한다 — 조용한 삼킴 금지');
   assert.equal(s.lapses, 0, '미상이 Again 으로 접혀 lapse 가 됐다 — 「모른다」는 벌점이 아니다(S2)');
 
-  /* S3 — 가둠이 S·D 를 안 자르는 전제(next 가 last_review 기준)는 5.4.1 실측이다.
+  /* S3 — 가둠이 S·D 를 안 자르는 전제(next 가 last_review 기준)는 5.4.2에서 재확인했다(④-b).
    * 판을 올리면 이 검사가 빨개진다 — 그때 가둠의 전제를 다시 재고 이 리터럴을 갱신한다. */
   const 설치판 = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'node_modules', 'ts-fsrs', 'package.json'), 'utf8')).version;
-  assert.equal(설치판, '5.4.1',
+  assert.equal(설치판, '5.4.2',
     `ts-fsrs 가 ${설치판} 로 바뀌었다 — 가둠(due 만 절단·S·D 유지)의 전제가 그 판에서도 참인지 실측으로 재확인한 뒤 이 리터럴을 올린다(S3)`);
 });

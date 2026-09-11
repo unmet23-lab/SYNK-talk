@@ -305,6 +305,8 @@ test('⑧ 경로를 «두 마디»로 가른다 — /v1/teach/아무거나/queue
     'observe/roster': 'GET',
     'observe/draft': 'POST',
     'observe/note': 'POST',
+    'records/roster': 'GET',
+    'records/student': 'GET',
   });
   // 안내문을 손으로 적으면 경로가 늘 때 낡는다 — 표에서 파생하는지 본다.
   assert.match(소스, /Object\.entries\(경로표\)/);

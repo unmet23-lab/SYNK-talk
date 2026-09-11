@@ -142,6 +142,10 @@ export default function 도착확인({ 돌아가기, 가기 }) {
             style={({ pressed }) => [s.줄버튼, pressed && { opacity: 눌림감.글 }]}>
             <Text style={s.줄버튼글}>교실 관찰 남기기 (원장·강사)</Text>
           </Pressable>
+          <Pressable onPress={() => 가기('학생기록')} accessibilityRole="button" hitSlop={6}
+            style={({ pressed }) => [s.줄버튼, pressed && { opacity: 눌림감.글 }]}>
+            <Text style={s.줄버튼글}>학생 기록 보기 (원장·강사)</Text>
+          </Pressable>
           {/* 🔑 몽글에게 묻는 문(`companion/ask` · G1-5)이다 — 위 줄들과 같은 규칙으로 숨기지
               않는다: 권한은 서버 403 이 정한다. 이 줄이 없으면 서버·지식·로그가 다 서 있어도
               그 문의 통과량은 원리상 0이다(`src/몽글API.js` 머리말의 그 병). */}

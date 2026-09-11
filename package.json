@@ -17,28 +17,29 @@
   },
   "dependencies": {
     "@sentry/react-native": "~7.11.0",
-    "@shopify/react-native-skia": "2.11.1",
-    "expo": "~57.0.18",
-    "expo-audio": "~57.0.3",
-    "expo-file-system": "~57.0.1",
-    "expo-font": "~57.0.1",
-    "expo-haptics": "~57.0.1",
-    "expo-secure-store": "~57.0.1",
-    "expo-speech": "~57.0.1",
-    "expo-splash-screen": "~57.0.5",
+    "@shopify/react-native-skia": "2.11.2",
+    "expo": "~57.0.22",
+    "expo-asset": "~57.0.17",
+    "expo-audio": "~57.0.5",
+    "expo-file-system": "~57.0.7",
+    "expo-font": "~57.0.4",
+    "expo-haptics": "~57.0.3",
+    "expo-secure-store": "~57.0.4",
+    "expo-speech": "~57.0.3",
+    "expo-splash-screen": "~57.0.9",
     "expo-status-bar": "~57.0.1",
-    "expo-updates": "~57.0.11",
+    "expo-updates": "~57.0.22",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-web": "^0.21.2",
-    "ts-fsrs": "^5.4.1"
+    "ts-fsrs": "^5.4.2"
   },
   "engines": {
     "node": ">=20"
   },
   "devDependencies": {
     "opentype.js": "^2.0.0",
-    "sharp": "^0.35.3"
+    "sharp": "^0.35.4"
   }
 }

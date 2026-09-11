@@ -26,6 +26,7 @@ import 문구감수화면 from './src/문구감수화면';
 import 반피드백화면 from './src/반피드백화면';
 import 나침반화면 from './src/나침반화면';
 import 관찰화면 from './src/관찰화면';
+import 학생기록화면 from './src/학생기록화면';
 import 회고화면 from './src/회고화면';
 import 오류경계 from './src/오류경계';
 import * as 인증 from './src/인증API';
@@ -88,7 +89,7 @@ export default function App() {
   useEffect(() => {
     const 구독 = BackHandler.addEventListener('hardwareBackPress', () => {
       if (화면 === '말하기') return false;
-      const 시스템행 = ['검수', '강사', '문구감수', '반피드백', '나침반', '회고', '관찰', '몽글'];
+      const 시스템행 = ['검수', '강사', '문구감수', '반피드백', '나침반', '회고', '관찰', '학생기록', '몽글'];
       set화면(시스템행.includes(화면) ? '시스템' : '말하기');
       return true;
     });
@@ -372,6 +373,9 @@ export default function App() {
               그 축은 엔진에 0건이고, 0건인 축은 「학생이 그렇지 않다」와 구분이 안 된다. */}
           {화면 === '관찰' && (
             <관찰화면 토큰={세션.access_token} 돌아가기={() => set화면('시스템')} />
+          )}
+          {화면 === '학생기록' && (
+            <학생기록화면 토큰={세션.access_token} 돌아가기={() => set화면('시스템')} />
           )}
           {/* 🔑 강사·원장이 몽글에게 «지금 정본»을 묻는 문(`companion/ask` · G1-5)이다 —
               권한은 서버가 정한다(학생 토큰이면 403 · `도착확인` 링크와 같은 규칙). */}
