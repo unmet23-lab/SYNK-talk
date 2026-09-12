@@ -25,7 +25,7 @@
  *   ② 서버 칸·서버 사건은 앱이 못 보낸다(위조 방지).
  *   ③ 동의는 `occurred_at` 시점 기준으로 서버가 고른다 — 사후 동의가 과거를 유효하게 만들지 않는다.
  */
-import postgres from 'npm:postgres@3.4.4';
+import postgres from 'npm:postgres@3.4.9';
 import 검증모듈 from './이벤트검증.mjs';
 import 출처모듈 from './사건출처.mjs';
 import 계약 from './계약.mjs';

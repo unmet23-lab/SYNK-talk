@@ -44,7 +44,7 @@
  *   PostgREST 를 못 지난다(events 가 실측). 그래서 DB 는 `SUPABASE_DB_URL` 직결이고,
  *   계정 생성만 GoTrue 관리자 API(다른 통로)를 쓴다.
  */
-import postgres from 'npm:postgres@3.4.4';
+import postgres from 'npm:postgres@3.4.9';
 import 학생계정 from './학생계정.mjs';
 import 가입문항 from './가입문항.mjs';
 import 계약판모듈 from './계약판.mjs';

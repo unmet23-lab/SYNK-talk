@@ -20,7 +20,7 @@
  *   약속이 아니라 행마다 붙는 관측값이어야 하고, 그 관측은 파일이 올라온 뒤 헤더에서 잰다.
  *   🔑 그래서 확장자만은 **실제 그것**으로 적는다(m4a 를 .wav 로 적으면 뒤에서 전부 오판한다).
  */
-import postgres from 'npm:postgres@3.4.4';
+import postgres from 'npm:postgres@3.4.9';
 import 경로모듈 from './업로드경로.mjs';
 import 토큰모듈 from './토큰.mjs';
 import 계약판모듈 from './계약판.mjs';

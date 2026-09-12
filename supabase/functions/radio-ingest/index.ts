@@ -27,7 +27,7 @@
  *   `learning_events` 로 가는 길은 c10 게이트 뒤의 승격기 몫이다(§4-3 · Lane B). 여기서
  *   같이 하면 오귀속이 불변 테이블에 굳는다 — 원장은 되파싱이 되고 승격은 안 된다.
  */
-import postgres from 'npm:postgres@3.4.4';
+import postgres from 'npm:postgres@3.4.9';
 import 파서모듈 from './라디오파서.mjs';
 import 계약판모듈 from './계약판.mjs';
 /* 수집 실패 갈래의 값록 — 정본은 `lib/라디오수집.js` «하나»다(값록을 여기 또 적으면 갈린다). */

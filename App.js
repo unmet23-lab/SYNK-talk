@@ -15,6 +15,7 @@ import 라디오화면 from './src/라디오화면';
  *   말하려면 이 형태여야 한다). `__DEV__` 는 빌드 때 상수로 접히므로 이 require 는 프로덕션에서
  *   도달 불가가 되어 제거된다. */
 const 검수문 = __DEV__ ? require('./src/검수문').default : null;
+const 액션테스트화면 = __DEV__ ? require('./src/액션테스트화면').default : null;
 import 도착확인 from './src/도착확인';
 import 인증화면, { 단계 } from './src/인증화면';
 import 오프라인카드 from './src/오프라인카드';
@@ -252,6 +253,11 @@ export default function App() {
         </View>
       );
     }
+    if (__DEV__ && 화면 === '액션테스트') {
+      return <View style={s.wrap}><StatusBar style="light" />
+        <액션테스트화면 돌아가기={() => set화면('말하기')} />
+      </View>;
+    }
     /* 복원이 막혔다(retryable · D7-3) — 로그인 폼 대신 오프라인 카드. 자격은 키체인에 그대로
        있으니 비밀번호를 다시 받는 것은 틀린 문이고, 기기 넘김만 손으로가기 로 연다. */
     if (복원막힘) {
@@ -266,6 +272,10 @@ export default function App() {
       <View style={s.wrap}>
         <StatusBar style="light" />
         <인증화면 로그인성공={세션세움} 초기학생번호={초기번호} />
+        {__DEV__ && <Pressable onPress={() => set화면('액션테스트')} accessibilityRole="button"
+          accessibilityLabel="액션 실행 테스트" style={[s.검수문링크_문앞, { bottom: 82, minHeight: 44, justifyContent: 'center' }]}>
+          <Text style={s.검수문글}>액션 실행 테스트</Text>
+        </Pressable>}
         {__DEV__ && (
           <Pressable
             onPress={() => set화면('검수문')}

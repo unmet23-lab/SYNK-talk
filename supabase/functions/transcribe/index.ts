@@ -15,7 +15,7 @@
  *   UPDATE 가 0행이 되어 **덮어쓰기는 원리상 못 일어난다**(DB 트리거와 같은 방향).
  *   ponytail: 락 없음 — 배치가 겹칠 만큼 잦아지면 `skip locked` + 선점 상태값으로 올린다.
  */
-import postgres from 'npm:postgres@3.4.4';
+import postgres from 'npm:postgres@3.4.9';
 import 전사모듈 from './전사.mjs';
 import 경로모듈 from './업로드경로.mjs';
 import 토큰모듈 from './토큰.mjs';

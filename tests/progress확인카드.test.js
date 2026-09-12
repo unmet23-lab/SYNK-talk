@@ -51,7 +51,7 @@ async function 호출(원문 = source) {
   };
   const 실제상태 = require('../lib/학습자상태.js');
   const modules = {
-    'npm:postgres@3.4.4': () => sql,
+    'npm:postgres@3.4.9': () => sql,
     './토큰.mjs': { 토큰주체: () => 'fixture-auth', 발급시각: () => 1, 살아있는학생: () => 'fixture-student' },
     './오늘과제.mjs': { 몽골날짜: () => 오늘, 시간대: 'Asia/Ulaanbaatar' },
     './계약판.mjs': require('../lib/계약판.js'),

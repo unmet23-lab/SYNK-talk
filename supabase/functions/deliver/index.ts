@@ -25,7 +25,7 @@
  *   `pg_cron` 이 `Authorization: Bearer <service_role>` 로 부른다. 학생 토큰은 여기 못 들어온다
  *   (`intervention.delivered`·`task.assigned` 는 `이벤트검증` 의 **서버사건**이다).
  */
-import postgres from 'npm:postgres@3.4.4';
+import postgres from 'npm:postgres@3.4.9';
 import 과제모듈 from './오늘과제.mjs';
 import 출처모듈 from './사건출처.mjs';
 import 토큰모듈 from './토큰.mjs';

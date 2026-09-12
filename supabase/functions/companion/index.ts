@@ -23,7 +23,7 @@
  *   ⚠ 이건 아직 «모였나»까지다. 원장이 그 목록을 읽는 통로는 2단계다(④ = ✓✗✗).
  */
 
-import postgres from 'npm:postgres@3.4.4';
+import postgres from 'npm:postgres@3.4.9';
 import 토큰모듈 from './토큰.mjs';
 import 계약판모듈 from './계약판.mjs';
 import 옛글자모듈 from './옛글자.mjs';

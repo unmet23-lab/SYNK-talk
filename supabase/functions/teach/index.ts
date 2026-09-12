@@ -48,7 +48,7 @@
  *     걸린 결과가 없어 위조 유인 자체가 없다 — 게이트를 세우는 날 이 자리가 재판정이다(§2
  *     「먼저 세고, 실측이 쌓이면 게이트를 판정한다」). 「막았다」고 적지 않는 것이 이 줄의 일이다.
  */
-import postgres from 'npm:postgres@3.4.4';
+import postgres from 'npm:postgres@3.4.9';
 import 토큰모듈 from './토큰.mjs';
 import 확정모듈 from './검수확정.mjs';
 import 표본모듈 from './골든표본.mjs';

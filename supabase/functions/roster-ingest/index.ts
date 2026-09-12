@@ -41,7 +41,7 @@
  *   **재료(명부 행)** 를 놓는 것까지다. 동의도 만들지 않는다 — 받은 사실이 없는데 만들면
  *   위조다(`tools/동의발급.js` 하나). 동의 0건 학생은 세어서 응답에 싣기만 한다.
  */
-import postgres from 'npm:postgres@3.4.4';
+import postgres from 'npm:postgres@3.4.9';
 import 명부규칙 from './명부규칙.mjs';
 import 학생계정 from './학생계정.mjs';
 import 로그인코드 from './로그인코드.mjs';

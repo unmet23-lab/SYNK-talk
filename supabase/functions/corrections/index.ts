@@ -50,7 +50,7 @@
  *     appsscript `SCHEMA_VER` 손사본까지 끌고 가 이 트랙이 지금 막힌 clasp 배포 사슬에 묶인다.
  *   🔑 판정은 `lib/꼬리.js` **하나**에 있고 이 파일은 재료만 뜬다(회귀 = `tests/꼬리.test.js`).
  */
-import postgres from 'npm:postgres@3.4.4';
+import postgres from 'npm:postgres@3.4.9';
 import 토큰모듈 from './토큰.mjs';
 import 동의모듈 from './동의게이트.mjs';
 import 꼬리모듈 from './꼬리.mjs';

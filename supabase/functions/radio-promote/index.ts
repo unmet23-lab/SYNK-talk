@@ -33,7 +33,7 @@
  *   pipeline_jobs 를 만들고 그 잡은 집는 소비자가 없어 queued 로 남는다 — 잡 생성 트리거와
  *   폐기 어휘는 검수 계약 몫이라 이 문이 손대지 않는다(반박 처분 기록 참조).
  */
-import postgres from 'npm:postgres@3.4.4';
+import postgres from 'npm:postgres@3.4.9';
 import 승격모듈 from './라디오승격.mjs';
 import 출처모듈 from './사건출처.mjs';
 import 토큰모듈 from './토큰.mjs';

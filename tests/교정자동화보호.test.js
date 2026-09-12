@@ -92,7 +92,7 @@ function setup(options = {}) {
     await previous;
     try { return await run(sql); } finally { release(); }
   };
-  const modules = { 'npm:postgres@3.4.4': () => sql };
+  const modules = { 'npm:postgres@3.4.9': () => sql };
   for (const [name, relative] of Object.entries(bundled)) {
     modules['./' + name] = relative.endsWith('.md') ? prompt : require(path.join(root, relative));
   }
@@ -322,7 +322,7 @@ test('배치 저장 → 학생 corrections API → 앱 교정 API/답장 갱신�
       })(); return result.then(resolve, reject);
     } };
   }
-  modules['npm:postgres@3.4.4'] = () => sql;
+  modules['npm:postgres@3.4.9'] = () => sql;
   for (const [name, relative] of Object.entries(bundle)) modules['./' + name] = require(path.join(root, relative));
   modules['./토큰.mjs'] = { 토큰주체: () => learner, 발급시각: () => 1,
     살아있는학생: () => sql`auth_id = ${learner}::uuid` };

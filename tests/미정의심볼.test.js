@@ -58,6 +58,11 @@ const 전역 = new Set([
   'requestAnimationFrame', 'cancelAnimationFrame', 'HermesInternal',
 ]);
 
+// Metro의 .web.js는 브라우저 전용이다. DOM 전역을 RN 공통 허용목록으로 넓히지 않는다.
+function 전역인가(이름, 파일) {
+  return 전역.has(이름) || (파일.endsWith('.web.js') && (이름 === 'window' || 이름 === 'document'));
+}
+
 /** 이 노드가 **이름을 만드는** 자리인가(선언·묶기). 그렇다면 그 이름들을 모은다. */
 function 이름모으기(노드, 담기) {
   if (!노드 || typeof 노드 !== 'object') return;
@@ -201,7 +206,7 @@ test('앱 소스에 선언되지 않은 이름을 참조하는 자리가 없다'
   for (const 파일 of 파일들) {
     const { 선언, 참조 } = 훑기(fs.readFileSync(파일, 'utf8'));
     for (const 노드 of 참조) {
-      if (선언.has(노드.name) || 전역.has(노드.name)) continue;
+      if (선언.has(노드.name) || 전역인가(노드.name, 파일)) continue;
       사고.push(`${path.relative(ROOT, 파일)}:${노드.loc.start.line} — '${노드.name}'`);
     }
   }
@@ -213,6 +218,15 @@ test('앱 소스에 선언되지 않은 이름을 참조하는 자리가 없다'
   );
   // 분모를 밝힌다 — 0건이 「검사가 안 돌았다」와 같은 모양이 되지 않게(F207).
   console.log(`  ℹ 검사한 파일 ${파일들.length}개`);
+});
+
+test('브라우저 전역은 web 전용 파일에만 있고 네이티브/공용 파일에는 허용하지 않는다', () => {
+  for (const 이름 of ['window', 'document']) {
+    assert.equal(전역인가(이름, 'src/운동장.web.js'), true);
+    assert.equal(전역인가(이름, 'src/운동장.native.js'), false);
+    assert.equal(전역인가(이름, 'src/운동장.js'), false);
+  }
+  assert.equal(전역인가('없는이름', 'src/운동장.web.js'), false);
 });
 
 test('탐지력 픽스처 — 없는 이름을 쓰면 실제로 잡힌다', () => {

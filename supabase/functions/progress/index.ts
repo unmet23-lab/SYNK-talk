@@ -32,7 +32,7 @@
  * ■ 읽기는 사건을 만들지 않는다
  *   S1-11 은 **조회 전용 · 사건 없음**이다(P0 §10-⑧: 열람 기록이 필요해지면 그때 계약 개정).
  */
-import postgres from 'npm:postgres@3.4.4';
+import postgres from 'npm:postgres@3.4.9';
 import 토큰모듈 from './토큰.mjs';
 import 과제모듈 from './오늘과제.mjs';
 import 계약판모듈 from './계약판.mjs';

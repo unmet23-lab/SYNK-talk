@@ -1,6 +1,6 @@
 {
   "name": "synk-talk",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "main": "index.js",
   "description": "SYNK 회화 앱 — 몽골어 화자를 위한 한국어 비동기 회화·교정",
@@ -10,13 +10,13 @@
     "ios": "node tools/앱시작.js start --ios",
     "web": "node tools/앱시작.js start --web",
     "test": "node --test",
-    "postinstall": "node tools/스키아패치.js && node tools/BGM빌드.js && node tools/오디오스트림문지기.js",
+    "postinstall": "node tools/BGM빌드.js && node tools/오디오스트림문지기.js",
     "eval": "node tools/eval-score.js evals/출력_v1.json",
     "setup": "node tools/install-hooks.js",
     "guard": "node tools/precommit.js"
   },
   "dependencies": {
-    "@sentry/react-native": "~7.11.0",
+    "@sentry/react-native": "8.26.0",
     "@shopify/react-native-skia": "2.11.2",
     "expo": "~57.0.22",
     "expo-asset": "~57.0.17",
@@ -32,11 +32,14 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-gesture-handler": "3.3.0",
+    "react-native-reanimated": "4.5.5",
     "react-native-web": "^0.21.2",
+    "react-native-worklets": "0.10.4",
     "ts-fsrs": "^5.4.2"
   },
   "engines": {
-    "node": ">=20"
+    "node": "^20.19.4 || ^22.13.0 || ^24.3.0 || >=25.0.0"
   },
   "devDependencies": {
     "opentype.js": "^2.0.0",

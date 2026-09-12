@@ -100,7 +100,7 @@ function 세우기(설정 = {}) {
   sql.json = (value) => ({ json: value });
 
   const modules = {
-    'npm:postgres@3.4.4': () => sql,
+    'npm:postgres@3.4.9': () => sql,
     './전사.mjs': 전사,
     './동의게이트.mjs': 동의,
     './토큰.mjs': { 서비스역할: (req) => req.headers.get('Authorization') === 'Bearer synthetic-service-role' },

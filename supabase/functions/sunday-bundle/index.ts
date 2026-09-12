@@ -32,7 +32,7 @@
  *   나가는 것은 `lib/오늘과제.js` 의 **허용 목록**이 가르므로, 여기서 벗기지 않고 **받은 그대로** 둔다
  *   (서버가 베껴 채우지 않는다 · C0 §task_snapshot 규약). 벗기면 채점 원본이 어디에도 안 남는다.
  */
-import postgres from 'npm:postgres@3.4.4';
+import postgres from 'npm:postgres@3.4.9';
 import 재료규칙 from './자율일재료.mjs';
 import 학생계정 from './학생계정.mjs';
 import 계약 from './수집_교정_계약.json' with { type: 'json' };

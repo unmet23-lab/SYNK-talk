@@ -94,7 +94,7 @@ function setup(options = {}) {
   sql.begin = (run) => run(tag(true));
   sql.json = (value) => value;
   const modules = Object.fromEntries(Object.entries(bundle).map(([name, src]) => ['./' + name, require(path.join(root, src))]));
-  modules['npm:postgres@3.4.4'] = () => sql;
+  modules['npm:postgres@3.4.9'] = () => sql;
   modules['./토큰.mjs'] = {
     토큰주체: (req) => req.headers.has('Authorization') ? staff : null,
     발급시각: () => 1, 살아있는직원: () => ({ query: 'active_staff' }),

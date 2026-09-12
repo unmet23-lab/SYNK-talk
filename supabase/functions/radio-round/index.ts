@@ -47,7 +47,7 @@
  *   (`task_snapshot->>'제안id'`). ⚠ 유일 인덱스가 아직 없어 동시 두 건이면 경합 창이 남는다 —
  *   v1 은 송출 런타임이 하나라 실질 0 이고, 정공은 다음 radio 조각의 부분 유일 인덱스다(잔여).
  */
-import postgres from 'npm:postgres@3.4.4';
+import postgres from 'npm:postgres@3.4.9';
 import 라운드모듈 from './라디오라운드.mjs';
 import 팩모듈 from './토픽퀴즈문항.mjs';
 import 장부모듈 from './토픽퀴즈검수장부.mjs';

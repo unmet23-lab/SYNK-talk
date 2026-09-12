@@ -45,7 +45,7 @@
  *   기존 append-only 교정/재검수 이력은 보존한다. 이 저장 통로를 우회하는 다른 writer까지
  *   전역 UNIQUE로 제한하는 변경은 아니다.
  */
-import postgres from 'npm:postgres@3.4.4';
+import postgres from 'npm:postgres@3.4.9';
 import 토큰모듈 from './토큰.mjs';
 import 교정모듈 from './교정엔진.mjs';
 import 계약 from './계약.mjs';

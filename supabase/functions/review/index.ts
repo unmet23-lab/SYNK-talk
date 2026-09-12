@@ -48,7 +48,7 @@
  *   새 `played` 행을 만들 수 없어 재검수가 자연히 닫힌다(창을 만드는 것은 서버의 상수가
  *   아니라 서명 수명이라는 물리다). 상수를 박으면 첫 확정까지 같이 조인다.
  */
-import postgres from 'npm:postgres@3.4.4';
+import postgres from 'npm:postgres@3.4.9';
 import 토큰모듈 from './토큰.mjs';
 import 커서모듈 from './검수커서.mjs';
 import 경로모듈 from './업로드경로.mjs';

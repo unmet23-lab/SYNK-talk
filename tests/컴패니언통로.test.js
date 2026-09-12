@@ -50,7 +50,7 @@ test('실제 핸들러의 최종 지시문과 기록판 — 환불은 인계하�
   const handler = 세우기(원문, { 파일: 'companion.ts',
     환경: { SUPABASE_DB_URL: 'synthetic', ANTHROPIC_API_KEY: 'synthetic' },
     모듈: {
-      'npm:postgres@3.4.4': () => sql,
+      'npm:postgres@3.4.9': () => sql,
       './토큰.mjs': { 토큰주체: () => 'fixture', 발급시각: () => 1, 살아있는직원: () => true },
       './계약판.mjs': require('../lib/계약판.js'),
       './옛글자.mjs': require('../lib/옛글자.js'),

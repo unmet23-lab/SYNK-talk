@@ -30,7 +30,7 @@
  *   `tools/문구내보내기.js` 한 줄로 파일까지 간다.
  */
 
-import postgres from 'npm:postgres@3.4.4';
+import postgres from 'npm:postgres@3.4.9';
 import 토큰모듈 from './토큰.mjs';
 import 계약판모듈 from './계약판.mjs';
 import 감수모듈 from './문구감수.mjs';

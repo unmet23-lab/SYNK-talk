@@ -44,7 +44,7 @@
  *   폴백의 task_snapshot 은 **`event_draft` 에 굳힌 그대로**(§7-2 — 재호출 0 · §12-28 스파이 축),
  *   성공은 `오늘과제.스냅샷` 으로 새로 조립하되 문장·질문은 **검문이 낸 정규화 후 값**(§7 표 —
  *   「검문이 본 것과 같은 바이트」 · SQL 대조 ⑥ 파서가 같은 정규화를 진다 · v5.13-b ③). */
-import postgres from 'npm:postgres@3.4.4';
+import postgres from 'npm:postgres@3.4.9';
 import 토큰모듈 from './토큰.mjs';
 import 교정모듈 from './교정엔진.mjs';
 import 캐시모듈 from './캐시성적.mjs';

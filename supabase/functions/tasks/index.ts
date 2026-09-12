@@ -25,7 +25,7 @@
  *   `correction.viewed` 같은 표시는 앱이 `POST /v1/events` 로 따로 보낸다(C0 §4-3 ②).
  *   조회가 쓰기를 겸하면 재시도 한 번이 곧 데이터 오염이다.
  */
-import postgres from 'npm:postgres@3.4.4';
+import postgres from 'npm:postgres@3.4.9';
 import 토큰모듈 from './토큰.mjs';
 import 과제모듈 from './오늘과제.mjs';
 import 동의모듈 from './동의게이트.mjs';
