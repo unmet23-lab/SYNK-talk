@@ -1,7 +1,7 @@
 'use strict';
 /**
  * Loom 정적 부품을 이름과 변환 치수로 화면에 연결한다.
- * 원천: SYNK-appsscript docs/Loom_앱반입_설계_v1.md와 현재 DESIGN.
+ * 원천: SYNK-appsscript docs/Loom_엔진_설계.md §6 앱 반입 계약과 현재 DESIGN.
  * 자산은 tools/부품변환.py → assets/부품/치수.json·이미지 → 아래 그림 표를 거친다.
  * 실제 화면의 사용처·테마·대비·무게·동적 상태를 함께 확인하고 필요한 자산을 연결한다.
  * 공방 이름과 화면 라우팅은 다를 수 있으므로 현재 import·소비 코드를 읽는다.
